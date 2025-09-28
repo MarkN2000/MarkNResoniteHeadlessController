@@ -402,25 +402,6 @@
 
   <div class="content">
     <aside class="sidebar">
-      <section class="logs-card compact">
-        <div class="section-header">
-          <h2>ライログ</h2>
-          <button type="button" on:click={clearLogs}>ログをクリア</button>
-        </div>
-        <div class="log-container" bind:this={logContainer}>
-          {#if !$logs.length}
-            <p class="empty">まだログがありません。</p>
-          {:else}
-            {#each $logs.slice(-LOG_DISPLAY_LIMIT) as log}
-              <div class:stderr={log.level === 'stderr'}>
-                <time>{new Date(log.timestamp).toLocaleTimeString()}</time>
-                <pre>{log.message}</pre>
-              </div>
-            {/each}
-          {/if}
-        </div>
-      </section>
-
       <section class="session-card">
         <h2>セッション一覧</h2>
         <div class="session-list">
@@ -440,6 +421,20 @@
           <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
             最新のセッションを取得
           </button>
+        </div>
+      </section>
+
+      <section class="logs-card compact">
+        <div class="log-container" bind:this={logContainer}>
+          {#if !$logs.length}
+            <p class="empty">まだログがありません。</p>
+          {:else}
+            {#each $logs.slice(-LOG_DISPLAY_LIMIT) as log}
+              <div class:stderr={log.level === 'stderr'}>
+                <pre>{log.message}</pre>
+              </div>
+            {/each}
+          {/if}
         </div>
       </section>
     </aside>
@@ -467,26 +462,6 @@
         <div class="tab-panels">
           <section class="panel" class:active={activeTab === 'dashboard'}>
             <div class="panel-grid">
-              <div class="card summary-card">
-                <h2>設定と操作</h2>
-                {#if !$configs.length}
-                  <p class="warning">`config/headless` に設定ファイルが見つかりません。JSONファイルを配置してください。</p>
-                {/if}
-                <label class="field">
-                  <span>設定ファイル</span>
-                  <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
-                    {#each $configs as config}
-                      <option value={config.path}>{config.name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <div class="metrics">
-                  <div><span>PID</span><strong>{$status.pid ?? '-'}</strong></div>
-                  <div><span>終了コード</span><strong>{$status.exitCode ?? '-'}</strong></div>
-                  <div><span>シグナル</span><strong>{$status.signal ?? '-'}</strong></div>
-                </div>
-              </div>
-
               <div class="card runtime-card" aria-busy={runtimeLoading}>
                 <div class="section-header">
                   <h2>ランタイム情報</h2>
@@ -918,7 +893,7 @@
 
   .content {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 380px 1fr;
     min-height: 0;
   }
 
@@ -934,6 +909,13 @@
   .sidebar section {
     display: grid;
     gap: 0.9rem;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
   }
 
   .sidebar h2 {
@@ -953,15 +935,17 @@
   }
 
   .session {
-    background: rgba(17, 21, 29, 0.7);
+    background: #2b2f35;
     padding: 0.75rem;
     border-radius: 0.75rem;
-    border: 1px solid rgba(97, 209, 250, 0.18);
+    border: none;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
     font-size: 0.85rem;
+    color: #e1f6ff;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
   }
 
   .session strong {
@@ -970,7 +954,7 @@
   }
 
   .session span {
-    color: #86888b;
+    color: #9aa3b3;
     font-size: 0.7rem;
   }
 
@@ -1252,13 +1236,19 @@
   .logs-card .log-container {
     background: rgba(17, 21, 29, 0.6);
     border-radius: 0.75rem;
-    padding: 0.75rem;
-    max-height: 55vh;
+    padding: 1.1rem 1.15rem 1.05rem;
+    max-height: 38vh;
     overflow: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
     font-size: 0.75rem;
+  }
+
+  .logs-card .log-container::-webkit-scrollbar {
+    display: none;
   }
 
   .logs-card .log-container div {
@@ -1272,13 +1262,6 @@
 
   .logs-card .log-container div.stderr {
     border-left: 2px solid #ff7676;
-  }
-
-  .logs-card time {
-    color: #86888b;
-    font-size: 0.7rem;
-    width: 3.5rem;
-    flex: 0 0 auto;
   }
 
   .logs-card pre {
