@@ -1,0 +1,44 @@
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080/api';
+
+export interface HeadlessStatus {
+  running: boolean;
+  pid?: number;
+  configPath?: string;
+  startedAt?: string;
+  exitCode?: number | null;
+  signal?: string | null;
+}
+
+export interface LogEntry {
+  id: number;
+  timestamp: string;
+  level: 'stdout' | 'stderr';
+  message: string;
+}
+
+async function request(path: string, init?: RequestInit) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    ...init
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? res.statusText);
+  }
+  return res.json();
+}
+
+export const getStatus = () => request('/server/status') as Promise<HeadlessStatus>;
+export const getLogs = (limit = 200) => request(`/server/logs?limit=${limit}`) as Promise<LogEntry[]>;
+export const getConfigs = () => request('/server/configs') as Promise<string[]>;
+export const startServer = (configPath?: string) =>
+  request('/server/start', {
+    method: 'POST',
+    body: JSON.stringify({ configPath })
+  });
+export const stopServer = () =>
+  request('/server/stop', {
+    method: 'POST'
+  });
