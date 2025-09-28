@@ -362,7 +362,6 @@
       <span class="logo">MRHC</span>
       <div>
         <h1>MarkN Resonite Headless Controller</h1>
-        <p>Resoniteヘッドレスをローカルネットワークから快適に管理</p>
       </div>
     </div>
     <div class="topbar-controls">
@@ -422,9 +421,9 @@
                     <span class="session-access">{world.accessLevel ?? 'Unknown'}</span>
                     <span class="session-counts">
                       <span class="present">{world.presentUsers ?? '-'}</span>
-                      <span class="sep">·</span>
+                      <span class="slash">/</span>
                       <span class="total">{world.currentUsers ?? '-'}</span>
-                      <span class="sep">/</span>
+                      <span class="slash">/</span>
                       <span class="max">{world.maxUsers ?? '-'}</span>
                     </span>
                   </div>
@@ -476,10 +475,10 @@
 
         <div class="tab-panels">
           <section class="panel" class:active={activeTab === 'dashboard'}>
-            <div class="panel-grid">
-              <div class="card runtime-card" aria-busy={runtimeLoading}>
+            <div class="panel-grid two">
+              <div class="card status-card" aria-busy={runtimeLoading}>
                 <div class="section-header">
-                  <h2>ランタイム情報</h2>
+                  <h2>/status</h2>
                   <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
                     更新
                   </button>
@@ -487,72 +486,76 @@
                 {#if !$status.running}
                   <p class="empty">サーバーが起動すると状態が表示されます。</p>
                 {:else if runtimeStatus}
-                  <div class="runtime-grid">
-                    <section>
-                      <h3>/status</h3>
-                      <dl>
-                        {#if runtimeStatus.data.name}<div><dt>セッション名</dt><dd>{runtimeStatus.data.name}</dd></div>{/if}
-                        {#if runtimeStatus.data.sessionId}<div><dt>SessionID</dt><dd>{runtimeStatus.data.sessionId}</dd></div>{/if}
-                        {#if runtimeStatus.data.currentUsers !== undefined}
-                          <div><dt>接続ユーザー</dt><dd>{runtimeStatus.data.currentUsers} / {runtimeStatus.data.maxUsers ?? '-'}</dd></div>
-                        {/if}
-                        {#if runtimeStatus.data.presentUsers !== undefined}
-                          <div><dt>在席ユーザー</dt><dd>{runtimeStatus.data.presentUsers}</dd></div>
-                        {/if}
-                        {#if runtimeStatus.data.uptime}<div><dt>起動時間</dt><dd>{runtimeStatus.data.uptime}</dd></div>{/if}
-                        {#if runtimeStatus.data.accessLevel}<div><dt>アクセスレベル</dt><dd>{runtimeStatus.data.accessLevel}</dd></div>{/if}
-                        {#if runtimeStatus.data.hiddenFromListing !== undefined}
-                          <div><dt>リスト非表示</dt><dd>{runtimeStatus.data.hiddenFromListing ? 'はい' : 'いいえ'}</dd></div>
-                        {/if}
-                        {#if runtimeStatus.data.mobileFriendly !== undefined}
-                          <div><dt>モバイル対応</dt><dd>{runtimeStatus.data.mobileFriendly ? 'はい' : 'いいえ'}</dd></div>
-                        {/if}
-                        {#if runtimeStatus.data.tags.length}
-                          <div><dt>タグ</dt><dd>{runtimeStatus.data.tags.join(', ')}</dd></div>
-                        {/if}
-                        {#if runtimeStatus.data.users.length}
-                          <div><dt>参加ユーザー</dt><dd>{runtimeStatus.data.users.join(', ')}</dd></div>
-                        {/if}
-                        {#if runtimeStatus.data.description}
-                          <div class="full"><dt>説明</dt><dd><pre>{runtimeStatus.data.description}</pre></dd></div>
-                        {/if}
-                      </dl>
-                    </section>
-                    <section>
-                      <h3>/users</h3>
-                      {#if runtimeUsers?.data?.length}
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>ユーザー</th>
-                              <th>Role</th>
-                              <th>在席</th>
-                              <th>Ping</th>
-                              <th>FPS</th>
-                              <th>Silenced</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {#each runtimeUsers.data as user}
-                              <tr>
-                                <td>
-                                  <strong>{user.name}</strong>
-                                  <span class="sub">{user.id}</span>
-                                </td>
-                                <td>{user.role}</td>
-                                <td>{user.present ? '在席' : '離席'}</td>
-                                <td>{user.pingMs}</td>
-                                <td>{user.fps}</td>
-                                <td>{user.silenced ? 'はい' : 'いいえ'}</td>
-                              </tr>
-                            {/each}
-                          </tbody>
-                        </table>
-                      {:else}
-                        <p class="empty">ユーザー情報が取得できませんでした。</p>
-                      {/if}
-                    </section>
-                  </div>
+                  <dl>
+                    {#if runtimeStatus.data.name}<div><dt>セッション名</dt><dd>{runtimeStatus.data.name}</dd></div>{/if}
+                    {#if runtimeStatus.data.sessionId}<div><dt>SessionID</dt><dd>{runtimeStatus.data.sessionId}</dd></div>{/if}
+                    {#if runtimeStatus.data.currentUsers !== undefined}
+                      <div><dt>接続ユーザー</dt><dd>{runtimeStatus.data.currentUsers} / {runtimeStatus.data.maxUsers ?? '-'}</dd></div>
+                    {/if}
+                    {#if runtimeStatus.data.presentUsers !== undefined}
+                      <div><dt>在席ユーザー</dt><dd>{runtimeStatus.data.presentUsers}</dd></div>
+                    {/if}
+                    {#if runtimeStatus.data.uptime}<div><dt>起動時間</dt><dd>{runtimeStatus.data.uptime}</dd></div>{/if}
+                    {#if runtimeStatus.data.accessLevel}<div><dt>アクセスレベル</dt><dd>{runtimeStatus.data.accessLevel}</dd></div>{/if}
+                    {#if runtimeStatus.data.hiddenFromListing !== undefined}
+                      <div><dt>リスト非表示</dt><dd>{runtimeStatus.data.hiddenFromListing ? 'はい' : 'いいえ'}</dd></div>
+                    {/if}
+                    {#if runtimeStatus.data.mobileFriendly !== undefined}
+                      <div><dt>モバイル対応</dt><dd>{runtimeStatus.data.mobileFriendly ? 'はい' : 'いいえ'}</dd></div>
+                    {/if}
+                    {#if runtimeStatus.data.tags.length}
+                      <div><dt>タグ</dt><dd>{runtimeStatus.data.tags.join(', ')}</dd></div>
+                    {/if}
+                    {#if runtimeStatus.data.users.length}
+                      <div><dt>参加ユーザー</dt><dd>{runtimeStatus.data.users.join(', ')}</dd></div>
+                    {/if}
+                    {#if runtimeStatus.data.description}
+                      <div class="full"><dt>説明</dt><dd><pre>{runtimeStatus.data.description}</pre></dd></div>
+                    {/if}
+                  </dl>
+                {:else}
+                  <p class="empty">読み込み中...</p>
+                {/if}
+              </div>
+
+              <div class="card users-card" aria-busy={runtimeLoading}>
+                <div class="section-header">
+                  <h2>/users</h2>
+                </div>
+                {#if !$status.running}
+                  <p class="empty">サーバーが起動するとユーザーが表示されます。</p>
+                {:else if runtimeUsers}
+                  {#if runtimeUsers.data.length}
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>ユーザー</th>
+                          <th>Role</th>
+                          <th>在席</th>
+                          <th>Ping</th>
+                          <th>FPS</th>
+                          <th>Silenced</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each runtimeUsers.data as user}
+                          <tr>
+                            <td>
+                              <strong>{user.name}</strong>
+                              <span class="sub">{user.id}</span>
+                            </td>
+                            <td>{user.role}</td>
+                            <td>{user.present ? '在席' : '離席'}</td>
+                            <td>{user.pingMs}</td>
+                            <td>{user.fps}</td>
+                            <td>{user.silenced ? 'はい' : 'いいえ'}</td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  {:else}
+                    <p class="empty">ユーザー情報が取得できませんでした。</p>
+                  {/if}
                 {:else}
                   <p class="empty">読み込み中...</p>
                 {/if}
@@ -767,14 +770,9 @@
   }
 
   .brand h1 {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
+    font-weight: 700;
     margin: 0 0 0.25rem;
-  }
-
-  .brand p {
-    margin: 0;
-    color: #86888b;
-    font-size: 0.9rem;
   }
 
   .logo {
@@ -784,8 +782,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #f8f770, #ba64f2);
-    color: #11151d;
+    background-color: #2a4a72;
+    background-image:
+      linear-gradient(45deg, rgba(74, 126, 179, 0.55) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(74, 126, 179, 0.55) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(16, 58, 96, 0.8) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(16, 58, 96, 0.8) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    color: #ecf3ff;
     font-weight: 700;
     letter-spacing: 1px;
   }
@@ -814,9 +819,9 @@
   }
 
   .resource-capsule {
-    background: #2b2f35;
-    border-radius: 0.7rem;
-    padding: 0.45rem 0.8rem;
+    background: rgba(43, 59, 71, 0.85);
+    border-radius: 0.65rem;
+    padding: 0.35rem 0.6rem;
     display: grid;
     gap: 0.25rem;
     font-size: 0.75rem;
@@ -824,11 +829,11 @@
     min-height: 38px;
     text-align: center;
     color: #e1f6ff;
-    box-shadow: inset 0 0 0 1px rgba(97, 209, 250, 0.25), 0 8px 18px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
   }
 
   .resource-capsule span {
-    color: #61d1fa;
+    color: #a9c8e0;
     font-weight: 600;
   }
 
@@ -913,7 +918,7 @@
   }
 
   .sidebar {
-    background: #171b26;
+    background: #1a2a36;
     padding: 1.75rem;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     display: grid;
@@ -953,7 +958,7 @@
     background: #2b2f35;
     padding: 0.75rem;
     border-radius: 0.75rem;
-    border: none;
+    border: 4px solid transparent;
     display: flex;
     align-items: center;
     font-size: 0.85rem;
@@ -990,29 +995,29 @@
   .session-counts {
     display: inline-flex;
     align-items: baseline;
-    gap: 0.15rem;
+    gap: 0.18rem;
     font-family: 'JetBrains Mono', monospace;
   }
 
   .session-counts .present {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 700;
     color: #f0f1ff;
   }
 
   .session-counts .total {
     color: #687183;
-    font-size: 0.72rem;
+    font-size: 0.85rem;
   }
 
   .session-counts .max {
     color: #aeb8c9;
-    font-size: 0.78rem;
+    font-size: 0.85rem;
   }
 
-  .session-counts .sep {
-    color: #4f596a;
-    font-size: 0.7rem;
+  .session-counts .slash {
+    color: #5a6476;
+    font-size: 0.8rem;
   }
 
   .session:hover:enabled {
@@ -1021,9 +1026,8 @@
   }
 
   .session.active {
-    background: #ba64f2;
-    color: #11151d;
-    box-shadow: 0 0 12px rgba(186, 100, 242, 0.35);
+    border-color: #ba64f2;
+    box-shadow: 0 0 0 3px rgba(186, 100, 242, 0.4);
   }
 
   .session.focused {
@@ -1249,12 +1253,6 @@
     background: rgba(17, 21, 29, 0.75);
     color: #61d1fa;
     font-weight: 600;
-  }
-
-  .runtime-grid {
-    display: grid;
-    gap: 1.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
   dl {
