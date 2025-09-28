@@ -3,12 +3,15 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { SERVER_PORT } from './config/index.js';
+import { apiRouter } from './http/index.js';
+import { registerSocketHandlers } from './ws/index.js';
 
 const app = express();
-const port = process.env.PORT ?? 8080;
 
 app.use(cors());
 app.use(express.json());
+app.use('/api', apiRouter);
 
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
@@ -17,14 +20,8 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
-io.on('connection', socket => {
-  console.log('socket connected', socket.id);
-});
+registerSocketHandlers(io);
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
-});
-
-httpServer.listen(port, () => {
-  console.log(`Backend listening on port ${port}`);
+httpServer.listen(SERVER_PORT, () => {
+  console.log(`Backend listening on port ${SERVER_PORT}`);
 });

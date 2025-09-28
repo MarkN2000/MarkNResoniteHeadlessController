@@ -17,3 +17,5 @@ yarn-error.log*
 # Resonite headless configs (keep templates only)
 config/headless/*.json
 !config/headless/*.template.json
+
+sample/バニラで起動したときのコンソール画面.txt
