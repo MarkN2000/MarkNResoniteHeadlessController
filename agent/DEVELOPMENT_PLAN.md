@@ -4,13 +4,70 @@
 
 Resoniteのヘッドレスサーバーを、ローカルネットワーク内のPCやスマートフォンのブラウザから簡単に操作・管理するためのWebアプリケーションの開発計画です。
 
+## アーキテクチャ概要
+
+```
+ブラウザ (Svelte + Skeleton UI)
+   ↕ HTTP / WebSocket (JWT + APIキー)
+バックエンド (Node.js / Express + Socket.io)
+   ↕ 標準入出力 / Configファイル
+Resonite ヘッドレスサーバー
+```
+
+- **バックエンド** はヘッドレスプロセスを管理し、ログ取得・コマンド送信・REST API を提供
+- **フロントエンド** はリアルタイムUIを提供し、WebSocketでログやステータスを購読
+- **セキュリティ** は JWT と APIキー（共通シークレット派生）、CIDR制限で保護
+
 ## 技術スタック
 
 - **バックエンド**: Node.js
 - **フロントエンド**: Svelte
 - **認証**: JWT (JSON Web Token)
-- **通信**: WebSocket + REST API
-- **外部連携**: REST API
+- **通信**: WebSocket (Socket.io) + REST API
+- **外部連携**: REST API（APIキー対応）
+- **UIライブラリ**: Tailwind CSS + Skeleton UI + カスタムコンポーネント
+- **ブランドカラー**: Resonite公式カラーをTailwindテーマとして採用 ([Resonite Branding](https://wiki.resonite.com/Branding))
+
+## プロジェクト構造
+
+```
+MarkNResoniteHeadlessController/
+├── agent/                  # AI協業用ドキュメント
+├── backend/                # Node.js バックエンド
+│   ├── src/
+│   │   ├── app.ts
+│   │   ├── config/
+│   │   ├── http/
+│   │   ├── ws/
+│   │   ├── services/
+│   │   └── utils/
+│   ├── tests/
+│   └── package.json
+├── config/
+│   ├── headless/           # Resonite 用 config.json
+│   └── security.json       # CIDR等セキュリティ設定
+├── docs/
+├── frontend/
+│   ├── src/
+│   │   ├── App.svelte
+│   │   ├── components/
+│   │   ├── routes/
+│   │   └── stores/
+│   ├── static/
+│   └── package.json
+├── scripts/
+├── shared/                 # 共通型・ユーティリティ
+├── .env.example
+├── package.json            # npm workspaces
+└── README.md
+```
+
+## セキュリティ方針
+
+- `.env` に `AUTH_SHARED_SECRET` を定義し、JWTサイン・初期パスワード・APIキー（`sha256(secret + "api")`）に活用
+- すべてのREST/WebSocketリクエストはJWT必須、APIキーは外部連携時に併用
+- `config/security.json` のCIDR（初期: `192.168.0.0/16`, `10.0.0.0/8`）でアクセス元IPを制限
+- 機密情報はリポジトリに含めず、環境変数とSecret Managerで管理
 
 ## 開発フェーズ
 
