@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { Router } from 'express';
 import { processManager } from '../../services/processManager.js';
 
@@ -13,7 +14,11 @@ serverRoutes.get('/logs', (req, res) => {
 });
 
 serverRoutes.get('/configs', (_req, res) => {
-  res.json(processManager.listConfigs());
+  const configs = processManager.listConfigs().map(filePath => ({
+    path: filePath,
+    name: path.basename(filePath)
+  }));
+  res.json(configs);
 });
 
 serverRoutes.post('/start', (req, res, next) => {

@@ -16,6 +16,8 @@ export interface LogEntry {
   message: string;
 }
 
+export type { ConfigEntry };
+
 async function request(path: string, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -31,8 +33,8 @@ async function request(path: string, init?: RequestInit) {
 }
 
 export const getStatus = () => request('/server/status') as Promise<HeadlessStatus>;
-export const getLogs = (limit = 200) => request(`/server/logs?limit=${limit}`) as Promise<LogEntry[]>;
-export const getConfigs = () => request('/server/configs') as Promise<string[]>;
+export const getLogs = (limit?: number) => request(`/server/logs${limit ? `?limit=${limit}` : ''}`) as Promise<LogEntry[]>;
+export const getConfigs = () => request('/server/configs') as Promise<ConfigEntry[]>;
 export const startServer = (configPath?: string) =>
   request('/server/start', {
     method: 'POST',

@@ -1,25 +1,32 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate } from 'svelte';
   import { createServerStores, getStatus, getLogs, getConfigs, startServer, stopServer } from '$lib';
 
-  const { status, logs, configs, setConfigs } = createServerStores();
+  const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
 
   let initialLoading = true;
   let selectedConfig: string | undefined;
   let errorMessage = '';
   let actionInProgress = false;
+  let autoScroll = true;
+  let maxDisplayLogs = 500;
+  let logContainer: HTMLDivElement | null = null;
+
+  const STORAGE_KEY = 'mrhc:selectedConfig';
 
   const refreshInitialData = async () => {
     try {
       const [statusValue, logEntries, configList] = await Promise.all([
         getStatus(),
-        getLogs(200),
+        getLogs(maxDisplayLogs),
         getConfigs()
       ]);
-      status.set(statusValue);
-      logs.set(logEntries);
+      setStatus(statusValue);
+      setLogs(logEntries);
       setConfigs(configList);
-      selectedConfig = configList[0];
+      const storedConfig = localStorage.getItem(STORAGE_KEY);
+      const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
+      selectedConfig = defaultConfig?.path;
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : '初期データ取得に失敗しました';
     } finally {
@@ -31,11 +38,20 @@
     refreshInitialData();
   });
 
+  afterUpdate(() => {
+    if (autoScroll && logContainer) {
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+  });
+
   const handleStart = async () => {
     actionInProgress = true;
     errorMessage = '';
     try {
       await startServer(selectedConfig);
+      if (selectedConfig) {
+        localStorage.setItem(STORAGE_KEY, selectedConfig);
+      }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'サーバー起動に失敗しました';
     } finally {
@@ -77,6 +93,12 @@
       </div>
     {/if}
 
+    {#if !$configs.length}
+      <div class="card warning">
+        <p>`config/headless` に設定ファイルが見つかりません。JSONファイルを配置して再度読み込んでください。</p>
+      </div>
+    {/if}
+
     <div class="grid">
       <section class="card">
         <h2>サーバー操作</h2>
@@ -93,19 +115,40 @@
           {#if $status.configPath}
             <span>設定ファイル: {$status.configPath}</span>
           {/if}
+          {#if $status.exitCode !== undefined}
+            <span>終了コード: {$status.exitCode ?? 'null'}</span>
+          {/if}
+          {#if $status.signal}
+            <span>終了シグナル: {$status.signal}</span>
+          {/if}
         </div>
 
         <label class="field">
           <span>設定ファイル</span>
           <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
             {#each $configs as config}
-              <option value={config}>{config}</option>
+              <option value={config.path}>{config.name}</option>
             {/each}
           </select>
         </label>
 
+        <div class="options">
+          <label>
+            表示件数
+            <select bind:value={maxDisplayLogs}>
+              <option value={200}>200</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+            </select>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" bind:checked={autoScroll} /> 自動スクロール
+          </label>
+          <button type="button" on:click={clearLogs}>ログをクリア</button>
+        </div>
+
         <div class="actions">
-          <button on:click={handleStart} disabled={$status.running || actionInProgress}>
+          <button on:click={handleStart} disabled={$status.running || actionInProgress || !$configs.length}>
             起動
           </button>
           <button on:click={handleStop} disabled={!$status.running || actionInProgress}>
@@ -116,13 +159,17 @@
 
       <section class="card logs">
         <h2>ライブログ</h2>
-        <div class="log-container">
-          {#each $logs.slice(-500) as log}
-            <div class:stderr={log.level === 'stderr'}>
-              <time>{new Date(log.timestamp).toLocaleTimeString()}</time>
-              <pre>{log.message}</pre>
-            </div>
-          {/each}
+        <div class="log-container" bind:this={logContainer}>
+          {#if !$logs.length}
+            <p class="empty">まだログがありません。</p>
+          {:else}
+            {#each $logs.slice(-maxDisplayLogs) as log}
+              <div class:stderr={log.level === 'stderr'}>
+                <time>{new Date(log.timestamp).toLocaleTimeString()}</time>
+                <pre>{log.message}</pre>
+              </div>
+            {/each}
+          {/if}
         </div>
       </section>
     </div>
@@ -154,10 +201,15 @@
     color: var(--color-error-500);
   }
 
+  .card.warning {
+    border-left: 4px solid var(--color-warning-500);
+    color: var(--color-warning-500);
+  }
+
   .grid {
     display: grid;
     gap: 1.5rem;
-    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
   }
 
   .status {
@@ -197,6 +249,31 @@
     cursor: not-allowed;
   }
 
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .options label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .options .checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .options button {
+    min-width: 110px;
+  }
+
   .actions {
     display: flex;
     gap: 1rem;
@@ -222,7 +299,7 @@
     background: var(--color-surface-0);
     border-radius: 0.75rem;
     padding: 0.75rem;
-    height: 420px;
+    height: 480px;
     overflow: auto;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-size: 0.85rem;
@@ -253,6 +330,12 @@
     border-left: 3px solid var(--color-error-500);
     padding-left: 0.5rem;
     color: var(--color-error-500);
+  }
+
+  .log-container .empty {
+    color: var(--color-surface-400);
+    text-align: center;
+    margin-top: 2rem;
   }
 
   @media (max-width: 960px) {
