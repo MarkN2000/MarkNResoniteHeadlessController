@@ -80,3 +80,9 @@ export interface RuntimeUsersData {
 
 export const getRuntimeStatus = () => request('/server/runtime/status') as Promise<RuntimeStatusData>;
 export const getRuntimeUsers = () => request('/server/runtime/users') as Promise<RuntimeUsersData>;
+
+export const postCommand = (command: string) =>
+  request('/server/runtime/command', {
+    method: 'POST',
+    body: JSON.stringify({ command })
+  }) as Promise<{ raw: string }>;

@@ -11,6 +11,7 @@ export class LogBuffer {
   private readonly buffer: (LogEntry | undefined)[];
   private readonly capacity: number;
   private nextEntryId = 1;
+  private readonly commandResponses: Map<number, LogEntry[]> = new Map();
   private index = 0;
   private size = 0;
 
@@ -31,6 +32,7 @@ export class LogBuffer {
     if (this.size < this.capacity) {
       this.size += 1;
     }
+    this.commandResponses.forEach(entries => entries.push(entry));
     return entry;
   }
 
@@ -47,16 +49,13 @@ export class LogBuffer {
     return result.reverse();
   }
 
-  after(startId: number): LogEntry[] {
-    const result: LogEntry[] = [];
-    for (let i = 0; i < this.size; i += 1) {
-      const bufferIndex = (this.index - this.size + i + this.capacity) % this.capacity;
-      const entry = this.buffer[bufferIndex];
-      if (entry && entry.id >= startId) {
-        result.push(entry);
-      }
-    }
-    return result;
+  createResponseCollector(startId: number) {
+    const entries: LogEntry[] = [];
+    this.commandResponses.set(startId, entries);
+    return {
+      collect: () => entries.filter(entry => entry.id >= startId),
+      dispose: () => this.commandResponses.delete(startId)
+    };
   }
 
   nextId(): number {
@@ -68,5 +67,6 @@ export class LogBuffer {
     this.size = 0;
     this.index = 0;
     this.nextEntryId = 1;
+    this.commandResponses.clear();
   }
 }

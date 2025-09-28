@@ -125,7 +125,8 @@ export class ProcessManager extends EventEmitter {
       throw new Error('Headless process is not running');
     }
 
-    const startId = this.logBuffer.nextId();
+    const collectorKey = this.logBuffer.nextId();
+    const collector = this.logBuffer.createResponseCollector(collectorKey);
 
     return new Promise((resolve, reject) => {
       const handleExit = () => {
@@ -136,11 +137,12 @@ export class ProcessManager extends EventEmitter {
       const cleanup = () => {
         clearTimeout(timer);
         this.off('status', handleExit);
+        collector.dispose();
       };
 
       const timer = setTimeout(() => {
         cleanup();
-        resolve(this.logBuffer.after(startId));
+        resolve(collector.collect());
       }, timeoutMs);
 
       this.on('status', handleExit);

@@ -156,3 +156,17 @@ serverRoutes.get('/runtime/users', async (_req, res, next) => {
     next(error);
   }
 });
+
+serverRoutes.post('/runtime/command', async (req, res, next) => {
+  try {
+    const { command } = req.body ?? {};
+    const trimmed = typeof command === 'string' ? command.trim() : '';
+    if (!trimmed) {
+      return res.status(400).json({ error: 'command is required' });
+    }
+    const output = await runCommand(trimmed);
+    res.json({ raw: output });
+  } catch (error) {
+    next(error);
+  }
+});
