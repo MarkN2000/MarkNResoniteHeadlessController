@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE } from '../config/index.js';
 import { LogBuffer } from './logBuffer.js';
 import type { LogEntry } from './logBuffer.js';
+import iconv from 'iconv-lite';
 
 export interface HeadlessStatus {
   running: boolean;
@@ -75,12 +76,14 @@ export class ProcessManager extends EventEmitter {
     this.emit('status', { ...this.status });
 
     child.stdout.on('data', data => {
-      const entry = this.logBuffer.push('stdout', data.toString());
+      const message = this.decodeBuffer(data as Buffer);
+      const entry = this.logBuffer.push('stdout', message);
       emitLog(this, entry);
     });
 
     child.stderr.on('data', data => {
-      const entry = this.logBuffer.push('stderr', data.toString());
+      const message = this.decodeBuffer(data as Buffer);
+      const entry = this.logBuffer.push('stderr', message);
       emitLog(this, entry);
     });
 
@@ -115,6 +118,34 @@ export class ProcessManager extends EventEmitter {
       const entry = this.logBuffer.push('stderr', `Failed to write command: ${message}`);
       emitLog(this, entry);
     }
+  }
+
+  async executeCommand(command: string, timeoutMs = 3000): Promise<LogEntry[]> {
+    if (!this.child) {
+      throw new Error('Headless process is not running');
+    }
+
+    const startId = this.logBuffer.nextId();
+
+    return new Promise((resolve, reject) => {
+      const handleExit = () => {
+        cleanup();
+        reject(new Error('Headless process exited during command execution'));
+      };
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.off('status', handleExit);
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve(this.logBuffer.after(startId));
+      }, timeoutMs);
+
+      this.on('status', handleExit);
+      this.sendCommand(command);
+    });
   }
 
   stop(gracePeriodMs = 10000, killTimeoutMs = 15000): Promise<void> {
@@ -166,6 +197,14 @@ export class ProcessManager extends EventEmitter {
     });
 
     return this.stopPromise;
+  }
+
+  private decodeBuffer(data: Buffer): string {
+    try {
+      return iconv.decode(data, 'shift_jis');
+    } catch (error) {
+      return data.toString('utf8');
+    }
   }
 }
 

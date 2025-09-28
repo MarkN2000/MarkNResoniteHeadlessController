@@ -44,3 +44,39 @@ export const stopServer = () =>
   request('/server/stop', {
     method: 'POST'
   });
+
+export interface RuntimeStatusData {
+  raw: string;
+  data: {
+    name?: string;
+    sessionId?: string;
+    currentUsers?: number;
+    presentUsers?: number;
+    maxUsers?: number;
+    uptime?: string;
+    accessLevel?: string;
+    hiddenFromListing?: boolean;
+    mobileFriendly?: boolean;
+    description?: string;
+    tags: string[];
+    users: string[];
+  };
+}
+
+export interface RuntimeUserEntry {
+  name: string;
+  id: string;
+  role: string;
+  present: boolean;
+  pingMs: number;
+  fps: number;
+  silenced: boolean;
+}
+
+export interface RuntimeUsersData {
+  raw: string;
+  data: RuntimeUserEntry[];
+}
+
+export const getRuntimeStatus = () => request('/server/runtime/status') as Promise<RuntimeStatusData>;
+export const getRuntimeUsers = () => request('/server/runtime/users') as Promise<RuntimeUsersData>;

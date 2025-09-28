@@ -1,6 +1,17 @@
 <script lang="ts">
   import { onMount, afterUpdate } from 'svelte';
-  import { createServerStores, getStatus, getLogs, getConfigs, startServer, stopServer } from '$lib';
+  import {
+    createServerStores,
+    getStatus,
+    getLogs,
+    getConfigs,
+    getRuntimeStatus,
+    getRuntimeUsers,
+    startServer,
+    stopServer,
+    type RuntimeStatusData,
+    type RuntimeUsersData
+  } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
 
@@ -11,6 +22,9 @@
   let autoScroll = true;
   let maxDisplayLogs = 500;
   let logContainer: HTMLDivElement | null = null;
+  let runtimeStatus: RuntimeStatusData | null = null;
+  let runtimeUsers: RuntimeUsersData | null = null;
+  let runtimeLoading = false;
 
   const STORAGE_KEY = 'mrhc:selectedConfig';
 
@@ -27,6 +41,9 @@
       const storedConfig = localStorage.getItem(STORAGE_KEY);
       const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
       selectedConfig = defaultConfig?.path;
+      if ($status.running) {
+        await refreshRuntimeInfo();
+      }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : '初期データ取得に失敗しました';
     } finally {
@@ -64,12 +81,38 @@
     errorMessage = '';
     try {
       await stopServer();
+      runtimeStatus = null;
+      runtimeUsers = null;
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'サーバー停止に失敗しました';
     } finally {
       actionInProgress = false;
     }
   };
+
+  const refreshRuntimeInfo = async () => {
+    if (!$status.running) {
+      runtimeStatus = null;
+      runtimeUsers = null;
+      return;
+    }
+    runtimeLoading = true;
+    try {
+      const [statusResult, usersResult] = await Promise.all([getRuntimeStatus(), getRuntimeUsers()]);
+      runtimeStatus = statusResult;
+      runtimeUsers = usersResult;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ランタイム情報の取得に失敗しました';
+      runtimeStatus = { raw: message, data: { tags: [], users: [] } };
+      runtimeUsers = { raw: '', data: [] };
+    } finally {
+      runtimeLoading = false;
+    }
+  };
+
+  $: if ($status.running) {
+    refreshRuntimeInfo();
+  }
 </script>
 
 <svelte:head>
@@ -155,6 +198,83 @@
             停止
           </button>
         </div>
+      </section>
+
+      <section class="card runtime" aria-busy={runtimeLoading}>
+        <div class="runtime-header">
+          <h2>ランタイム情報</h2>
+          <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
+            更新
+          </button>
+        </div>
+        {#if !$status.running}
+          <p class="empty">サーバーが起動すると状態が表示されます。</p>
+        {:else if runtimeStatus}
+          <div class="runtime-content">
+            <section>
+              <h3>ステータス</h3>
+              <ul class="runtime-list">
+                {#if runtimeStatus.data.name}<li><span>セッション名</span><strong>{runtimeStatus.data.name}</strong></li>{/if}
+                {#if runtimeStatus.data.sessionId}<li><span>SessionID</span><strong>{runtimeStatus.data.sessionId}</strong></li>{/if}
+                {#if runtimeStatus.data.currentUsers !== undefined}<li><span>接続ユーザー</span><strong>{runtimeStatus.data.currentUsers} / {runtimeStatus.data.maxUsers ?? '-'}</strong></li>{/if}
+                {#if runtimeStatus.data.presentUsers !== undefined}<li><span>在席ユーザー</span><strong>{runtimeStatus.data.presentUsers}</strong></li>{/if}
+                {#if runtimeStatus.data.uptime}<li><span>起動時間</span><strong>{runtimeStatus.data.uptime}</strong></li>{/if}
+                {#if runtimeStatus.data.accessLevel}<li><span>アクセスレベル</span><strong>{runtimeStatus.data.accessLevel}</strong></li>{/if}
+                {#if runtimeStatus.data.hiddenFromListing !== undefined}
+                  <li><span>リスト非表示</span><strong>{runtimeStatus.data.hiddenFromListing ? 'はい' : 'いいえ'}</strong></li>
+                {/if}
+                {#if runtimeStatus.data.mobileFriendly !== undefined}
+                  <li><span>モバイル対応</span><strong>{runtimeStatus.data.mobileFriendly ? 'はい' : 'いいえ'}</strong></li>
+                {/if}
+                {#if runtimeStatus.data.tags.length}
+                  <li><span>タグ</span><strong>{runtimeStatus.data.tags.join(', ')}</strong></li>
+                {/if}
+                {#if runtimeStatus.data.users.length}
+                  <li><span>参加ユーザー</span><strong>{runtimeStatus.data.users.join(', ')}</strong></li>
+                {/if}
+                {#if runtimeStatus.data.description}
+                  <li class="full"><span>説明</span><pre>{runtimeStatus.data.description}</pre></li>
+                {/if}
+              </ul>
+            </section>
+            <section>
+              <h3>ユーザー一覧</h3>
+              {#if runtimeUsers?.data?.length}
+                <table class="users-table">
+                  <thead>
+                    <tr>
+                      <th>ユーザー</th>
+                      <th>Role</th>
+                      <th>在席</th>
+                      <th>Ping (ms)</th>
+                      <th>FPS</th>
+                      <th>Silenced</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each runtimeUsers.data as user}
+                      <tr>
+                        <td>
+                          <strong>{user.name}</strong>
+                          <div class="sub">{user.id}</div>
+                        </td>
+                        <td>{user.role}</td>
+                        <td>{user.present ? '在席' : '離席'}</td>
+                        <td>{user.pingMs}</td>
+                        <td>{user.fps}</td>
+                        <td>{user.silenced ? 'はい' : 'いいえ'}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {:else}
+                <p class="empty">ユーザー情報が取得できませんでした。</p>
+              {/if}
+            </section>
+          </div>
+        {:else}
+          <p class="empty">読み込み中...</p>
+        {/if}
       </section>
 
       <section class="card logs">
@@ -295,6 +415,39 @@
     flex-direction: column;
   }
 
+  .runtime {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .runtime-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .runtime-content {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .runtime section h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+  }
+
+  .runtime pre {
+    background: var(--color-surface-0);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   .log-container {
     background: var(--color-surface-0);
     border-radius: 0.75rem;
@@ -336,6 +489,81 @@
     color: var(--color-surface-400);
     text-align: center;
     margin-top: 2rem;
+  }
+
+  .runtime-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .runtime-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-surface-200);
+  }
+
+  .runtime-list li:last-child {
+    border-bottom: none;
+  }
+
+  .runtime-list li strong {
+    font-weight: 600;
+    color: var(--color-surface-900);
+  }
+
+  .runtime-list li span {
+    color: var(--color-surface-500);
+    font-size: 0.85rem;
+  }
+
+  .runtime-list .full {
+    margin-top: 0.5rem;
+  }
+
+  .runtime-list .full pre {
+    background: var(--color-surface-0);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .users-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-surface-200);
+  }
+
+  .users-table th {
+    background-color: var(--color-surface-0);
+    font-weight: 600;
+    color: var(--color-surface-900);
+  }
+
+  .users-table td {
+    color: var(--color-surface-800);
+  }
+
+  .users-table td strong {
+    font-weight: 600;
+    color: var(--color-surface-900);
+  }
+
+  .users-table td .sub {
+    font-size: 0.75rem;
+    color: var(--color-surface-500);
   }
 
   @media (max-width: 960px) {
