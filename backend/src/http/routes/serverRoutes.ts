@@ -26,9 +26,9 @@ serverRoutes.post('/start', (req, res, next) => {
   }
 });
 
-serverRoutes.post('/stop', (_req, res, next) => {
+serverRoutes.post('/stop', async (_req, res, next) => {
   try {
-    processManager.stop();
+    await processManager.stop();
     res.json({ ok: true });
   } catch (error) {
     next(error);
