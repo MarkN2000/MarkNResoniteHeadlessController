@@ -1,9 +1,11 @@
-import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE } from '../config/index.js';
-import { LogBuffer, LogEntry } from './logBuffer.js';
+import { LogBuffer } from './logBuffer.js';
+import type { LogEntry } from './logBuffer.js';
 
 export interface HeadlessStatus {
   running: boolean;

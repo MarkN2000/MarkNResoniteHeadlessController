@@ -38,6 +38,7 @@
 		"vite": "^7.0.4"
 	},
 	"dependencies": {
-		"@skeletonlabs/skeleton": "^3.2.2"
+		"@skeletonlabs/skeleton": "^3.2.2",
+		"socket.io-client": "^4.7.5"
 	}
 }
