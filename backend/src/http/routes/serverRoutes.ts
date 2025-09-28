@@ -139,6 +139,12 @@ const parseUsersOutput = (output: string) => {
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 };
 
+const parseFriendRequestsOutput = (output: string) =>
+  output
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(line => line && !line.endsWith('>'));
+
 serverRoutes.get('/runtime/status', async (_req, res, next) => {
   try {
     const output = await runCommand('status');
@@ -152,6 +158,15 @@ serverRoutes.get('/runtime/users', async (_req, res, next) => {
   try {
     const output = await runCommand('users');
     res.json({ raw: output, data: parseUsersOutput(output) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+serverRoutes.get('/runtime/friend-requests', async (_req, res, next) => {
+  try {
+    const output = await runCommand('friendrequests');
+    res.json({ raw: output, data: parseFriendRequestsOutput(output) });
   } catch (error) {
     next(error);
   }

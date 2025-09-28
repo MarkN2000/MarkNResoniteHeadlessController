@@ -78,8 +78,14 @@ export interface RuntimeUsersData {
   data: RuntimeUserEntry[];
 }
 
+export interface FriendRequestsData {
+  raw: string;
+  data: string[];
+}
+
 export const getRuntimeStatus = () => request('/server/runtime/status') as Promise<RuntimeStatusData>;
 export const getRuntimeUsers = () => request('/server/runtime/users') as Promise<RuntimeUsersData>;
+export const getFriendRequests = () => request('/server/runtime/friend-requests') as Promise<FriendRequestsData>;
 
 export const postCommand = (command: string) =>
   request('/server/runtime/command', {

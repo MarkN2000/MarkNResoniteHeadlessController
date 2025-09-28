@@ -7,11 +7,13 @@
     getConfigs,
     getRuntimeStatus,
     getRuntimeUsers,
+    getFriendRequests,
     postCommand,
     startServer,
     stopServer,
     type RuntimeStatusData,
-    type RuntimeUsersData
+    type RuntimeUsersData,
+    type FriendRequestsData
   } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
@@ -30,8 +32,7 @@
   let selectedConfig: string | undefined;
   let errorMessage = '';
   let actionInProgress = false;
-  let autoScroll = true;
-  let maxDisplayLogs = 500;
+  const LOG_DISPLAY_LIMIT = 1000;
   let logContainer: HTMLDivElement | null = null;
   let runtimeStatus: RuntimeStatusData | null = null;
   let runtimeUsers: RuntimeUsersData | null = null;
@@ -53,26 +54,26 @@
   let worldUrlSuccess = false;
   let worldUrlLoading = false;
 
-  let friendSendName = '';
   let friendSendMessage = '';
   let friendSendSuccess = false;
   let friendSendLoading = false;
 
-  let friendAcceptName = '';
   let friendAcceptMessage = '';
   let friendAcceptSuccess = false;
   let friendAcceptLoading = false;
 
-  let friendRemoveName = '';
   let friendRemoveMessage = '';
   let friendRemoveSuccess = false;
   let friendRemoveLoading = false;
 
-  let friendMessageName = '';
+  let friendTargetName = '';
   let friendMessageText = '';
   let friendMessageFeedback = '';
   let friendMessageSuccess = false;
   let friendMessageLoading = false;
+  let friendRequests: FriendRequestsData | null = null;
+  let friendRequestsLoading = false;
+  let friendRequestsError = '';
 
   const resourceMetrics = [
     { label: 'CPU', value: '--- %' },
@@ -96,7 +97,7 @@
     try {
       const [statusValue, logEntries, configList] = await Promise.all([
         getStatus(),
-        getLogs(maxDisplayLogs),
+        getLogs(LOG_DISPLAY_LIMIT),
         getConfigs()
       ]);
       setStatus(statusValue);
@@ -132,7 +133,7 @@
   });
 
   afterUpdate(() => {
-    if (autoScroll && logContainer) {
+    if (logContainer) {
       logContainer.scrollTop = logContainer.scrollHeight;
     }
   });
@@ -250,7 +251,7 @@
   };
 
   const submitFriendSend = async () => {
-    const value = friendSendName.trim();
+    const value = friendTargetName.trim();
     friendSendMessage = '';
     friendSendSuccess = false;
     if (!value) {
@@ -262,7 +263,6 @@
       await postCommand(`sendfriendrequest "${value}"`);
       friendSendSuccess = true;
       friendSendMessage = 'フレンドリクエストを送信しました。';
-      friendSendName = '';
     } catch (error) {
       friendSendSuccess = false;
       friendSendMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
@@ -272,7 +272,7 @@
   };
 
   const submitFriendAccept = async () => {
-    const value = friendAcceptName.trim();
+    const value = friendTargetName.trim();
     friendAcceptMessage = '';
     friendAcceptSuccess = false;
     if (!value) {
@@ -284,7 +284,6 @@
       await postCommand(`acceptfriendrequest "${value}"`);
       friendAcceptSuccess = true;
       friendAcceptMessage = 'フレンドリクエストを承認しました。';
-      friendAcceptName = '';
     } catch (error) {
       friendAcceptSuccess = false;
       friendAcceptMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
@@ -294,7 +293,7 @@
   };
 
   const submitFriendRemove = async () => {
-    const value = friendRemoveName.trim();
+    const value = friendTargetName.trim();
     friendRemoveMessage = '';
     friendRemoveSuccess = false;
     if (!value) {
@@ -306,7 +305,6 @@
       await postCommand(`removefriend "${value}"`);
       friendRemoveSuccess = true;
       friendRemoveMessage = 'フレンドを解除しました。';
-      friendRemoveName = '';
     } catch (error) {
       friendRemoveSuccess = false;
       friendRemoveMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
@@ -316,7 +314,7 @@
   };
 
   const submitFriendMessage = async () => {
-    const name = friendMessageName.trim();
+    const name = friendTargetName.trim();
     const text = friendMessageText.trim();
     friendMessageFeedback = '';
     friendMessageSuccess = false;
@@ -329,13 +327,30 @@
       await postCommand(`message "${name}" "${text}"`);
       friendMessageSuccess = true;
       friendMessageFeedback = 'メッセージを送信しました。';
-      friendMessageName = '';
       friendMessageText = '';
     } catch (error) {
       friendMessageSuccess = false;
       friendMessageFeedback = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       friendMessageLoading = false;
+    }
+  };
+
+  const fetchFriendRequests = async () => {
+    if (!$status.running) {
+      friendRequests = null;
+      friendRequestsError = 'サーバー起動中のみ取得できます';
+      return;
+    }
+    friendRequestsLoading = true;
+    friendRequestsError = '';
+    try {
+      friendRequests = await getFriendRequests();
+    } catch (error) {
+      friendRequests = null;
+      friendRequestsError = error instanceof Error ? error.message : 'フレンドリクエスト取得に失敗しました';
+    } finally {
+      friendRequestsLoading = false;
     }
   };
 
@@ -390,12 +405,13 @@
       <section class="logs-card compact">
         <div class="section-header">
           <h2>ライログ</h2>
+          <button type="button" on:click={clearLogs}>ログをクリア</button>
         </div>
         <div class="log-container" bind:this={logContainer}>
           {#if !$logs.length}
             <p class="empty">まだログがありません。</p>
           {:else}
-            {#each $logs.slice(-maxDisplayLogs) as log}
+            {#each $logs.slice(-LOG_DISPLAY_LIMIT) as log}
               <div class:stderr={log.level === 'stderr'}>
                 <time>{new Date(log.timestamp).toLocaleTimeString()}</time>
                 <pre>{log.message}</pre>
@@ -468,17 +484,6 @@
                   <div><span>PID</span><strong>{$status.pid ?? '-'}</strong></div>
                   <div><span>終了コード</span><strong>{$status.exitCode ?? '-'}</strong></div>
                   <div><span>シグナル</span><strong>{$status.signal ?? '-'}</strong></div>
-                </div>
-                <div class="options">
-                  <label>
-                    表示件数
-                    <select bind:value={maxDisplayLogs}>
-                      <option value={200}>200</option>
-                      <option value={500}>500</option>
-                      <option value={1000}>1000</option>
-                    </select>
-                  </label>
-                  <button type="button" on:click={clearLogs}>ログをクリア</button>
                 </div>
               </div>
 
@@ -562,28 +567,6 @@
                   <p class="empty">読み込み中...</p>
                 {/if}
               </div>
-
-              <section class="card logs-card">
-                <div class="section-header">
-                  <h2>ライブログ</h2>
-                  <label class="checkbox">
-                    <input type="checkbox" bind:checked={autoScroll} />
-                    自動スクロール
-                  </label>
-                </div>
-                <div class="log-container" bind:this={logContainer}>
-                  {#if !$logs.length}
-                    <p class="empty">まだログがありません。</p>
-                  {:else}
-                    {#each $logs.slice(-maxDisplayLogs) as log}
-                      <div class:stderr={log.level === 'stderr'}>
-                        <time>{new Date(log.timestamp).toLocaleTimeString()}</time>
-                        <pre>{log.message}</pre>
-                      </div>
-                    {/each}
-                  {/if}
-                </div>
-              </section>
             </div>
           </section>
 
@@ -619,14 +602,37 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'friends'}>
+            <div class="panel-grid one">
+              <div class="card form-card">
+                <h2>対象ユーザー</h2>
+                <label class="field">
+                  <span>フレンド名</span>
+                  <input type="text" bind:value={friendTargetName} placeholder="ユーザー名" />
+                </label>
+                <p class="info">以下の操作はすべてこの名前を使用します。</p>
+                <button type="button" on:click={fetchFriendRequests} disabled={!$status.running || friendRequestsLoading}>
+                  フレンドリクエスト一覧を取得
+                </button>
+                {#if friendRequestsLoading}
+                  <p class="info">取得中...</p>
+                {:else if friendRequestsError}
+                  <p class="feedback">{friendRequestsError}</p>
+                {:else if friendRequests?.data?.length}
+                  <ul class="friend-requests">
+                    {#each friendRequests.data as request}
+                      <li>{request}</li>
+                    {/each}
+                  </ul>
+                {:else if friendRequests}
+                  <p class="info">保留中のフレンドリクエストはありません。</p>
+                {/if}
+              </div>
+            </div>
+
             <div class="panel-grid two">
               <div class="card form-card">
                 <h2>フレンド申請を送る</h2>
                 <form on:submit|preventDefault={submitFriendSend}>
-                  <label class="field">
-                    <span>フレンド名</span>
-                    <input type="text" bind:value={friendSendName} placeholder="ユーザー名" />
-                  </label>
                   <button type="submit" disabled={!$status.running || friendSendLoading}>送信</button>
                   {#if friendSendMessage}
                     <p class="feedback" class:success={friendSendSuccess}>{friendSendMessage}</p>
@@ -636,10 +642,6 @@
               <div class="card form-card">
                 <h2>申請を承認する</h2>
                 <form on:submit|preventDefault={submitFriendAccept}>
-                  <label class="field">
-                    <span>フレンド名</span>
-                    <input type="text" bind:value={friendAcceptName} placeholder="ユーザー名" />
-                  </label>
                   <button type="submit" disabled={!$status.running || friendAcceptLoading}>承認</button>
                   {#if friendAcceptMessage}
                     <p class="feedback" class:success={friendAcceptSuccess}>{friendAcceptMessage}</p>
@@ -649,10 +651,6 @@
               <div class="card form-card">
                 <h2>フレンド解除</h2>
                 <form on:submit|preventDefault={submitFriendRemove}>
-                  <label class="field">
-                    <span>フレンド名</span>
-                    <input type="text" bind:value={friendRemoveName} placeholder="ユーザー名" />
-                  </label>
                   <button type="submit" disabled={!$status.running || friendRemoveLoading}>解除</button>
                   {#if friendRemoveMessage}
                     <p class="feedback" class:success={friendRemoveSuccess}>{friendRemoveMessage}</p>
@@ -662,10 +660,6 @@
               <div class="card form-card">
                 <h2>メッセージ送信</h2>
                 <form on:submit|preventDefault={submitFriendMessage}>
-                  <label class="field">
-                    <span>フレンド名</span>
-                    <input type="text" bind:value={friendMessageName} placeholder="ユーザー名" />
-                  </label>
                   <label class="field">
                     <span>メッセージ</span>
                     <textarea rows="3" bind:value={friendMessageText}></textarea>
@@ -680,19 +674,7 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'settings'}>
-            <div class="panel-grid two">
-              <div class="card form-card">
-                <h2>ログ表示設定</h2>
-                <label class="field">
-                  <span>表示件数</span>
-                  <select bind:value={maxDisplayLogs}>
-                    <option value={200}>200</option>
-                    <option value={500}>500</option>
-                    <option value={1000}>1000</option>
-                  </select>
-                </label>
-                <button type="button" on:click={clearLogs}>ログをクリア</button>
-              </div>
+            <div class="panel-grid one">
               <div class="card form-card">
                 <h2>設定ファイル管理</h2>
                 <p>新しく追加した設定ファイルはこのボタンで一覧を更新できます。</p>
@@ -833,45 +815,64 @@
 
   .topbar-controls select {
     min-width: 220px;
-    padding: 0.55rem 0.75rem;
-    border-radius: 0.6rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(17, 21, 29, 0.65);
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.75rem;
+    border: none;
+    background: #2b2f35;
     color: inherit;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25) inset;
   }
 
   .resource-capsule {
-    background: rgba(23, 27, 38, 0.85);
-    border-radius: 0.75rem;
-    border: 1px solid rgba(97, 209, 250, 0.3);
-    padding: 0.5rem 0.75rem;
+    background: #2b2f35;
+    border-radius: 0.7rem;
+    padding: 0.45rem 0.8rem;
     display: grid;
-    gap: 0.35rem;
-    font-size: 0.8rem;
-    min-width: 120px;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    min-width: 108px;
+    min-height: 38px;
     text-align: center;
+    color: #e1f6ff;
+    box-shadow: inset 0 0 0 1px rgba(97, 209, 250, 0.25), 0 8px 18px rgba(0, 0, 0, 0.2);
   }
 
   .resource-capsule span {
     color: #61d1fa;
+    font-weight: 600;
   }
 
   .resource-capsule strong {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
 
   .status-indicators {
     display: flex;
+    align-items: stretch;
+    gap: 0.9rem;
+  }
+
+  .status-indicators > * {
+    display: inline-flex;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: center;
+    min-height: 54px;
+    padding: 0 1.45rem;
+    border-radius: 0.85rem;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .status-indicators .online,
+  .status-indicators .offline {
+    background: rgba(17, 21, 29, 0.7);
+    font-weight: 600;
+    gap: 0.35rem;
   }
 
   .status-indicators .dot {
     width: 0.75rem;
     height: 0.75rem;
     border-radius: 999px;
-    margin-right: 0.35rem;
-    display: inline-block;
   }
 
   .status-indicators .online .dot {
@@ -891,17 +892,28 @@
   }
 
   .status-indicators button {
-    padding: 0.55rem 1.1rem;
-    border-radius: 0.65rem;
-    border: 1px solid rgba(97, 209, 250, 0.4);
-    background: rgba(97, 209, 250, 0.18);
-    color: #e1e1e0;
-    font-weight: 600;
+    background: #61d1fa;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+    min-width: 140px;
+    transition: transform 0.2s ease, filter 0.2s ease;
+    border: none;
+  }
+
+  .status-indicators button:hover:enabled {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
   }
 
   .status-indicators button.danger {
-    border-color: rgba(255, 118, 118, 0.45);
-    background: rgba(255, 118, 118, 0.2);
+    background: #ba64f2;
+    color: #ffffff;
+  }
+
+  .status-indicators button.danger:hover:enabled {
+    filter: brightness(1.1);
   }
 
   .content {
@@ -970,10 +982,11 @@
   .session-list button {
     padding: 0.5rem 0.75rem;
     border-radius: 0.6rem;
-    border: 1px solid rgba(97, 209, 250, 0.3);
-    background: rgba(17, 21, 29, 0.7);
+    border: none;
+    background: #2b2f35;
     color: #61d1fa;
     font-weight: 600;
+    transition: background 0.15s ease, transform 0.15s ease;
   }
 
   .resource-metrics {
@@ -1051,24 +1064,25 @@
 
   .tab-bar button {
     flex: 1;
-    padding: 0.6rem 1rem;
+    padding: 0.65rem 1rem;
     border-radius: 0.75rem;
-    border: 1px solid transparent;
-    background: rgba(32, 35, 47, 0.85);
-    color: #e1e1e0;
+    border: none;
+    background: #2b2f35;
+    color: #61d1fa;
     font-weight: 600;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
   }
 
   .tab-bar button:hover {
-    background: rgba(97, 209, 250, 0.22);
+    background: #34404c;
     color: #61d1fa;
+    transform: translateY(-1px);
   }
 
   .tab-bar button.active {
-    border-color: rgba(186, 100, 242, 0.45);
-    background: rgba(186, 100, 242, 0.45);
-    color: #11151d;
+    background: #ba64f2;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(186, 100, 242, 0.35);
   }
 
   .tab-panels {
@@ -1132,21 +1146,25 @@
   }
 
   .summary-card .metrics div {
-    background: rgba(17, 21, 29, 0.7);
+    background: #2b2f35;
     padding: 0.85rem;
     border-radius: 0.75rem;
-    border: 1px solid rgba(97, 209, 250, 0.2);
+    border: 1px solid rgba(17, 21, 29, 0.45);
+    color: #f5f5f6;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .summary-card .metrics span {
-    color: #86888b;
+    color: #c7cad3;
     font-size: 0.75rem;
+    font-weight: 600;
   }
 
   .summary-card .metrics strong {
     display: block;
     margin-top: 0.35rem;
     font-size: 1.05rem;
+    color: #ffffff;
   }
 
   .options {
@@ -1297,10 +1315,21 @@
   .command-card button {
     padding: 0.55rem 1.1rem;
     border-radius: 0.65rem;
-    border: 1px solid rgba(97, 209, 250, 0.35);
-    background: rgba(17, 21, 29, 0.7);
+    border: none;
+    background: #2b2f35;
     color: #61d1fa;
     font-weight: 600;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .command-input button:hover,
+  .form-card button:hover,
+  .summary-card button:hover,
+  .runtime-card button:hover,
+  .command-card button:hover,
+  .session-list button:hover {
+    background: #34404c;
+    transform: translateY(-1px);
   }
 
   .command-help,
@@ -1334,9 +1363,14 @@
   textarea {
     padding: 0.55rem 0.75rem;
     border-radius: 0.6rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(17, 21, 29, 0.65);
-    color: inherit;
+    border: 1px solid rgba(17, 21, 29, 0.45);
+    background: #2b2f35;
+    color: #f5f6fb;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9fa5b2;
   }
 
   textarea {
@@ -1375,6 +1409,25 @@
   .empty {
     text-align: center;
     color: #86888b;
+  }
+
+  .friend-requests {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .friend-requests li {
+    background: #1a1e27;
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    color: #d7f1ff;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   @media (max-width: 1200px) {
