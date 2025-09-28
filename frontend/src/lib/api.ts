@@ -83,9 +83,33 @@ export interface FriendRequestsData {
   data: string[];
 }
 
+export interface RuntimeWorldEntry {
+  name: string;
+  sessionId: string;
+  currentUsers?: number;
+  presentUsers?: number;
+  maxUsers?: number;
+  accessLevel?: string;
+  hiddenFromListing?: boolean;
+  focusTarget: string;
+  focused: boolean;
+  raw: string;
+}
+
+export interface RuntimeWorldsData {
+  raw: string;
+  data: RuntimeWorldEntry[];
+}
+
 export const getRuntimeStatus = () => request('/server/runtime/status') as Promise<RuntimeStatusData>;
 export const getRuntimeUsers = () => request('/server/runtime/users') as Promise<RuntimeUsersData>;
 export const getFriendRequests = () => request('/server/runtime/friend-requests') as Promise<FriendRequestsData>;
+export const getRuntimeWorlds = () => request('/server/runtime/worlds') as Promise<RuntimeWorldsData>;
+export const postFocusWorld = (sessionId: string) =>
+  request('/server/runtime/worlds/focus', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId })
+  }) as Promise<{ raw: string }>;
 
 export const postCommand = (command: string) =>
   request('/server/runtime/command', {

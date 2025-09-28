@@ -8,12 +8,16 @@
     getRuntimeStatus,
     getRuntimeUsers,
     getFriendRequests,
+    getRuntimeWorlds,
     postCommand,
+    postFocusWorld,
     startServer,
     stopServer,
     type RuntimeStatusData,
     type RuntimeUsersData,
-    type FriendRequestsData
+    type FriendRequestsData,
+    type RuntimeWorldsData,
+    type RuntimeWorldEntry
   } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
@@ -41,8 +45,14 @@
   let commandResult = '';
   let commandLoading = false;
   let wasRunning = false;
+  let runtimeWorlds: RuntimeWorldsData | null = null;
+  let worldsLoading = false;
+  let worldsError = '';
+  let selectedWorldId: string | null = null;
+  let currentWorld: RuntimeWorldEntry | null = null;
 
   const STORAGE_KEY = 'mrhc:selectedConfig';
+  const WORLD_STORAGE_KEY = 'mrhc:selectedWorldId';
 
   let templateName = '';
   let templateMessage = '';
@@ -80,285 +90,266 @@
     { label: 'メモリ', value: '--- GB' }
   ];
 
-  let runtimeSessions: Array<{ name: string; sessionId: string; users: number; maxUsers: number }> = [];
-
-  $: runtimeSessions = runtimeStatus?.data?.name
-    ? [
-        {
-          name: runtimeStatus.data.name ?? '未取得',
-          sessionId: runtimeStatus.data.sessionId ?? 'N/A',
-          users: runtimeStatus.data.currentUsers ?? 0,
-          maxUsers: runtimeStatus.data.maxUsers ?? 0
-        }
-      ]
-    : [];
-
-  const refreshInitialData = async () => {
-    try {
-      const [statusValue, logEntries, configList] = await Promise.all([
-        getStatus(),
-        getLogs(LOG_DISPLAY_LIMIT),
-        getConfigs()
-      ]);
-      setStatus(statusValue);
-      setLogs(logEntries);
-      setConfigs(configList);
-      const storedConfig = localStorage.getItem(STORAGE_KEY);
-      const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
-      selectedConfig = defaultConfig?.path;
-      if ($status.running) {
-        await refreshRuntimeInfo();
-      }
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : '初期データ取得に失敗しました';
-    } finally {
-      initialLoading = false;
-    }
-  };
-
-  const refreshConfigsOnly = async () => {
-    try {
-      const configList = await getConfigs();
-      setConfigs(configList);
-      if (configList.length && !configList.some(item => item.path === selectedConfig)) {
-        selectedConfig = configList[0].path;
-      }
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : '設定ファイルの取得に失敗しました';
-    }
-  };
-
-  onMount(() => {
-    refreshInitialData();
-  });
-
   afterUpdate(() => {
     if (logContainer) {
       logContainer.scrollTop = logContainer.scrollHeight;
     }
   });
 
-  const handleStart = async () => {
-    actionInProgress = true;
-    errorMessage = '';
+  $: if ($status.running && !wasRunning) {
+    Promise.all([refreshWorlds(), refreshRuntimeInfo()]);
+  }
+
+  $: wasRunning = $status.running;
+
+  $: currentWorld = runtimeWorlds?.data.find(world => world.sessionId === selectedWorldId) ?? null;
+
+  const refreshWorlds = async (suppressError = false) => {
+    worldsLoading = true;
+    if (!suppressError) worldsError = '';
     try {
-      await startServer(selectedConfig);
+      const worlds = await getRuntimeWorlds();
+      runtimeWorlds = worlds;
+      const focused = worlds.data.find(world => world.focused);
+      if (focused) {
+        selectedWorldId = focused.sessionId;
+      } else if (selectedWorldId) {
+        const exists = worlds.data.some(world => world.sessionId === selectedWorldId);
+        if (!exists) {
+          selectedWorldId = worlds.data[0]?.sessionId ?? null;
+        }
+      } else {
+        selectedWorldId = worlds.data[0]?.sessionId ?? null;
+      }
+      if (selectedWorldId) {
+        localStorage.setItem(WORLD_STORAGE_KEY, selectedWorldId);
+      } else {
+        localStorage.removeItem(WORLD_STORAGE_KEY);
+      }
+    } catch (error) {
+      runtimeWorlds = null;
+      if (!suppressError) {
+        worldsError = error instanceof Error ? error.message : 'セッションを取得できませんでした';
+      }
+    } finally {
+      worldsLoading = false;
+    }
+  };
+
+  const refreshRuntimeInfo = async (suppressError = false) => {
+    runtimeLoading = true;
+    try {
+      runtimeStatus = await getRuntimeStatus();
+      runtimeUsers = await getRuntimeUsers();
+    } catch (error) {
+      runtimeStatus = null;
+      runtimeUsers = null;
+      if (!suppressError) {
+        errorMessage = error instanceof Error ? error.message : 'ランタイム情報を取得できませんでした';
+      }
+    } finally {
+      runtimeLoading = false;
+    }
+  };
+
+  const refreshConfigsOnly = async () => {
+    const configList = await getConfigs();
+    setConfigs(configList);
+    if (configList.length && !configList.some(item => item.path === selectedConfig)) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const match = configList.find(item => item.path === stored) ?? configList[0];
+      selectedConfig = match.path;
+      localStorage.setItem(STORAGE_KEY, selectedConfig);
+    }
+  };
+
+  const loadInitialData = async () => {
+    initialLoading = true;
+    try {
+      const configList = await getConfigs();
+      setConfigs(configList);
+      const storedConfig = localStorage.getItem(STORAGE_KEY);
+      const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
+      selectedConfig = defaultConfig?.path;
       if (selectedConfig) {
         localStorage.setItem(STORAGE_KEY, selectedConfig);
       }
+
+      const statusValue = await getStatus();
+      setStatus(statusValue);
+      setLogs(await getLogs(LOG_DISPLAY_LIMIT));
+
+      if (statusValue.running) {
+        selectedWorldId = localStorage.getItem(WORLD_STORAGE_KEY);
+        await Promise.all([refreshWorlds(true), refreshRuntimeInfo(true)]);
+      }
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'サーバー起動に失敗しました';
+      errorMessage = error instanceof Error ? error.message : '初期データの取得に失敗しました';
+    } finally {
+      initialLoading = false;
+    }
+  };
+
+  onMount(() => {
+    loadInitialData();
+  });
+
+  const handleStart = async () => {
+    if (actionInProgress) return;
+    actionInProgress = true;
+    try {
+      await startServer(selectedConfig);
+      await Promise.all([refreshWorlds(), refreshRuntimeInfo(), refreshConfigsOnly()]);
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'サーバーを起動できませんでした';
     } finally {
       actionInProgress = false;
     }
   };
 
   const handleStop = async () => {
+    if (actionInProgress) return;
     actionInProgress = true;
-    errorMessage = '';
     try {
       await stopServer();
       runtimeStatus = null;
       runtimeUsers = null;
+      runtimeWorlds = null;
+      await refreshConfigsOnly();
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'サーバー停止に失敗しました';
+      errorMessage = error instanceof Error ? error.message : 'サーバーを停止できませんでした';
     } finally {
       actionInProgress = false;
     }
   };
 
-  const refreshRuntimeInfo = async () => {
-    if (!$status.running) {
-      runtimeStatus = null;
-      runtimeUsers = null;
-      return;
-    }
-    runtimeLoading = true;
-    try {
-      const [statusResult, usersResult] = await Promise.all([getRuntimeStatus(), getRuntimeUsers()]);
-      runtimeStatus = statusResult;
-      runtimeUsers = usersResult;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'ランタイム情報の取得に失敗しました';
-      runtimeStatus = { raw: message, data: { tags: [], users: [] } };
-      runtimeUsers = { raw: '', data: [] };
-    } finally {
-      runtimeLoading = false;
-    }
-  };
-
-  const executeCommand = async () => {
-    const trimmed = commandText.trim();
-    commandResult = '';
-    if (!trimmed) return;
-    commandLoading = true;
-    try {
-      const response = await postCommand(trimmed);
-      commandResult = response.raw || '(出力なし)';
-      commandText = '';
-      if ($status.running) {
-        await refreshRuntimeInfo();
-      }
-    } catch (error) {
-      commandResult = error instanceof Error ? error.message : 'コマンド実行中にエラーが発生しました';
-    } finally {
-      commandLoading = false;
-    }
-  };
-
   const submitTemplate = async () => {
-    const value = templateName.trim();
-    templateMessage = '';
-    templateSuccess = false;
-    if (!value) {
-      templateMessage = 'テンプレート名を入力してください';
-      return;
-    }
+    if (templateLoading) return;
     templateLoading = true;
     try {
-      await postCommand(`startworldtemplate "${value}"`);
+      await postCommand(`/template ${templateName}`);
+      templateMessage = 'テンプレートを起動しました。';
       templateSuccess = true;
-      templateMessage = `テンプレート「${value}」で起動コマンドを送信しました。`;
-      templateName = '';
     } catch (error) {
+      templateMessage = error instanceof Error ? error.message : 'テンプレートを起動できませんでした';
       templateSuccess = false;
-      templateMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       templateLoading = false;
     }
   };
 
   const submitWorldUrl = async () => {
-    const value = worldUrl.trim();
-    worldUrlMessage = '';
-    worldUrlSuccess = false;
-    if (!value) {
-      worldUrlMessage = 'ResoniteワールドURLを入力してください';
-      return;
-    }
+    if (worldUrlLoading) return;
     worldUrlLoading = true;
     try {
-      await postCommand(`startworldurl "${value}"`);
+      await postCommand(`/url ${worldUrl}`);
+      worldUrlMessage = 'URLから起動しました。';
       worldUrlSuccess = true;
-      worldUrlMessage = 'URLから起動コマンドを送信しました。';
-      worldUrl = '';
     } catch (error) {
+      worldUrlMessage = error instanceof Error ? error.message : 'URLから起動できませんでした';
       worldUrlSuccess = false;
-      worldUrlMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       worldUrlLoading = false;
     }
   };
 
-  const submitFriendSend = async () => {
-    const value = friendTargetName.trim();
-    friendSendMessage = '';
-    friendSendSuccess = false;
-    if (!value) {
-      friendSendMessage = 'フレンド名を入力してください';
-      return;
+  const fetchFriendRequests = async () => {
+    if (friendRequestsLoading) return;
+    friendRequestsLoading = true;
+    try {
+      friendRequests = await getFriendRequests();
+    } catch (error) {
+      friendRequestsError = error instanceof Error ? error.message : 'フレンドリクエストを取得できませんでした';
+    } finally {
+      friendRequestsLoading = false;
     }
+  };
+
+  const submitFriendSend = async () => {
+    if (friendSendLoading) return;
     friendSendLoading = true;
     try {
-      await postCommand(`sendfriendrequest "${value}"`);
+      await postCommand(`/friend send ${friendTargetName}`);
+      friendSendMessage = 'フレンド申請を送りました。';
       friendSendSuccess = true;
-      friendSendMessage = 'フレンドリクエストを送信しました。';
     } catch (error) {
+      friendSendMessage = error instanceof Error ? error.message : 'フレンド申請を送れませんでした';
       friendSendSuccess = false;
-      friendSendMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       friendSendLoading = false;
     }
   };
 
   const submitFriendAccept = async () => {
-    const value = friendTargetName.trim();
-    friendAcceptMessage = '';
-    friendAcceptSuccess = false;
-    if (!value) {
-      friendAcceptMessage = 'フレンド名を入力してください';
-      return;
-    }
+    if (friendAcceptLoading) return;
     friendAcceptLoading = true;
     try {
-      await postCommand(`acceptfriendrequest "${value}"`);
+      await postCommand(`/friend accept ${friendTargetName}`);
+      friendAcceptMessage = 'フレンド申請を承認しました。';
       friendAcceptSuccess = true;
-      friendAcceptMessage = 'フレンドリクエストを承認しました。';
     } catch (error) {
+      friendAcceptMessage = error instanceof Error ? error.message : 'フレンド申請を承認できませんでした';
       friendAcceptSuccess = false;
-      friendAcceptMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       friendAcceptLoading = false;
     }
   };
 
   const submitFriendRemove = async () => {
-    const value = friendTargetName.trim();
-    friendRemoveMessage = '';
-    friendRemoveSuccess = false;
-    if (!value) {
-      friendRemoveMessage = 'フレンド名を入力してください';
-      return;
-    }
+    if (friendRemoveLoading) return;
     friendRemoveLoading = true;
     try {
-      await postCommand(`removefriend "${value}"`);
-      friendRemoveSuccess = true;
+      await postCommand(`/friend remove ${friendTargetName}`);
       friendRemoveMessage = 'フレンドを解除しました。';
+      friendRemoveSuccess = true;
     } catch (error) {
+      friendRemoveMessage = error instanceof Error ? error.message : 'フレンドを解除できませんでした';
       friendRemoveSuccess = false;
-      friendRemoveMessage = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       friendRemoveLoading = false;
     }
   };
 
   const submitFriendMessage = async () => {
-    const name = friendTargetName.trim();
-    const text = friendMessageText.trim();
-    friendMessageFeedback = '';
-    friendMessageSuccess = false;
-    if (!name || !text) {
-      friendMessageFeedback = 'フレンド名とメッセージを入力してください';
-      return;
-    }
+    if (friendMessageLoading) return;
     friendMessageLoading = true;
     try {
-      await postCommand(`message "${name}" "${text}"`);
-      friendMessageSuccess = true;
+      await postCommand(`/friend message ${friendTargetName} ${friendMessageText}`);
       friendMessageFeedback = 'メッセージを送信しました。';
-      friendMessageText = '';
+      friendMessageSuccess = true;
     } catch (error) {
+      friendMessageFeedback = error instanceof Error ? error.message : 'メッセージを送信できませんでした';
       friendMessageSuccess = false;
-      friendMessageFeedback = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
     } finally {
       friendMessageLoading = false;
     }
   };
 
-  const fetchFriendRequests = async () => {
-    if (!$status.running) {
-      friendRequests = null;
-      friendRequestsError = 'サーバー起動中のみ取得できます';
-      return;
-    }
-    friendRequestsLoading = true;
-    friendRequestsError = '';
+  const executeCommand = async () => {
+    if (commandLoading) return;
+    commandLoading = true;
     try {
-      friendRequests = await getFriendRequests();
+      commandResult = await postCommand(commandText);
     } catch (error) {
-      friendRequests = null;
-      friendRequestsError = error instanceof Error ? error.message : 'フレンドリクエスト取得に失敗しました';
+      commandResult = error instanceof Error ? error.message : 'コマンドを実行できませんでした';
     } finally {
-      friendRequestsLoading = false;
+      commandLoading = false;
     }
   };
 
-  $: if ($status.running && !wasRunning) {
-    refreshRuntimeInfo();
-  }
-
-  $: wasRunning = $status.running;
+  const focusWorld = async (world: RuntimeWorldEntry) => {
+    if (!$status.running) return;
+    worldsError = '';
+    try {
+      const target = world.focusTarget ?? world.sessionId;
+      await postFocusWorld(target);
+      selectedWorldId = world.sessionId;
+      localStorage.setItem(WORLD_STORAGE_KEY, world.sessionId);
+      await Promise.all([refreshRuntimeInfo(), refreshWorlds()]);
+    } catch (error) {
+      worldsError = error instanceof Error ? error.message : 'フォーカスに失敗しました';
+    }
+  };
 </script>
 
 <svelte:head>
@@ -403,24 +394,48 @@
   <div class="content">
     <aside class="sidebar">
       <section class="session-card">
-        <h2>セッション一覧</h2>
+        <div class="section-header">
+          <h2>セッション一覧</h2>
+          <button type="button" on:click={() => refreshWorlds()} disabled={!$status.running || worldsLoading}>
+            手動更新
+          </button>
+        </div>
+        {#if worldsError}
+          <p class="feedback">{worldsError}</p>
+        {/if}
         <div class="session-list">
-          {#if runtimeSessions.length}
-            {#each runtimeSessions as session}
-              <div class="session">
-                <div>
-                  <strong>{session.name}</strong>
-                  <span>{session.sessionId}</span>
+          {#if runtimeWorlds?.data?.length}
+            {#each runtimeWorlds.data as world}
+              <button
+                type="button"
+                class="session"
+                class:active={selectedWorldId === world.sessionId}
+                class:focused={world.focused}
+                on:click={() => focusWorld(world)}
+                disabled={worldsLoading || !$status.running}
+              >
+                <div class="session-body">
+                  <div class="session-row">
+                    <div class="session-name">{world.name}</div>
+                  </div>
+                  <div class="session-row">
+                    <span class="session-access">{world.accessLevel ?? 'Unknown'}</span>
+                    <span class="session-counts">
+                      <span class="present">{world.presentUsers ?? '-'}</span>
+                      <span class="sep">·</span>
+                      <span class="total">{world.currentUsers ?? '-'}</span>
+                      <span class="sep">/</span>
+                      <span class="max">{world.maxUsers ?? '-'}</span>
+                    </span>
+                  </div>
                 </div>
-                <div class="counts">{session.users} / {session.maxUsers}</div>
-              </div>
+              </button>
             {/each}
+          {:else if worldsLoading}
+            <p class="info">取得中...</p>
           {:else}
             <p class="empty">アクティブなセッションがありません。</p>
           {/if}
-          <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
-            最新のセッションを取得
-          </button>
         </div>
       </section>
 
@@ -940,12 +955,81 @@
     border-radius: 0.75rem;
     border: none;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 1rem;
     font-size: 0.85rem;
     color: #e1f6ff;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .session-body {
+    display: grid;
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .session-name {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #61d1fa;
+  }
+
+  .session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .session-access {
+    color: #9fb8ff;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .session-counts {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.15rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .session-counts .present {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f0f1ff;
+  }
+
+  .session-counts .total {
+    color: #687183;
+    font-size: 0.72rem;
+  }
+
+  .session-counts .max {
+    color: #aeb8c9;
+    font-size: 0.78rem;
+  }
+
+  .session-counts .sep {
+    color: #4f596a;
+    font-size: 0.7rem;
+  }
+
+  .session:hover:enabled {
+    background: #34404c;
+    transform: translateY(-1px);
+  }
+
+  .session.active {
+    background: #ba64f2;
+    color: #11151d;
+    box-shadow: 0 0 12px rgba(186, 100, 242, 0.35);
+  }
+
+  .session.focused {
+    background: #61d1fa;
+    color: #11151d;
+    box-shadow: 0 0 12px rgba(97, 209, 250, 0.35);
   }
 
   .session strong {
