@@ -123,6 +123,13 @@ Resoniteのヘッドレスサーバーを、ローカルネットワーク内の
   3. **トークンを利用した通信**: ブラウザは受け取ったJWTを保持し、これ以降のWebSocket接続やAPIリクエストの際に、このトークンを付与して送信する。  
   4. **サーバー側検証**: バックエンドは、リクエストの都度JWTの有効性を検証し、無効な場合はアクセスを拒否する。
 
+#### **セキュリティ方針の決定事項**
+
+- **共通シークレット管理**: `.env` などの環境変数に `AUTH_SHARED_SECRET` を定義し、リポジトリには含めない。開発環境では `.env.local` を使用し、本番ではOSの環境変数またはSecret Managerを利用する。
+- **パスワード・JWTシークレット**: 認証用初期パスワードとJWTサインシークレットは `AUTH_SHARED_SECRET` から直接読み取って利用する。平文のハードコードは禁止。
+- **APIキー認証**: APIキーは `sha256(AUTH_SHARED_SECRET + "api")` など固定サフィックス付きハッシュで派生させ、利用者には共通パスワードと同じ値として案内する。必要な連携先にのみ発行し、JWTと併用して多層防御とする。
+- **ローカルネットワーク制限**: `config/security.json` に許可CIDRを定義し、バックエンドでアクセス元IPを検証する。初期値は `192.168.0.0/16` と `10.0.0.0/8` を想定。
+
 ### **外部連携API（Resonite Modからの利用）**
 
 * **方針**: ローカルネットワーク内からのアクセスに限定した**REST API**を通じて行う。  
@@ -166,7 +173,84 @@ Resoniteのヘッドレスサーバーを、ローカルネットワーク内の
 
 * Node.jsでJWTを扱うためのライブラリ（例: jsonwebtoken）を活用し、トークンの発行と検証を安全に実装する。
 
-## **8\. 付録: コマンドリファレンス一覧**
+## **8\. 開発環境情報**
+
+### **Resoniteヘッドレスサーバー環境**
+- **インストールパス**: `C:\Program Files (x86)\Steam\steamapps\common\Resonite\Headless\Resonite.exe`
+- **動作確認**: 完了済み
+- **設定ファイル管理**: 独自フォルダ内で複数設定ファイルを管理
+- **設定ファイル指定方法**: `Resonite.exe -HeadlessConfig Config/設定ファイル名.json`
+
+### **推奨開発環境**
+- **Node.js**: 18.x LTS 以上 (推奨: 20.x LTS)
+- **npm**: 9.x 以上
+- **開発用ポート**: 3000 (フロントエンド), 8080 (バックエンド)
+- **OS**: Windows 10/11 (Resoniteサーバー環境に合わせる)
+
+## **9\. プロジェクト構造**
+
+```
+MarkNResoniteHeadlessController/
+├── agent/                  # AI協業用ドキュメント (開発計画・タスク分解)
+├── backend/                # Node.js バックエンド (API・WebSocket・プロセス管理)
+│   ├── src/
+│   │   ├── app.ts         # エントリポイント
+│   │   ├── config/        # 設定読み込み・バリデーション
+│   │   ├── http/          # REST API ルート
+│   │   ├── ws/            # WebSocket ハンドラ
+│   │   ├── services/      # ドメインロジック (プロセス管理・ログ管理)
+│   │   └── utils/         # 共通ユーティリティ
+│   ├── tests/             # バックエンドテスト
+│   └── package.json
+├── config/                 # ランタイム設定
+│   ├── headless/          # Resonite 用カスタム config.json 群
+│   └── security.json      # 許可CIDR やポリシー設定
+├── docs/                   # 追加ドキュメント (API仕様・セットアップ)
+├── frontend/               # Svelte フロントエンド
+│   ├── src/
+│   │   ├── App.svelte     # ルートコンポーネント
+│   │   ├── components/    # UIコンポーネント
+│   │   ├── routes/        # ページ/レイアウト
+│   │   └── stores/        # 状態管理 (Svelte stores)
+│   ├── static/            # 静的アセット
+│   └── package.json
+├── scripts/                # メンテ・ビルド用スクリプト
+├── shared/                 # フロント/バックエンド共通型定義・ユーティリティ
+├── .env.example            # 環境変数テンプレート (AUTH_SHARED_SECRET 等)
+├── package.json            # ルートワークスペース設定 (npm workspaces)
+└── README.md
+```
+
+### **ディレクトリ運用ポリシー**
+- ルート `package.json` で backend・frontend を npm workspaces として管理
+- `config/headless` に Resonite 用設定ファイルを保管し、`Resonite.exe -HeadlessConfig` で指定 ([参考](https://wiki.resonite.com/Headless_server_software/Configuration_file))
+- `shared/` で TypeScript 型や共通定数を集約し、型整合性を維持
+- `scripts/` に開発・デプロイスクリプトを集約し、CI/CD から再利用
+
+## **10\. 技術的詳細の決定**
+
+### **WebSocketライブラリ**
+- **採用**: Socket.io
+- **理由**: 自動リトライ・名前空間・Room などリアルタイムUIに必要な機能が揃っており、Resonite ログ配信やステータス通知を簡潔に実装可能
+- **運用**: バックエンドで Socket.io サーバーを構築し、フロントエンドは公式クライアントで接続。JWT 検証済みのソケットのみイベントを購読させる。
+
+### **状態管理**
+- **採用**: Svelte stores (標準機能)
+- **理由**: 規模が中程度であり、Svelte のリアクティブストアで十分柔軟かつ軽量。必要に応じて `derived` / `readable` stores を活用し、APIレスポンスやWebSocketイベントを集約する。
+- **運用**: `frontend/src/stores/` に zustand など外部ライブラリを追加する前提の拡張余地を残しつつ、標準ストアで開始。
+
+### **UIフレームワーク**
+- **採用**: Tailwind CSS + Skeleton UI + カスタムコンポーネント
+- **理由**: Tailwind の柔軟性に Skeleton UI のコンポーネント/テーマ機能を乗せることで、ダッシュボード向けUIを効率良く構築できる。Skeleton は Svelte 向けのTailwind拡張で、アクセシビリティやダークモードを標準サポートし、開発を迅速化できる ([Skeleton UI](https://github.com/skeletonlabs/skeleton))。
+- **運用**: Tailwind設定 (`tailwind.config.cjs`) に Skeleton プリセットを適用し、テーマカラーを共通管理。Skeletonのコンポーネントをベースにしつつ、必要に応じて Tailwind ユーティリティや自作コンポーネントを `frontend/src/components/` に配置する。
+- **ブランドカラー**: Resonite公式ブランドガイドに掲載されているパレットを優先的に使用し、Tailwindのカラートークンへ反映することでUI全体の統一感を維持する ([Resonite Branding](https://wiki.resonite.com/Branding))。
+
+### **ログ保存**
+- **採用**: メモリ + ファイルのハイブリッド
+- **理由**: UI 表示向けにはバックエンドでリングバッファ (例: 最新 1,000 行) を保持し、即時表示を実現。恒久保存やトラブルシュート向けにはローテーション付きファイル出力を行う。
+- **運用**: `services/logService.ts` でヘッドレスプロセスの stdout/stderr を監視し、`winston` 等でファイル出力。UI には WebSocket 経由でストリーム配信し、履歴要求にはファイル読み出しで対応。
+
+## **11\. 付録: コマンドリファレンス一覧**
 
 | Command | Description | Usage |
 | :---- | :---- | :---- |
