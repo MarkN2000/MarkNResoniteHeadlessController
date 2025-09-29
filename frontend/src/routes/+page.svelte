@@ -782,11 +782,13 @@
       <label class="field">
         <span>プロファイル選択</span>
         {#if backendReachable && $configs.length}
-          <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
-            {#each $configs as config}
-              <option value={config.path}>{config.name}</option>
-            {/each}
-          </select>
+          <div class="select-wrapper">
+            <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
+              {#each $configs as config}
+                <option value={config.path}>{config.name}</option>
+              {/each}
+            </select>
+          </div>
         {:else}
           <div class="field-placeholder">利用可能な設定がありません</div>
         {/if}
@@ -894,216 +896,226 @@
         <div class="tab-panels">
           <section class="panel" class:active={activeTab === 'dashboard'}>
             <div class="panel-grid two">
-              <div class="card status-card" aria-busy={runtimeLoading}>
-                <div class="section-header">
+              <div class="panel-column">
+                <div class="panel-heading">
                   <h2>/status</h2>
                   <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
                     再取得
                   </button>
                 </div>
-                {#if !$status.running}
-                  <p class="empty">サーバーが起動すると状態が表示されます。</p>
-                {:else if runtimeStatus}
-                  <form class="status-form" on:submit|preventDefault={() => {}}>
-                    <label>
-                      <span>セッション名</span>
-                      <div class="field-row">
-                        <input type="text" bind:value={sessionNameInput} />
-                        <button type="button" on:click={applySessionName} disabled={statusActionLoading.name}>
-                          適用
+                <div class="card status-card" aria-busy={runtimeLoading}>
+                  {#if !$status.running}
+                    <p class="empty">サーバーが起動すると状態が表示されます。</p>
+                  {:else if runtimeStatus}
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <label>
+                        <span>セッション名</span>
+                        <div class="field-row">
+                          <input type="text" bind:value={sessionNameInput} />
+                          <button type="button" class="status-action-button" on:click={applySessionName} disabled={statusActionLoading.name}>
+                            適用
+                          </button>
+                        </div>
+                        {#if statusActionFeedback.name}
+                          <span class="feedback" class:success={statusActionFeedback.name.success}>{statusActionFeedback.name.message}</span>
+                        {/if}
+                      </label>
+
+                      <label>
+                        <span>SessionID</span>
+                        <div class="field-row">
+                          <input class="muted" type="text" value={runtimeStatus.data.sessionId ?? ''} readonly />
+                          <button type="button" class="status-action-button" on:click={copySessionId}>
+                            コピー
+                          </button>
+                        </div>
+                        {#if statusActionFeedback.sessionId}
+                          <span class="feedback" class:success={statusActionFeedback.sessionId.success}>
+                            {statusActionFeedback.sessionId.message}
+                          </span>
+                        {/if}
+                      </label>
+
+                      <label>
+                        <span>最大人数 (Max Users)</span>
+                        <div class="field-row">
+                          <input type="number" min="0" bind:value={maxUsersInput} />
+                          <button type="button" class="status-action-button" on:click={applyMaxUsers} disabled={statusActionLoading.maxUsers}>
+                            適用
+                          </button>
+                        </div>
+                        {#if statusActionFeedback.maxUsers}
+                          <span class="feedback" class:success={statusActionFeedback.maxUsers.success}>{statusActionFeedback.maxUsers.message}</span>
+                        {/if}
+                      </label>
+
+                      <label>
+                        <span>アクセスレベル</span>
+                        <div class="select-wrapper">
+                          <select
+                            value={accessLevelInput || runtimeStatus.data.accessLevel || DEFAULT_ACCESS_LEVELS[0]}
+                            on:change={(event) => {
+                              accessLevelInput = (event.target as HTMLSelectElement).value;
+                              applyAccessLevel(accessLevelInput);
+                            }}
+                            disabled={statusActionLoading.accessLevel}
+                          >
+                            {#each accessLevelOptions as level}
+                              <option value={level}>{level}</option>
+                            {/each}
+                          </select>
+                        </div>
+                        {#if statusActionFeedback.accessLevel}
+                          <span class="feedback" class:success={statusActionFeedback.accessLevel.success}>{statusActionFeedback.accessLevel.message}</span>
+                        {/if}
+                      </label>
+
+                      <label class="checkbox-field">
+                        <span>リスト非表示にする</span>
+                        <input
+                          type="checkbox"
+                          checked={hiddenFromListingInput}
+                          on:change={(event) => handleHiddenFromListingChange((event.target as HTMLInputElement).checked)}
+                          disabled={statusActionLoading.hidden}
+                        />
+                      </label>
+                      {#if statusActionFeedback.hidden}
+                        <span class="feedback" class:success={statusActionFeedback.hidden.success}>{statusActionFeedback.hidden.message}</span>
+                      {/if}
+
+                      <div class="description-block">
+                        <div class="description-header">
+                          <label for="session-description">説明</label>
+                          <button type="button" class="status-action-button" on:click={applyDescription} disabled={statusActionLoading.description}>
+                            適用
+                          </button>
+                        </div>
+                        <textarea id="session-description" rows="4" bind:value={sessionDescriptionInput}></textarea>
+                        {#if statusActionFeedback.description}
+                          <span class="feedback" class:success={statusActionFeedback.description.success}>
+                            {statusActionFeedback.description.message}
+                          </span>
+                        {/if}
+                      </div>
+
+                      <div class="action-buttons">
+                        <button type="button" on:click={() => executeSessionCommand('save')} disabled={statusActionLoading.save}>
+                          ワールドを保存
+                        </button>
+                        <button type="button" on:click={() => executeSessionCommand('close')} disabled={statusActionLoading.close}>
+                          セッションを閉じる
+                        </button>
+                        <button type="button" on:click={() => executeSessionCommand('restart')} disabled={statusActionLoading.restart}>
+                          セッションを再起動
                         </button>
                       </div>
-                      {#if statusActionFeedback.name}
-                        <span class="feedback" class:success={statusActionFeedback.name.success}>{statusActionFeedback.name.message}</span>
-                      {/if}
-                    </label>
-
-                    <label>
-                      <span>SessionID</span>
-                      <div class="field-row">
-                        <input class="muted" type="text" value={runtimeStatus.data.sessionId ?? ''} readonly />
-                        <button type="button" on:click={copySessionId}>
-                          コピー
-                        </button>
-                      </div>
-                      {#if statusActionFeedback.sessionId}
-                        <span class="feedback" class:success={statusActionFeedback.sessionId.success}>
-                          {statusActionFeedback.sessionId.message}
-                        </span>
-                      {/if}
-                    </label>
-
-                    <label>
-                      <span>最大人数 (Max Users)</span>
-                      <div class="field-row">
-                        <input type="number" min="0" bind:value={maxUsersInput} />
-                        <button type="button" on:click={applyMaxUsers} disabled={statusActionLoading.maxUsers}>
-                          適用
-                        </button>
-                      </div>
-                      {#if statusActionFeedback.maxUsers}
-                        <span class="feedback" class:success={statusActionFeedback.maxUsers.success}>{statusActionFeedback.maxUsers.message}</span>
-                      {/if}
-                    </label>
-
-                    <label>
-                      <span>アクセスレベル</span>
-                      <select
-                        value={accessLevelInput || runtimeStatus.data.accessLevel || DEFAULT_ACCESS_LEVELS[0]}
-                        on:change={(event) => {
-                          accessLevelInput = (event.target as HTMLSelectElement).value;
-                          applyAccessLevel(accessLevelInput);
-                        }}
-                        disabled={statusActionLoading.accessLevel}
-                      >
-                        {#each accessLevelOptions as level}
-                          <option value={level}>{level}</option>
-                        {/each}
-                      </select>
-                      {#if statusActionFeedback.accessLevel}
-                        <span class="feedback" class:success={statusActionFeedback.accessLevel.success}>{statusActionFeedback.accessLevel.message}</span>
-                      {/if}
-                    </label>
-
-                    <label class="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={hiddenFromListingInput}
-                        on:change={(event) => handleHiddenFromListingChange((event.target as HTMLInputElement).checked)}
-                        disabled={statusActionLoading.hidden}
-                      />
-                      <span>リスト非表示にする</span>
-                    </label>
-                    {#if statusActionFeedback.hidden}
-                      <span class="feedback" class:success={statusActionFeedback.hidden.success}>{statusActionFeedback.hidden.message}</span>
-                    {/if}
-
-                    <label>
-                      <span>説明</span>
-                      <textarea rows="4" bind:value={sessionDescriptionInput}></textarea>
-                      <div class="field-row end">
-                        <button type="button" on:click={applyDescription} disabled={statusActionLoading.description}>
-                          適用
-                        </button>
-                      </div>
-                      {#if statusActionFeedback.description}
-                        <span class="feedback" class:success={statusActionFeedback.description.success}>
-                          {statusActionFeedback.description.message}
-                        </span>
-                      {/if}
-                    </label>
-
-                    <div class="action-buttons">
-                      <button type="button" on:click={() => executeSessionCommand('save')} disabled={statusActionLoading.save}>
-                        ワールドを保存
-                      </button>
-                      <button type="button" on:click={() => executeSessionCommand('close')} disabled={statusActionLoading.close}>
-                        セッションを閉じる
-                      </button>
-                      <button type="button" on:click={() => executeSessionCommand('restart')} disabled={statusActionLoading.restart}>
-                        セッションを再起動
-                      </button>
-                    </div>
-                  </form>
-                {:else}
-                  <p class="empty">読み込み中...</p>
-                {/if}
+                    </form>
+                  {:else}
+                    <p class="empty">読み込み中...</p>
+                  {/if}
+                </div>
               </div>
 
-              <div class="card users-card" aria-busy={runtimeLoading}>
-                <div class="section-header">
+              <div class="panel-column">
+                <div class="panel-heading">
                   <h2>/users</h2>
                 </div>
-                {#if !$status.running}
-                  <p class="empty">サーバーが起動するとユーザーが表示されます。</p>
-                {:else if runtimeUsers}
-                  {#if runtimeUsers.data.length}
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>ユーザー</th>
-                          <th>在席</th>
-                          <th>Role</th>
-                          <th>Silenced</th>
-                          <th>操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {#each runtimeUsers.data as user}
+                <div class="card users-card" aria-busy={runtimeLoading}>
+                  {#if !$status.running}
+                    <p class="empty">サーバーが起動するとユーザーが表示されます。</p>
+                  {:else if runtimeUsers}
+                    {#if runtimeUsers.data.length}
+                      <table>
+                        <thead>
                           <tr>
-                            <td>
-                              <strong>{user.name}</strong>
-                              <span class="sub">{user.id}</span>
-                              {#if userActionFeedback[user.name]}
-                                <span
-                                  class="feedback"
-                                  class:success={userActionFeedback[user.name]?.success}
-                                >
-                                  {userActionFeedback[user.name]?.message}
-                                </span>
-                              {/if}
-                            </td>
-                            <td>{user.present ? '在席' : '離席'}</td>
-                            <td>
-                              <select
-                                class:disabled-control={isHeadlessAccount(user)}
-                                value={userRoleSelections[user.name] ?? user.role}
-                                on:change={(event) => {
-                                  const value = (event.target as HTMLSelectElement).value;
-                                  userRoleSelections = { ...userRoleSelections, [user.name]: value };
-                                  updateUserRole(user.name, value);
-                                }}
-                                disabled={userActionLoading[`${user.name}-role`] || isHeadlessAccount(user)}
-                              >
-                                {#each ROLE_OPTIONS as option}
-                                  <option value={option}>{option}</option>
-                                {/each}
-                              </select>
-                            </td>
-                            <td>
-                              <select
-                                class:disabled-control={isHeadlessAccount(user)}
-                                value={user.silenced ? 'silence' : 'unsilence'}
-                                on:change={(event) => {
-                                  const value = (event.target as HTMLSelectElement).value as 'silence' | 'unsilence';
-                                  sendUserAction(user.name, value);
-                                }}
-                                disabled={
-                                  userActionLoading[`${user.name}-silence`] ||
-                                  userActionLoading[`${user.name}-unsilence`] ||
-                                  isHeadlessAccount(user)
-                                }
-                              >
-                                <option value="silence">ミュート</option>
-                                <option value="unsilence">ボイス許可</option>
-                              </select>
-                            </td>
-                            <td>
-                              <div class="user-actions">
-                                {#each USER_ACTIONS as action}
-                                  {#if action.key === 'silence' || action.key === 'unsilence'}
-                                  {:else}
-                                    <button
-                                      type="button"
-                                      on:click={() => sendUserAction(user.name, action.key)}
-                                      disabled={userActionLoading[`${user.name}-${action.key}`]}
-                                    >
-                                      {action.label}
-                                    </button>
-                                  {/if}
-                                {/each}
-                              </div>
-                            </td>
+                            <th>ユーザー</th>
+                            <th>在席</th>
+                            <th>Role</th>
+                            <th>Silenced</th>
+                            <th>操作</th>
                           </tr>
-                        {/each}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {#each runtimeUsers.data as user}
+                            <tr>
+                              <td>
+                                <strong>{user.name}</strong>
+                                <span class="sub">{user.id}</span>
+                                {#if userActionFeedback[user.name]}
+                                  <span
+                                    class="feedback"
+                                    class:success={userActionFeedback[user.name]?.success}
+                                  >
+                                    {userActionFeedback[user.name]?.message}
+                                  </span>
+                                {/if}
+                              </td>
+                              <td>{user.present ? '在席' : '離席'}</td>
+                              <td>
+                                <div class="select-wrapper">
+                                  <select
+                                    class:disabled-control={isHeadlessAccount(user)}
+                                    value={userRoleSelections[user.name] ?? user.role}
+                                    on:change={(event) => {
+                                      const value = (event.target as HTMLSelectElement).value;
+                                      userRoleSelections = { ...userRoleSelections, [user.name]: value };
+                                      updateUserRole(user.name, value);
+                                    }}
+                                    disabled={userActionLoading[`${user.name}-role`] || isHeadlessAccount(user)}
+                                  >
+                                    {#each ROLE_OPTIONS as option}
+                                      <option value={option}>{option}</option>
+                                    {/each}
+                                  </select>
+                                </div>
+                              </td>
+                              <td>
+                                <div class="select-wrapper">
+                                  <select
+                                    class:disabled-control={isHeadlessAccount(user)}
+                                    value={user.silenced ? 'silence' : 'unsilence'}
+                                    on:change={(event) => {
+                                      const value = (event.target as HTMLSelectElement).value as 'silence' | 'unsilence';
+                                      sendUserAction(user.name, value);
+                                    }}
+                                    disabled={
+                                      userActionLoading[`${user.name}-silence`] ||
+                                      userActionLoading[`${user.name}-unsilence`] ||
+                                      isHeadlessAccount(user)
+                                    }
+                                  >
+                                    <option value="silence">ミュート</option>
+                                    <option value="unsilence">ボイス許可</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td>
+                                <div class="user-actions">
+                                  {#each USER_ACTIONS as action}
+                                    {#if action.key === 'silence' || action.key === 'unsilence'}
+                                    {:else}
+                                      <button
+                                        type="button"
+                                        on:click={() => sendUserAction(user.name, action.key)}
+                                        disabled={userActionLoading[`${user.name}-${action.key}`]}
+                                      >
+                                        {action.label}
+                                      </button>
+                                    {/if}
+                                  {/each}
+                                </div>
+                              </td>
+                            </tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                    {:else}
+                      <p class="empty">ユーザー情報が取得できませんでした。</p>
+                    {/if}
                   {:else}
-                    <p class="empty">ユーザー情報が取得できませんでした。</p>
+                    <p class="empty">読み込み中...</p>
                   {/if}
-                {:else}
-                  <p class="empty">読み込み中...</p>
-                {/if}
+                </div>
               </div>
             </div>
           </section>
@@ -1367,6 +1379,33 @@
     background: #2b2f35;
     color: inherit;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25) inset;
+  }
+
+  .select-wrapper {
+    position: relative;
+    display: inline-flex;
+    width: 100%;
+  }
+
+  .select-wrapper select {
+    width: 100%;
+    padding-right: 2rem;
+    appearance: none;
+    background: #2b2f35;
+    color: #f5f5f5;
+    border: none;
+    border-radius: 0.65rem;
+  }
+
+  .select-wrapper::after {
+    content: '\25BC';
+    position: absolute;
+    right: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #61d1fa;
+    pointer-events: none;
+    font-size: 0.65rem;
   }
 
   .resource-capsule {
@@ -1729,6 +1768,8 @@
   }
 
   .panel-grid.two {
+    display: grid;
+    gap: 1.5rem;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   }
 
@@ -2128,15 +2169,16 @@
   .field-row button {
     padding: 0.4rem 0.8rem;
     border-radius: 0.6rem;
-    border: 1px solid rgba(97, 209, 250, 0.3);
+    border: none;
     background: #2b2f35;
     color: #61d1fa;
     font-weight: 600;
     font-size: 0.8rem;
+    transition: background 0.15s ease, transform 0.15s ease;
   }
 
   .field-row button:hover:enabled {
-    background: #34404c;
+    background: rgba(97, 209, 250, 0.2);
   }
 
   .checkbox-field {
@@ -2204,44 +2246,52 @@
   }
 
   .status-card .status-form {
-    display: grid;
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
-  .status-card label {
-    display: grid;
+  .status-form label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    font-size: 0.85rem;
+    padding: 0.34rem 0.55rem;
+    background: #11151d;
+    border-radius: 0.75rem;
+    font-size: 0.9rem;
   }
 
-  .status-card label span {
-    color: #9aa3b3;
+  .status-form label > span {
+    color: #f5f5f5;
     font-weight: 600;
   }
 
-  .status-card .field-row {
+  .status-form .field-row {
     display: flex;
+    gap: 0.65rem;
     align-items: center;
-    gap: 0.6rem;
+    justify-content: flex-end;
   }
 
-  .status-card .field-row .slash {
-    color: #6a7286;
-  }
-
-  .status-card .field-row.end {
+  .status-form .field-row.end {
     justify-content: flex-end;
   }
 
   .status-card .checkbox-field {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-    color: #cfd6e4;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.34rem 0.55rem;
+    background: #11151d;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    color: #f5f5f5;
   }
 
   .status-card .checkbox-field input {
+    order: 1;
     width: 1rem;
     height: 1rem;
   }
@@ -2349,5 +2399,130 @@
   select.disabled-control:disabled {
     opacity: 0.4;
     pointer-events: none;
+  }
+
+  .panel-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.175rem;
+  }
+
+  .panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #61d1fa;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .panel-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .panel-heading button {
+    background: rgba(97, 209, 250, 0.15);
+    color: #61d1fa;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.6rem;
+    font-weight: 600;
+  }
+
+  .panel-heading button:disabled {
+    opacity: 0.4;
+  }
+
+  .status-card,
+  .users-card {
+    background: #2b2f35;
+    padding: 0.7rem 0.55rem;
+  }
+
+  .status-form .feedback {
+    display: block;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.35rem;
+  }
+
+  .status-form .description-row {
+    margin-bottom: 0;
+  }
+
+  .description-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.34rem 0.55rem;
+    background: #11151d;
+    border-radius: 0.75rem;
+  }
+
+  .description-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #f5f5f5;
+    font-weight: 600;
+  }
+
+  .description-header button {
+    background: #2b2f35;
+    color: #61d1fa;
+    border: none;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.6rem;
+    font-weight: 600;
+  }
+
+  .description-header button:hover:enabled {
+    background: rgba(97, 209, 250, 0.2);
+  }
+
+  .description-block textarea {
+    width: 100%;
+    min-height: 6rem;
+    border-radius: 0.6rem;
+    border: none;
+    background: #2b2f35;
+  }
+
+  .field-row button {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.6rem;
+    border: none;
+    background: #2b2f35;
+    color: #61d1fa;
+    font-weight: 600;
+    font-size: 0.8rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .field-row button:hover:enabled {
+    background: rgba(97, 209, 250, 0.2);
+  }
+
+  .status-action-button {
+    width: 72px;
+    text-align: center;
+    background: #2b2f35;
+    color: #61d1fa;
+    border-radius: 0.55rem;
+    border: none;
+    font-weight: 600;
+    font-size: 0.92rem;
+    padding: 0.38rem 0.6rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .status-action-button:hover:enabled {
+    background: rgba(97, 209, 250, 0.2);
+  }
+
+  .field-row .status-action-button {
+    font-size: 0.92rem;
   }
 </style>
