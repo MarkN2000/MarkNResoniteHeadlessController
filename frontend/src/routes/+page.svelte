@@ -2677,56 +2677,45 @@
 
   .toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    z-index: 1000;
-  }
-
-  .toast {
-    background-color: #333;
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 5px;
-    animation: slideIn 0.5s ease-out, fadeOut 0.5s ease-in 2s;
-  }
-
-  @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
-
-  @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-
-  .toast-container {
-    position: fixed;
-    bottom: 1.6rem;
-    right: 1.6rem;
+    top: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
     display: grid;
-    gap: 0.75rem;
+    gap: 0.5rem;
     z-index: 9999;
+    pointer-events: none;
   }
 
   .toast {
-    min-width: 240px;
-    max-width: 340px;
-    padding: 0.85rem 1.2rem;
-    border-radius: 0.75rem;
-    background: rgba(17, 21, 29, 0.92);
+    min-width: 180px;
+    max-width: 260px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.6rem;
+    background: rgba(17, 21, 29, 0.96);
     color: #e9f9ff;
-    font-weight: 600;
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+    font-weight: 500;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
     display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    border: 1px solid rgba(97, 209, 250, 0.3);
-    backdrop-filter: blur(6px);
+    justify-content: center;
+    gap: 0.75rem;
+    border: 1px solid rgba(97, 209, 250, 0.28);
+    backdrop-filter: blur(5px);
+    pointer-events: auto;
+    animation: toast-pop 220ms ease-out;
+  }
+
+  @keyframes toast-pop {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
   }
 
   .toast.success {
@@ -2741,11 +2730,5 @@
 
   .toast.info {
     border-color: rgba(97, 209, 250, 0.6);
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: -450px 0;
-    }
   }
 </style>
