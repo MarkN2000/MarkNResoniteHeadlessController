@@ -1037,13 +1037,13 @@
                       </div>
 
                       <div class="action-buttons">
-                        <button type="button" on:click={() => executeSessionCommand('save')} disabled={statusActionLoading.save}>
+                        <button type="button" class="save" on:click={() => executeSessionCommand('save')} disabled={statusActionLoading.save}>
                           ワールドを保存
                         </button>
-                        <button type="button" on:click={() => executeSessionCommand('close')} disabled={statusActionLoading.close}>
+                        <button type="button" class="close" on:click={() => executeSessionCommand('close')} disabled={statusActionLoading.close}>
                           セッションを閉じる
                         </button>
-                        <button type="button" on:click={() => executeSessionCommand('restart')} disabled={statusActionLoading.restart}>
+                        <button type="button" class="restart" on:click={() => executeSessionCommand('restart')} disabled={statusActionLoading.restart}>
                           セッションを再起動
                         </button>
                       </div>
@@ -1077,11 +1077,11 @@
                       <table>
                         <thead>
                           <tr>
-                            <th>ユーザー</th>
-                            <th>在席</th>
+                            <th>User</th>
+                            <th>AFK</th>
                             <th>Role</th>
                             <th>Silenced</th>
-                            <th>操作</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1099,7 +1099,7 @@
                                   </span>
                                 {/if}
                               </td>
-                              <td>{user.present ? '在席' : '離席'}</td>
+                              <td>{user.present ? 'Active' : 'AFK'}</td>
                               <td>
                                 <div class="select-wrapper">
                                   <select
@@ -1145,8 +1145,9 @@
                                     {:else}
                                       <button
                                         type="button"
+                                        class:disabled-control={isHeadlessAccount(user)}
                                         on:click={() => sendUserAction(user.name, action.key)}
-                                        disabled={userActionLoading[`${user.name}-${action.key}`]}
+                                        disabled={userActionLoading[`${user.name}-${action.key}`] || isHeadlessAccount(user)}
                                       >
                                         {action.label}
                                       </button>
@@ -2260,14 +2261,37 @@
     padding: 0.55rem 1.1rem;
     border-radius: 0.65rem;
     border: none;
-    background: #2b2f35;
-    color: #61d1fa;
+    color: #f5f5f5;
     font-weight: 600;
-    transition: background 0.15s ease, transform 0.15s ease;
+    transition: background 0.15s ease;
+  }
+
+  .action-buttons button.save {
+    background: #24512c;
+  }
+
+  .action-buttons button.close {
+    background: #5d323a;
+  }
+
+  .action-buttons button.restart {
+    background: #48392a;
+  }
+
+  .action-buttons button.save:hover:enabled {
+    background: #2f6d3b;
+  }
+
+  .action-buttons button.close:hover:enabled {
+    background: #7a404b;
+  }
+
+  .action-buttons button.restart:hover:enabled {
+    background: #5f4d33;
   }
 
   .action-buttons button:hover:enabled {
-    background: #34404c;
+    transform: translateY(-1px);
   }
 
   .status-card button:not(.status-action-button),
@@ -2446,9 +2470,12 @@
   }
 
   select.disabled-control,
-  select.disabled-control:disabled {
+  select.disabled-control:disabled,
+  .user-actions button.disabled-control,
+  .user-actions button:disabled {
     opacity: 0.4;
     pointer-events: none;
+    cursor: not-allowed;
   }
 
   .panel-column {
@@ -2616,5 +2643,9 @@
     width: 20px;
     height: 20px;
     fill: currentColor;
+  }
+
+  .users-card table {
+    background: #11151d;
   }
 </style>
