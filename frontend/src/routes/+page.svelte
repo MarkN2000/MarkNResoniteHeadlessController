@@ -44,7 +44,8 @@
   let logContainer: HTMLDivElement | null = null;
   let runtimeStatus: RuntimeStatusData | null = null;
   let runtimeUsers: RuntimeUsersData | null = null;
-  let runtimeLoading = false;
+  let statusLoading = false;
+  let usersLoading = false;
   let commandText = '';
   let commandResult = '';
   let commandLoading = false;
@@ -224,20 +225,10 @@
     return count;
   };
 
-  const refreshRuntimeInfo = async (suppressError = false): Promise<number | null> => {
-    runtimeLoading = true;
-    let userCount: number | null = null;
+  const refreshRuntimeStatus = async (suppressError = false) => {
+    statusLoading = true;
     try {
       runtimeStatus = await getRuntimeStatus();
-      runtimeUsers = await getRuntimeUsers();
-      if (runtimeUsers?.data) {
-        const nextSelections: Record<string, string> = {};
-        runtimeUsers.data.forEach(user => {
-          nextSelections[user.name] = userRoleSelections[user.name] ?? user.role;
-        });
-        userRoleSelections = nextSelections;
-        userCount = runtimeUsers.data.length;
-      }
       if (runtimeStatus?.data) {
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
@@ -259,16 +250,44 @@
       }
     } catch (error) {
       runtimeStatus = null;
+      if (!suppressError) {
+        const message = error instanceof Error ? error.message : 'ステータス情報を取得できませんでした';
+        appMessage = { type: 'error', text: message };
+      }
+    } finally {
+      statusLoading = false;
+    }
+  };
+
+  const refreshRuntimeUsers = async (suppressError = false): Promise<number | null> => {
+    usersLoading = true;
+    let userCount: number | null = null;
+    try {
+      runtimeUsers = await getRuntimeUsers();
+      if (runtimeUsers?.data) {
+        const nextSelections: Record<string, string> = {};
+        runtimeUsers.data.forEach(user => {
+          nextSelections[user.name] = userRoleSelections[user.name] ?? user.role;
+        });
+        userRoleSelections = nextSelections;
+        userCount = runtimeUsers.data.length;
+      }
+    } catch (error) {
       runtimeUsers = null;
       if (!suppressError) {
-        const message = error instanceof Error ? error.message : 'ランタイム情報を取得できませんでした';
+        const message = error instanceof Error ? error.message : 'ユーザー情報を取得できませんでした';
         appMessage = { type: 'error', text: message };
       }
       userCount = null;
     } finally {
-      runtimeLoading = false;
+      usersLoading = false;
     }
     return userCount;
+  };
+
+  const refreshRuntimeInfo = async (suppressError = false): Promise<number | null> => {
+    await refreshRuntimeStatus(suppressError);
+    return refreshRuntimeUsers(suppressError);
   };
 
   const refreshConfigsOnly = async () => {
@@ -815,8 +834,16 @@
       <section class="session-card">
         <div class="section-header">
           <h2>セッション一覧</h2>
-          <button type="button" on:click={() => refreshWorlds()} disabled={!$status.running || worldsLoading}>
-            手動更新
+          <button
+            type="button"
+            class="refresh-button"
+            on:click={() => refreshWorlds()}
+            disabled={!$status.running || worldsLoading}
+            aria-label="セッション一覧を再取得"
+          >
+            <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+              <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+            </svg>
           </button>
         </div>
         {#if worldsError}
@@ -899,11 +926,19 @@
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>/status</h2>
-                  <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
-                    再取得
+                  <button
+                    type="button"
+                    class="refresh-button"
+                    on:click={() => refreshRuntimeStatus()}
+                    disabled={!$status.running || statusLoading}
+                    aria-label="ステータス再取得"
+                  >
+                    <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                      <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+                    </svg>
                   </button>
                 </div>
-                <div class="card status-card" aria-busy={runtimeLoading}>
+                <div class="card status-card" aria-busy={statusLoading}>
                   {#if !$status.running}
                     <p class="empty">サーバーが起動すると状態が表示されます。</p>
                   {:else if runtimeStatus}
@@ -1022,8 +1057,19 @@
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>/users</h2>
+                  <button
+                    type="button"
+                    class="refresh-button"
+                    on:click={() => refreshRuntimeUsers()}
+                    disabled={!$status.running || usersLoading}
+                    aria-label="ユーザー再取得"
+                  >
+                    <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                      <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+                    </svg>
+                  </button>
                 </div>
-                <div class="card users-card" aria-busy={runtimeLoading}>
+                <div class="card users-card" aria-busy={usersLoading}>
                   {#if !$status.running}
                     <p class="empty">サーバーが起動するとユーザーが表示されます。</p>
                   {:else if runtimeUsers}
@@ -1532,13 +1578,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .sidebar h2 {
     font-size: 1rem;
     color: #61d1fa;
     margin: 0;
+    font-weight: 700;
   }
 
   .session-card {
@@ -2421,20 +2468,29 @@
 
   .panel-heading h2 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.2rem;
   }
 
-  .panel-heading button {
-    background: rgba(97, 209, 250, 0.15);
-    color: #61d1fa;
+  .refresh-button {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #2b2f35;
+    color: #ffffff;
+    border-radius: 0.55rem;
     border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 0.6rem;
-    font-weight: 600;
+    font-size: 1.1rem;
+    transition: background 0.15s ease;
   }
 
-  .panel-heading button:disabled {
-    opacity: 0.4;
+  .refresh-button:hover:enabled {
+    background: rgba(97, 209, 250, 0.22);
+  }
+
+  .refresh-button:disabled {
+    opacity: 0.45;
   }
 
   .status-card,
@@ -2554,5 +2610,11 @@
   .status-action-button:focus-visible {
     outline: none;
     box-shadow: none;
+  }
+
+  .refresh-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
   }
 </style>
