@@ -7,6 +7,8 @@ export interface HeadlessStatus {
   startedAt?: string;
   exitCode?: number | null;
   signal?: string | null;
+  userName?: string;
+  userId?: string;
 }
 
 export interface LogEntry {

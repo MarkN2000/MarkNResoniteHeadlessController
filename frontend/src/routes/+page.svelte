@@ -54,6 +54,14 @@
   let worldsError = '';
   let selectedWorldId: string | null = null;
   let currentWorld: RuntimeWorldEntry | null = null;
+  let pendingStartup = false;
+  let logsInitialized = false;
+  let lastProcessedLogId = 0;
+  let startupFinalizeTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastWorldRunningAt = 0;
+  let showStartupMessage = false;
+  let headlessUserName: string | null = null;
+  let headlessUserId: string | null = null;
 
   const STORAGE_KEY = 'mrhc:selectedConfig';
   const WORLD_STORAGE_KEY = 'mrhc:selectedWorldId';
@@ -98,7 +106,12 @@
     { key: 'ban', label: 'BAN' }
   ] as const;
 
-  const isCommandLog = (entry: LogEntry) => entry.level === 'stdout' && entry.message.trimStart().startsWith('>');
+  const isCommandLog = (entry: LogEntry) => {
+    if (entry.level !== 'stdout') return false;
+    const trimmed = entry.message.trimStart();
+    if (!trimmed.startsWith('>')) return false;
+    return Boolean(trimmed.slice(1).trim());
+  };
 
   const getActionLabel = (key: UserActionDefinition['key']) =>
     USER_ACTIONS.find(action => action.key === key)?.label ?? key;
@@ -109,6 +122,11 @@
     { label: 'CPU', value: '--- %' },
     { label: 'メモリ', value: '--- GB' }
   ];
+
+  const ENGINE_READY_REGEX = /Engine Ready!?/i;
+  const START_LOG_REGEX = /(Initializing App|Starting running world)/i;
+  const WORLD_RUNNING_REGEX = /World running\.\.\./i;
+  const STARTUP_WORLD_DELAY = 2000;
 
   let accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
   let sessionNameInput = '';
@@ -142,30 +160,52 @@
     }
   });
 
-  $: if ($status.running && !wasRunning) {
-    Promise.all([refreshWorlds(), refreshRuntimeInfo()]);
+  $: if (!$status.running) {
+    pendingStartup = false;
+    runtimeWorlds = null;
+    selectedWorldId = null;
+    if (startupFinalizeTimer) {
+      clearTimeout(startupFinalizeTimer);
+      startupFinalizeTimer = null;
+    }
+    showStartupMessage = false;
+  }
+
+  $: if ($status.running && !wasRunning && !pendingStartup) {
+    refreshWorlds(true);
+    refreshRuntimeInfo(true);
   }
 
   $: wasRunning = $status.running;
 
   $: currentWorld = runtimeWorlds?.data.find(world => world.sessionId === selectedWorldId) ?? null;
 
-  const refreshWorlds = async (suppressError = false) => {
+  const refreshWorlds = async (suppressError = false): Promise<number | null> => {
     worldsLoading = true;
     if (!suppressError) worldsError = '';
+    let count: number | null = null;
     try {
       const worlds = await getRuntimeWorlds();
-      runtimeWorlds = worlds;
-      const focused = worlds.data.find(world => world.focused);
+      const unique: RuntimeWorldEntry[] = [];
+      const seen = new Set<string>();
+      for (const world of worlds.data) {
+        const key = world.sessionId || world.focusTarget || world.name;
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        unique.push(world);
+      }
+      runtimeWorlds = { ...worlds, data: unique };
+      count = unique.length;
+      const focused = unique.find(world => world.focused);
       if (focused) {
         selectedWorldId = focused.sessionId;
       } else if (selectedWorldId) {
-        const exists = worlds.data.some(world => world.sessionId === selectedWorldId);
+        const exists = unique.some(world => world.sessionId === selectedWorldId);
         if (!exists) {
-          selectedWorldId = worlds.data[0]?.sessionId ?? null;
+          selectedWorldId = unique[0]?.sessionId ?? null;
         }
       } else {
-        selectedWorldId = worlds.data[0]?.sessionId ?? null;
+        selectedWorldId = unique[0]?.sessionId ?? null;
       }
       if (selectedWorldId) {
         localStorage.setItem(WORLD_STORAGE_KEY, selectedWorldId);
@@ -177,13 +217,16 @@
       if (!suppressError) {
         worldsError = error instanceof Error ? error.message : 'セッションを取得できませんでした';
       }
+      count = null;
     } finally {
       worldsLoading = false;
     }
+    return count;
   };
 
-  const refreshRuntimeInfo = async (suppressError = false) => {
+  const refreshRuntimeInfo = async (suppressError = false): Promise<number | null> => {
     runtimeLoading = true;
+    let userCount: number | null = null;
     try {
       runtimeStatus = await getRuntimeStatus();
       runtimeUsers = await getRuntimeUsers();
@@ -193,6 +236,7 @@
           nextSelections[user.name] = userRoleSelections[user.name] ?? user.role;
         });
         userRoleSelections = nextSelections;
+        userCount = runtimeUsers.data.length;
       }
       if (runtimeStatus?.data) {
         sessionNameInput = runtimeStatus.data.name ?? '';
@@ -220,9 +264,11 @@
         const message = error instanceof Error ? error.message : 'ランタイム情報を取得できませんでした';
         appMessage = { type: 'error', text: message };
       }
+      userCount = null;
     } finally {
       runtimeLoading = false;
     }
+    return userCount;
   };
 
   const refreshConfigsOnly = async () => {
@@ -293,7 +339,7 @@
   };
 
   onMount(() => {
-    const unsubscribe = configs.subscribe(current => {
+    const unsubscribeConfigs = configs.subscribe(current => {
       if (!initialLoading) {
         if (current.length === 0) {
           backendReachable = false;
@@ -308,10 +354,47 @@
       }
     });
 
+    const unsubscribeLogs = logs.subscribe(entries => {
+      if (!entries.length) return;
+      if (!logsInitialized) {
+        logsInitialized = true;
+        lastProcessedLogId = entries[entries.length - 1].id;
+        return;
+      }
+
+      for (const entry of entries) {
+        if (entry.id <= lastProcessedLogId) continue;
+        lastProcessedLogId = entry.id;
+        const message = entry.message;
+
+        if (START_LOG_REGEX.test(message)) {
+          pendingStartup = true;
+          showStartupMessage = true;
+          if (startupFinalizeTimer) {
+            clearTimeout(startupFinalizeTimer);
+            startupFinalizeTimer = null;
+          }
+          continue;
+        }
+
+        if (pendingStartup && ENGINE_READY_REGEX.test(message)) {
+          continue;
+        }
+
+        if (pendingStartup && WORLD_RUNNING_REGEX.test(message)) {
+          lastWorldRunningAt = Date.now();
+          pendingStartup = true;
+          scheduleStartupFinalize();
+          continue;
+        }
+      }
+    });
+
     loadInitialData();
 
     return () => {
-      unsubscribe();
+      unsubscribeConfigs();
+      unsubscribeLogs();
     };
   });
 
@@ -447,20 +530,37 @@
     await sendStatusCommand('description', `description ${JSON.stringify(sessionDescriptionInput)}`, '説明を更新しました');
   };
 
-  const executeWorldCommand = async (command: 'save' | 'close') => {
-    const successMessage = command === 'save' ? 'ワールドを保存しました' : 'ワールドを閉じるコマンドを送信しました';
+  const executeSessionCommand = async (command: 'save' | 'close' | 'restart') => {
+    let successMessage = '';
+    switch (command) {
+      case 'save':
+        successMessage = 'ワールドを保存しました';
+        break;
+      case 'close':
+        successMessage = 'セッションを閉じるコマンドを送信しました';
+        break;
+      case 'restart':
+        successMessage = 'セッション再起動コマンドを送信しました';
+        break;
+      default:
+        successMessage = 'コマンドを送信しました';
+        break;
+    }
     await sendStatusCommand(command, command, successMessage);
   };
 
   const handleStart = async () => {
     actionInProgress = true;
+    pendingStartup = true;
+    showStartupMessage = true;
     try {
       await startServer(selectedConfig);
-      await Promise.all([refreshRuntimeInfo(true), refreshWorlds(true)]);
       appMessage = { type: 'info', text: 'サーバー起動コマンドを送信しました' };
+      pendingStartup = true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'サーバーを起動できませんでした';
       appMessage = { type: 'error', text: message };
+      pendingStartup = false;
     } finally {
       actionInProgress = false;
     }
@@ -602,10 +702,60 @@
       await postFocusWorld(target);
       selectedWorldId = world.sessionId;
       localStorage.setItem(WORLD_STORAGE_KEY, world.sessionId);
-      await Promise.all([refreshRuntimeInfo(), refreshWorlds()]);
+      await refreshWorlds(true);
+      refreshRuntimeInfo(true).catch(error => {
+        console.error('Failed to refresh runtime info after focus:', error);
+      });
     } catch (error) {
       worldsError = error instanceof Error ? error.message : 'フォーカスに失敗しました';
     }
+  };
+
+  const ensureStartupData = async () => {
+    if (!pendingStartup) return;
+    const [worldsCount, usersCount] = await Promise.all([refreshWorlds(true), refreshRuntimeInfo(true)]);
+    startupWorldsReady = worldsCount !== null && worldsCount > 0;
+    startupUsersReady = usersCount !== null;
+    if (startupWorldsReady && startupUsersReady) {
+      pendingStartup = false;
+      appMessage = { type: 'info', text: 'ヘッドレスの起動が完了しました' };
+    }
+  };
+
+  const scheduleStartupFinalize = () => {
+    if (startupFinalizeTimer) {
+      clearTimeout(startupFinalizeTimer);
+    }
+    const delay = Math.max(STARTUP_WORLD_DELAY - (Date.now() - lastWorldRunningAt), 0);
+    startupFinalizeTimer = setTimeout(() => {
+      Promise.all([refreshWorlds(true), refreshRuntimeInfo(true)])
+        .then(() => {
+          pendingStartup = false;
+          if (showStartupMessage) {
+            appMessage = { type: 'info', text: 'ヘッドレスの起動が完了しました' };
+          }
+        })
+        .catch(error => {
+          console.error('Failed to finalize startup data load:', error);
+        })
+        .finally(() => {
+          startupFinalizeTimer = null;
+          showStartupMessage = false;
+        });
+    }, delay);
+  };
+
+  $: headlessUserName = $status.userName ?? headlessUserName;
+  $: headlessUserId = $status.userId ?? headlessUserId;
+
+  const isHeadlessAccount = (user: RuntimeUserEntry) => {
+    if (headlessUserId) {
+      if (user.id === headlessUserId) return true;
+    }
+    if (headlessUserName) {
+      if (user.name === headlessUserName) return true;
+    }
+    return false;
   };
 </script>
 
@@ -619,6 +769,9 @@
       <span class="logo">MRHC</span>
       <div>
         <h1>MarkN Resonite Headless Controller</h1>
+        {#if headlessUserName}
+          <p class="account-label">起動ユーザー: {headlessUserName}</p>
+        {/if}
       </div>
     </div>
     <div class="topbar-controls">
@@ -676,7 +829,7 @@
                 class:active={selectedWorldId === world.sessionId}
                 class:focused={world.focused}
                 on:click={() => focusWorld(world)}
-                disabled={worldsLoading || !$status.running}
+                disabled={!$status.running}
               >
                 <div class="session-body">
                   <div class="session-row">
@@ -781,12 +934,8 @@
                     </label>
 
                     <label>
-                      <span>人数 (Present / Users / Max)</span>
+                      <span>最大人数 (Max Users)</span>
                       <div class="field-row">
-                        <span class="muted">{runtimeStatus.data.presentUsers ?? '-'}</span>
-                        <span class="slash">/</span>
-                        <span class="muted">{runtimeStatus.data.currentUsers ?? '-'}</span>
-                        <span class="slash">/</span>
                         <input type="number" min="0" bind:value={maxUsersInput} />
                         <button type="button" on:click={applyMaxUsers} disabled={statusActionLoading.maxUsers}>
                           適用
@@ -845,11 +994,14 @@
                     </label>
 
                     <div class="action-buttons">
-                      <button type="button" on:click={() => executeWorldCommand('save')} disabled={statusActionLoading.save}>
+                      <button type="button" on:click={() => executeSessionCommand('save')} disabled={statusActionLoading.save}>
                         ワールドを保存
                       </button>
-                      <button type="button" on:click={() => executeWorldCommand('close')} disabled={statusActionLoading.close}>
-                        ワールドを閉じる
+                      <button type="button" on:click={() => executeSessionCommand('close')} disabled={statusActionLoading.close}>
+                        セッションを閉じる
+                      </button>
+                      <button type="button" on:click={() => executeSessionCommand('restart')} disabled={statusActionLoading.restart}>
+                        セッションを再起動
                       </button>
                     </div>
                   </form>
@@ -894,13 +1046,14 @@
                             <td>{user.present ? '在席' : '離席'}</td>
                             <td>
                               <select
+                                class:disabled-control={isHeadlessAccount(user)}
                                 value={userRoleSelections[user.name] ?? user.role}
                                 on:change={(event) => {
                                   const value = (event.target as HTMLSelectElement).value;
                                   userRoleSelections = { ...userRoleSelections, [user.name]: value };
                                   updateUserRole(user.name, value);
                                 }}
-                                disabled={userActionLoading[`${user.name}-role`]}
+                                disabled={userActionLoading[`${user.name}-role`] || isHeadlessAccount(user)}
                               >
                                 {#each ROLE_OPTIONS as option}
                                   <option value={option}>{option}</option>
@@ -909,12 +1062,17 @@
                             </td>
                             <td>
                               <select
+                                class:disabled-control={isHeadlessAccount(user)}
                                 value={user.silenced ? 'silence' : 'unsilence'}
                                 on:change={(event) => {
                                   const value = (event.target as HTMLSelectElement).value as 'silence' | 'unsilence';
                                   sendUserAction(user.name, value);
                                 }}
-                                disabled={userActionLoading[`${user.name}-silence`] || userActionLoading[`${user.name}-unsilence`]}
+                                disabled={
+                                  userActionLoading[`${user.name}-silence`] ||
+                                  userActionLoading[`${user.name}-unsilence`] ||
+                                  isHeadlessAccount(user)
+                                }
                               >
                                 <option value="silence">ミュート</option>
                                 <option value="unsilence">ボイス許可</option>
@@ -1160,6 +1318,12 @@
     font-size: 1.6rem;
     font-weight: 700;
     margin: 0 0 0.25rem;
+  }
+
+  .account-label {
+    margin: 0;
+    font-size: 0.82rem;
+    color: rgba(225, 225, 224, 0.65);
   }
 
   .logo {
@@ -2169,5 +2333,21 @@
 
   .backend-status.offline .dot {
     background: #ff7676;
+  }
+
+  .status-form .field-row {
+    display: flex;
+    gap: 0.65rem;
+    align-items: center;
+  }
+
+  .status-form .field-row .slash {
+    color: rgba(225, 225, 224, 0.35);
+  }
+
+  select.disabled-control,
+  select.disabled-control:disabled {
+    opacity: 0.4;
+    pointer-events: none;
   }
 </style>

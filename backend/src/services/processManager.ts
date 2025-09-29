@@ -15,6 +15,8 @@ export interface HeadlessStatus {
   startedAt?: string;
   exitCode?: number | null;
   signal?: NodeJS.Signals | null;
+  userName?: string;
+  userId?: string;
 }
 
 export class ProcessManager extends EventEmitter {
@@ -22,6 +24,8 @@ export class ProcessManager extends EventEmitter {
   private status: HeadlessStatus = { running: false };
   private readonly logBuffer = new LogBuffer(LOG_RING_BUFFER_SIZE);
   private stopPromise?: Promise<void>;
+  private lastUserName?: string;
+  private lastUserId?: string;
 
   constructor() {
     super();
@@ -71,12 +75,15 @@ export class ProcessManager extends EventEmitter {
       configPath: resolvedConfig,
       startedAt: new Date().toISOString(),
       exitCode: undefined,
-      signal: undefined
+      signal: undefined,
+      userName: this.lastUserName,
+      userId: this.lastUserId
     };
     this.emit('status', { ...this.status });
 
     child.stdout.on('data', data => {
       const message = this.decodeBuffer(data as Buffer);
+      this.updateAccountFromLog(message);
       const entry = this.logBuffer.push('stdout', message);
       emitLog(this, entry);
     });
@@ -94,7 +101,9 @@ export class ProcessManager extends EventEmitter {
         pid: undefined,
         configPath: resolvedConfig,
         exitCode: code,
-        signal
+        signal,
+        userName: this.lastUserName,
+        userId: this.lastUserId
       };
       this.emit('status', { ...this.status });
       this.stopPromise = undefined;
@@ -111,7 +120,9 @@ export class ProcessManager extends EventEmitter {
   private sendCommand(command: string): void {
     if (!this.child || !this.child.stdin) return;
     try {
-      this.child.stdin.write(`${command}\n`);
+      const payload = `${command}\n`;
+      const encoded = iconv.encode(payload, 'shift_jis');
+      this.child.stdin.write(encoded);
       emitLog(this, this.logBuffer.push('stdout', `> ${command}`));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -207,6 +218,36 @@ export class ProcessManager extends EventEmitter {
     } catch (error) {
       return data.toString('utf8');
     }
+  }
+
+  private updateAccountFromLog(message: string): void {
+    const loginMatch = message.match(/Logging in as\s+(?<user>[^\s]+)/i);
+    if (loginMatch?.groups?.user) {
+      const user = loginMatch.groups.user.trim();
+      if (user) {
+        let updated = false;
+        if (user !== this.lastUserName) {
+          this.lastUserName = user;
+          updated = true;
+        }
+        if (updated) this.emitStatusUpdate();
+      }
+      return;
+    }
+
+    const userIdMatch = message.match(/Initializing SignalR: UserLogin:\s*(?<id>U-[A-Za-z0-9]+)/i);
+    if (userIdMatch?.groups?.id) {
+      const id = userIdMatch.groups.id.trim();
+      if (id && id !== this.lastUserId) {
+        this.lastUserId = id;
+        this.emitStatusUpdate();
+      }
+    }
+  }
+
+  private emitStatusUpdate(): void {
+    this.status = { ...this.status, userName: this.lastUserName, userId: this.lastUserId };
+    this.emit('status', { ...this.status });
   }
 }
 
