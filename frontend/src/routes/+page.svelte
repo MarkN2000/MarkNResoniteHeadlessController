@@ -116,7 +116,7 @@
   const getActionLabel = (key: UserActionDefinition['key']) =>
     USER_ACTIONS.find(action => action.key === key)?.label ?? key;
 
-  const DEFAULT_ACCESS_LEVELS = ['Public', 'LAN', 'Friends', 'Private', 'Hidden'];
+  const DEFAULT_ACCESS_LEVELS = ['Private', 'LAN', 'Contacts', 'ContactsPlus', 'RegisteredUsers', 'Anyone'];
 
   const resourceMetrics = [
     { label: 'CPU', value: '--- %' },
@@ -951,7 +951,7 @@
 
                       <label>
                         <span>アクセスレベル</span>
-                        <div class="select-wrapper">
+                        <div class="select-wrapper narrow">
                           <select
                             value={accessLevelInput || runtimeStatus.data.accessLevel || DEFAULT_ACCESS_LEVELS[0]}
                             on:change={(event) => {
@@ -970,15 +970,18 @@
                         {/if}
                       </label>
 
-                      <label class="checkbox-field">
+                      <div class="toggle-row">
                         <span>リスト非表示にする</span>
-                        <input
-                          type="checkbox"
-                          checked={hiddenFromListingInput}
-                          on:change={(event) => handleHiddenFromListingChange((event.target as HTMLInputElement).checked)}
+                        <button
+                          type="button"
+                          class={hiddenFromListingInput ? 'status-action-button active' : 'status-action-button'}
+                          aria-pressed={hiddenFromListingInput}
+                          on:click={() => handleHiddenFromListingChange(!hiddenFromListingInput)}
                           disabled={statusActionLoading.hidden}
-                        />
-                      </label>
+                        >
+                          {hiddenFromListingInput ? 'オン' : 'オフ'}
+                        </button>
+                      </div>
                       {#if statusActionFeedback.hidden}
                         <span class="feedback" class:success={statusActionFeedback.hidden.success}>{statusActionFeedback.hidden.message}</span>
                       {/if}
@@ -1385,6 +1388,10 @@
     position: relative;
     display: inline-flex;
     width: 100%;
+  }
+
+  .select-wrapper.narrow {
+    max-width: 240px;
   }
 
   .select-wrapper select {
@@ -2216,17 +2223,13 @@
     background: #34404c;
   }
 
-  .status-card button,
+  .status-card button:not(.status-action-button),
   .status-card input,
   .status-card textarea,
   .runtime-card button,
   .command-card button {
     padding: 0.55rem 1.1rem;
     border-radius: 0.65rem;
-    border: 1px solid rgba(97, 209, 250, 0.35);
-    background: #2b2f35;
-    color: #61d1fa;
-    font-weight: 600;
   }
 
   .status-card input,
@@ -2507,22 +2510,49 @@
 
   .status-action-button {
     width: 72px;
-    text-align: center;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: #2b2f35;
     color: #61d1fa;
     border-radius: 0.55rem;
     border: none;
     font-weight: 600;
     font-size: 0.92rem;
-    padding: 0.38rem 0.6rem;
-    transition: background 0.15s ease, transform 0.15s ease;
+    padding: 0;
+    transition: background 0.15s ease;
   }
 
   .status-action-button:hover:enabled {
-    background: rgba(97, 209, 250, 0.2);
+    background: rgba(97, 209, 250, 0.22);
   }
 
-  .field-row .status-action-button {
-    font-size: 0.92rem;
+  .status-action-button:disabled {
+    opacity: 0.55;
+  }
+
+  .status-action-button.active {
+    background: rgba(97, 209, 250, 0.28);
+    color: #0b1926;
+    border-color: transparent;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.34rem 0.55rem;
+    background: #11151d;
+    border-radius: 0.75rem;
+    font-size: 0.9rem;
+    color: #f5f5f5;
+    font-weight: 600;
+  }
+
+  .status-action-button:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
 </style>
