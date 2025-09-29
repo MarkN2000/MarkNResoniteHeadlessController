@@ -103,7 +103,6 @@ const runCommand = async (command: string, options: RunCommandOptions = {}) => {
       const trimmed = message.trim();
       if (!trimmed) return false;
       if (trimmed.startsWith('>')) return false;
-      if (!trimmed.includes(':') && trimmed.endsWith('>')) return false;
       return true;
     })
     .join('\n')
@@ -234,13 +233,14 @@ const parseWorldsOutput = (output: string) => {
         hiddenFromListing: undefined,
         focusTarget,
         raw: line,
-        focused: focusedName ? focusedName === name : false
+        focused: false
       });
     }
   }
 
   if (sessions.length > 0) {
-    return sessions;
+    const result = finalizeWorldsFocus(sessions, focusedName);
+    return result;
   }
 
   const toNumber = (value?: string) => {
@@ -285,7 +285,7 @@ const parseWorldsOutput = (output: string) => {
       hiddenFromListing: current.hiddenFromListing,
       focusTarget: sessionId,
       raw: current.raw.join('\n'),
-      focused: focusedName ? focusedName === name || focusedName === sessionId : false
+      focused: false
     });
     current = null;
   };
@@ -343,7 +343,49 @@ const parseWorldsOutput = (output: string) => {
 
   commit();
 
-  return sessions;
+  return finalizeWorldsFocus(sessions, focusedName);
+};
+
+const finalizeWorldsFocus = (
+  sessions: Array<{
+    name: string;
+    sessionId: string;
+    currentUsers?: number;
+    presentUsers?: number;
+    maxUsers?: number;
+    accessLevel?: string;
+    hiddenFromListing?: boolean;
+    focusTarget: string;
+    raw: string;
+    focused: boolean;
+  }>,
+  focusedName: string | null
+) => {
+  let focusedSessionId: string | null = null;
+  let focusedFocusTarget: string | null = null;
+
+  if (focusedName) {
+    for (const session of sessions) {
+      if (
+        session.name === focusedName ||
+        session.sessionId === focusedName ||
+        session.focusTarget === focusedName
+      ) {
+        session.focused = true;
+        focusedSessionId = session.sessionId;
+        focusedFocusTarget = session.focusTarget;
+      } else {
+        session.focused = false;
+      }
+    }
+  }
+
+  return {
+    sessions,
+    focusedSessionId,
+    focusedSessionName: focusedName,
+    focusedFocusTarget
+  };
 };
 
 const parseFriendRequestsOutput = (output: string) =>
@@ -385,7 +427,14 @@ serverRoutes.get('/runtime/worlds', async (_req, res, next) => {
       settleDurationMs: 120,
       timeoutMs: 2000
     });
-    res.json({ raw: output, data: parseWorldsOutput(output) });
+    const parsed = parseWorldsOutput(output);
+    res.json({
+      raw: output,
+      data: parsed.sessions,
+      focusedSessionId: parsed.focusedSessionId,
+      focusedSessionName: parsed.focusedSessionName,
+      focusedFocusTarget: parsed.focusedFocusTarget
+    });
   } catch (error) {
     next(error);
   }
@@ -445,8 +494,16 @@ serverRoutes.post('/runtime/worlds/focus-refresh', async (req, res, next) => {
       timeoutMs: 2000
     });
 
+    const parsedWorlds = parseWorldsOutput(worlds);
+
     res.json({
-      worlds: { raw: worlds, data: parseWorldsOutput(worlds) },
+      worlds: {
+        raw: worlds,
+        data: parsedWorlds.sessions,
+        focusedSessionId: parsedWorlds.focusedSessionId,
+        focusedSessionName: parsedWorlds.focusedSessionName,
+        focusedFocusTarget: parsedWorlds.focusedFocusTarget
+      },
       status: { raw: status, data: parseStatusOutput(status) },
       users: { raw: users, data: parseUsersOutput(users) }
     });

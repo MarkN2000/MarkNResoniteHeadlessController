@@ -75,6 +75,9 @@
   let startupUsersReady = false;
   let headlessUserName: string | null = null;
   let headlessUserId: string | null = null;
+  let startupRetryCount = 0;
+  const STARTUP_RETRY_INTERVAL = 1800;
+  const STARTUP_MAX_RETRIES = 4;
 
   const STORAGE_KEY = 'mrhc:selectedConfig';
   const WORLD_STORAGE_KEY = 'mrhc:selectedWorldId';
@@ -187,17 +190,26 @@
       }
       runtimeWorlds = { ...worlds, data: unique };
       count = unique.length;
-      const focused = unique.find(world => world.focused);
-      if (focused) {
-        selectedWorldId = focused.sessionId;
-      } else if (selectedWorldId) {
-        const exists = unique.some(world => world.sessionId === selectedWorldId);
-        if (!exists) {
-          selectedWorldId = unique[0]?.sessionId ?? null;
-        }
-      } else {
-        selectedWorldId = unique[0]?.sessionId ?? null;
+
+      let preferred: RuntimeWorldEntry | undefined;
+      if (worlds.focusedSessionId) {
+        preferred = unique.find(entry => entry.sessionId === worlds.focusedSessionId);
       }
+      if (!preferred && worlds.focusedFocusTarget) {
+        preferred = unique.find(entry => entry.focusTarget === worlds.focusedFocusTarget);
+      }
+      if (!preferred) {
+        preferred = unique.find(entry => entry.focused);
+      }
+      if (!preferred && selectedWorldId) {
+        preferred = unique.find(entry => entry.sessionId === selectedWorldId);
+      }
+      if (!preferred) {
+        preferred = unique[0];
+      }
+
+      selectedWorldId = preferred?.sessionId ?? null;
+
       if (selectedWorldId) {
         localStorage.setItem(WORLD_STORAGE_KEY, selectedWorldId);
       } else {
@@ -383,6 +395,7 @@
             clearTimeout(startupFinalizeTimer);
             startupFinalizeTimer = null;
           }
+          startupRetryCount = 0;
           continue;
         }
 
@@ -395,6 +408,7 @@
         pendingStartup = true;
         startupWorldsReady = false;
         startupUsersReady = false;
+        startupRetryCount = 0;
         scheduleStartupFinalize();
           continue;
         }
@@ -741,8 +755,24 @@
       }
       runtimeWorlds = { ...response.worlds, data: unique };
 
-      const focused = unique.find(item => item.focused) ?? unique.find(item => item.sessionId === world.sessionId);
-      selectedWorldId = focused?.sessionId ?? unique[0]?.sessionId ?? null;
+      let preferred: RuntimeWorldEntry | undefined;
+      if (response.worlds.focusedSessionId) {
+        preferred = unique.find(item => item.sessionId === response.worlds.focusedSessionId);
+      }
+      if (!preferred && response.worlds.focusedFocusTarget) {
+        preferred = unique.find(item => item.focusTarget === response.worlds.focusedFocusTarget);
+      }
+      if (!preferred) {
+        preferred = unique.find(item => item.focused);
+      }
+      if (!preferred) {
+        preferred = unique.find(item => item.sessionId === world.sessionId);
+      }
+      if (!preferred) {
+        preferred = unique[0];
+      }
+
+      selectedWorldId = preferred?.sessionId ?? null;
       if (selectedWorldId) {
         localStorage.setItem(WORLD_STORAGE_KEY, selectedWorldId);
       } else {
@@ -805,14 +835,49 @@
             if (showStartupMessage) {
               appMessage = { type: 'info', text: 'ヘッドレスの起動が完了しました' };
             }
+
+            if (
+              runtimeWorlds?.focusedSessionId &&
+              runtimeWorlds.focusedSessionId !== selectedWorldId &&
+              runtimeWorlds.data.some(world => world.sessionId === runtimeWorlds.focusedSessionId)
+            ) {
+              selectedWorldId = runtimeWorlds.focusedSessionId;
+              localStorage.setItem(WORLD_STORAGE_KEY, selectedWorldId);
+            }
+            startupRetryCount = 0;
+          } else if (startupRetryCount < STARTUP_MAX_RETRIES) {
+            startupRetryCount += 1;
+            startupFinalizeTimer = setTimeout(() => {
+              scheduleStartupFinalize();
+            }, STARTUP_RETRY_INTERVAL);
+          } else {
+            pendingStartup = false;
+            appMessage = {
+              type: 'warning',
+              text: '起動情報の取得に時間がかかっています。セッション一覧を再取得してください。'
+            };
           }
         })
         .catch(error => {
           console.error('Failed to finalize startup data load:', error);
+          if (startupRetryCount < STARTUP_MAX_RETRIES) {
+            startupRetryCount += 1;
+            startupFinalizeTimer = setTimeout(() => {
+              scheduleStartupFinalize();
+            }, STARTUP_RETRY_INTERVAL);
+          } else {
+            pendingStartup = false;
+            appMessage = {
+              type: 'error',
+              text: '起動情報を取得できませんでした。手動で再取得してください。'
+            };
+          }
         })
         .finally(() => {
-          startupFinalizeTimer = null;
-          showStartupMessage = false;
+          if (!pendingStartup) {
+            startupFinalizeTimer = null;
+            showStartupMessage = false;
+          }
         });
     }, delay);
   };
@@ -1696,9 +1761,10 @@
   }
 
   .session.focused {
-    background: #61d1fa;
-    color: #11151d;
-    box-shadow: 0 0 12px rgba(97, 209, 250, 0.35);
+    background: #2b2f35;
+    color: #e1f6ff;
+    border-color: #ba64f2;
+    box-shadow: 0 0 0 3px rgba(186, 100, 242, 0.4);
   }
 
   .session strong {

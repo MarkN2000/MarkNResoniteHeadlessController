@@ -104,6 +104,9 @@ export interface RuntimeWorldEntry {
 export interface RuntimeWorldsData {
   raw: string;
   data: RuntimeWorldEntry[];
+  focusedSessionId?: string | null;
+  focusedSessionName?: string | null;
+  focusedFocusTarget?: string | null;
 }
 
 export const getRuntimeStatus = () => request('/server/runtime/status') as Promise<RuntimeStatusData>;
