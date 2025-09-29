@@ -607,9 +607,15 @@
     if (templateLoading) return;
     templateLoading = true;
     try {
-      await postCommand(`/template ${templateName}`);
-      templateMessage = 'テンプレートを起動しました。';
-      templateSuccess = true;
+      const trimmed = templateName.trim();
+      if (!trimmed) {
+        templateMessage = 'テンプレート名を入力してください。';
+        templateSuccess = false;
+      } else {
+        await postCommand(`startworldtemplate ${JSON.stringify(trimmed)}`);
+        templateMessage = 'テンプレートを起動しました。';
+        templateSuccess = true;
+      }
     } catch (error) {
       templateMessage = error instanceof Error ? error.message : 'テンプレートを起動できませんでした';
       templateSuccess = false;
@@ -622,9 +628,15 @@
     if (worldUrlLoading) return;
     worldUrlLoading = true;
     try {
-      await postCommand(`/url ${worldUrl}`);
-      worldUrlMessage = 'URLから起動しました。';
-      worldUrlSuccess = true;
+      const trimmed = worldUrl.trim();
+      if (!trimmed) {
+        worldUrlMessage = 'URLを入力してください。';
+        worldUrlSuccess = false;
+      } else {
+        await postCommand(`startworldurl ${JSON.stringify(trimmed)}`);
+        worldUrlMessage = 'URLから起動しました。';
+        worldUrlSuccess = true;
+      }
     } catch (error) {
       worldUrlMessage = error instanceof Error ? error.message : 'URLから起動できませんでした';
       worldUrlSuccess = false;
@@ -649,9 +661,15 @@
     if (friendSendLoading) return;
     friendSendLoading = true;
     try {
-      await postCommand(`/friend send ${friendTargetName}`);
-      friendSendMessage = 'フレンド申請を送りました。';
-      friendSendSuccess = true;
+      const target = friendTargetName.trim();
+      if (!target) {
+        friendSendMessage = 'ユーザー名を入力してください。';
+        friendSendSuccess = false;
+      } else {
+        await postCommand(`sendfriendrequest ${JSON.stringify(target)}`);
+        friendSendMessage = 'フレンド申請を送りました。';
+        friendSendSuccess = true;
+      }
     } catch (error) {
       friendSendMessage = error instanceof Error ? error.message : 'フレンド申請を送れませんでした';
       friendSendSuccess = false;
@@ -664,9 +682,15 @@
     if (friendAcceptLoading) return;
     friendAcceptLoading = true;
     try {
-      await postCommand(`/friend accept ${friendTargetName}`);
-      friendAcceptMessage = 'フレンド申請を承認しました。';
-      friendAcceptSuccess = true;
+      const target = friendTargetName.trim();
+      if (!target) {
+        friendAcceptMessage = 'ユーザー名を入力してください。';
+        friendAcceptSuccess = false;
+      } else {
+        await postCommand(`acceptfriendrequest ${JSON.stringify(target)}`);
+        friendAcceptMessage = 'フレンド申請を承認しました。';
+        friendAcceptSuccess = true;
+      }
     } catch (error) {
       friendAcceptMessage = error instanceof Error ? error.message : 'フレンド申請を承認できませんでした';
       friendAcceptSuccess = false;
@@ -679,9 +703,15 @@
     if (friendRemoveLoading) return;
     friendRemoveLoading = true;
     try {
-      await postCommand(`/friend remove ${friendTargetName}`);
-      friendRemoveMessage = 'フレンドを解除しました。';
-      friendRemoveSuccess = true;
+      const target = friendTargetName.trim();
+      if (!target) {
+        friendRemoveMessage = 'ユーザー名を入力してください。';
+        friendRemoveSuccess = false;
+      } else {
+        await postCommand(`removefriend ${JSON.stringify(target)}`);
+        friendRemoveMessage = 'フレンドを解除しました。';
+        friendRemoveSuccess = true;
+      }
     } catch (error) {
       friendRemoveMessage = error instanceof Error ? error.message : 'フレンドを解除できませんでした';
       friendRemoveSuccess = false;
@@ -694,9 +724,16 @@
     if (friendMessageLoading) return;
     friendMessageLoading = true;
     try {
-      await postCommand(`/friend message ${friendTargetName} ${friendMessageText}`);
-      friendMessageFeedback = 'メッセージを送信しました。';
-      friendMessageSuccess = true;
+      const target = friendTargetName.trim();
+      const text = friendMessageText.trim();
+      if (!target || !text) {
+        friendMessageFeedback = 'ユーザー名とメッセージを入力してください。';
+        friendMessageSuccess = false;
+      } else {
+        await postCommand(`message ${JSON.stringify(target)} ${JSON.stringify(text)}`);
+        friendMessageFeedback = 'メッセージを送信しました。';
+        friendMessageSuccess = true;
+      }
     } catch (error) {
       friendMessageFeedback = error instanceof Error ? error.message : 'メッセージを送信できませんでした';
       friendMessageSuccess = false;
