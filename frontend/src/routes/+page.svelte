@@ -11,6 +11,7 @@
     getFriendRequests,
     getRuntimeWorlds,
     postCommand,
+    postFocusWorld,
     postFocusWorldRefresh,
     startServer,
     stopServer,
@@ -135,7 +136,7 @@
   let accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
   let sessionNameInput = '';
   let sessionDescriptionInput = '';
-  let maxUsersInput = '';
+  let maxUsersInput: number | null = null;
   let accessLevelInput = '';
   let hiddenFromListingInput = false;
   let statusActionLoading: Record<string, boolean> = {};
@@ -234,7 +235,7 @@
       if (runtimeStatus?.data) {
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
-        maxUsersInput = runtimeStatus.data.maxUsers !== undefined ? String(runtimeStatus.data.maxUsers) : '';
+        maxUsersInput = runtimeStatus.data.maxUsers ?? null;
         accessLevelInput = runtimeStatus.data.accessLevel ?? '';
         hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
         const combinedLevels = new Set([...DEFAULT_ACCESS_LEVELS]);
@@ -245,7 +246,7 @@
       } else {
         sessionNameInput = '';
         sessionDescriptionInput = '';
-        maxUsersInput = '';
+        maxUsersInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -337,7 +338,7 @@
         userRoleSelections = {};
         sessionNameInput = '';
         sessionDescriptionInput = '';
-        maxUsersInput = '';
+        maxUsersInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -474,6 +475,7 @@
     }
     setStatusLoading(key, true);
     try {
+      await ensureSelectedWorldFocused();
       await postCommand(command);
       pushToast(successMessage, 'success');
       await refreshRuntimeInfo(true);
@@ -511,16 +513,15 @@
   };
 
   const applyMaxUsers = async () => {
-    if (!maxUsersInput.trim()) {
+    if (maxUsersInput === null || Number.isNaN(maxUsersInput)) {
       pushToast('最大人数を入力してください', 'error');
       return;
     }
-    const parsed = Number(maxUsersInput);
-    if (!Number.isFinite(parsed) || parsed < 0) {
+    if (!Number.isFinite(maxUsersInput) || maxUsersInput < 0) {
       pushToast('0以上の数値を入力してください', 'error');
       return;
     }
-    await sendStatusCommand('maxUsers', `maxusers ${parsed}`, '最大人数を更新しました');
+    await sendStatusCommand('maxUsers', `maxusers ${Math.floor(maxUsersInput)}`, '最大人数を更新しました');
   };
 
   const applyAccessLevel = async (value?: string) => {
@@ -569,10 +570,13 @@
     actionInProgress = true;
     pendingStartup = true;
     showStartupMessage = true;
+    startupRetryCount = 0;
     try {
       await startServer(selectedConfig);
       appMessage = { type: 'info', text: 'サーバー起動コマンドを送信しました' };
       pendingStartup = true;
+      lastWorldRunningAt = Date.now();
+      scheduleStartupFinalize();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'サーバーを起動できませんでした';
       appMessage = { type: 'error', text: message };
@@ -783,7 +787,7 @@
       if (runtimeStatus?.data) {
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
-        maxUsersInput = runtimeStatus.data.maxUsers !== undefined ? String(runtimeStatus.data.maxUsers) : '';
+        maxUsersInput = runtimeStatus.data.maxUsers ?? null;
         accessLevelInput = runtimeStatus.data.accessLevel ?? '';
         hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
 
@@ -795,7 +799,7 @@
       } else {
         sessionNameInput = '';
         sessionDescriptionInput = '';
-        maxUsersInput = '';
+        maxUsersInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -893,6 +897,27 @@
       if (user.name === headlessUserName) return true;
     }
     return false;
+  };
+
+  const ensureSelectedWorldFocused = async () => {
+    if (!$status.running) return;
+    if (!selectedWorldId) return;
+    if (!runtimeWorlds?.data?.length) return;
+
+    if (runtimeWorlds.focusedSessionId === selectedWorldId) return;
+
+    const targetWorld = runtimeWorlds.data.find(world => world.sessionId === selectedWorldId);
+    if (!targetWorld) return;
+
+    const focusTarget = targetWorld.focusTarget || targetWorld.sessionId;
+    if (!focusTarget) return;
+
+    try {
+      await postFocusWorld(focusTarget);
+      await refreshWorlds(true);
+    } catch (error) {
+      console.error('Failed to focus selected world before command:', error);
+    }
   };
 </script>
 
@@ -1084,7 +1109,15 @@
                       <label>
                         <span>最大人数 (Max Users)</span>
                         <div class="field-row">
-                          <input type="number" min="0" bind:value={maxUsersInput} />
+                          <input
+                            type="number"
+                            min="0"
+                            bind:value={maxUsersInput}
+                            on:input={(event) => {
+                              const value = (event.target as HTMLInputElement).value;
+                              maxUsersInput = value === '' ? null : Number(value);
+                            }}
+                          />
                           <button type="button" class="status-action-button" on:click={applyMaxUsers} disabled={statusActionLoading.maxUsers}>
                             適用
                           </button>
