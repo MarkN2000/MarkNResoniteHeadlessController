@@ -85,10 +85,50 @@
   let friendRequestsLoading = false;
   let friendRequestsError = '';
 
+  const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'];
+  const USER_ACTIONS = [
+    { key: 'silence', label: 'ミュート' },
+    { key: 'unsilence', label: 'ボイス許可' },
+    { key: 'respawn', label: 'リスポーン' },
+    { key: 'kick', label: 'キック' },
+    { key: 'ban', label: 'BAN' }
+  ] as const;
+
+  const getActionLabel = (key: UserActionDefinition['key']) =>
+    USER_ACTIONS.find(action => action.key === key)?.label ?? key;
+
+  const DEFAULT_ACCESS_LEVELS = ['Public', 'LAN', 'Friends', 'Private', 'Hidden'];
+
   const resourceMetrics = [
     { label: 'CPU', value: '--- %' },
     { label: 'メモリ', value: '--- GB' }
   ];
+
+  let accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
+  let sessionNameInput = '';
+  let sessionDescriptionInput = '';
+  let maxUsersInput = '';
+  let accessLevelInput = '';
+  let hiddenFromListingInput = false;
+  let statusActionLoading: Record<string, boolean> = {};
+  let statusActionFeedback: Record<string, { message: string; success: boolean } | undefined> = {};
+
+  type UserActionDefinition = (typeof USER_ACTIONS)[number];
+
+  let userRoleSelections: Record<string, string> = {};
+  let userActionLoading: Record<string, boolean> = {};
+  let userActionFeedback: Record<string, { message: string; success: boolean } | undefined> = {};
+
+  const setStatusLoading = (key: string, value: boolean) => {
+    statusActionLoading = { ...statusActionLoading, [key]: value };
+  };
+
+  const setStatusFeedback = (key: string, message: string, success: boolean) => {
+    statusActionFeedback = {
+      ...statusActionFeedback,
+      [key]: { message, success }
+    };
+  };
 
   afterUpdate(() => {
     if (logContainer) {
@@ -141,6 +181,32 @@
     try {
       runtimeStatus = await getRuntimeStatus();
       runtimeUsers = await getRuntimeUsers();
+      if (runtimeUsers?.data) {
+        const nextSelections: Record<string, string> = {};
+        runtimeUsers.data.forEach(user => {
+          nextSelections[user.name] = userRoleSelections[user.name] ?? user.role;
+        });
+        userRoleSelections = nextSelections;
+      }
+      if (runtimeStatus?.data) {
+        sessionNameInput = runtimeStatus.data.name ?? '';
+        sessionDescriptionInput = runtimeStatus.data.description ?? '';
+        maxUsersInput = runtimeStatus.data.maxUsers !== undefined ? String(runtimeStatus.data.maxUsers) : '';
+        accessLevelInput = runtimeStatus.data.accessLevel ?? '';
+        hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
+        const combinedLevels = new Set([...DEFAULT_ACCESS_LEVELS]);
+        if (runtimeStatus.data.accessLevel) {
+          combinedLevels.add(runtimeStatus.data.accessLevel);
+        }
+        accessLevelOptions = Array.from(combinedLevels);
+      } else {
+        sessionNameInput = '';
+        sessionDescriptionInput = '';
+        maxUsersInput = '';
+        accessLevelInput = '';
+        hiddenFromListingInput = false;
+        accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
+      }
     } catch (error) {
       runtimeStatus = null;
       runtimeUsers = null;
@@ -182,6 +248,14 @@
       if (statusValue.running) {
         selectedWorldId = localStorage.getItem(WORLD_STORAGE_KEY);
         await Promise.all([refreshWorlds(true), refreshRuntimeInfo(true)]);
+      } else {
+        userRoleSelections = {};
+        sessionNameInput = '';
+        sessionDescriptionInput = '';
+        maxUsersInput = '';
+        accessLevelInput = '';
+        hiddenFromListingInput = false;
+        accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
       }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : '初期データの取得に失敗しました';
@@ -193,6 +267,143 @@
   onMount(() => {
     loadInitialData();
   });
+
+  const sendUserAction = async (username: string, action: UserActionDefinition['key']) => {
+    if (!username) return;
+    userActionLoading = { ...userActionLoading, [`${username}-${action}`]: true };
+    userActionFeedback = { ...userActionFeedback, [username]: undefined };
+    try {
+      await postCommand(`${action} "${username}"`);
+      userActionFeedback = {
+        ...userActionFeedback,
+        [username]: { message: `${getActionLabel(action)} を送信しました`, success: true }
+      };
+      if ($status.running) {
+        await Promise.all([refreshRuntimeInfo(true), refreshWorlds(true)]);
+      }
+    } catch (error) {
+      userActionFeedback = {
+        ...userActionFeedback,
+        [username]: {
+          message: error instanceof Error ? error.message : 'コマンド送信に失敗しました',
+          success: false
+        }
+      };
+    } finally {
+      userActionLoading = { ...userActionLoading, [`${username}-${action}`]: false };
+    }
+  };
+
+  const updateUserRole = async (username: string, role: string) => {
+    if (!username || !role) return;
+    userActionLoading = { ...userActionLoading, [`${username}-role`]: true };
+    userActionFeedback = { ...userActionFeedback, [username]: undefined };
+    try {
+      await postCommand(`role "${username}" "${role}"`);
+      userActionFeedback = {
+        ...userActionFeedback,
+        [username]: { message: `ロールを ${role} に変更しました`, success: true }
+      };
+      if ($status.running) {
+        await refreshRuntimeInfo(true);
+      }
+    } catch (error) {
+      userActionFeedback = {
+        ...userActionFeedback,
+        [username]: {
+          message: error instanceof Error ? error.message : 'ロール変更に失敗しました',
+          success: false
+        }
+      };
+    } finally {
+      userActionLoading = { ...userActionLoading, [`${username}-role`]: false };
+    }
+  };
+
+  const sendStatusCommand = async (key: string, command: string, successMessage: string) => {
+    if (!$status.running) {
+      setStatusFeedback(key, 'サーバーが起動していません', false);
+      return;
+    }
+    setStatusLoading(key, true);
+    setStatusFeedback(key, '', true);
+    try {
+      await postCommand(command);
+      setStatusFeedback(key, successMessage, true);
+      await refreshRuntimeInfo(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
+      setStatusFeedback(key, message, false);
+    } finally {
+      setStatusLoading(key, false);
+    }
+  };
+
+  const applySessionName = async () => {
+    const value = sessionNameInput.trim();
+    if (!value) {
+      setStatusFeedback('name', 'セッション名を入力してください', false);
+      return;
+    }
+    await sendStatusCommand('name', `name ${JSON.stringify(value)}`, 'セッション名を更新しました');
+  };
+
+  const copySessionId = async () => {
+    const sessionId = runtimeStatus?.data?.sessionId;
+    if (!sessionId) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(sessionId);
+        setStatusFeedback('sessionId', 'SessionIDをコピーしました', true);
+      } else {
+        setStatusFeedback('sessionId', 'クリップボードに対応していません', false);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コピーに失敗しました';
+      setStatusFeedback('sessionId', message, false);
+    }
+  };
+
+  const applyMaxUsers = async () => {
+    if (!maxUsersInput.trim()) {
+      setStatusFeedback('maxUsers', '最大人数を入力してください', false);
+      return;
+    }
+    const parsed = Number(maxUsersInput);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setStatusFeedback('maxUsers', '0以上の数値を入力してください', false);
+      return;
+    }
+    await sendStatusCommand('maxUsers', `maxusers ${parsed}`, '最大人数を更新しました');
+  };
+
+  const applyAccessLevel = async (value?: string) => {
+    const nextLevel = value ?? accessLevelInput;
+    if (!nextLevel) {
+      setStatusFeedback('accessLevel', 'アクセスレベルを選択してください', false);
+      return;
+    }
+    accessLevelInput = nextLevel;
+    await sendStatusCommand('accessLevel', `accesslevel ${nextLevel}`, `アクセスレベルを${nextLevel}に設定しました`);
+  };
+
+  const handleHiddenFromListingChange = async (checked: boolean) => {
+    hiddenFromListingInput = checked;
+    await sendStatusCommand(
+      'hidden',
+      `hidefromlisting ${checked ? 'true' : 'false'}`,
+      checked ? 'リスト非表示に設定しました' : 'リスト表示に設定しました'
+    );
+  };
+
+  const applyDescription = async () => {
+    await sendStatusCommand('description', `description ${JSON.stringify(sessionDescriptionInput)}`, '説明を更新しました');
+  };
+
+  const executeWorldCommand = async (command: 'save' | 'close') => {
+    const successMessage = command === 'save' ? 'ワールドを保存しました' : 'ワールドを閉じるコマンドを送信しました';
+    await sendStatusCommand(command, command, successMessage);
+  };
 
   const handleStart = async () => {
     if (actionInProgress) return;
@@ -480,39 +691,114 @@
                 <div class="section-header">
                   <h2>/status</h2>
                   <button type="button" on:click={refreshRuntimeInfo} disabled={!$status.running || runtimeLoading}>
-                    更新
+                    再取得
                   </button>
                 </div>
                 {#if !$status.running}
                   <p class="empty">サーバーが起動すると状態が表示されます。</p>
                 {:else if runtimeStatus}
-                  <dl>
-                    {#if runtimeStatus.data.name}<div><dt>セッション名</dt><dd>{runtimeStatus.data.name}</dd></div>{/if}
-                    {#if runtimeStatus.data.sessionId}<div><dt>SessionID</dt><dd>{runtimeStatus.data.sessionId}</dd></div>{/if}
-                    {#if runtimeStatus.data.currentUsers !== undefined}
-                      <div><dt>接続ユーザー</dt><dd>{runtimeStatus.data.currentUsers} / {runtimeStatus.data.maxUsers ?? '-'}</dd></div>
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
+                    <label>
+                      <span>セッション名</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={sessionNameInput} />
+                        <button type="button" on:click={applySessionName} disabled={statusActionLoading.name}>
+                          適用
+                        </button>
+                      </div>
+                      {#if statusActionFeedback.name}
+                        <span class="feedback" class:success={statusActionFeedback.name.success}>{statusActionFeedback.name.message}</span>
+                      {/if}
+                    </label>
+
+                    <label>
+                      <span>SessionID</span>
+                      <div class="field-row">
+                        <input class="muted" type="text" value={runtimeStatus.data.sessionId ?? ''} readonly />
+                        <button type="button" on:click={copySessionId}>
+                          コピー
+                        </button>
+                      </div>
+                      {#if statusActionFeedback.sessionId}
+                        <span class="feedback" class:success={statusActionFeedback.sessionId.success}>
+                          {statusActionFeedback.sessionId.message}
+                        </span>
+                      {/if}
+                    </label>
+
+                    <label>
+                      <span>人数 (Present / Users / Max)</span>
+                      <div class="field-row">
+                        <span class="muted">{runtimeStatus.data.presentUsers ?? '-'}</span>
+                        <span class="slash">/</span>
+                        <span class="muted">{runtimeStatus.data.currentUsers ?? '-'}</span>
+                        <span class="slash">/</span>
+                        <input type="number" min="0" bind:value={maxUsersInput} />
+                        <button type="button" on:click={applyMaxUsers} disabled={statusActionLoading.maxUsers}>
+                          適用
+                        </button>
+                      </div>
+                      {#if statusActionFeedback.maxUsers}
+                        <span class="feedback" class:success={statusActionFeedback.maxUsers.success}>{statusActionFeedback.maxUsers.message}</span>
+                      {/if}
+                    </label>
+
+                    <label>
+                      <span>アクセスレベル</span>
+                      <select
+                        value={accessLevelInput || runtimeStatus.data.accessLevel || DEFAULT_ACCESS_LEVELS[0]}
+                        on:change={(event) => {
+                          accessLevelInput = (event.target as HTMLSelectElement).value;
+                          applyAccessLevel(accessLevelInput);
+                        }}
+                        disabled={statusActionLoading.accessLevel}
+                      >
+                        {#each accessLevelOptions as level}
+                          <option value={level}>{level}</option>
+                        {/each}
+                      </select>
+                      {#if statusActionFeedback.accessLevel}
+                        <span class="feedback" class:success={statusActionFeedback.accessLevel.success}>{statusActionFeedback.accessLevel.message}</span>
+                      {/if}
+                    </label>
+
+                    <label class="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFromListingInput}
+                        on:change={(event) => handleHiddenFromListingChange((event.target as HTMLInputElement).checked)}
+                        disabled={statusActionLoading.hidden}
+                      />
+                      <span>リスト非表示にする</span>
+                    </label>
+                    {#if statusActionFeedback.hidden}
+                      <span class="feedback" class:success={statusActionFeedback.hidden.success}>{statusActionFeedback.hidden.message}</span>
                     {/if}
-                    {#if runtimeStatus.data.presentUsers !== undefined}
-                      <div><dt>在席ユーザー</dt><dd>{runtimeStatus.data.presentUsers}</dd></div>
-                    {/if}
-                    {#if runtimeStatus.data.uptime}<div><dt>起動時間</dt><dd>{runtimeStatus.data.uptime}</dd></div>{/if}
-                    {#if runtimeStatus.data.accessLevel}<div><dt>アクセスレベル</dt><dd>{runtimeStatus.data.accessLevel}</dd></div>{/if}
-                    {#if runtimeStatus.data.hiddenFromListing !== undefined}
-                      <div><dt>リスト非表示</dt><dd>{runtimeStatus.data.hiddenFromListing ? 'はい' : 'いいえ'}</dd></div>
-                    {/if}
-                    {#if runtimeStatus.data.mobileFriendly !== undefined}
-                      <div><dt>モバイル対応</dt><dd>{runtimeStatus.data.mobileFriendly ? 'はい' : 'いいえ'}</dd></div>
-                    {/if}
-                    {#if runtimeStatus.data.tags.length}
-                      <div><dt>タグ</dt><dd>{runtimeStatus.data.tags.join(', ')}</dd></div>
-                    {/if}
-                    {#if runtimeStatus.data.users.length}
-                      <div><dt>参加ユーザー</dt><dd>{runtimeStatus.data.users.join(', ')}</dd></div>
-                    {/if}
-                    {#if runtimeStatus.data.description}
-                      <div class="full"><dt>説明</dt><dd><pre>{runtimeStatus.data.description}</pre></dd></div>
-                    {/if}
-                  </dl>
+
+                    <label>
+                      <span>説明</span>
+                      <textarea rows="4" bind:value={sessionDescriptionInput}></textarea>
+                      <div class="field-row end">
+                        <button type="button" on:click={applyDescription} disabled={statusActionLoading.description}>
+                          適用
+                        </button>
+                      </div>
+                      {#if statusActionFeedback.description}
+                        <span class="feedback" class:success={statusActionFeedback.description.success}>
+                          {statusActionFeedback.description.message}
+                        </span>
+                      {/if}
+                    </label>
+
+                    <div class="action-buttons">
+                      <button type="button" on:click={() => executeWorldCommand('save')} disabled={statusActionLoading.save}>
+                        ワールドを保存
+                      </button>
+                      <button type="button" on:click={() => executeWorldCommand('close')} disabled={statusActionLoading.close}>
+                        ワールドを閉じる
+                      </button>
+                    </div>
+                  </form>
                 {:else}
                   <p class="empty">読み込み中...</p>
                 {/if}
@@ -530,11 +816,10 @@
                       <thead>
                         <tr>
                           <th>ユーザー</th>
-                          <th>Role</th>
                           <th>在席</th>
-                          <th>Ping</th>
-                          <th>FPS</th>
+                          <th>Role</th>
                           <th>Silenced</th>
+                          <th>操作</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -543,12 +828,60 @@
                             <td>
                               <strong>{user.name}</strong>
                               <span class="sub">{user.id}</span>
+                              {#if userActionFeedback[user.name]}
+                                <span
+                                  class="feedback"
+                                  class:success={userActionFeedback[user.name]?.success}
+                                >
+                                  {userActionFeedback[user.name]?.message}
+                                </span>
+                              {/if}
                             </td>
-                            <td>{user.role}</td>
                             <td>{user.present ? '在席' : '離席'}</td>
-                            <td>{user.pingMs}</td>
-                            <td>{user.fps}</td>
-                            <td>{user.silenced ? 'はい' : 'いいえ'}</td>
+                            <td>
+                              <select
+                                value={userRoleSelections[user.name] ?? user.role}
+                                on:change={(event) => {
+                                  const value = (event.target as HTMLSelectElement).value;
+                                  userRoleSelections = { ...userRoleSelections, [user.name]: value };
+                                  updateUserRole(user.name, value);
+                                }}
+                                disabled={userActionLoading[`${user.name}-role`]}
+                              >
+                                {#each ROLE_OPTIONS as option}
+                                  <option value={option}>{option}</option>
+                                {/each}
+                              </select>
+                            </td>
+                            <td>
+                              <select
+                                value={user.silenced ? 'silence' : 'unsilence'}
+                                on:change={(event) => {
+                                  const value = (event.target as HTMLSelectElement).value as 'silence' | 'unsilence';
+                                  sendUserAction(user.name, value);
+                                }}
+                                disabled={userActionLoading[`${user.name}-silence`] || userActionLoading[`${user.name}-unsilence`]}
+                              >
+                                <option value="silence">ミュート</option>
+                                <option value="unsilence">ボイス許可</option>
+                              </select>
+                            </td>
+                            <td>
+                              <div class="user-actions">
+                                {#each USER_ACTIONS as action}
+                                  {#if action.key === 'silence' || action.key === 'unsilence'}
+                                  {:else}
+                                    <button
+                                      type="button"
+                                      on:click={() => sendUserAction(user.name, action.key)}
+                                      disabled={userActionLoading[`${user.name}-${action.key}`]}
+                                    >
+                                      {action.label}
+                                    </button>
+                                  {/if}
+                                {/each}
+                              </div>
+                            </td>
                           </tr>
                         {/each}
                       </tbody>
@@ -903,12 +1236,12 @@
   }
 
   .status-indicators button.danger {
-    background: #ba64f2;
-    color: #ffffff;
+    background: #ff7676;
+    color: #11151d;
   }
 
   .status-indicators button.danger:hover:enabled {
-    filter: brightness(1.1);
+    filter: brightness(1.05);
   }
 
   .content {
@@ -1288,21 +1621,37 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
-    background: rgba(17, 21, 29, 0.4);
+    background: #1a2a36;
     border-radius: 0.75rem;
     overflow: hidden;
+  }
+
+  td select {
+    background: #2b2f35;
+    border: none;
+    border-radius: 0.55rem;
+    padding: 0.35rem 1.9rem 0.35rem 0.5rem;
+    color: #e1f6ff;
+    font-size: 0.8rem;
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, rgba(207, 214, 228, 0.8) 50%),
+      linear-gradient(135deg, rgba(207, 214, 228, 0.8) 50%, transparent 50%);
+    background-position: calc(100% - 1.1rem) calc(50% - 2px), calc(100% - 0.75rem) calc(50% - 2px);
+    background-size: 9px 9px;
+    background-repeat: no-repeat;
   }
 
   th,
   td {
     padding: 0.75rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.15);
     text-align: left;
   }
 
   th {
     font-size: 0.75rem;
-    color: #86888b;
+    color: #e8edf6;
   }
 
   td .sub {
@@ -1493,6 +1842,188 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .user-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .user-actions button {
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.55rem;
+    border: none;
+    background: #2b2f35;
+    color: #cfd6e4;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  td select[value='silence'],
+  td select[value='unsilence'] {
+    width: 100%;
+  }
+
+  .user-actions button:hover:enabled {
+    background: #3a404d;
+  }
+
+  td .feedback {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.7rem;
+    color: #ff7676;
+  }
+
+  td .feedback.success {
+    color: #59eb5c;
+  }
+
+  .field-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .field-row input {
+    flex: 1;
+  }
+
+  .field-row button {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.6rem;
+    border: 1px solid rgba(97, 209, 250, 0.3);
+    background: #2b2f35;
+    color: #61d1fa;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+
+  .field-row button:hover:enabled {
+    background: #34404c;
+  }
+
+  .checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #86888b;
+  }
+
+  .checkbox-field input {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: #61d1fa;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .action-buttons button {
+    flex: 1;
+    padding: 0.55rem 1.1rem;
+    border-radius: 0.65rem;
+    border: none;
+    background: #2b2f35;
+    color: #61d1fa;
+    font-weight: 600;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .action-buttons button:hover:enabled {
+    background: #34404c;
+  }
+
+  .status-card button,
+  .status-card input,
+  .status-card textarea,
+  .runtime-card button,
+  .command-card button {
+    padding: 0.55rem 1.1rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(97, 209, 250, 0.35);
+    background: #2b2f35;
+    color: #61d1fa;
+    font-weight: 600;
+  }
+
+  .status-card input,
+  .status-card textarea,
+  .status-card select {
+    border: none;
+    border-radius: 0.55rem;
+    padding: 0.4rem 0.6rem;
+    background: #2b2f35;
+    color: #e1f6ff;
+    font-size: 0.85rem;
+  }
+
+  .status-card .muted {
+    background: rgba(24, 34, 43, 0.85);
+    color: #9aa3b3;
+  }
+
+  .status-card .status-form {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .status-card label {
+    display: grid;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .status-card label span {
+    color: #9aa3b3;
+    font-weight: 600;
+  }
+
+  .status-card .field-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .status-card .field-row .slash {
+    color: #6a7286;
+  }
+
+  .status-card .field-row.end {
+    justify-content: flex-end;
+  }
+
+  .status-card .checkbox-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #cfd6e4;
+  }
+
+  .status-card .checkbox-field input {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .status-card .action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+
+  .status-card .feedback {
+    font-size: 0.75rem;
+    color: #ff7676;
+  }
+
+  .status-card .feedback.success {
+    color: #59eb5c;
   }
 
   @media (max-width: 1200px) {
