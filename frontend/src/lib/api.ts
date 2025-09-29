@@ -16,7 +16,10 @@ export interface LogEntry {
   message: string;
 }
 
-export type { ConfigEntry };
+export interface ConfigEntry {
+  path: string;
+  name: string;
+}
 
 async function request(path: string, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {

@@ -17,7 +17,9 @@
     type RuntimeUsersData,
     type FriendRequestsData,
     type RuntimeWorldsData,
-    type RuntimeWorldEntry
+    type RuntimeWorldEntry,
+    type ConfigEntry,
+    type LogEntry
   } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
@@ -34,9 +36,11 @@
 
   let initialLoading = true;
   let selectedConfig: string | undefined;
-  let errorMessage = '';
+  let appMessage: { type: 'error' | 'warning' | 'info'; text: string } | null = null;
   let actionInProgress = false;
   const LOG_DISPLAY_LIMIT = 1000;
+  const INITIAL_RETRY_DELAY = 3000;
+  let backendReachable = true;
   let logContainer: HTMLDivElement | null = null;
   let runtimeStatus: RuntimeStatusData | null = null;
   let runtimeUsers: RuntimeUsersData | null = null;
@@ -93,6 +97,8 @@
     { key: 'kick', label: 'キック' },
     { key: 'ban', label: 'BAN' }
   ] as const;
+
+  const isCommandLog = (entry: LogEntry) => entry.level === 'stdout' && entry.message.trimStart().startsWith('>');
 
   const getActionLabel = (key: UserActionDefinition['key']) =>
     USER_ACTIONS.find(action => action.key === key)?.label ?? key;
@@ -211,7 +217,8 @@
       runtimeStatus = null;
       runtimeUsers = null;
       if (!suppressError) {
-        errorMessage = error instanceof Error ? error.message : 'ランタイム情報を取得できませんでした';
+        const message = error instanceof Error ? error.message : 'ランタイム情報を取得できませんでした';
+        appMessage = { type: 'error', text: message };
       }
     } finally {
       runtimeLoading = false;
@@ -229,17 +236,28 @@
     }
   };
 
+  const applyConfigList = (configList: ConfigEntry[]) => {
+    setConfigs(configList);
+    const storedConfig = localStorage.getItem(STORAGE_KEY);
+    const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
+    selectedConfig = defaultConfig?.path;
+    if (selectedConfig) {
+      localStorage.setItem(STORAGE_KEY, selectedConfig);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
   const loadInitialData = async () => {
     initialLoading = true;
     try {
       const configList = await getConfigs();
-      setConfigs(configList);
-      const storedConfig = localStorage.getItem(STORAGE_KEY);
-      const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
-      selectedConfig = defaultConfig?.path;
-      if (selectedConfig) {
-        localStorage.setItem(STORAGE_KEY, selectedConfig);
+      backendReachable = true;
+      appMessage = null;
+      if (configList.length === 0) {
+        throw Object.assign(new Error('設定ファイルが見つかりません'), { retryable: true });
       }
+      applyConfigList(configList);
 
       const statusValue = await getStatus();
       setStatus(statusValue);
@@ -258,14 +276,43 @@
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
       }
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : '初期データの取得に失敗しました';
+      backendReachable = false;
+      const message = error instanceof Error ? error.message : '初期データの取得に失敗しました';
+      appMessage = { type: 'error', text: message };
+      if (error instanceof Error && (error as { retryable?: boolean }).retryable) {
+        setTimeout(() => {
+          if (!initialLoading) {
+            initialLoading = true;
+          }
+          loadInitialData();
+        }, INITIAL_RETRY_DELAY);
+      }
     } finally {
       initialLoading = false;
     }
   };
 
   onMount(() => {
+    const unsubscribe = configs.subscribe(current => {
+      if (!initialLoading) {
+        if (current.length === 0) {
+          backendReachable = false;
+          refreshConfigsOnly().catch(err => {
+            console.error('Failed to refresh configs after reconnect:', err);
+          });
+        } else {
+          backendReachable = true;
+          appMessage = null;
+          applyConfigList(current);
+        }
+      }
+    });
+
     loadInitialData();
+
+    return () => {
+      unsubscribe();
+    };
   });
 
   const sendUserAction = async (username: string, action: UserActionDefinition['key']) => {
@@ -406,29 +453,28 @@
   };
 
   const handleStart = async () => {
-    if (actionInProgress) return;
     actionInProgress = true;
     try {
       await startServer(selectedConfig);
-      await Promise.all([refreshWorlds(), refreshRuntimeInfo(), refreshConfigsOnly()]);
+      await Promise.all([refreshRuntimeInfo(true), refreshWorlds(true)]);
+      appMessage = { type: 'info', text: 'サーバー起動コマンドを送信しました' };
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'サーバーを起動できませんでした';
+      const message = error instanceof Error ? error.message : 'サーバーを起動できませんでした';
+      appMessage = { type: 'error', text: message };
     } finally {
       actionInProgress = false;
     }
   };
 
   const handleStop = async () => {
-    if (actionInProgress) return;
     actionInProgress = true;
     try {
       await stopServer();
-      runtimeStatus = null;
-      runtimeUsers = null;
-      runtimeWorlds = null;
-      await refreshConfigsOnly();
+      await refreshRuntimeInfo(true);
+      appMessage = { type: 'info', text: 'サーバー停止コマンドを送信しました' };
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'サーバーを停止できませんでした';
+      const message = error instanceof Error ? error.message : 'サーバーを停止できませんでした';
+      appMessage = { type: 'error', text: message };
     } finally {
       actionInProgress = false;
     }
@@ -576,13 +622,21 @@
       </div>
     </div>
     <div class="topbar-controls">
+      <div class="backend-status" class:offline={!backendReachable}>
+        <span class="dot"></span>
+        {backendReachable ? 'バックエンド接続済み' : 'バックエンド未接続'}
+      </div>
       <label class="field">
         <span>プロファイル選択</span>
-        <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
-          {#each $configs as config}
-            <option value={config.path}>{config.name}</option>
-          {/each}
-        </select>
+        {#if backendReachable && $configs.length}
+          <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
+            {#each $configs as config}
+              <option value={config.path}>{config.name}</option>
+            {/each}
+          </select>
+        {:else}
+          <div class="field-placeholder">利用可能な設定がありません</div>
+        {/if}
       </label>
       {#each resourceMetrics as metric}
         <div class="resource-capsule">
@@ -655,7 +709,7 @@
             <p class="empty">まだログがありません。</p>
           {:else}
             {#each $logs.slice(-LOG_DISPLAY_LIMIT) as log}
-              <div class:stderr={log.level === 'stderr'}>
+              <div class:stderr={log.level === 'stderr'} class:command-log={isCommandLog(log)}>
                 <pre>{log.message}</pre>
               </div>
             {/each}
@@ -668,8 +722,8 @@
       {#if initialLoading}
         <div class="panel notice loading">読み込み中...</div>
       {:else}
-        {#if errorMessage}
-          <div class="panel notice error">{errorMessage}</div>
+        {#if appMessage}
+          <div class={`panel notice ${appMessage.type}`}>{appMessage.text}</div>
         {/if}
 
         <nav class="tab-bar">
@@ -1534,8 +1588,21 @@
   }
 
   .panel.notice.error {
-    border-color: rgba(255, 118, 118, 0.45);
-    color: #ff7676;
+    background: rgba(255, 118, 118, 0.1);
+    color: #ffb2b2;
+    border: 1px solid rgba(255, 118, 118, 0.35);
+  }
+
+  .panel.notice.info {
+    background: rgba(97, 209, 250, 0.1);
+    color: #c7efff;
+    border: 1px solid rgba(97, 209, 250, 0.25);
+  }
+
+  .panel.notice.warning {
+    background: rgba(255, 210, 0, 0.1);
+    color: #ffe8a3;
+    border: 1px solid rgba(255, 210, 0, 0.25);
   }
 
   .card h2 {
@@ -1693,6 +1760,10 @@
 
   .logs-card .log-container div.stderr {
     border-left: 2px solid #ff7676;
+  }
+
+  .logs-card .log-container div.command-log {
+    background: rgba(97, 209, 250, 0.18);
   }
 
   .logs-card pre {
@@ -2062,5 +2133,41 @@
     .summary-card button {
       width: 100%;
     }
+  }
+
+  .field-placeholder {
+    min-width: 220px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.75rem;
+    background: rgba(43, 47, 53, 0.4);
+    color: rgba(225, 225, 224, 0.6);
+    border: 1px dashed rgba(186, 100, 242, 0.4);
+  }
+
+  .backend-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.9rem;
+    background: rgba(48, 73, 89, 0.5);
+    border-radius: 0.75rem;
+    font-size: 0.85rem;
+    color: #cceaff;
+  }
+
+  .backend-status .dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    background: #59eb5c;
+  }
+
+  .backend-status.offline {
+    background: rgba(120, 43, 43, 0.6);
+    color: #ffdcdc;
+  }
+
+  .backend-status.offline .dot {
+    background: #ff7676;
   }
 </style>
