@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, afterUpdate } from 'svelte';
+  import { derived, writable } from 'svelte/store';
   import {
     createServerStores,
     getStatus,
@@ -37,6 +38,15 @@
   let initialLoading = true;
   let selectedConfig: string | undefined;
   let appMessage: { type: 'error' | 'warning' | 'info'; text: string } | null = null;
+  const notificationsStore = writable<Array<{ id: number; message: string; type: 'success' | 'error' | 'info' }>>([]);
+  const notifications = derived(notificationsStore, value => value);
+  const pushToast = (message: string, type: 'success' | 'error' | 'info' = 'info', duration = 4200) => {
+    const id = Date.now() + Math.random();
+    notificationsStore.update(items => [...items, { id, message, type }]);
+    setTimeout(() => {
+      notificationsStore.update(items => items.filter(item => item.id !== id));
+    }, duration);
+  };
   let actionInProgress = false;
   const LOG_DISPLAY_LIMIT = 1000;
   const INITIAL_RETRY_DELAY = 3000;
@@ -70,31 +80,19 @@
   const WORLD_STORAGE_KEY = 'mrhc:selectedWorldId';
 
   let templateName = '';
-  let templateMessage = '';
-  let templateSuccess = false;
   let templateLoading = false;
 
   let worldUrl = '';
-  let worldUrlMessage = '';
-  let worldUrlSuccess = false;
   let worldUrlLoading = false;
 
-  let friendSendMessage = '';
-  let friendSendSuccess = false;
   let friendSendLoading = false;
 
-  let friendAcceptMessage = '';
-  let friendAcceptSuccess = false;
   let friendAcceptLoading = false;
 
-  let friendRemoveMessage = '';
-  let friendRemoveSuccess = false;
   let friendRemoveLoading = false;
 
   let friendTargetName = '';
   let friendMessageText = '';
-  let friendMessageFeedback = '';
-  let friendMessageSuccess = false;
   let friendMessageLoading = false;
   let friendRequests: FriendRequestsData | null = null;
   let friendRequestsLoading = false;
@@ -138,23 +136,13 @@
   let accessLevelInput = '';
   let hiddenFromListingInput = false;
   let statusActionLoading: Record<string, boolean> = {};
-  let statusActionFeedback: Record<string, { message: string; success: boolean } | undefined> = {};
 
   type UserActionDefinition = (typeof USER_ACTIONS)[number];
 
   let userRoleSelections: Record<string, string> = {};
   let userActionLoading: Record<string, boolean> = {};
-  let userActionFeedback: Record<string, { message: string; success: boolean } | undefined> = {};
-
   const setStatusLoading = (key: string, value: boolean) => {
     statusActionLoading = { ...statusActionLoading, [key]: value };
-  };
-
-  const setStatusFeedback = (key: string, message: string, success: boolean) => {
-    statusActionFeedback = {
-      ...statusActionFeedback,
-      [key]: { message, success }
-    };
   };
 
   afterUpdate(() => {
@@ -422,52 +410,44 @@
   });
 
   const sendUserAction = async (username: string, action: UserActionDefinition['key']) => {
-    if (!username) return;
+    if (!username) {
+      pushToast('ユーザー名が取得できませんでした', 'error');
+      return;
+    }
     userActionLoading = { ...userActionLoading, [`${username}-${action}`]: true };
-    userActionFeedback = { ...userActionFeedback, [username]: undefined };
     try {
       await postCommand(`${action} "${username}"`);
-      userActionFeedback = {
-        ...userActionFeedback,
-        [username]: { message: `${getActionLabel(action)} を送信しました`, success: true }
-      };
+      pushToast(`${getActionLabel(action)} を送信しました`, 'success');
       if ($status.running) {
         await Promise.all([refreshRuntimeInfo(true), refreshWorlds(true)]);
       }
     } catch (error) {
-      userActionFeedback = {
-        ...userActionFeedback,
-        [username]: {
-          message: error instanceof Error ? error.message : 'コマンド送信に失敗しました',
-          success: false
-        }
-      };
+      const message = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
+      pushToast(message, 'error');
     } finally {
       userActionLoading = { ...userActionLoading, [`${username}-${action}`]: false };
     }
   };
 
   const updateUserRole = async (username: string, role: string) => {
-    if (!username || !role) return;
+    if (!username) {
+      pushToast('ユーザー名が取得できませんでした', 'error');
+      return;
+    }
+    if (!role) {
+      pushToast('ロールを選択してください', 'error');
+      return;
+    }
     userActionLoading = { ...userActionLoading, [`${username}-role`]: true };
-    userActionFeedback = { ...userActionFeedback, [username]: undefined };
     try {
       await postCommand(`role "${username}" "${role}"`);
-      userActionFeedback = {
-        ...userActionFeedback,
-        [username]: { message: `ロールを ${role} に変更しました`, success: true }
-      };
+      pushToast(`ロールを ${role} に変更しました`, 'success');
       if ($status.running) {
         await refreshRuntimeInfo(true);
       }
     } catch (error) {
-      userActionFeedback = {
-        ...userActionFeedback,
-        [username]: {
-          message: error instanceof Error ? error.message : 'ロール変更に失敗しました',
-          success: false
-        }
-      };
+      const message = error instanceof Error ? error.message : 'ロール変更に失敗しました';
+      pushToast(message, 'error');
     } finally {
       userActionLoading = { ...userActionLoading, [`${username}-role`]: false };
     }
@@ -475,18 +455,17 @@
 
   const sendStatusCommand = async (key: string, command: string, successMessage: string) => {
     if (!$status.running) {
-      setStatusFeedback(key, 'サーバーが起動していません', false);
+      pushToast('サーバーが起動していません', 'error');
       return;
     }
     setStatusLoading(key, true);
-    setStatusFeedback(key, '', true);
     try {
       await postCommand(command);
-      setStatusFeedback(key, successMessage, true);
+      pushToast(successMessage, 'success');
       await refreshRuntimeInfo(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
-      setStatusFeedback(key, message, false);
+      pushToast(message, 'error');
     } finally {
       setStatusLoading(key, false);
     }
@@ -495,7 +474,7 @@
   const applySessionName = async () => {
     const value = sessionNameInput.trim();
     if (!value) {
-      setStatusFeedback('name', 'セッション名を入力してください', false);
+      pushToast('セッション名を入力してください', 'error');
       return;
     }
     await sendStatusCommand('name', `name ${JSON.stringify(value)}`, 'セッション名を更新しました');
@@ -507,24 +486,24 @@
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(sessionId);
-        setStatusFeedback('sessionId', 'SessionIDをコピーしました', true);
+        pushToast('SessionIDをコピーしました', 'success');
       } else {
-        setStatusFeedback('sessionId', 'クリップボードに対応していません', false);
+        pushToast('クリップボードに対応していません', 'error');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'コピーに失敗しました';
-      setStatusFeedback('sessionId', message, false);
+      pushToast(message, 'error');
     }
   };
 
   const applyMaxUsers = async () => {
     if (!maxUsersInput.trim()) {
-      setStatusFeedback('maxUsers', '最大人数を入力してください', false);
+      pushToast('最大人数を入力してください', 'error');
       return;
     }
     const parsed = Number(maxUsersInput);
     if (!Number.isFinite(parsed) || parsed < 0) {
-      setStatusFeedback('maxUsers', '0以上の数値を入力してください', false);
+      pushToast('0以上の数値を入力してください', 'error');
       return;
     }
     await sendStatusCommand('maxUsers', `maxusers ${parsed}`, '最大人数を更新しました');
@@ -533,7 +512,7 @@
   const applyAccessLevel = async (value?: string) => {
     const nextLevel = value ?? accessLevelInput;
     if (!nextLevel) {
-      setStatusFeedback('accessLevel', 'アクセスレベルを選択してください', false);
+      pushToast('アクセスレベルを選択してください', 'error');
       return;
     }
     accessLevelInput = nextLevel;
@@ -609,16 +588,14 @@
     try {
       const trimmed = templateName.trim();
       if (!trimmed) {
-        templateMessage = 'テンプレート名を入力してください。';
-        templateSuccess = false;
+        pushToast('テンプレート名を入力してください。', 'error');
       } else {
         await postCommand(`startworldtemplate ${JSON.stringify(trimmed)}`);
-        templateMessage = 'テンプレートを起動しました。';
-        templateSuccess = true;
+        pushToast('テンプレートを起動しました。', 'success');
       }
     } catch (error) {
-      templateMessage = error instanceof Error ? error.message : 'テンプレートを起動できませんでした';
-      templateSuccess = false;
+      const message = error instanceof Error ? error.message : 'テンプレートを起動できませんでした';
+      pushToast(message, 'error');
     } finally {
       templateLoading = false;
     }
@@ -630,16 +607,14 @@
     try {
       const trimmed = worldUrl.trim();
       if (!trimmed) {
-        worldUrlMessage = 'URLを入力してください。';
-        worldUrlSuccess = false;
+        pushToast('URLを入力してください。', 'error');
       } else {
         await postCommand(`startworldurl ${JSON.stringify(trimmed)}`);
-        worldUrlMessage = 'URLから起動しました。';
-        worldUrlSuccess = true;
+        pushToast('URLから起動しました。', 'success');
       }
     } catch (error) {
-      worldUrlMessage = error instanceof Error ? error.message : 'URLから起動できませんでした';
-      worldUrlSuccess = false;
+      const message = error instanceof Error ? error.message : 'URLから起動できませんでした';
+      pushToast(message, 'error');
     } finally {
       worldUrlLoading = false;
     }
@@ -663,16 +638,14 @@
     try {
       const target = friendTargetName.trim();
       if (!target) {
-        friendSendMessage = 'ユーザー名を入力してください。';
-        friendSendSuccess = false;
+        pushToast('ユーザー名を入力してください。', 'error');
       } else {
         await postCommand(`sendfriendrequest ${JSON.stringify(target)}`);
-        friendSendMessage = 'フレンド申請を送りました。';
-        friendSendSuccess = true;
+        pushToast('フレンド申請を送りました。', 'success');
       }
     } catch (error) {
-      friendSendMessage = error instanceof Error ? error.message : 'フレンド申請を送れませんでした';
-      friendSendSuccess = false;
+      const message = error instanceof Error ? error.message : 'フレンド申請を送れませんでした';
+      pushToast(message, 'error');
     } finally {
       friendSendLoading = false;
     }
@@ -684,16 +657,14 @@
     try {
       const target = friendTargetName.trim();
       if (!target) {
-        friendAcceptMessage = 'ユーザー名を入力してください。';
-        friendAcceptSuccess = false;
+        pushToast('ユーザー名を入力してください。', 'error');
       } else {
         await postCommand(`acceptfriendrequest ${JSON.stringify(target)}`);
-        friendAcceptMessage = 'フレンド申請を承認しました。';
-        friendAcceptSuccess = true;
+        pushToast('フレンド申請を承認しました。', 'success');
       }
     } catch (error) {
-      friendAcceptMessage = error instanceof Error ? error.message : 'フレンド申請を承認できませんでした';
-      friendAcceptSuccess = false;
+      const message = error instanceof Error ? error.message : 'フレンド申請を承認できませんでした';
+      pushToast(message, 'error');
     } finally {
       friendAcceptLoading = false;
     }
@@ -705,16 +676,14 @@
     try {
       const target = friendTargetName.trim();
       if (!target) {
-        friendRemoveMessage = 'ユーザー名を入力してください。';
-        friendRemoveSuccess = false;
+        pushToast('ユーザー名を入力してください。', 'error');
       } else {
         await postCommand(`removefriend ${JSON.stringify(target)}`);
-        friendRemoveMessage = 'フレンドを解除しました。';
-        friendRemoveSuccess = true;
+        pushToast('フレンドを解除しました。', 'success');
       }
     } catch (error) {
-      friendRemoveMessage = error instanceof Error ? error.message : 'フレンドを解除できませんでした';
-      friendRemoveSuccess = false;
+      const message = error instanceof Error ? error.message : 'フレンドを解除できませんでした';
+      pushToast(message, 'error');
     } finally {
       friendRemoveLoading = false;
     }
@@ -727,16 +696,14 @@
       const target = friendTargetName.trim();
       const text = friendMessageText.trim();
       if (!target || !text) {
-        friendMessageFeedback = 'ユーザー名とメッセージを入力してください。';
-        friendMessageSuccess = false;
+        pushToast('ユーザー名とメッセージを入力してください。', 'error');
       } else {
         await postCommand(`message ${JSON.stringify(target)} ${JSON.stringify(text)}`);
-        friendMessageFeedback = 'メッセージを送信しました。';
-        friendMessageSuccess = true;
+        pushToast('メッセージを送信しました。', 'success');
       }
     } catch (error) {
-      friendMessageFeedback = error instanceof Error ? error.message : 'メッセージを送信できませんでした';
-      friendMessageSuccess = false;
+      const message = error instanceof Error ? error.message : 'メッセージを送信できませんでした';
+      pushToast(message, 'error');
     } finally {
       friendMessageLoading = false;
     }
@@ -1037,9 +1004,6 @@
                             適用
                           </button>
                         </div>
-                        {#if statusActionFeedback.name}
-                          <span class="feedback" class:success={statusActionFeedback.name.success}>{statusActionFeedback.name.message}</span>
-                        {/if}
                       </label>
 
                       <label>
@@ -1050,11 +1014,6 @@
                             コピー
                           </button>
                         </div>
-                        {#if statusActionFeedback.sessionId}
-                          <span class="feedback" class:success={statusActionFeedback.sessionId.success}>
-                            {statusActionFeedback.sessionId.message}
-                          </span>
-                        {/if}
                       </label>
 
                       <label>
@@ -1065,9 +1024,6 @@
                             適用
                           </button>
                         </div>
-                        {#if statusActionFeedback.maxUsers}
-                          <span class="feedback" class:success={statusActionFeedback.maxUsers.success}>{statusActionFeedback.maxUsers.message}</span>
-                        {/if}
                       </label>
 
                       <label>
@@ -1086,9 +1042,6 @@
                             {/each}
                           </select>
                         </div>
-                        {#if statusActionFeedback.accessLevel}
-                          <span class="feedback" class:success={statusActionFeedback.accessLevel.success}>{statusActionFeedback.accessLevel.message}</span>
-                        {/if}
                       </label>
 
                       <div class="toggle-row">
@@ -1103,9 +1056,6 @@
                           {hiddenFromListingInput ? 'オン' : 'オフ'}
                         </button>
                       </div>
-                      {#if statusActionFeedback.hidden}
-                        <span class="feedback" class:success={statusActionFeedback.hidden.success}>{statusActionFeedback.hidden.message}</span>
-                      {/if}
 
                       <div class="description-block">
                         <div class="description-header">
@@ -1115,11 +1065,6 @@
                           </button>
                         </div>
                         <textarea id="session-description" rows="4" bind:value={sessionDescriptionInput}></textarea>
-                        {#if statusActionFeedback.description}
-                          <span class="feedback" class:success={statusActionFeedback.description.success}>
-                            {statusActionFeedback.description.message}
-                          </span>
-                        {/if}
                       </div>
 
                       <div class="action-buttons">
@@ -1176,14 +1121,6 @@
                               <td>
                                 <strong>{user.name}</strong>
                                 <span class="sub">{user.id}</span>
-                                {#if userActionFeedback[user.name]}
-                                  <span
-                                    class="feedback"
-                                    class:success={userActionFeedback[user.name]?.success}
-                                  >
-                                    {userActionFeedback[user.name]?.message}
-                                  </span>
-                                {/if}
                               </td>
                               <td>{user.present ? 'Active' : 'AFK'}</td>
                               <td>
@@ -1266,9 +1203,6 @@
                     <input type="text" bind:value={templateName} placeholder="例: Grid" />
                   </label>
                   <button type="submit" disabled={!$status.running || templateLoading}>送信</button>
-                  {#if templateMessage}
-                    <p class="feedback" class:success={templateSuccess}>{templateMessage}</p>
-                  {/if}
                 </form>
               </div>
               <div class="card form-card">
@@ -1279,9 +1213,6 @@
                     <input type="text" bind:value={worldUrl} placeholder="resrec://..." />
                   </label>
                   <button type="submit" disabled={!$status.running || worldUrlLoading}>送信</button>
-                  {#if worldUrlMessage}
-                    <p class="feedback" class:success={worldUrlSuccess}>{worldUrlMessage}</p>
-                  {/if}
                 </form>
               </div>
             </div>
@@ -1320,27 +1251,18 @@
                 <h2>フレンド申請を送る</h2>
                 <form on:submit|preventDefault={submitFriendSend}>
                   <button type="submit" disabled={!$status.running || friendSendLoading}>送信</button>
-                  {#if friendSendMessage}
-                    <p class="feedback" class:success={friendSendSuccess}>{friendSendMessage}</p>
-                  {/if}
                 </form>
               </div>
               <div class="card form-card">
                 <h2>申請を承認する</h2>
                 <form on:submit|preventDefault={submitFriendAccept}>
                   <button type="submit" disabled={!$status.running || friendAcceptLoading}>承認</button>
-                  {#if friendAcceptMessage}
-                    <p class="feedback" class:success={friendAcceptSuccess}>{friendAcceptMessage}</p>
-                  {/if}
                 </form>
               </div>
               <div class="card form-card">
                 <h2>フレンド解除</h2>
                 <form on:submit|preventDefault={submitFriendRemove}>
                   <button type="submit" disabled={!$status.running || friendRemoveLoading}>解除</button>
-                  {#if friendRemoveMessage}
-                    <p class="feedback" class:success={friendRemoveSuccess}>{friendRemoveMessage}</p>
-                  {/if}
                 </form>
               </div>
               <div class="card form-card">
@@ -1351,9 +1273,6 @@
                     <textarea rows="3" bind:value={friendMessageText}></textarea>
                   </label>
                   <button type="submit" disabled={!$status.running || friendMessageLoading}>送信</button>
-                  {#if friendMessageFeedback}
-                    <p class="feedback" class:success={friendMessageSuccess}>{friendMessageFeedback}</p>
-                  {/if}
                 </form>
               </div>
             </div>
@@ -1405,6 +1324,21 @@
         </div>
       {/if}
     </main>
+  </div>
+
+  {#if $status.running && pendingStartup && showStartupMessage}
+    <div class="startup-overlay">
+      <div class="loader"></div>
+      <p>セッション情報を読み込んでいます...</p>
+    </div>
+  {/if}
+
+  <div class="toast-container" aria-live="polite">
+    {#each $notifications as notification (notification.id)}
+      <div class={`toast ${notification.type}`}>
+        <span>{notification.message}</span>
+      </div>
+    {/each}
   </div>
 </div>
 
@@ -2170,12 +2104,12 @@
   }
 
   .command-result {
-    background: rgba(17, 21, 29, 0.65);
-    border-radius: 0.6rem;
-    padding: 0.9rem;
+    background: rgba(17, 21, 29, 0.75);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    white-space: pre-wrap;
+    font-size: 0.82rem;
+    line-height: 1.4;
   }
 
   .field {
@@ -2220,16 +2154,6 @@
   .warning {
     color: #e69e50;
     font-weight: 600;
-  }
-
-  .feedback {
-    font-size: 0.85rem;
-    color: #ff7676;
-    margin: 0;
-  }
-
-  .feedback.success {
-    color: #59eb5c;
   }
 
   .info {
@@ -2612,17 +2536,6 @@
     padding: 0.7rem 0.55rem;
   }
 
-  .status-form .feedback {
-    display: block;
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
-    margin-top: 0.35rem;
-  }
-
-  .status-form .description-row {
-    margin-bottom: 0;
-  }
-
   .description-block {
     display: flex;
     flex-direction: column;
@@ -2733,5 +2646,106 @@
 
   .users-card table {
     background: #11151d;
+  }
+
+  .startup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+  }
+
+  .toast {
+    background-color: #333;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 5px;
+    animation: slideIn 0.5s ease-out, fadeOut 0.5s ease-in 2s;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  .toast-container {
+    position: fixed;
+    bottom: 1.6rem;
+    right: 1.6rem;
+    display: grid;
+    gap: 0.75rem;
+    z-index: 9999;
+  }
+
+  .toast {
+    min-width: 240px;
+    max-width: 340px;
+    padding: 0.85rem 1.2rem;
+    border-radius: 0.75rem;
+    background: rgba(17, 21, 29, 0.92);
+    color: #e9f9ff;
+    font-weight: 600;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid rgba(97, 209, 250, 0.3);
+    backdrop-filter: blur(6px);
+  }
+
+  .toast.success {
+    border-color: rgba(84, 226, 146, 0.5);
+    color: #c0ffd9;
+  }
+
+  .toast.error {
+    border-color: rgba(255, 118, 118, 0.58);
+    color: #ffd0d6;
+  }
+
+  .toast.info {
+    border-color: rgba(97, 209, 250, 0.6);
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -450px 0;
+    }
   }
 </style>
