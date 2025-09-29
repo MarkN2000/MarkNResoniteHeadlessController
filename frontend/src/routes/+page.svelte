@@ -1532,7 +1532,7 @@
 
   .status-indicators button {
     background: #61d1fa;
-    color: #ffffff;
+    color: #000000;
     font-weight: 700;
     font-size: 1.1rem;
     letter-spacing: 0.03em;
@@ -1622,7 +1622,7 @@
     font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.01em;
-    color: #61d1fa;
+    color: #f5f5f5;
   }
 
   .session-row {
