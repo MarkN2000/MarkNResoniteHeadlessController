@@ -61,6 +61,8 @@
   let startupFinalizeTimer: ReturnType<typeof setTimeout> | null = null;
   let lastWorldRunningAt = 0;
   let showStartupMessage = false;
+  let startupWorldsReady = false;
+  let startupUsersReady = false;
   let headlessUserName: string | null = null;
   let headlessUserId: string | null = null;
 
@@ -401,9 +403,11 @@
         }
 
         if (pendingStartup && WORLD_RUNNING_REGEX.test(message)) {
-          lastWorldRunningAt = Date.now();
-          pendingStartup = true;
-          scheduleStartupFinalize();
+        lastWorldRunningAt = Date.now();
+        pendingStartup = true;
+        startupWorldsReady = false;
+        startupUsersReady = false;
+        scheduleStartupFinalize();
           continue;
         }
       }
@@ -782,17 +786,6 @@
     }
   };
 
-  const ensureStartupData = async () => {
-    if (!pendingStartup) return;
-    const [worldsCount, usersCount] = await Promise.all([refreshWorlds(true), refreshRuntimeInfo(true)]);
-    startupWorldsReady = worldsCount !== null && worldsCount > 0;
-    startupUsersReady = usersCount !== null;
-    if (startupWorldsReady && startupUsersReady) {
-      pendingStartup = false;
-      appMessage = { type: 'info', text: 'ヘッドレスの起動が完了しました' };
-    }
-  };
-
   const scheduleStartupFinalize = () => {
     if (startupFinalizeTimer) {
       clearTimeout(startupFinalizeTimer);
@@ -800,10 +793,14 @@
     const delay = Math.max(STARTUP_WORLD_DELAY - (Date.now() - lastWorldRunningAt), 0);
     startupFinalizeTimer = setTimeout(() => {
       Promise.all([refreshWorlds(true), refreshRuntimeInfo(true)])
-        .then(() => {
-          pendingStartup = false;
-          if (showStartupMessage) {
-            appMessage = { type: 'info', text: 'ヘッドレスの起動が完了しました' };
+        .then(([worldsCount, usersCount]) => {
+          startupWorldsReady = worldsCount !== null && worldsCount > 0;
+          startupUsersReady = usersCount !== null;
+          if (startupWorldsReady && startupUsersReady) {
+            pendingStartup = false;
+            if (showStartupMessage) {
+              appMessage = { type: 'info', text: 'ヘッドレスの起動が完了しました' };
+            }
           }
         })
         .catch(error => {

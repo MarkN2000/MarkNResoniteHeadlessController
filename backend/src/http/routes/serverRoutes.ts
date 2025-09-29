@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { Router } from 'express';
 import { processManager } from '../../services/processManager.js';
+import type { ExecuteCommandOptions } from '../../services/processManager.js';
 
 export const serverRoutes = Router();
 
@@ -40,8 +41,60 @@ serverRoutes.post('/stop', async (_req, res, next) => {
   }
 });
 
-const runCommand = async (command: string) => {
-  const logs = await processManager.executeCommand(command, 4000);
+const PROMPT_DETECTOR = (entry: { message: string }) => {
+  const trimmed = entry.message.trim();
+  if (!trimmed) return false;
+  if (trimmed === '>') return true;
+  return trimmed.endsWith('>') && !trimmed.startsWith('>');
+};
+
+const createPromptAfterDataDetector = (pattern: RegExp) => {
+  let sawData = false;
+  return (entry: { message: string }) => {
+    const trimmed = entry.message.trim();
+    if (!trimmed) return false;
+    if (!sawData && pattern.test(trimmed)) {
+      sawData = true;
+    }
+    if (!sawData) return false;
+    if (trimmed === '>') return true;
+    return trimmed.endsWith('>') && !trimmed.startsWith('>');
+  };
+};
+
+const STATUS_DATA_REGEX = /^(Name|SessionID|Current Users|Present Users|Max Users|Access Level|Hidden from listing|Mobile Friendly|Description|Tags|Users):/i;
+const USERS_DATA_REGEX = /^.+\s+ID:\s+/i;
+const WORLDS_DATA_REGEX = /^(\[\d+\]\s+.+\s+Users:\s+\d+|Name:\s+)/i;
+
+interface RunCommandOptions {
+  timeoutMs?: number;
+  stopWhen?: ExecuteCommandOptions['stopWhen'];
+  stopWhenPrompt?: boolean;
+  settleDurationMs?: number;
+}
+
+const runCommand = async (command: string, options: RunCommandOptions = {}) => {
+  const execOptions: ExecuteCommandOptions = {};
+  let hasOption = false;
+
+  if (options.stopWhen) {
+    execOptions.stopWhen = options.stopWhen;
+    hasOption = true;
+  } else if (options.stopWhenPrompt) {
+    execOptions.stopWhen = PROMPT_DETECTOR;
+    hasOption = true;
+  }
+
+  if (options.settleDurationMs !== undefined) {
+    execOptions.settleDurationMs = options.settleDurationMs;
+    hasOption = true;
+  }
+
+  const logs = await processManager.executeCommand(
+    command,
+    options.timeoutMs ?? 4000,
+    hasOption ? execOptions : undefined
+  );
   return logs
     .map(entry => entry.message)
     .map(message => message.replace(/\r/g, ''))
@@ -301,7 +354,11 @@ const parseFriendRequestsOutput = (output: string) =>
 
 serverRoutes.get('/runtime/status', async (_req, res, next) => {
   try {
-    const output = await runCommand('status');
+    const output = await runCommand('status', {
+      stopWhen: createPromptAfterDataDetector(STATUS_DATA_REGEX),
+      settleDurationMs: 120,
+      timeoutMs: 2000
+    });
     res.json({ raw: output, data: parseStatusOutput(output) });
   } catch (error) {
     next(error);
@@ -310,7 +367,11 @@ serverRoutes.get('/runtime/status', async (_req, res, next) => {
 
 serverRoutes.get('/runtime/users', async (_req, res, next) => {
   try {
-    const output = await runCommand('users');
+    const output = await runCommand('users', {
+      stopWhen: createPromptAfterDataDetector(USERS_DATA_REGEX),
+      settleDurationMs: 120,
+      timeoutMs: 2000
+    });
     res.json({ raw: output, data: parseUsersOutput(output) });
   } catch (error) {
     next(error);
@@ -319,7 +380,11 @@ serverRoutes.get('/runtime/users', async (_req, res, next) => {
 
 serverRoutes.get('/runtime/worlds', async (_req, res, next) => {
   try {
-    const output = await runCommand('worlds');
+    const output = await runCommand('worlds', {
+      stopWhen: createPromptAfterDataDetector(WORLDS_DATA_REGEX),
+      settleDurationMs: 120,
+      timeoutMs: 2000
+    });
     res.json({ raw: output, data: parseWorldsOutput(output) });
   } catch (error) {
     next(error);
@@ -345,7 +410,7 @@ serverRoutes.post('/runtime/worlds/focus', async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid sessionId format' });
     }
 
-    const output = await runCommand(`focus ${sessionId}`);
+    const output = await runCommand(`focus ${sessionId}`, { stopWhenPrompt: true, settleDurationMs: 120, timeoutMs: 2000 });
     res.json({ raw: output });
   } catch (error) {
     next(error);
@@ -362,13 +427,23 @@ serverRoutes.post('/runtime/worlds/focus-refresh', async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid sessionId format' });
     }
 
-    await runCommand(`focus ${sessionId}`);
+    await runCommand(`focus ${sessionId}`, { stopWhenPrompt: true, settleDurationMs: 120, timeoutMs: 2000 });
 
-    const [worlds, status, users] = await Promise.all([
-      runCommand('worlds'),
-      runCommand('status'),
-      runCommand('users')
-    ]);
+    const worlds = await runCommand('worlds', {
+      stopWhen: createPromptAfterDataDetector(WORLDS_DATA_REGEX),
+      settleDurationMs: 120,
+      timeoutMs: 2000
+    });
+    const status = await runCommand('status', {
+      stopWhen: createPromptAfterDataDetector(STATUS_DATA_REGEX),
+      settleDurationMs: 120,
+      timeoutMs: 2000
+    });
+    const users = await runCommand('users', {
+      stopWhen: createPromptAfterDataDetector(USERS_DATA_REGEX),
+      settleDurationMs: 120,
+      timeoutMs: 2000
+    });
 
     res.json({
       worlds: { raw: worlds, data: parseWorldsOutput(worlds) },

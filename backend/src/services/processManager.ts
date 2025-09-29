@@ -19,6 +19,11 @@ export interface HeadlessStatus {
   userId?: string;
 }
 
+export interface ExecuteCommandOptions {
+  stopWhen?: (entry: LogEntry) => boolean;
+  settleDurationMs?: number;
+}
+
 export class ProcessManager extends EventEmitter {
   private child?: ChildProcessWithoutNullStreams;
   private status: HeadlessStatus = { running: false };
@@ -131,13 +136,16 @@ export class ProcessManager extends EventEmitter {
     }
   }
 
-  async executeCommand(command: string, timeoutMs = 3000): Promise<LogEntry[]> {
+  async executeCommand(command: string, timeoutMs = 3000, options?: ExecuteCommandOptions): Promise<LogEntry[]> {
     if (!this.child) {
       throw new Error('Headless process is not running');
     }
 
     const collectorKey = this.logBuffer.nextId();
     const collector = this.logBuffer.createResponseCollector(collectorKey);
+
+    const stopWhen = options?.stopWhen;
+    const settleDurationMs = options?.settleDurationMs ?? 80;
 
     return new Promise((resolve, reject) => {
       const handleExit = () => {
@@ -147,16 +155,35 @@ export class ProcessManager extends EventEmitter {
 
       const cleanup = () => {
         clearTimeout(timer);
+        if (settleTimer) clearTimeout(settleTimer);
         this.off('status', handleExit);
+        this.off('log', handleLog);
         collector.dispose();
       };
 
-      const timer = setTimeout(() => {
+      const finalize = () => {
         cleanup();
         resolve(collector.collect());
+      };
+
+      const timer = setTimeout(() => {
+        finalize();
       }, timeoutMs);
 
+      let settleTimer: NodeJS.Timeout | null = null;
+
+      const handleLog = (entry: LogEntry) => {
+        if (entry.id < collectorKey) return;
+        if (!stopWhen) return;
+        if (!stopWhen(entry)) return;
+        if (settleTimer) return;
+        settleTimer = setTimeout(finalize, settleDurationMs);
+      };
+
       this.on('status', handleExit);
+      if (stopWhen) {
+        this.on('log', handleLog);
+      }
       this.sendCommand(command);
     });
   }
