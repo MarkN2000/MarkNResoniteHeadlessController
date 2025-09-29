@@ -116,6 +116,18 @@ export const postFocusWorld = (sessionId: string) =>
     body: JSON.stringify({ sessionId })
   }) as Promise<{ raw: string }>;
 
+export interface FocusRefreshResponse {
+  worlds: RuntimeWorldsData;
+  status: RuntimeStatusData;
+  users: RuntimeUsersData;
+}
+
+export const postFocusWorldRefresh = (sessionId: string) =>
+  request('/server/runtime/worlds/focus-refresh', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId })
+  }) as Promise<FocusRefreshResponse>;
+
 export const postCommand = (command: string) =>
   request('/server/runtime/command', {
     method: 'POST',

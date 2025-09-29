@@ -352,6 +352,34 @@ serverRoutes.post('/runtime/worlds/focus', async (req, res, next) => {
   }
 });
 
+serverRoutes.post('/runtime/worlds/focus-refresh', async (req, res, next) => {
+  try {
+    const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+    if (!/^[A-Za-z0-9:_\-\.]+$/.test(sessionId)) {
+      return res.status(400).json({ error: 'Invalid sessionId format' });
+    }
+
+    await runCommand(`focus ${sessionId}`);
+
+    const [worlds, status, users] = await Promise.all([
+      runCommand('worlds'),
+      runCommand('status'),
+      runCommand('users')
+    ]);
+
+    res.json({
+      worlds: { raw: worlds, data: parseWorldsOutput(worlds) },
+      status: { raw: status, data: parseStatusOutput(status) },
+      users: { raw: users, data: parseUsersOutput(users) }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 serverRoutes.post('/runtime/command', async (req, res, next) => {
   try {
     const { command } = req.body ?? {};

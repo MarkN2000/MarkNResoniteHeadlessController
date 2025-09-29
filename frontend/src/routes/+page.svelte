@@ -10,7 +10,7 @@
     getFriendRequests,
     getRuntimeWorlds,
     postCommand,
-    postFocusWorld,
+    postFocusWorldRefresh,
     startServer,
     stopServer,
     type RuntimeStatusData,
@@ -716,17 +716,69 @@
   const focusWorld = async (world: RuntimeWorldEntry) => {
     if (!$status.running) return;
     worldsError = '';
+    worldsLoading = true;
+    statusLoading = true;
+    usersLoading = true;
     try {
       const target = world.focusTarget ?? world.sessionId;
-      await postFocusWorld(target);
-      selectedWorldId = world.sessionId;
-      localStorage.setItem(WORLD_STORAGE_KEY, world.sessionId);
-      await refreshWorlds(true);
-      refreshRuntimeInfo(true).catch(error => {
-        console.error('Failed to refresh runtime info after focus:', error);
-      });
+      const response = await postFocusWorldRefresh(target);
+
+      const unique: RuntimeWorldEntry[] = [];
+      const seen = new Set<string>();
+      for (const entry of response.worlds.data) {
+        const key = entry.sessionId || entry.focusTarget || entry.name;
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        unique.push(entry);
+      }
+      runtimeWorlds = { ...response.worlds, data: unique };
+
+      const focused = unique.find(item => item.focused) ?? unique.find(item => item.sessionId === world.sessionId);
+      selectedWorldId = focused?.sessionId ?? unique[0]?.sessionId ?? null;
+      if (selectedWorldId) {
+        localStorage.setItem(WORLD_STORAGE_KEY, selectedWorldId);
+      } else {
+        localStorage.removeItem(WORLD_STORAGE_KEY);
+      }
+
+      runtimeStatus = response.status;
+      if (runtimeStatus?.data) {
+        sessionNameInput = runtimeStatus.data.name ?? '';
+        sessionDescriptionInput = runtimeStatus.data.description ?? '';
+        maxUsersInput = runtimeStatus.data.maxUsers !== undefined ? String(runtimeStatus.data.maxUsers) : '';
+        accessLevelInput = runtimeStatus.data.accessLevel ?? '';
+        hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
+
+        const combinedLevels = new Set([...DEFAULT_ACCESS_LEVELS]);
+        if (runtimeStatus.data.accessLevel) {
+          combinedLevels.add(runtimeStatus.data.accessLevel);
+        }
+        accessLevelOptions = Array.from(combinedLevels);
+      } else {
+        sessionNameInput = '';
+        sessionDescriptionInput = '';
+        maxUsersInput = '';
+        accessLevelInput = '';
+        hiddenFromListingInput = false;
+        accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
+      }
+
+      runtimeUsers = response.users;
+      if (runtimeUsers?.data) {
+        const nextSelections: Record<string, string> = {};
+        runtimeUsers.data.forEach(user => {
+          nextSelections[user.name] = userRoleSelections[user.name] ?? user.role;
+        });
+        userRoleSelections = nextSelections;
+      } else {
+        userRoleSelections = {};
+      }
     } catch (error) {
       worldsError = error instanceof Error ? error.message : 'フォーカスに失敗しました';
+    } finally {
+      worldsLoading = false;
+      statusLoading = false;
+      usersLoading = false;
     }
   };
 
