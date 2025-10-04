@@ -77,7 +77,7 @@
   let headlessUserName: string | null = null;
   let headlessUserId: string | null = null;
   let startupRetryCount = 0;
-  const STARTUP_RETRY_INTERVAL = 1800;
+  const STARTUP_RETRY_INTERVAL = 3800;
   const STARTUP_MAX_RETRIES = 4;
 
   const STORAGE_KEY = 'mrhc:selectedConfig';
@@ -131,12 +131,13 @@
   const ENGINE_READY_REGEX = /Engine Ready!?/i;
   const START_LOG_REGEX = /(Initializing App|Starting running world)/i;
   const WORLD_RUNNING_REGEX = /World running\.\.\./i;
-  const STARTUP_WORLD_DELAY = 2000;
+  const STARTUP_WORLD_DELAY = 4000;
 
   let accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
   let sessionNameInput = '';
   let sessionDescriptionInput = '';
   let maxUsersInput: number | null = null;
+  let awayKickIntervalInput: number | null = null;
   let accessLevelInput = '';
   let hiddenFromListingInput = false;
   let statusActionLoading: Record<string, boolean> = {};
@@ -236,6 +237,7 @@
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
         maxUsersInput = runtimeStatus.data.maxUsers ?? null;
+        awayKickIntervalInput = runtimeStatus.data.awayKickInterval ?? null;
         accessLevelInput = runtimeStatus.data.accessLevel ?? '';
         hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
         const combinedLevels = new Set([...DEFAULT_ACCESS_LEVELS]);
@@ -247,6 +249,7 @@
         sessionNameInput = '';
         sessionDescriptionInput = '';
         maxUsersInput = null;
+        awayKickIntervalInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -339,6 +342,7 @@
         sessionNameInput = '';
         sessionDescriptionInput = '';
         maxUsersInput = null;
+        awayKickIntervalInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -522,6 +526,18 @@
       return;
     }
     await sendStatusCommand('maxUsers', `maxusers ${Math.floor(maxUsersInput)}`, '最大人数を更新しました');
+  };
+
+  const applyAwayKickInterval = async () => {
+    if (awayKickIntervalInput === null || Number.isNaN(awayKickIntervalInput)) {
+      pushToast('最大AFK時間を入力してください', 'error');
+      return;
+    }
+    if (!Number.isFinite(awayKickIntervalInput) || awayKickIntervalInput < 0) {
+      pushToast('0以上の数値を入力してください', 'error');
+      return;
+    }
+    await sendStatusCommand('awayKickInterval', `awaykickinterval ${Math.floor(awayKickIntervalInput)}`, '最大AFK時間を更新しました');
   };
 
   const applyAccessLevel = async (value?: string) => {
@@ -788,6 +804,7 @@
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
         maxUsersInput = runtimeStatus.data.maxUsers ?? null;
+        awayKickIntervalInput = runtimeStatus.data.awayKickInterval ?? null;
         accessLevelInput = runtimeStatus.data.accessLevel ?? '';
         hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
 
@@ -800,6 +817,7 @@
         sessionNameInput = '';
         sessionDescriptionInput = '';
         maxUsersInput = null;
+        awayKickIntervalInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -1107,7 +1125,7 @@
                       </label>
 
                       <label>
-                        <span>最大人数 (Max Users)</span>
+                        <span>最大人数</span>
                         <div class="field-row">
                           <input
                             type="number"
@@ -1119,6 +1137,24 @@
                             }}
                           />
                           <button type="button" class="status-action-button" on:click={applyMaxUsers} disabled={statusActionLoading.maxUsers}>
+                            適用
+                          </button>
+                        </div>
+                      </label>
+
+                      <label>
+                        <span>最大AFK時間(分)</span>
+                        <div class="field-row">
+                          <input
+                            type="number"
+                            min="0"
+                            bind:value={awayKickIntervalInput}
+                            on:input={(event) => {
+                              const value = (event.target as HTMLInputElement).value;
+                              awayKickIntervalInput = value === '' ? null : Number(value);
+                            }}
+                          />
+                          <button type="button" class="status-action-button" on:click={applyAwayKickInterval} disabled={statusActionLoading.awayKickInterval}>
                             適用
                           </button>
                         </div>
@@ -1143,7 +1179,7 @@
                       </label>
 
                       <div class="toggle-row">
-                        <span>リスト非表示にする</span>
+                        <span>セッションリストに表示しない</span>
                         <button
                           type="button"
                           class={hiddenFromListingInput ? 'status-action-button active' : 'status-action-button'}
