@@ -83,8 +83,9 @@
   const STORAGE_KEY = 'mrhc:selectedConfig';
   const WORLD_STORAGE_KEY = 'mrhc:selectedWorldId';
 
-  let templateName = '';
+  let templateName = 'Grid';
   let templateLoading = false;
+  const templateSuggestions = ['Grid', 'Platform', 'Blank'];
 
   let worldUrl = '';
   let worldUrlLoading = false;
@@ -1331,130 +1332,184 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'newWorld'}>
-            <div class="panel-grid two">
-              <div class="card form-card">
-                <h2>テンプレートから起動</h2>
-                <form on:submit|preventDefault={submitTemplate}>
-                  <label class="field">
-                    <span>テンプレート名</span>
-                    <input type="text" bind:value={templateName} placeholder="例: Grid" />
-                  </label>
-                  <button type="submit" disabled={!$status.running || templateLoading}>送信</button>
-                </form>
-              </div>
-              <div class="card form-card">
-                <h2>URLから起動</h2>
-                <form on:submit|preventDefault={submitWorldUrl}>
-                  <label class="field">
-                    <span>Resonite URL</span>
-                    <input type="text" bind:value={worldUrl} placeholder="resrec://..." />
-                  </label>
-                  <button type="submit" disabled={!$status.running || worldUrlLoading}>送信</button>
-                </form>
+            <div class="panel-grid one">
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/newWorld</h2>
+                </div>
+                <div class="card status-card">
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
+                    <label>
+                      <span>テンプレートから起動</span>
+                      <div class="field-row">
+                        <div class="select-wrapper narrow">
+                          <select
+                            bind:value={templateName}
+                            disabled={templateLoading}
+                          >
+                            {#each templateSuggestions as t}
+                              <option value={t}>{t}</option>
+                            {/each}
+                          </select>
+                        </div>
+                        <button type="button" class="status-action-button" on:click={submitTemplate} disabled={!$status.running || templateLoading}>
+                          起動
+                        </button>
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>URLから起動</span>
+                      <div class="field-row">
+                        <input
+                          type="text"
+                          bind:value={worldUrl}
+                          placeholder="resrec://..."
+                        />
+                        <button type="button" class="status-action-button" on:click={submitWorldUrl} disabled={!$status.running || worldUrlLoading}>
+                          起動
+                        </button>
+                      </div>
+                    </label>
+                  </form>
+                </div>
               </div>
             </div>
           </section>
 
           <section class="panel" class:active={activeTab === 'friends'}>
             <div class="panel-grid one">
-              <div class="card form-card">
-                <h2>対象ユーザー</h2>
-                <label class="field">
-                  <span>フレンド名</span>
-                  <input type="text" bind:value={friendTargetName} placeholder="ユーザー名" />
-                </label>
-                <p class="info">以下の操作はすべてこの名前を使用します。</p>
-                <button type="button" on:click={fetchFriendRequests} disabled={!$status.running || friendRequestsLoading}>
-                  フレンドリクエスト一覧を取得
-                </button>
-                {#if friendRequestsLoading}
-                  <p class="info">取得中...</p>
-                {:else if friendRequestsError}
-                  <p class="feedback">{friendRequestsError}</p>
-                {:else if friendRequests?.data?.length}
-                  <ul class="friend-requests">
-                    {#each friendRequests.data as request}
-                      <li>{request}</li>
-                    {/each}
-                  </ul>
-                {:else if friendRequests}
-                  <p class="info">保留中のフレンドリクエストはありません。</p>
-                {/if}
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/friends</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>対象ユーザー</h2>
+                  <label class="field">
+                    <span>フレンド名</span>
+                    <input type="text" bind:value={friendTargetName} placeholder="ユーザー名" />
+                  </label>
+                  <p class="info">以下の操作はすべてこの名前を使用します。</p>
+                  <button type="button" on:click={fetchFriendRequests} disabled={!$status.running || friendRequestsLoading}>
+                    フレンドリクエスト一覧を取得
+                  </button>
+                  {#if friendRequestsLoading}
+                    <p class="info">取得中...</p>
+                  {:else if friendRequestsError}
+                    <p class="feedback">{friendRequestsError}</p>
+                  {:else if friendRequests?.data?.length}
+                    <ul class="friend-requests">
+                      {#each friendRequests.data as request}
+                        <li>{request}</li>
+                      {/each}
+                    </ul>
+                  {:else if friendRequests}
+                    <p class="info">保留中のフレンドリクエストはありません。</p>
+                  {/if}
+                </div>
               </div>
             </div>
 
             <div class="panel-grid two">
-              <div class="card form-card">
-                <h2>フレンド申請を送る</h2>
-                <form on:submit|preventDefault={submitFriendSend}>
-                  <button type="submit" disabled={!$status.running || friendSendLoading}>送信</button>
-                </form>
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/send</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>フレンド申請を送る</h2>
+                  <form on:submit|preventDefault={submitFriendSend}>
+                    <button type="submit" disabled={!$status.running || friendSendLoading}>送信</button>
+                  </form>
+                </div>
               </div>
-              <div class="card form-card">
-                <h2>申請を承認する</h2>
-                <form on:submit|preventDefault={submitFriendAccept}>
-                  <button type="submit" disabled={!$status.running || friendAcceptLoading}>承認</button>
-                </form>
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/accept</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>申請を承認する</h2>
+                  <form on:submit|preventDefault={submitFriendAccept}>
+                    <button type="submit" disabled={!$status.running || friendAcceptLoading}>承認</button>
+                  </form>
+                </div>
               </div>
-              <div class="card form-card">
-                <h2>フレンド解除</h2>
-                <form on:submit|preventDefault={submitFriendRemove}>
-                  <button type="submit" disabled={!$status.running || friendRemoveLoading}>解除</button>
-                </form>
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/remove</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>フレンド解除</h2>
+                  <form on:submit|preventDefault={submitFriendRemove}>
+                    <button type="submit" disabled={!$status.running || friendRemoveLoading}>解除</button>
+                  </form>
+                </div>
               </div>
-              <div class="card form-card">
-                <h2>メッセージ送信</h2>
-                <form on:submit|preventDefault={submitFriendMessage}>
-                  <label class="field">
-                    <span>メッセージ</span>
-                    <textarea rows="3" bind:value={friendMessageText}></textarea>
-                  </label>
-                  <button type="submit" disabled={!$status.running || friendMessageLoading}>送信</button>
-                </form>
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/message</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>メッセージ送信</h2>
+                  <form on:submit|preventDefault={submitFriendMessage}>
+                    <label class="field">
+                      <span>メッセージ</span>
+                      <textarea rows="3" bind:value={friendMessageText}></textarea>
+                    </label>
+                    <button type="submit" disabled={!$status.running || friendMessageLoading}>送信</button>
+                  </form>
+                </div>
               </div>
             </div>
           </section>
 
           <section class="panel" class:active={activeTab === 'settings'}>
             <div class="panel-grid one">
-              <div class="card form-card">
-                <h2>設定ファイル管理</h2>
-                <p>新しく追加した設定ファイルはこのボタンで一覧を更新できます。</p>
-                <button type="button" on:click={refreshConfigsOnly}>設定ファイルを再取得</button>
-                <p class="info">現在の件数: {$configs.length}</p>
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/configs</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>設定ファイル管理</h2>
+                  <p>新しく追加した設定ファイルはこのボタンで一覧を更新できます。</p>
+                  <button type="button" on:click={refreshConfigsOnly}>設定ファイルを再取得</button>
+                  <p class="info">現在の件数: {$configs.length}</p>
+                </div>
               </div>
             </div>
           </section>
 
           <section class="panel" class:active={activeTab === 'commands'}>
             <div class="panel-grid one">
-              <div class="card command-card">
-                <div class="section-header">
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>/console</h2>
+                </div>
+                <div class="card command-card">
                   <h2>コマンドコンソール</h2>
+                  <p class="command-help">ヘッドレスが起動している間に直接コマンドを実行できます。</p>
+                  <div class="command-input">
+                    <input
+                      type="text"
+                      bind:value={commandText}
+                      placeholder="例: worlds"
+                      on:keydown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          executeCommand();
+                        }
+                      }}
+                      disabled={!$status.running || commandLoading}
+                    />
+                    <button type="button" on:click={executeCommand} disabled={!$status.running || commandLoading || !commandText.trim()}>
+                      実行
+                    </button>
+                  </div>
+                  {#if commandLoading}
+                    <p class="command-status">実行中...</p>
+                  {:else if commandResult}
+                    <pre class="command-result">{commandResult}</pre>
+                  {/if}
                 </div>
-                <p class="command-help">ヘッドレスが起動している間に直接コマンドを実行できます。</p>
-                <div class="command-input">
-                  <input
-                    type="text"
-                    bind:value={commandText}
-                    placeholder="例: worlds"
-                    on:keydown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        executeCommand();
-                      }
-                    }}
-                    disabled={!$status.running || commandLoading}
-                  />
-                  <button type="button" on:click={executeCommand} disabled={!$status.running || commandLoading || !commandText.trim()}>
-                    実行
-                  </button>
-                </div>
-                {#if commandLoading}
-                  <p class="command-status">実行中...</p>
-                {:else if commandResult}
-                  <pre class="command-result">{commandResult}</pre>
-                {/if}
               </div>
             </div>
           </section>
