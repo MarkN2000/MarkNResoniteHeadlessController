@@ -1090,7 +1090,7 @@
             <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>/status</h2>
+                  <h2>セッション設定</h2>
                   <button
                     type="button"
                     class="refresh-button"
@@ -1225,7 +1225,7 @@
 
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>/users</h2>
+                  <h2>ユーザー</h2>
                   <button
                     type="button"
                     class="refresh-button"
@@ -1332,10 +1332,10 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'newWorld'}>
-            <div class="panel-grid one">
+            <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>/newWorld</h2>
+                  <h2>新規ワールド</h2>
                 </div>
                 <div class="card status-card">
                   <form class="status-form" on:submit|preventDefault={() => {}}>
@@ -1372,6 +1372,16 @@
                       </div>
                     </label>
                   </form>
+                </div>
+              </div>
+
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>検索して起動</h2>
+                </div>
+                <div class="card form-card">
+                  <h2>ワールド検索して起動</h2>
+                  <p class="info">このセクションは後で実装します。</p>
                 </div>
               </div>
             </div>
