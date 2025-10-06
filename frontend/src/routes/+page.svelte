@@ -50,6 +50,31 @@
       notificationsStore.update(items => items.filter(item => item.id !== id));
     }, duration);
   };
+
+  const copyLogsToClipboard = async () => {
+    try {
+      const text = $logs.slice(-LOG_DISPLAY_LIMIT).map(entry => entry.message).join('\n');
+      if (!text) {
+        pushToast('コピーするログがありません', 'info');
+        return;
+      }
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        pushToast('ログをコピーしました', 'success');
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        pushToast('ログをコピーしました', 'success');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コピーに失敗しました';
+      pushToast(message, 'error');
+    }
+  };
   let actionInProgress = false;
   const LOG_DISPLAY_LIMIT = 1000;
   const INITIAL_RETRY_DELAY = 3000;
@@ -1092,7 +1117,22 @@
       </section>
 
       <section class="logs-card compact">
-        <div class="log-container" bind:this={logContainer}>
+        <div class="section-header">
+          <h2>ログ</h2>
+          <div class="header-actions">
+            <button type="button" class="refresh-button" on:click={copyLogsToClipboard} aria-label="ログをコピー">
+              <svg viewBox="0 0 24 24" class="refresh-icon" aria-hidden="true">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16h13c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/>
+              </svg>
+            </button>
+            <button type="button" class="refresh-button" on:click={() => { clearLogs(); pushToast('表示中のログを消去しました', 'success'); }} aria-label="表示ログをクリア">
+              <svg viewBox="0 0 24 24" class="refresh-icon" aria-hidden="true">
+                <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-container selectable" bind:this={logContainer}>
           {#if !$logs.length}
             <p class="empty">まだログがありません。</p>
           {:else}
@@ -1441,6 +1481,12 @@
                     {/if}
 
                     {#if worldSearchResults.length}
+                      <div class="action-buttons">
+                        <button type="button" class="save" on:click={launchSelectedWorld} disabled={!selectedResoniteUrl}>
+                          このワールドを起動
+                        </button>
+                      </div>
+
                       <div class="world-grid">
                         {#each worldSearchResults as item}
                           <button
@@ -1461,12 +1507,6 @@
                             </div>
                           </button>
                         {/each}
-                      </div>
-
-                      <div class="action-buttons">
-                        <button type="button" class="save" on:click={launchSelectedWorld} disabled={!selectedResoniteUrl}>
-                          このワールドを起動
-                        </button>
                       </div>
                     {/if}
                   </form>
@@ -1890,6 +1930,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  .section-header .header-actions {
+    margin-left: auto;
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
   }
 
   .sidebar h2 {
@@ -2327,6 +2374,12 @@
     padding: 0.35rem 0.45rem;
     border-radius: 0.45rem;
     background: rgba(11, 14, 20, 0.9);
+  }
+
+  .logs-card .log-container.selectable,
+  .logs-card .log-container.selectable * {
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   .logs-card .log-container div.stderr {

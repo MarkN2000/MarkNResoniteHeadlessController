@@ -541,16 +541,37 @@ serverRoutes.get('/world-search', async (req, res, next) => {
     const html = await resp.text();
     const $ = cheerio.load(html);
 
+    const origin = 'https://go.resonite.com';
+    const absolutize = (u?: string | null) => {
+      if (!u) return null;
+      if (/^https?:\/\//i.test(u)) return u;
+      if (u.startsWith('//')) return `https:${u}`;
+      if (u.startsWith('/')) return origin + u;
+      return u;
+    };
+
     const items: Array<{ name: string; imageUrl: string | null; recordId: string; resoniteUrl: string }> = [];
     $('ol.listing li a.listing-item').each((_i, el) => {
       const anchor = $(el);
       const name = anchor.find('h2.listing-item__heading span').first().text().trim();
       const href = anchor.attr('href') || '';
-      // Try to find image in common places
+      // Try to find image in common places (img/src, img/srcset, data-src, background-image)
       let imageUrl: string | null = null;
       const img = anchor.find('img').first();
       if (img && img.attr('src')) imageUrl = img.attr('src')!;
       if (!imageUrl && img && img.attr('data-src')) imageUrl = img.attr('data-src')!;
+      if (!imageUrl && img && img.attr('srcset')) {
+        const srcset = img.attr('srcset')!;
+        const first = srcset.split(',')[0]?.trim().split(' ')[0];
+        if (first) imageUrl = first;
+      }
+      if (!imageUrl) {
+        const styled = anchor.find('[style*="background-image"]').first();
+        const style = styled.attr('style') || '';
+        const m = style.match(/background-image:\s*url\(("|')?(?<u>[^)"']+)("|')?\)/i);
+        if (m && m.groups && m.groups.u) imageUrl = m.groups.u;
+      }
+      imageUrl = absolutize(imageUrl);
 
       const match = href.match(/\/R-([A-Za-z0-9_-]+)/);
       if (!name || !match) return;
