@@ -304,3 +304,38 @@
 - [ ] 問題点の分析
 - [ ] 改善案の検討
 - [ ] プロセス最適化
+
+---
+
+## 追加タスク: ワールド検索して起動
+
+1. バックエンドAPIの追加（/api/world-search）
+   - [ ] 依存追加: cheerio
+   - [ ] ルート追加: `backend/src/http/routes/serverRoutes.ts`
+   - [ ] スクレイピング実装: `https://go.resonite.com/world?term=<term>`
+   - [ ] 解析: タイトル/相対URL/画像URL → recordId/resoniteUrl 生成
+   - [ ] 入力バリデーション・タイムアウト・エラーハンドリング
+   - [ ] 短期TTLキャッシュ（任意）
+
+2. フロントAPI関数の追加
+   - [ ] `frontend/src/lib/api.ts` に `getWorldSearch(term)` を追加
+   - [ ] エラー時の例外化・型定義
+
+3. UI実装（newWorld 右カラム）
+   - [ ] 検索入力と検索ボタン（status-form/field-row 準拠）
+   - [ ] ローディング・エラー表示
+   - [ ] 結果カードグリッド（画像・タイトル・選択状態）
+   - [ ] 「このワールドを起動」ボタン（選択時のみ活性）
+
+4. コマンド送信
+   - [ ] `postCommand('startworldurl <resoniteUrl>')` 呼び出し
+
+5. テスト
+   - [ ] 代表クエリでの結果確認
+   - [ ] 画像なしフォールバック
+   - [ ] 起動ボタン動作確認（トースト）
+
+6. 将来拡張（任意）
+   - [ ] ページング/無限スクロール
+   - [ ] 最近検索/最近起動
+   - [ ] 並べ替え（関連度/新着）
