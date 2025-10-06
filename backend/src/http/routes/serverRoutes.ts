@@ -573,10 +573,13 @@ serverRoutes.get('/world-search', async (req, res, next) => {
       }
       imageUrl = absolutize(imageUrl);
 
-      const match = href.match(/\/R-([A-Za-z0-9_-]+)/);
-      if (!name || !match) return;
-      const recordId = `R-${match[1]}`;
-      const resoniteUrl = `resonite:///world/${recordId}`;
+      const recMatch = href.match(/\/R-([A-Za-z0-9_-]+)/);
+      const ownerMatch = href.match(/\/U-([A-Za-z0-9_-]+)/);
+      if (!name || !recMatch || !ownerMatch) return;
+      const recordId = `R-${recMatch[1]}`;
+      const ownerId = `U-${ownerMatch[1]}`;
+      // Expected final: resrec:///U-<owner>/R-<record>
+      const resoniteUrl = `resrec:///${ownerId}/${recordId}`;
       items.push({ name, imageUrl, recordId, resoniteUrl });
     });
 
