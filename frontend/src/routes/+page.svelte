@@ -15,6 +15,8 @@
     postFocusWorldRefresh,
     startServer,
     stopServer,
+    getWorldSearch,
+    type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
     type FriendRequestsData,
@@ -102,6 +104,13 @@
   let friendRequests: FriendRequestsData | null = null;
   let friendRequestsLoading = false;
   let friendRequestsError = '';
+
+  // World search state
+  let worldSearchTerm = '';
+  let worldSearchLoading = false;
+  let worldSearchError = '';
+  let worldSearchResults: WorldSearchItem[] = [];
+  let selectedResoniteUrl: string | null = null;
 
   const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'];
   const USER_ACTIONS = [
@@ -655,6 +664,38 @@
       pushToast(message, 'error');
     } finally {
       worldUrlLoading = false;
+    }
+  };
+
+  const submitWorldSearch = async () => {
+    if (worldSearchLoading) return;
+    worldSearchLoading = true;
+    worldSearchError = '';
+    selectedResoniteUrl = null;
+    try {
+      const term = worldSearchTerm.trim();
+      if (!term) {
+        worldSearchResults = [];
+      } else {
+        const resp = await getWorldSearch(term);
+        worldSearchResults = resp.items ?? [];
+      }
+    } catch (error) {
+      worldSearchError = error instanceof Error ? error.message : '検索に失敗しました';
+      worldSearchResults = [];
+    } finally {
+      worldSearchLoading = false;
+    }
+  };
+
+  const launchSelectedWorld = async () => {
+    if (!selectedResoniteUrl) return;
+    try {
+      await postCommand(`startworldurl ${JSON.stringify(selectedResoniteUrl)}`);
+      pushToast('選択したワールドを起動しました。', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ワールドを起動できませんでした';
+      pushToast(message, 'error');
     }
   };
 
@@ -1379,9 +1420,56 @@
                 <div class="panel-heading">
                   <h2>検索して起動</h2>
                 </div>
-                <div class="card form-card">
-                  <h2>ワールド検索して起動</h2>
-                  <p class="info">このセクションは後で実装します。</p>
+                <div class="card status-card">
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
+                    <label>
+                      <span>ワールド検索</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={worldSearchTerm} placeholder="キーワード" />
+                        <button type="button" class="status-action-button" on:click={submitWorldSearch} disabled={worldSearchLoading}>
+                          検索
+                        </button>
+                      </div>
+                    </label>
+
+                    {#if worldSearchLoading}
+                      <p class="info">検索中...</p>
+                    {:else if worldSearchError}
+                      <p class="feedback">{worldSearchError}</p>
+                    {:else if worldSearchResults.length === 0 && worldSearchTerm}
+                      <p class="empty">該当するワールドが見つかりませんでした。</p>
+                    {/if}
+
+                    {#if worldSearchResults.length}
+                      <div class="world-grid">
+                        {#each worldSearchResults as item}
+                          <button
+                            type="button"
+                            class={selectedResoniteUrl === item.resoniteUrl ? 'world-card selected' : 'world-card'}
+                            on:click={() => (selectedResoniteUrl = item.resoniteUrl)}
+                          >
+                            <div class="thumb" aria-hidden="true">
+                              {#if item.imageUrl}
+                                <img src={item.imageUrl} alt="" />
+                              {:else}
+                                <div class="thumb-placeholder">No Image</div>
+                              {/if}
+                            </div>
+                            <div class="meta">
+                              <strong class="title">{item.name}</strong>
+                              <span class="sub">{item.recordId}</span>
+                            </div>
+                          </button>
+                        {/each}
+                      </div>
+
+                      <div class="action-buttons">
+                        <button type="button" class="save" on:click={launchSelectedWorld} disabled={!selectedResoniteUrl}>
+                          このワールドを起動
+                        </button>
+                      </div>
+                    {/if}
+                  </form>
                 </div>
               </div>
             </div>
@@ -2849,6 +2937,62 @@
 
   .users-card table {
     background: #11151d;
+  }
+
+  /* world search */
+  .world-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .world-card {
+    background: #2b2f35;
+    border: 2px solid transparent;
+    border-radius: 0.75rem;
+    display: grid;
+    grid-template-rows: 120px auto;
+    padding: 0;
+    text-align: left;
+    color: #e1f6ff;
+  }
+
+  .world-card.selected {
+    border-color: #ba64f2;
+    box-shadow: 0 0 0 3px rgba(186, 100, 242, 0.35);
+  }
+
+  .world-card .thumb {
+    background: #11151d;
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .world-card .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-placeholder {
+    color: #9aa3b3;
+    font-size: 0.85rem;
+  }
+
+  .world-card .meta {
+    padding: 0.6rem 0.7rem 0.7rem;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .world-card .title {
+    font-size: 0.95rem;
+    color: #f5f5f5;
   }
 
   .startup-overlay {

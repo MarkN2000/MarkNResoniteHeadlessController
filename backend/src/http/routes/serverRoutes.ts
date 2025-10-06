@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { Router } from 'express';
+import * as cheerio from 'cheerio';
 import { processManager } from '../../services/processManager.js';
 import type { ExecuteCommandOptions } from '../../services/processManager.js';
 
@@ -521,6 +522,44 @@ serverRoutes.post('/runtime/command', async (req, res, next) => {
     }
     const output = await runCommand(trimmed);
     res.json({ raw: output });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// World search via go.resonite.com HTML scraping
+serverRoutes.get('/world-search', async (req, res, next) => {
+  try {
+    const term = typeof req.query.term === 'string' ? req.query.term.trim() : '';
+    if (!term) return res.status(400).json({ error: 'term is required' });
+
+    const url = `https://go.resonite.com/world?term=${encodeURIComponent(term)}`;
+    const resp = await fetch(url, { headers: { 'User-Agent': 'MRHC/1.0' } });
+    if (!resp.ok) {
+      return res.status(502).json({ error: `upstream error ${resp.status}` });
+    }
+    const html = await resp.text();
+    const $ = cheerio.load(html);
+
+    const items: Array<{ name: string; imageUrl: string | null; recordId: string; resoniteUrl: string }> = [];
+    $('ol.listing li a.listing-item').each((_i, el) => {
+      const anchor = $(el);
+      const name = anchor.find('h2.listing-item__heading span').first().text().trim();
+      const href = anchor.attr('href') || '';
+      // Try to find image in common places
+      let imageUrl: string | null = null;
+      const img = anchor.find('img').first();
+      if (img && img.attr('src')) imageUrl = img.attr('src')!;
+      if (!imageUrl && img && img.attr('data-src')) imageUrl = img.attr('data-src')!;
+
+      const match = href.match(/\/R-([A-Za-z0-9_-]+)/);
+      if (!name || !match) return;
+      const recordId = `R-${match[1]}`;
+      const resoniteUrl = `resonite:///world/${recordId}`;
+      items.push({ name, imageUrl, recordId, resoniteUrl });
+    });
+
+    res.json({ items });
   } catch (error) {
     next(error);
   }

@@ -136,3 +136,15 @@ export const postCommand = (command: string) =>
     method: 'POST',
     body: JSON.stringify({ command })
   }) as Promise<{ raw: string }>;
+
+// World Search API
+export interface WorldSearchItem {
+  name: string;
+  imageUrl: string | null;
+  recordId: string;
+  resoniteUrl: string;
+}
+export interface WorldSearchResponse {
+  items: WorldSearchItem[];
+}
+export const getWorldSearch = (term: string) => request(`/server/world-search?term=${encodeURIComponent(term)}`) as Promise<WorldSearchResponse>;
