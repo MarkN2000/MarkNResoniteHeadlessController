@@ -1482,7 +1482,7 @@
 
                     {#if worldSearchResults.length}
                       <div class="action-buttons">
-                        <button type="button" class="save" on:click={launchSelectedWorld} disabled={!selectedResoniteUrl}>
+                        <button type="button" class="save" on:click={launchSelectedWorld} disabled={!$status.running || !selectedResoniteUrl}>
                           このワールドを起動
                         </button>
                       </div>
