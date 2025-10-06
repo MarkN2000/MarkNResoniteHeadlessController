@@ -292,8 +292,11 @@
   };
 
   const refreshRuntimeInfo = async (suppressError = false): Promise<number | null> => {
-    await refreshRuntimeStatus(suppressError);
-    return refreshRuntimeUsers(suppressError);
+    const [, userCount] = await Promise.all([
+      refreshRuntimeStatus(suppressError),
+      refreshRuntimeUsers(suppressError)
+    ]);
+    return userCount;
   };
 
   const refreshConfigsOnly = async () => {
@@ -462,7 +465,7 @@
       await postCommand(`role "${username}" "${role}"`);
       pushToast(`ロールを ${role} に変更しました`, 'success');
       if ($status.running) {
-        await refreshRuntimeInfo(true);
+        await Promise.all([refreshRuntimeInfo(true), refreshWorlds(true)]);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ロール変更に失敗しました';
@@ -482,7 +485,7 @@
       await ensureSelectedWorldFocused();
       await postCommand(command);
       pushToast(successMessage, 'success');
-      await refreshRuntimeInfo(true);
+      await Promise.all([refreshRuntimeInfo(true), refreshWorlds(true)]);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'コマンド送信に失敗しました';
       pushToast(message, 'error');
