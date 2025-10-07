@@ -26,12 +26,16 @@ serverRoutes.get('/configs', (_req, res) => {
 serverRoutes.post('/configs/generate', async (req, res, next) => {
   try {
     const { name, username, password, configData } = req.body ?? {};
-    
-    if (!name || !username || !password) {
-      return res.status(400).json({ error: 'name, username, and password are required' });
+
+    // name は必須、username/password は空文字も許容
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required' });
     }
 
-    const configPath = await processManager.generateConfig(name, username, password, configData || {});
+    const safeUsername = typeof username === 'string' ? username : '';
+    const safePassword = typeof password === 'string' ? password : '';
+
+    const configPath = await processManager.generateConfig(name.trim(), safeUsername, safePassword, configData || {});
     res.json({ 
       ok: true, 
       path: configPath,

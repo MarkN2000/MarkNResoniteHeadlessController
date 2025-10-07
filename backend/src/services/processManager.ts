@@ -74,9 +74,12 @@ export class ProcessManager extends EventEmitter {
       "universeId": configData.universeId || null,
       "tickRate": configData.tickRate || 60.0,
       "maxConcurrentAssetTransfers": configData.maxConcurrentAssetTransfers || 128,
-      "usernameOverride": configData.usernameOverride || username,
-      "loginCredential": username,
-      "loginPassword": password,
+      // 仕様: デフォルトは null。入力がなければ null を採用
+      "usernameOverride": typeof configData.usernameOverride === 'string' && configData.usernameOverride.trim() !== ''
+        ? configData.usernameOverride
+        : null,
+      "loginCredential": username ?? '',
+      "loginPassword": password ?? '',
       "startWorlds": configData.startWorlds || [],
       "dataFolder": configData.dataFolder || null,
       "cacheFolder": configData.cacheFolder || null,
