@@ -44,19 +44,6 @@
     },
     {
       "isEnabled": true,
-      "sessionName": null,
-      "customSessionId": null,
-      "description": null,
-      "maxUsers": 16,
-      "accessLevel": "Anyone",
-      "loadWorldURL": "resrec:///G-*******/*******",
-      "loadWorldPresetName": "Grid",
-      "idleRestartInterval": 1800,
-      "autoSleep": true,
-      "defaultUserRoles": { "*******":"Admin"}
-    },
-    {
-      "isEnabled": true,
       "sessionName": "グリッドスペース",
       "customSessionId": null,
       "description": null,

@@ -143,6 +143,59 @@
   let configUsername = '';
   let configPassword = '';
   let configGenerationLoading = false;
+  
+  // Advanced config settings
+  let configComment = '';
+  let configUniverseId = '';
+  let configTickRate = 60.0;
+  let configMaxConcurrentAssetTransfers = 128;
+  let configUsernameOverride = '';
+  let configDataFolder = '';
+  let configCacheFolder = '';
+  let configLogsFolder = '';
+  let configAllowedUrlHosts = '';
+  let configAutoSpawnItems = '';
+  
+  // Session management
+  let sessions = [
+    {
+      id: 1,
+      isEnabled: true,
+      sessionName: '',
+      customSessionId: '',
+      description: '',
+      maxUsers: 16,
+      accessLevel: 'Anyone',
+      useCustomJoinVerifier: false,
+      hideFromPublicListing: null,
+      tags: '',
+      mobileFriendly: false,
+      loadWorldURL: '',
+      loadWorldPresetName: 'Grid',
+      overrideCorrespondingWorldId: '',
+      forcePort: null,
+      keepOriginalRoles: false,
+      defaultUserRoles: '',
+      roleCloudVariable: '',
+      allowUserCloudVariable: '',
+      denyUserCloudVariable: '',
+      requiredUserJoinCloudVariable: '',
+      requiredUserJoinCloudVariableDenyMessage: '',
+      awayKickMinutes: 30,
+      parentSessionIds: '',
+      autoInviteUsernames: '',
+      autoInviteMessage: '',
+      saveAsOwner: '',
+      autoRecover: true,
+      idleRestartInterval: 1800,
+      forcedRestartInterval: -1.0,
+      saveOnExit: false,
+      autosaveInterval: -1.0,
+      autoSleep: true
+    }
+  ];
+  let activeSessionTab = 1;
+  let nextSessionId = 2;
 
   const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'];
   const USER_ACTIONS = [
@@ -352,6 +405,61 @@
     }
   };
 
+  const addSession = () => {
+    const newSession = {
+      id: nextSessionId++,
+      isEnabled: true,
+      sessionName: '',
+      customSessionId: '',
+      description: '',
+      maxUsers: 16,
+      accessLevel: 'Anyone',
+      useCustomJoinVerifier: false,
+      hideFromPublicListing: null,
+      tags: '',
+      mobileFriendly: false,
+      loadWorldURL: '',
+      loadWorldPresetName: 'Grid',
+      overrideCorrespondingWorldId: '',
+      forcePort: null,
+      keepOriginalRoles: false,
+      defaultUserRoles: '',
+      roleCloudVariable: '',
+      allowUserCloudVariable: '',
+      denyUserCloudVariable: '',
+      requiredUserJoinCloudVariable: '',
+      requiredUserJoinCloudVariableDenyMessage: '',
+      awayKickMinutes: 30,
+      parentSessionIds: '',
+      autoInviteUsernames: '',
+      autoInviteMessage: '',
+      saveAsOwner: '',
+      autoRecover: true,
+      idleRestartInterval: 1800,
+      forcedRestartInterval: -1.0,
+      saveOnExit: false,
+      autosaveInterval: -1.0,
+      autoSleep: true
+    };
+    sessions = [...sessions, newSession];
+    activeSessionTab = newSession.id;
+  };
+
+  const removeSession = (sessionId: number) => {
+    if (sessions.length <= 1) {
+      pushToast('最低1つのセッションが必要です', 'error');
+      return;
+    }
+    sessions = sessions.filter(s => s.id !== sessionId);
+    if (activeSessionTab === sessionId) {
+      activeSessionTab = sessions[0].id;
+    }
+  };
+
+  const getCurrentSession = () => {
+    return sessions.find(s => s.id === activeSessionTab) || sessions[0];
+  };
+
   const generateConfigFile = async () => {
     if (configGenerationLoading) return;
     configGenerationLoading = true;
@@ -365,7 +473,68 @@
         return;
       }
 
-      await generateConfig(trimmedName, trimmedUsername, trimmedPassword);
+      // セッションデータを処理
+      const processedSessions = sessions.map(session => {
+        const processedSession: any = {
+          isEnabled: session.isEnabled,
+          maxUsers: session.maxUsers,
+          accessLevel: session.accessLevel,
+          useCustomJoinVerifier: session.useCustomJoinVerifier,
+          mobileFriendly: session.mobileFriendly,
+          keepOriginalRoles: session.keepOriginalRoles,
+          awayKickMinutes: session.awayKickMinutes,
+          autoRecover: session.autoRecover,
+          idleRestartInterval: session.idleRestartInterval,
+          forcedRestartInterval: session.forcedRestartInterval,
+          saveOnExit: session.saveOnExit,
+          autosaveInterval: session.autosaveInterval,
+          autoSleep: session.autoSleep
+        };
+
+        // 文字列フィールドの処理
+        if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
+        if (session.customSessionId.trim()) processedSession.customSessionId = session.customSessionId.trim();
+        if (session.description.trim()) processedSession.description = session.description.trim();
+        if (session.tags.trim()) processedSession.tags = session.tags.split(',').map(t => t.trim()).filter(Boolean);
+        if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
+        if (session.loadWorldPresetName.trim()) processedSession.loadWorldPresetName = session.loadWorldPresetName.trim();
+        if (session.overrideCorrespondingWorldId.trim()) processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim();
+        if (session.forcePort !== null && session.forcePort !== '') processedSession.forcePort = Number(session.forcePort);
+        if (session.defaultUserRoles.trim()) {
+          try {
+            processedSession.defaultUserRoles = JSON.parse(session.defaultUserRoles);
+          } catch {
+            // 無効なJSONの場合は無視
+          }
+        }
+        if (session.roleCloudVariable.trim()) processedSession.roleCloudVariable = session.roleCloudVariable.trim();
+        if (session.allowUserCloudVariable.trim()) processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim();
+        if (session.denyUserCloudVariable.trim()) processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim();
+        if (session.requiredUserJoinCloudVariable.trim()) processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim();
+        if (session.requiredUserJoinCloudVariableDenyMessage.trim()) processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim();
+        if (session.parentSessionIds.trim()) processedSession.parentSessionIds = session.parentSessionIds.split(',').map(s => s.trim()).filter(Boolean);
+        if (session.autoInviteUsernames.trim()) processedSession.autoInviteUsernames = session.autoInviteUsernames.split(',').map(s => s.trim()).filter(Boolean);
+        if (session.autoInviteMessage.trim()) processedSession.autoInviteMessage = session.autoInviteMessage.trim();
+        if (session.saveAsOwner.trim()) processedSession.saveAsOwner = session.saveAsOwner.trim();
+
+        return processedSession;
+      });
+
+      const configData = {
+        comment: configComment.trim() || `${trimmedName}の設定ファイル`,
+        universeId: configUniverseId.trim() || null,
+        tickRate: configTickRate,
+        maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
+        usernameOverride: configUsernameOverride.trim() || trimmedUsername,
+        dataFolder: configDataFolder.trim() || null,
+        cacheFolder: configCacheFolder.trim() || null,
+        logsFolder: configLogsFolder.trim() || null,
+        allowedUrlHosts: configAllowedUrlHosts.trim() ? configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean) : null,
+        autoSpawnItems: configAutoSpawnItems.trim() ? configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean) : null,
+        startWorlds: processedSessions
+      };
+
+      await generateConfig(trimmedName, trimmedUsername, trimmedPassword, configData);
       pushToast('設定ファイルを生成しました', 'success');
       
       // 設定ファイル一覧を更新
@@ -375,6 +544,53 @@
       configName = '';
       configUsername = '';
       configPassword = '';
+      configComment = '';
+      configUniverseId = '';
+      configTickRate = 60.0;
+      configMaxConcurrentAssetTransfers = 128;
+      configUsernameOverride = '';
+      configDataFolder = '';
+      configCacheFolder = '';
+      configLogsFolder = '';
+      configAllowedUrlHosts = '';
+      configAutoSpawnItems = '';
+      sessions = [{
+        id: 1,
+        isEnabled: true,
+        sessionName: '',
+        customSessionId: '',
+        description: '',
+        maxUsers: 16,
+        accessLevel: 'Anyone',
+        useCustomJoinVerifier: false,
+        hideFromPublicListing: null,
+        tags: '',
+        mobileFriendly: false,
+        loadWorldURL: '',
+        loadWorldPresetName: 'Grid',
+        overrideCorrespondingWorldId: '',
+        forcePort: null,
+        keepOriginalRoles: false,
+        defaultUserRoles: '',
+        roleCloudVariable: '',
+        allowUserCloudVariable: '',
+        denyUserCloudVariable: '',
+        requiredUserJoinCloudVariable: '',
+        requiredUserJoinCloudVariableDenyMessage: '',
+        awayKickMinutes: 30,
+        parentSessionIds: '',
+        autoInviteUsernames: '',
+        autoInviteMessage: '',
+        saveAsOwner: '',
+        autoRecover: true,
+        idleRestartInterval: 1800,
+        forcedRestartInterval: -1.0,
+        saveOnExit: false,
+        autosaveInterval: -1.0,
+        autoSleep: true
+      }];
+      activeSessionTab = 1;
+      nextSessionId = 2;
     } catch (error) {
       const message = error instanceof Error ? error.message : '設定ファイルの生成に失敗しました';
       pushToast(message, 'error');
@@ -1076,12 +1292,15 @@
       <label class="field">
         <span>プロファイル選択</span>
         {#if backendReachable && $configs.length}
-          <div class="select-wrapper">
-            <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
-              {#each $configs as config}
-                <option value={config.path}>{config.name}</option>
-              {/each}
-            </select>
+          <div class="field-row">
+            <div class="select-wrapper">
+              <select bind:value={selectedConfig} disabled={$status.running || actionInProgress}>
+                {#each $configs as config}
+                  <option value={config.path}>{config.name}</option>
+                {/each}
+              </select>
+            </div>
+            <button type="button" class="status-action-button" on:click={refreshConfigsOnly}>更新</button>
           </div>
         {:else}
           <div class="field-placeholder">利用可能な設定がありません</div>
@@ -1648,10 +1867,12 @@
             <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>設定ファイル生成</h2>
+                  <h2>基本・詳細設定</h2>
                 </div>
                 <div class="card status-card">
                   <form class="status-form" on:submit|preventDefault={generateConfigFile}>
+                    <!-- 基本設定 -->
+                    <h3>基本設定</h3>
                     <label>
                       <span>設定名</span>
                       <div class="field-row">
@@ -1673,6 +1894,79 @@
                       </div>
                     </label>
 
+                    <label>
+                      <span>コメント</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configComment} placeholder="設定ファイルの説明" />
+                      </div>
+                    </label>
+
+                    <!-- 詳細設定 -->
+                    <h3>詳細設定</h3>
+                    <label>
+                      <span>Universe ID</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configUniverseId} placeholder="Universe ID (オプション)" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>Tick Rate</span>
+                      <div class="field-row">
+                        <input type="number" bind:value={configTickRate} min="1" max="120" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>最大同時アセット転送数</span>
+                      <div class="field-row">
+                        <input type="number" bind:value={configMaxConcurrentAssetTransfers} min="1" max="1000" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>ユーザー名オーバーライド</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configUsernameOverride} placeholder="表示用ユーザー名" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>データフォルダ</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configDataFolder} placeholder="データ保存フォルダ" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>キャッシュフォルダ</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configCacheFolder} placeholder="キャッシュフォルダ" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>ログフォルダ</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configLogsFolder} placeholder="ログ保存フォルダ" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>許可されたURLホスト</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configAllowedUrlHosts} placeholder="例: example.com,api.example.com" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>自動スポーンアイテム</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configAutoSpawnItems} placeholder="例: resrec:///U-User/R-Item1,resrec:///U-User/R-Item2" />
+                      </div>
+                    </label>
+
+
                     <div class="action-buttons">
                       <button type="submit" class="save" disabled={configGenerationLoading}>
                         {configGenerationLoading ? '生成中...' : '設定ファイルを生成'}
@@ -1681,25 +1975,174 @@
                   </form>
                 </div>
               </div>
+
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>設定ファイル管理</h2>
+                  <h2>セッション管理</h2>
                 </div>
                 <div class="card status-card">
-                  <form class="status-form" on:submit|preventDefault={() => {}}>
-                    <label>
-                      <span>設定ファイル一覧</span>
-                      <div class="field-row">
-                        <div class="field-placeholder">現在の件数: {$configs.length}</div>
-                        <button type="button" class="status-action-button" on:click={refreshConfigsOnly}>
-                          再取得
-                        </button>
-                      </div>
-                    </label>
-                  </form>
+                  <!-- Session tab buttons -->
+                  <div class="session-tab-bar">
+                    {#each sessions as session}
+                      <button
+                        type="button"
+                        class="session-tab"
+                        class:active={activeSessionTab === session.id}
+                        on:click={() => activeSessionTab = session.id}
+                      >
+                        セッション {session.id}
+                        {#if sessions.length > 1}
+                          <span
+                            class="remove-session-btn"
+                            role="button"
+                            tabindex="0"
+                            on:click|stopPropagation={() => removeSession(session.id)}
+                            on:keydown={(e) => e.key === 'Enter' && removeSession(session.id)}
+                            title="セッションを削除"
+                          >
+                            ×
+                          </span>
+                        {/if}
+                      </button>
+                    {/each}
+                    <button type="button" class="add-session-btn" on:click={addSession} title="セッションを追加">
+                      +
+                    </button>
+                  </div>
+
+                  <!-- Session content -->
+                  {#each sessions as session}
+                    {#if activeSessionTab === session.id}
+                      <form class="status-form">
+                        <label>
+                          <span>セッション名</span>
+                          <div class="field-row">
+                            <input type="text" bind:value={session.sessionName} placeholder="セッション名" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>カスタムセッションID</span>
+                          <div class="field-row">
+                            <input type="text" bind:value={session.customSessionId} placeholder="U-UserID:CustomID" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>説明</span>
+                          <div class="field-row">
+                            <textarea bind:value={session.description} placeholder="セッションの説明" rows="2"></textarea>
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>最大ユーザー数</span>
+                          <div class="field-row">
+                            <input type="number" bind:value={session.maxUsers} min="1" max="100" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>アクセスレベル</span>
+                          <div class="field-row">
+                            <select bind:value={session.accessLevel}>
+                              <option value="Private">Private</option>
+                              <option value="LAN">LAN</option>
+                              <option value="Contacts">Contacts</option>
+                              <option value="ContactsPlus">ContactsPlus</option>
+                              <option value="RegisteredUsers">RegisteredUsers</option>
+                              <option value="Anyone">Anyone</option>
+                            </select>
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>ワールドURL</span>
+                          <div class="field-row">
+                            <input type="text" bind:value={session.loadWorldURL} placeholder="resrec:///U-UserID/R-RecordID" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>ワールドプリセット</span>
+                          <div class="field-row">
+                            <select bind:value={session.loadWorldPresetName}>
+                              <option value="Grid">Grid</option>
+                              <option value="Platform">Platform</option>
+                              <option value="Blank">Blank</option>
+                            </select>
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>タグ</span>
+                          <div class="field-row">
+                            <input type="text" bind:value={session.tags} placeholder="tag1,tag2,tag3" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>デフォルトユーザーロール</span>
+                          <div class="field-row">
+                            <input type="text" bind:value={session.defaultUserRoles} placeholder="JSON形式で入力してください" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>AFKキック時間（分）</span>
+                          <div class="field-row">
+                            <input type="number" bind:value={session.awayKickMinutes} min="-1" />
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>アイドル再起動間隔（分）</span>
+                          <div class="field-row">
+                            <input type="number" bind:value={session.idleRestartInterval} min="0" />
+                          </div>
+                        </label>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.isEnabled} />
+                          <span>セッションを有効にする</span>
+                        </div>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.useCustomJoinVerifier} />
+                          <span>カスタム参加検証を使用</span>
+                        </div>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.mobileFriendly} />
+                          <span>モバイルフレンドリー</span>
+                        </div>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.keepOriginalRoles} />
+                          <span>元のロールを保持</span>
+                        </div>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.autoRecover} />
+                          <span>自動復旧</span>
+                        </div>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.saveOnExit} />
+                          <span>終了時に保存</span>
+                        </div>
+
+                        <div class="checkbox-field">
+                          <input type="checkbox" bind:checked={session.autoSleep} />
+                          <span>自動スリープ</span>
+                        </div>
+                      </form>
+                    {/if}
+                  {/each}
                 </div>
               </div>
             </div>
+
           </section>
 
           <section class="panel" class:active={activeTab === 'commands'}>
@@ -3217,4 +3660,76 @@
   .toast.info {
     border-color: rgba(97, 209, 250, 0.6);
   }
+
+  /* Session tabs styles */
+  .session-tab-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .session-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #2b2f35;
+    color: #61d1fa;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: background 0.15s ease;
+    position: relative;
+  }
+
+  .session-tab:hover {
+    background: #34404c;
+  }
+
+  .session-tab.active {
+    background: #ba64f2;
+    color: #ffffff;
+  }
+
+  .remove-session-btn {
+    background: #ff7676;
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 0.5rem;
+    transition: background 0.15s ease;
+    cursor: pointer;
+  }
+
+  .remove-session-btn:hover {
+    background: #ff5555;
+  }
+
+  .add-session-btn {
+    background: #59eb5c;
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: bold;
+    transition: background 0.15s ease;
+  }
+
+  .add-session-btn:hover {
+    background: #4ddb50;
+  }
+
 </style>
