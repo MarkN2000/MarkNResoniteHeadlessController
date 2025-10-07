@@ -54,7 +54,7 @@ export class ProcessManager extends EventEmitter {
       .map(file => path.join(HEADLESS_CONFIG_DIR, file));
   }
 
-  async generateConfig(name: string, username: string, password: string, configData: any): Promise<string> {
+  async generateConfig(name: string, username: string, password: string, configData: any, overwrite = false): Promise<string> {
     // 設定ディレクトリが存在しない場合は作成
     if (!fs.existsSync(HEADLESS_CONFIG_DIR)) {
       fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
@@ -62,9 +62,11 @@ export class ProcessManager extends EventEmitter {
 
     const configPath = path.join(HEADLESS_CONFIG_DIR, `${name}.json`);
     
-    // 既存のファイルがある場合はエラー
+    // 既存のファイルがある場合の挙動
     if (fs.existsSync(configPath)) {
-      throw new Error(`Config file already exists: ${name}.json`);
+      if (!overwrite) {
+        throw new Error(`Config file already exists: ${name}.json`);
+      }
     }
 
     // 設定ファイルを生成

@@ -25,7 +25,7 @@ serverRoutes.get('/configs', (_req, res) => {
 
 serverRoutes.post('/configs/generate', async (req, res, next) => {
   try {
-    const { name, username, password, configData } = req.body ?? {};
+    const { name, username, password, configData, overwrite } = req.body ?? {};
 
     // name は必須、username/password は空文字も許容
     if (!name || typeof name !== 'string' || !name.trim()) {
@@ -35,7 +35,7 @@ serverRoutes.post('/configs/generate', async (req, res, next) => {
     const safeUsername = typeof username === 'string' ? username : '';
     const safePassword = typeof password === 'string' ? password : '';
 
-    const configPath = await processManager.generateConfig(name.trim(), safeUsername, safePassword, configData || {});
+    const configPath = await processManager.generateConfig(name.trim(), safeUsername, safePassword, configData || {}, Boolean(overwrite));
     res.json({ 
       ok: true, 
       path: configPath,

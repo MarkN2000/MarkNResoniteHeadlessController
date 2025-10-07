@@ -177,6 +177,81 @@
   let configLogsFolder = '';
   let configAllowedUrlHosts = '';
   let configAutoSpawnItems = '';
+
+  // リセット用デフォルト値（default.json 準拠）
+  const DEFAULT_CONFIG = {
+    name: 'default',
+    username: '',
+    password: '',
+    comment: '',
+    universeId: '',
+    tickRate: 60.0,
+    maxConcurrentAssetTransfers: 128,
+    usernameOverride: '',
+    dataFolder: '',
+    cacheFolder: '',
+    logsFolder: '',
+    allowedUrlHosts: '',
+    autoSpawnItems: ''
+  } as const;
+
+  const DEFAULT_SESSION_FIELDS = {
+    sessionName: '',
+    customSessionId: '',
+    description: '',
+    tags: '',
+    mobileFriendly: false,
+    loadWorldURL: '',
+    loadWorldPresetName: 'Grid',
+    overrideCorrespondingWorldId: '',
+    forcePort: null as number | null,
+    keepOriginalRoles: false,
+    defaultUserRoles: '',
+    roleCloudVariable: '',
+    allowUserCloudVariable: '',
+    denyUserCloudVariable: '',
+    requiredUserJoinCloudVariable: '',
+    requiredUserJoinCloudVariableDenyMessage: '',
+    awayKickMinutes: -1.0,
+    parentSessionIds: '',
+    autoInviteUsernames: '',
+    autoInviteMessage: '',
+    saveAsOwner: '',
+    autoRecover: true,
+    idleRestartInterval: 1800,
+    forcedRestartInterval: -1.0,
+    saveOnExit: false,
+    autosaveInterval: -1.0,
+    autoSleep: true,
+    isEnabled: true,
+    useCustomJoinVerifier: false,
+    accessLevel: 'Anyone',
+    maxUsers: 16
+  } as const;
+
+  // リセットヘルパー
+  const resetBasicField = (key: keyof typeof DEFAULT_CONFIG) => {
+    if (key === 'name') configName = DEFAULT_CONFIG.name;
+    if (key === 'username') configUsername = DEFAULT_CONFIG.username;
+    if (key === 'password') configPassword = DEFAULT_CONFIG.password;
+    if (key === 'comment') configComment = DEFAULT_CONFIG.comment;
+    if (key === 'universeId') configUniverseId = DEFAULT_CONFIG.universeId;
+    if (key === 'tickRate') configTickRate = DEFAULT_CONFIG.tickRate;
+    if (key === 'maxConcurrentAssetTransfers') configMaxConcurrentAssetTransfers = DEFAULT_CONFIG.maxConcurrentAssetTransfers;
+    if (key === 'usernameOverride') configUsernameOverride = DEFAULT_CONFIG.usernameOverride;
+    if (key === 'dataFolder') configDataFolder = DEFAULT_CONFIG.dataFolder;
+    if (key === 'cacheFolder') configCacheFolder = DEFAULT_CONFIG.cacheFolder;
+    if (key === 'logsFolder') configLogsFolder = DEFAULT_CONFIG.logsFolder;
+    if (key === 'allowedUrlHosts') configAllowedUrlHosts = DEFAULT_CONFIG.allowedUrlHosts;
+    if (key === 'autoSpawnItems') configAutoSpawnItems = DEFAULT_CONFIG.autoSpawnItems;
+  };
+
+  const resetCurrentSessionField = (field: keyof typeof DEFAULT_SESSION_FIELDS) => {
+    const cur = getCurrentSession();
+    (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
+    // sessions 配列を更新して再描画
+    sessions = sessions.map(s => (s.id === cur.id ? cur : s));
+  };
   
   // Session management (default.json と同値になるよう初期値設定)
   let sessions = [
@@ -620,8 +695,21 @@
         startWorlds: processedSessions
       };
 
+      // 既存ファイル名との衝突チェック
+      const currentList = $configs as ConfigEntry[];
+      const exists = currentList.some(item => item.name === `${trimmedName}.json`);
+      let overwrite = false;
+      if (exists) {
+        // 上書き確認ダイアログ
+        overwrite = window.confirm(`${trimmedName}.json は既に存在します。上書きしますか？`);
+        if (!overwrite) {
+          pushToast('作成をキャンセルしました', 'info');
+          return;
+        }
+      }
+
       // ここで初めてバックエンドへ送信（"作成"ボタン押下時）
-      await generateConfig(trimmedName, trimmedUsername, trimmedPassword, configData);
+      await generateConfig(trimmedName, trimmedUsername, trimmedPassword, configData, overwrite);
       pushToast('コンフィグファイルを作成しました', 'success');
       
       // 設定ファイル一覧を更新
@@ -2116,9 +2204,14 @@
                   <form class="status-form" on:submit|preventDefault={generateConfigFile}>
                     <!-- 基本設定 -->
                     <label>
-                      <span>設定名</span>
+                      <span>ファイル名 <small class="note">一部使用できない文字があります</small></span>
                       <div class="field-row">
-                        <input type="text" bind:value={configName} placeholder="例: メインサーバー" />
+                        <input type="text" bind:value={configName} placeholder="例: イベント用" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('name')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                            <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+                          </svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2126,6 +2219,9 @@
                       <span>Resoniteユーザー名</span>
                       <div class="field-row">
                         <input type="text" bind:value={configUsername} placeholder="あなたのResoniteユーザー名" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('username')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2133,6 +2229,9 @@
                       <span>パスワード</span>
                       <div class="field-row">
                         <input type="password" bind:value={configPassword} placeholder="あなたのResoniteパスワード" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('password')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2140,6 +2239,9 @@
                       <span>コメント</span>
                       <div class="field-row">
                         <input type="text" bind:value={configComment} placeholder="設定ファイルの説明" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('comment')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2148,6 +2250,9 @@
                       <span>Universe ID</span>
                       <div class="field-row">
                         <input type="text" bind:value={configUniverseId} placeholder="Universe ID (オプション)" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('universeId')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2155,6 +2260,9 @@
                       <span>Tick Rate</span>
                       <div class="field-row">
                         <input type="number" bind:value={configTickRate} min="1" max="120" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('tickRate')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2162,6 +2270,9 @@
                       <span>最大同時アセット転送数</span>
                       <div class="field-row">
                         <input type="number" bind:value={configMaxConcurrentAssetTransfers} min="1" max="1000" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('maxConcurrentAssetTransfers')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2169,6 +2280,9 @@
                       <span>ユーザー名オーバーライド</span>
                       <div class="field-row">
                         <input type="text" bind:value={configUsernameOverride} placeholder="表示用ユーザー名" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('usernameOverride')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2176,6 +2290,9 @@
                       <span>データフォルダ</span>
                       <div class="field-row">
                         <input type="text" bind:value={configDataFolder} placeholder="データ保存フォルダ" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('dataFolder')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2183,6 +2300,9 @@
                       <span>キャッシュフォルダ</span>
                       <div class="field-row">
                         <input type="text" bind:value={configCacheFolder} placeholder="キャッシュフォルダ" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('cacheFolder')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2190,6 +2310,9 @@
                       <span>ログフォルダ</span>
                       <div class="field-row">
                         <input type="text" bind:value={configLogsFolder} placeholder="ログ保存フォルダ" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('logsFolder')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2197,6 +2320,9 @@
                       <span>許可されたURLホスト</span>
                       <div class="field-row">
                         <input type="text" bind:value={configAllowedUrlHosts} placeholder="例: example.com,api.example.com" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('allowedUrlHosts')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2204,6 +2330,9 @@
                       <span>自動スポーンアイテム</span>
                       <div class="field-row">
                         <input type="text" bind:value={configAutoSpawnItems} placeholder="例: resrec:///U-User/R-Item1,resrec:///U-User/R-Item2" />
+                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('autoSpawnItems')} title="リセット" aria-label="リセット">
+                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        </button>
                       </div>
                     </label>
 
@@ -2260,6 +2389,9 @@
                           <span>セッション名</span>
                           <div class="field-row">
                             <input type="text" bind:value={session.sessionName} placeholder="セッション名" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('sessionName')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2267,6 +2399,9 @@
                           <span>カスタムセッションID</span>
                           <div class="field-row">
                             <input type="text" bind:value={session.customSessionId} placeholder="U-UserID:CustomID" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('customSessionId')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2274,6 +2409,9 @@
                           <span>説明</span>
                           <div class="field-row">
                             <textarea bind:value={session.description} placeholder="セッションの説明" rows="2"></textarea>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('description')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2281,6 +2419,9 @@
                           <span>最大ユーザー数</span>
                           <div class="field-row">
                             <input type="number" bind:value={session.maxUsers} min="1" max="100" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('maxUsers')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2295,6 +2436,9 @@
                               <option value="RegisteredUsers">RegisteredUsers</option>
                               <option value="Anyone">Anyone</option>
                             </select>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('accessLevel')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2302,6 +2446,9 @@
                           <span>ワールドURL</span>
                           <div class="field-row">
                             <input type="text" bind:value={session.loadWorldURL} placeholder="resrec:///U-UserID/R-RecordID" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('loadWorldURL')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2313,6 +2460,9 @@
                               <option value="Platform">Platform</option>
                               <option value="Blank">Blank</option>
                             </select>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('loadWorldPresetName')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2320,6 +2470,9 @@
                           <span>タグ</span>
                           <div class="field-row">
                             <input type="text" bind:value={session.tags} placeholder="tag1,tag2,tag3" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('tags')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l-64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2327,6 +2480,9 @@
                           <span>デフォルトユーザーロール</span>
                           <div class="field-row">
                             <input type="text" bind:value={session.defaultUserRoles} placeholder="JSON形式で入力してください" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('defaultUserRoles')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2334,6 +2490,9 @@
                           <span>AFKキック時間（分）</span>
                           <div class="field-row">
                             <input type="number" bind:value={session.awayKickMinutes} min="-1" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('awayKickMinutes')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
@@ -2341,42 +2500,94 @@
                           <span>アイドル再起動間隔（分）</span>
                           <div class="field-row">
                             <input type="number" bind:value={session.idleRestartInterval} min="0" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('idleRestartInterval')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
                           </div>
                         </label>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.isEnabled} />
+                        <div class="toggle-row">
                           <span>セッションを有効にする</span>
+                          <button
+                            type="button"
+                            class={session.isEnabled ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.isEnabled}
+                            on:click={() => session.isEnabled = !session.isEnabled}
+                          >
+                            {session.isEnabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.useCustomJoinVerifier} />
+                        <div class="toggle-row">
                           <span>カスタム参加検証を使用</span>
+                          <button
+                            type="button"
+                            class={session.useCustomJoinVerifier ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.useCustomJoinVerifier}
+                            on:click={() => session.useCustomJoinVerifier = !session.useCustomJoinVerifier}
+                          >
+                            {session.useCustomJoinVerifier ? 'オン' : 'オフ'}
+                          </button>
                         </div>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.mobileFriendly} />
+                        <div class="toggle-row">
                           <span>モバイルフレンドリー</span>
+                          <button
+                            type="button"
+                            class={session.mobileFriendly ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.mobileFriendly}
+                            on:click={() => session.mobileFriendly = !session.mobileFriendly}
+                          >
+                            {session.mobileFriendly ? 'オン' : 'オフ'}
+                          </button>
                         </div>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.keepOriginalRoles} />
+                        <div class="toggle-row">
                           <span>元のロールを保持</span>
+                          <button
+                            type="button"
+                            class={session.keepOriginalRoles ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.keepOriginalRoles}
+                            on:click={() => session.keepOriginalRoles = !session.keepOriginalRoles}
+                          >
+                            {session.keepOriginalRoles ? 'オン' : 'オフ'}
+                          </button>
                         </div>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.autoRecover} />
+                        <div class="toggle-row">
                           <span>自動復旧</span>
+                          <button
+                            type="button"
+                            class={session.autoRecover ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.autoRecover}
+                            on:click={() => session.autoRecover = !session.autoRecover}
+                          >
+                            {session.autoRecover ? 'オン' : 'オフ'}
+                          </button>
                         </div>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.saveOnExit} />
+                        <div class="toggle-row">
                           <span>終了時に保存</span>
+                          <button
+                            type="button"
+                            class={session.saveOnExit ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.saveOnExit}
+                            on:click={() => session.saveOnExit = !session.saveOnExit}
+                          >
+                            {session.saveOnExit ? 'オン' : 'オフ'}
+                          </button>
                         </div>
 
-                        <div class="checkbox-field">
-                          <input type="checkbox" bind:checked={session.autoSleep} />
+                        <div class="toggle-row">
                           <span>自動スリープ</span>
+                          <button
+                            type="button"
+                            class={session.autoSleep ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.autoSleep}
+                            on:click={() => session.autoSleep = !session.autoSleep}
+                          >
+                            {session.autoSleep ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </form>
                     {/if}
@@ -2550,6 +2761,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+  }
+
+  .note {
+    color: rgba(225, 225, 224, 0.65);
+    font-size: 0.85em;
+    font-weight: normal;
   }
 
   .refresh-config-button {
@@ -3808,7 +4025,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #2b2f35;
+    background: rgba(24, 34, 43, 0.85);
     color: #61d1fa;
     border-radius: 0.55rem;
     border: none;
@@ -3827,8 +4044,8 @@
   }
 
   .status-action-button.active {
-    background: rgba(97, 209, 250, 0.28);
-    color: #0b1926;
+    background: #61d1fa;
+    color: #11151d;
     border-color: transparent;
   }
 
