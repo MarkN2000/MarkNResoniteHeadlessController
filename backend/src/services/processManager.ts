@@ -54,6 +54,75 @@ export class ProcessManager extends EventEmitter {
       .map(file => path.join(HEADLESS_CONFIG_DIR, file));
   }
 
+  async generateConfig(name: string, username: string, password: string): Promise<string> {
+    // 設定ディレクトリが存在しない場合は作成
+    if (!fs.existsSync(HEADLESS_CONFIG_DIR)) {
+      fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
+    }
+
+    const configPath = path.join(HEADLESS_CONFIG_DIR, `${name}.json`);
+    
+    // 既存のファイルがある場合はエラー
+    if (fs.existsSync(configPath)) {
+      throw new Error(`Config file already exists: ${name}.json`);
+    }
+
+    // デフォルト設定ファイルを生成
+    const defaultConfig = {
+      "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
+      "universeId": null,
+      "tickRate": 60.0,
+      "maxConcurrentAssetTransfers": 128,
+      "usernameOverride": username,
+      "loginCredential": username,
+      "loginPassword": password,
+      "startWorlds": [
+        {
+          "isEnabled": true,
+          "sessionName": `${name}のセッション`,
+          "customSessionId": null,
+          "description": `${name}で管理されるセッションです`,
+          "maxUsers": 16,
+          "accessLevel": "Anyone",
+          "useCustomJoinVerifier": false,
+          "hideFromPublicListing": null,
+          "tags": null,
+          "mobileFriendly": false,
+          "loadWorldURL": null,
+          "loadWorldPresetName": "Grid",
+          "overrideCorrespondingWorldId": null,
+          "forcePort": null,
+          "keepOriginalRoles": false,
+          "defaultUserRoles": { [username]: "Admin" },
+          "roleCloudVariable": null,
+          "allowUserCloudVariable": null,
+          "denyUserCloudVariable": null,
+          "requiredUserJoinCloudVariable": null,
+          "requiredUserJoinCloudVariableDenyMessage": null,
+          "awayKickMinutes": 30,
+          "parentSessionIds": null,
+          "autoInviteUsernames": null,
+          "autoInviteMessage": null,
+          "saveAsOwner": null,
+          "autoRecover": true,
+          "idleRestartInterval": 1800,
+          "forcedRestartInterval": -1.0,
+          "saveOnExit": false,
+          "autosaveInterval": -1.0,
+          "autoSleep": true
+        }
+      ],
+      "dataFolder": null,
+      "cacheFolder": null,
+      "logsFolder": null,
+      "allowedUrlHosts": null,
+      "autoSpawnItems": null
+    };
+
+    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
+    return configPath;
+  }
+
   start(configPath?: string): void {
     if (this.child) {
       throw new Error('Headless process already running');

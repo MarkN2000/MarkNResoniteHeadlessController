@@ -6,6 +6,7 @@
     getStatus,
     getLogs,
     getConfigs,
+    generateConfig,
     getRuntimeStatus,
     getRuntimeUsers,
     getFriendRequests,
@@ -136,6 +137,12 @@
   let worldSearchError = '';
   let worldSearchResults: WorldSearchItem[] = [];
   let selectedResoniteUrl: string | null = null;
+
+  // Config generation state
+  let configName = '';
+  let configUsername = '';
+  let configPassword = '';
+  let configGenerationLoading = false;
 
   const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'];
   const USER_ACTIONS = [
@@ -345,6 +352,37 @@
     }
   };
 
+  const generateConfigFile = async () => {
+    if (configGenerationLoading) return;
+    configGenerationLoading = true;
+    try {
+      const trimmedName = configName.trim();
+      const trimmedUsername = configUsername.trim();
+      const trimmedPassword = configPassword.trim();
+      
+      if (!trimmedName || !trimmedUsername || !trimmedPassword) {
+        pushToast('設定名、ユーザー名、パスワードをすべて入力してください', 'error');
+        return;
+      }
+
+      await generateConfig(trimmedName, trimmedUsername, trimmedPassword);
+      pushToast('設定ファイルを生成しました', 'success');
+      
+      // 設定ファイル一覧を更新
+      await refreshConfigsOnly();
+      
+      // フォームをクリア
+      configName = '';
+      configUsername = '';
+      configPassword = '';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '設定ファイルの生成に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      configGenerationLoading = false;
+    }
+  };
+
   const applyConfigList = (configList: ConfigEntry[]) => {
     setConfigs(configList);
     const storedConfig = localStorage.getItem(STORAGE_KEY);
@@ -364,7 +402,7 @@
       backendReachable = true;
       appMessage = null;
       if (configList.length === 0) {
-        throw Object.assign(new Error('設定ファイルが見つかりません'), { retryable: true });
+        throw Object.assign(new Error('設定ファイルが見つかりません。設定ファイルを作成してください。'), { retryable: true, configMissing: true });
       }
       applyConfigList(configList);
 
@@ -386,16 +424,22 @@
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
       }
     } catch (error) {
-      backendReachable = false;
-      const message = error instanceof Error ? error.message : '初期データの取得に失敗しました';
-      appMessage = { type: 'error', text: message };
-      if (error instanceof Error && (error as { retryable?: boolean }).retryable) {
-        setTimeout(() => {
-          if (!initialLoading) {
-            initialLoading = true;
-          }
-          loadInitialData();
-        }, INITIAL_RETRY_DELAY);
+      const isConfigMissing = error instanceof Error && (error as { configMissing?: boolean }).configMissing;
+      if (isConfigMissing) {
+        backendReachable = true; // バックエンドは接続できている
+        appMessage = { type: 'warning', text: '設定ファイルが見つかりません。設定タブで設定ファイルを作成してください。' };
+      } else {
+        backendReachable = false;
+        const message = error instanceof Error ? error.message : '初期データの取得に失敗しました';
+        appMessage = { type: 'error', text: message };
+        if (error instanceof Error && (error as { retryable?: boolean }).retryable) {
+          setTimeout(() => {
+            if (!initialLoading) {
+              initialLoading = true;
+            }
+            loadInitialData();
+          }, INITIAL_RETRY_DELAY);
+        }
       }
     } finally {
       initialLoading = false;
@@ -1601,16 +1645,58 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'settings'}>
-            <div class="panel-grid one">
+            <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>/configs</h2>
+                  <h2>設定ファイル生成</h2>
                 </div>
-                <div class="card form-card">
+                <div class="card status-card">
+                  <form class="status-form" on:submit|preventDefault={generateConfigFile}>
+                    <label>
+                      <span>設定名</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configName} placeholder="例: メインサーバー" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>Resoniteユーザー名</span>
+                      <div class="field-row">
+                        <input type="text" bind:value={configUsername} placeholder="あなたのResoniteユーザー名" />
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>パスワード</span>
+                      <div class="field-row">
+                        <input type="password" bind:value={configPassword} placeholder="あなたのResoniteパスワード" />
+                      </div>
+                    </label>
+
+                    <div class="action-buttons">
+                      <button type="submit" class="save" disabled={configGenerationLoading}>
+                        {configGenerationLoading ? '生成中...' : '設定ファイルを生成'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div class="panel-column">
+                <div class="panel-heading">
                   <h2>設定ファイル管理</h2>
-                  <p>新しく追加した設定ファイルはこのボタンで一覧を更新できます。</p>
-                  <button type="button" on:click={refreshConfigsOnly}>設定ファイルを再取得</button>
-                  <p class="info">現在の件数: {$configs.length}</p>
+                </div>
+                <div class="card status-card">
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
+                    <label>
+                      <span>設定ファイル一覧</span>
+                      <div class="field-row">
+                        <div class="field-placeholder">現在の件数: {$configs.length}</div>
+                        <button type="button" class="status-action-button" on:click={refreshConfigsOnly}>
+                          再取得
+                        </button>
+                      </div>
+                    </label>
+                  </form>
                 </div>
               </div>
             </div>
