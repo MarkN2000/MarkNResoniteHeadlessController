@@ -663,12 +663,12 @@
       // セッションデータを処理
       const processedSessions = sessions.map(session => {
         const processedSession: any = {
-          isEnabled: session.isEnabled,
+          isEnabled: true,
           maxUsers: session.maxUsers,
           accessLevel: session.accessLevel,
-          useCustomJoinVerifier: session.useCustomJoinVerifier,
-          mobileFriendly: session.mobileFriendly,
-          keepOriginalRoles: session.keepOriginalRoles,
+          useCustomJoinVerifier: false,
+          mobileFriendly: false,
+          keepOriginalRoles: false,
           awayKickMinutes: session.awayKickMinutes,
           autoRecover: session.autoRecover,
           idleRestartInterval: session.idleRestartInterval,
@@ -2584,65 +2584,31 @@
                         </label>
 
                         <label>
-                          <span>アイドル再起動間隔（分）</span>
+                          <span>自動保存間隔（秒） <small class="note">-1で無効</small></span>
                           <div class="field-row">
-                            <input type="number" bind:value={session.idleRestartInterval} min="0" />
+                            <input type="number" bind:value={session.autosaveInterval} min="-1" />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('autosaveInterval')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>セッションリセット間隔（秒） <small class="note">ユーザーがいなくなってから何秒でリセット（-1で無効）</small></span>
+                          <div class="field-row">
+                            <input type="number" bind:value={session.idleRestartInterval} min="-1" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('idleRestartInterval')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
                           </div>
                         </label>
 
-                        <div class="toggle-row">
-                          <span>セッションを有効にする</span>
-                          <button
-                            type="button"
-                            class={session.isEnabled ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.isEnabled}
-                            on:click={() => session.isEnabled = !session.isEnabled}
-                          >
-                            {session.isEnabled ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
+
+
+
 
                         <div class="toggle-row">
-                          <span>カスタム参加検証を使用</span>
-                          <button
-                            type="button"
-                            class={session.useCustomJoinVerifier ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.useCustomJoinVerifier}
-                            on:click={() => session.useCustomJoinVerifier = !session.useCustomJoinVerifier}
-                          >
-                            {session.useCustomJoinVerifier ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
-
-                        <div class="toggle-row">
-                          <span>モバイルフレンドリー</span>
-                          <button
-                            type="button"
-                            class={session.mobileFriendly ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.mobileFriendly}
-                            on:click={() => session.mobileFriendly = !session.mobileFriendly}
-                          >
-                            {session.mobileFriendly ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
-
-                        <div class="toggle-row">
-                          <span>元のロールを保持</span>
-                          <button
-                            type="button"
-                            class={session.keepOriginalRoles ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.keepOriginalRoles}
-                            on:click={() => session.keepOriginalRoles = !session.keepOriginalRoles}
-                          >
-                            {session.keepOriginalRoles ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
-
-                        <div class="toggle-row">
-                          <span>自動復旧</span>
+                          <span>自動復旧 <small class="note">落ちたのがセッションだけなら再起動される</small></span>
                           <button
                             type="button"
                             class={session.autoRecover ? 'status-action-button active' : 'status-action-button'}
@@ -2654,7 +2620,7 @@
                         </div>
 
                         <div class="toggle-row">
-                          <span>終了時に保存</span>
+                          <span>終了時に保存 <small class="note">権限必要</small></span>
                           <button
                             type="button"
                             class={session.saveOnExit ? 'status-action-button active' : 'status-action-button'}
@@ -2666,7 +2632,7 @@
                         </div>
 
                         <div class="toggle-row">
-                          <span>自動スリープ</span>
+                          <span>自動スリープ <small class="note">人がいないとエコモードに</small></span>
                           <button
                             type="button"
                             class={session.autoSleep ? 'status-action-button active' : 'status-action-button'}
