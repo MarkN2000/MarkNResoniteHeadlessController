@@ -1285,12 +1285,17 @@
       </div>
     </div>
     <div class="topbar-controls">
-      <div class="backend-status" class:offline={!backendReachable}>
-        <span class="dot"></span>
-        {backendReachable ? 'バックエンド接続済み' : 'バックエンド未接続'}
-      </div>
       <label class="field">
-        <span>プロファイル選択</span>
+        <div class="field-header">
+          <span>プロファイル選択</span>
+          {#if backendReachable && $configs.length}
+            <button type="button" class="refresh-config-button" on:click={refreshConfigsOnly} title="設定ファイル一覧を更新" aria-label="設定ファイル一覧を更新">
+              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+              </svg>
+            </button>
+          {/if}
+        </div>
         {#if backendReachable && $configs.length}
           <div class="field-row">
             <div class="select-wrapper">
@@ -1300,22 +1305,31 @@
                 {/each}
               </select>
             </div>
-            <button type="button" class="status-action-button" on:click={refreshConfigsOnly}>更新</button>
           </div>
         {:else}
           <div class="field-placeholder">利用可能な設定がありません</div>
         {/if}
       </label>
-      {#each resourceMetrics as metric}
-        <div class="resource-capsule">
-          <span>{metric.label}</span>
-          <strong>{metric.value}</strong>
+      <div class="resource-capsule combined">
+        <div class="resource-row">
+          <span>CPU</span>
+          <strong>{resourceMetrics.find(m => m.label === 'CPU')?.value || 'N/A'}</strong>
         </div>
-      {/each}
+        <div class="resource-row">
+          <span>メモリ</span>
+          <strong>{resourceMetrics.find(m => m.label === 'メモリ')?.value || 'N/A'}</strong>
+        </div>
+      </div>
       <div class="status-indicators">
-        <div class={$status.running ? 'online' : 'offline'}>
-          <span class="dot"></span>
-          {$status.running ? '起動中' : '停止中'}
+        <div class="status-info">
+          <div class="backend-status" class:offline={!backendReachable}>
+            <span class="dot"></span>
+            {backendReachable ? '接続済' : '未接続'}
+          </div>
+          <div class={$status.running ? 'online' : 'offline'}>
+            <span class="dot"></span>
+            {$status.running ? '起動中' : '停止中'}
+          </div>
         </div>
         <button type="button" on:click={handleStart} disabled={$status.running || actionInProgress || !$configs.length}>起動</button>
         <button type="button" on:click={handleStop} class="danger" disabled={!$status.running || actionInProgress}>停止</button>
@@ -2247,6 +2261,8 @@
     position: sticky;
     top: 0;
     z-index: 10;
+    flex-wrap: wrap;
+    gap: 1rem;
   }
 
   .brand {
@@ -2291,6 +2307,7 @@
     display: flex;
     gap: 1.5rem;
     align-items: flex-end;
+    flex-wrap: wrap;
   }
 
   .topbar-controls .field {
@@ -2298,6 +2315,37 @@
     flex-direction: column;
     gap: 0.4rem;
     font-size: 0.85rem;
+  }
+
+  .field-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .refresh-config-button {
+    background: #2b2f35;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    color: #61d1fa;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .refresh-config-button:hover {
+    background: #34404c;
+    transform: translateY(-1px);
+  }
+
+  .refresh-config-button .refresh-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
   }
 
   .topbar-controls select {
@@ -2355,6 +2403,19 @@
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
   }
 
+  .resource-capsule.combined {
+    min-width: 120px;
+    min-height: 50px;
+    padding: 0.4rem 0.7rem;
+  }
+
+  .resource-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .resource-capsule span {
     color: #a9c8e0;
     font-weight: 600;
@@ -2385,6 +2446,56 @@
     background: rgba(17, 21, 29, 0.7);
     font-weight: 600;
     gap: 0.35rem;
+  }
+
+  .status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    background: rgba(17, 21, 29, 0.7);
+    padding: 0.6rem 1rem;
+    border-radius: 0.85rem;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    min-height: 54px;
+    justify-content: center;
+  }
+
+  .status-info .backend-status,
+  .status-info .online,
+  .status-info .offline {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    min-height: auto;
+    color: #cceaff;
+  }
+
+  .status-info .backend-status .dot,
+  .status-info .online .dot,
+  .status-info .offline .dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+  }
+
+  .status-info .backend-status:not(.offline) .dot,
+  .status-info .online .dot {
+    background: #59eb5c;
+  }
+
+  .status-info .backend-status.offline .dot,
+  .status-info .offline .dot {
+    background: #ff7676;
+  }
+
+  .status-info .backend-status.offline,
+  .status-info .offline {
+    color: #ffdcdc;
   }
 
   .status-indicators .dot {
@@ -3730,6 +3841,57 @@
 
   .add-session-btn:hover {
     background: #4ddb50;
+  }
+
+  /* レスポンシブ対応 */
+  @media (max-width: 1200px) {
+    .topbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .topbar-controls {
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .brand h1 {
+      font-size: 1.3rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .topbar {
+      padding: 1rem;
+    }
+
+    .topbar-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .topbar-controls .field {
+      min-width: auto;
+    }
+
+    .topbar-controls select {
+      min-width: auto;
+    }
+
+    .status-indicators {
+      justify-content: center;
+    }
+
+    .brand h1 {
+      font-size: 1.1rem;
+    }
+
+    .logo {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
   }
 
 </style>
