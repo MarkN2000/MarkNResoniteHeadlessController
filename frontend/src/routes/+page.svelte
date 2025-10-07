@@ -31,9 +31,9 @@
 
   const tabs = [
     { id: 'dashboard', label: 'ダッシュボード' },
-    { id: 'newWorld', label: '新規ワールド' },
+    { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
-    { id: 'settings', label: '設定' },
+    { id: 'settings', label: 'コンフィグ作成' },
     { id: 'commands', label: 'コマンド' }
   ];
 
@@ -535,7 +535,7 @@
       };
 
       await generateConfig(trimmedName, trimmedUsername, trimmedPassword, configData);
-      pushToast('設定ファイルを生成しました', 'success');
+      pushToast('コンフィグファイルを作成しました', 'success');
       
       // 設定ファイル一覧を更新
       await refreshConfigsOnly();
@@ -1287,7 +1287,7 @@
     <div class="topbar-controls">
       <label class="field">
         <div class="field-header">
-          <span>プロファイル選択</span>
+          <span>コンフィグ選択</span>
           {#if backendReachable && $configs.length}
             <button type="button" class="refresh-config-button" on:click={refreshConfigsOnly} title="設定ファイル一覧を更新" aria-label="設定ファイル一覧を更新">
               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
@@ -1693,7 +1693,7 @@
             <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>新規ワールド</h2>
+                  <h2>新規セッション</h2>
                 </div>
                 <div class="card status-card">
                   <form class="status-form" on:submit|preventDefault={() => {}}>
@@ -1983,7 +1983,7 @@
 
                     <div class="action-buttons">
                       <button type="submit" class="save" disabled={configGenerationLoading}>
-                        {configGenerationLoading ? '生成中...' : '設定ファイルを生成'}
+                        {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
                       </button>
                     </div>
                   </form>
@@ -1992,7 +1992,7 @@
 
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>セッション管理</h2>
+                  <h2>セッション</h2>
                 </div>
                 <div class="card status-card">
                   <!-- Session tab buttons -->
