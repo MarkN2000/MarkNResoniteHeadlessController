@@ -200,6 +200,7 @@
   const DEFAULT_SESSION_FIELDS = {
     sessionName: '',
     customSessionId: '',
+    customSessionIdSuffix: '',
     description: '',
     tags: '',
     mobileFriendly: false,
@@ -228,7 +229,12 @@
     isEnabled: true,
     useCustomJoinVerifier: false,
     accessLevel: 'Anyone',
-    maxUsers: 16
+    maxUsers: 16,
+    showWorldSearch: false,
+    worldSearchTerm: '',
+    worldSearchLoading: false,
+    worldSearchError: '',
+    worldSearchResults: [] as WorldSearchItem[]
   } as const;
 
   // リセットヘルパー
@@ -248,11 +254,21 @@
     if (key === 'autoSpawnItems') configAutoSpawnItems = DEFAULT_CONFIG.autoSpawnItems;
   };
 
-  const resetCurrentSessionField = (field: keyof typeof DEFAULT_SESSION_FIELDS) => {
+  const resetCurrentSessionField = (field: keyof typeof DEFAULT_SESSION_FIELDS | 'customSessionIdSuffix') => {
     const cur = getCurrentSession();
-    (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
+    if (field === 'customSessionIdSuffix') {
+      (cur as any).customSessionIdSuffix = '';
+    } else {
+      (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
+      if (field === 'customSessionId') (cur as any).customSessionIdSuffix = '';
+    }
     // sessions 配列を更新して再描画
     sessions = sessions.map(s => (s.id === cur.id ? cur : s));
+  };
+
+  // カスタムセッションIDの接頭辞
+  const getCustomIdPrefix = () => {
+    return headlessUserId ? `S-${headlessUserId}:` : 'S-<UserID>:';
   };
   
   // Session management (default.json と同値になるよう初期値設定)
@@ -262,6 +278,7 @@
       isEnabled: true,
       sessionName: '',
       customSessionId: '',
+      customSessionIdSuffix: '',
       description: '',
       maxUsers: 16,
       accessLevel: 'Anyone',
@@ -330,6 +347,15 @@
 
   const saveDraft = () => {
     try {
+      // 検索用の一時フィールドは保存しないようにセッションを整形
+      const draftSessions = sessions.map((s) => {
+        const { worldSearchResults, worldSearchLoading, worldSearchError, showWorldSearch, worldSearchTerm, ...rest } = s as any;
+        return {
+          ...rest,
+          // 軽量化のため、UI状態は保存しない
+        };
+      });
+
       const draft = {
         configName,
         configUsername,
@@ -344,7 +370,7 @@
         configLogsFolder,
         configAllowedUrlHosts: configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean),
         configAutoSpawnItems: configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean),
-        sessions
+        sessions: draftSessions
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
     } catch {
@@ -570,6 +596,7 @@
       isEnabled: true,
       sessionName: '',
       customSessionId: '',
+      customSessionIdSuffix: '',
       description: '',
       maxUsers: 16,
       accessLevel: 'Anyone',
@@ -800,7 +827,13 @@
         autoSleep: session.autoSleep
       };
       if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
-      if (session.customSessionId.trim()) processedSession.customSessionId = session.customSessionId.trim();
+        // customSessionId: サフィックスが空なら null、あれば prefix + suffix
+        const suffix = (session as any).customSessionIdSuffix?.trim?.() ?? '';
+        if (suffix) {
+          processedSession.customSessionId = `${getCustomIdPrefix()}${suffix}`;
+        } else {
+          processedSession.customSessionId = null;
+        }
       if (session.description.trim()) processedSession.description = session.description.trim();
       if (session.tags.trim()) processedSession.tags = session.tags.split(',').map(t => t.trim()).filter(Boolean);
       if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
@@ -2253,7 +2286,7 @@
                     <!-- 詳細設定 -->
 
                     <label>
-                      <span>Tick Rate</span>
+                      <span>更新レート（fps）</span>
                       <div class="field-row">
                         <input type="number" bind:value={configTickRate} min="1" max="120" />
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('tickRate')} title="リセット" aria-label="リセット">
@@ -2273,7 +2306,7 @@
                     </label>
 
                     <label>
-                      <span>ユーザー名オーバーライド</span>
+                      <span>ユーザー名オーバーライド <small class="note">表示名を書き換える</small></span>
                       <div class="field-row">
                         <input type="text" bind:value={configUsernameOverride} placeholder="表示用ユーザー名" />
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('usernameOverride')} title="リセット" aria-label="リセット">
@@ -2382,9 +2415,9 @@
                     {#if activeSessionTab === session.id}
                       <form class="status-form">
                         <label>
-                          <span>セッション名</span>
+                          <span>セッション名 <small class="note">空欄だとワールド名になる</small></span>
                           <div class="field-row">
-                            <input type="text" bind:value={session.sessionName} placeholder="セッション名" />
+                            <input type="text" bind:value={session.sessionName} placeholder="例：～の誕生日セッション" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('sessionName')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -2394,7 +2427,10 @@
                         <label>
                           <span>カスタムセッションID</span>
                           <div class="field-row">
-                            <input type="text" bind:value={session.customSessionId} placeholder="U-UserID:CustomID" />
+                            <div class="field-row" style="gap:0.4rem; align-items:center;">
+                              <input type="text" value={getCustomIdPrefix()} readonly class="prefix" />
+                              <input type="text" bind:value={session.customSessionIdSuffix} placeholder="<custom text>（空欄可）" />
+                            </div>
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('customSessionId')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -2424,14 +2460,16 @@
                         <label>
                           <span>アクセスレベル</span>
                           <div class="field-row">
-                            <select bind:value={session.accessLevel}>
+                            <div class="select-wrapper narrow">
+                              <select bind:value={session.accessLevel}>
                               <option value="Private">Private</option>
                               <option value="LAN">LAN</option>
                               <option value="Contacts">Contacts</option>
                               <option value="ContactsPlus">ContactsPlus</option>
                               <option value="RegisteredUsers">RegisteredUsers</option>
                               <option value="Anyone">Anyone</option>
-                            </select>
+                              </select>
+                            </div>
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('accessLevel')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -2441,12 +2479,63 @@
                         <label>
                           <span>ワールドURL</span>
                           <div class="field-row">
+                            <button type="button" class="status-action-button" on:click={() => { session.showWorldSearch = !session.showWorldSearch; sessions = [...sessions]; }} aria-pressed={session.showWorldSearch}>
+                              検索{session.showWorldSearch ? '▲' : '▼'}
+                            </button>
                             <input type="text" bind:value={session.loadWorldURL} placeholder="resrec:///U-UserID/R-RecordID" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('loadWorldURL')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
                           </div>
                         </label>
+                        {#if session.showWorldSearch}
+                          <div class="world-search">
+                            <div class="field-row" style="margin-top:0.5rem;">
+                              <input type="text" bind:value={session.worldSearchTerm} placeholder="ワールド名で検索" />
+                              <button type="button" on:click={async () => {
+                                (session as any).worldSearchLoading = true; sessions = [...sessions];
+                                try {
+                                  const res = await getWorldSearch(session.worldSearchTerm.trim());
+                                  (session as any).worldSearchResults = res.items;
+                                  (session as any).worldSearchError = '';
+                                } catch (e) {
+                                  (session as any).worldSearchError = e instanceof Error ? e.message : '検索に失敗しました';
+                                } finally {
+                                  (session as any).worldSearchLoading = false; sessions = [...sessions];
+                                }
+                              }}>検索</button>
+                            </div>
+                            {#if session.worldSearchLoading}
+                              <p class="info">検索中...</p>
+                            {:else if session.worldSearchError}
+                              <p class="feedback">{session.worldSearchError}</p>
+                            {:else if session.worldSearchResults && session.worldSearchResults.length}
+                              <div class="world-grid">
+                                {#each session.worldSearchResults as item}
+                                  <button
+                                    type="button"
+                                    class="world-card"
+                                    on:click={() => { session.loadWorldURL = item.resoniteUrl; sessions = [...sessions]; }}
+                                  >
+                                    <div class="thumb" aria-hidden="true">
+                                      {#if item.imageUrl}
+                                        <img src={item.imageUrl} alt="" />
+                                      {:else}
+                                        <div class="thumb-placeholder">No Image</div>
+                                      {/if}
+                                    </div>
+                                    <div class="meta">
+                                      <div class="title-row">
+                                        <strong class="title">{item.name}</strong>
+                                      </div>
+                                      <div class="sub">{item.resoniteUrl}</div>
+                                    </div>
+                                  </button>
+                                {/each}
+                              </div>
+                            {/if}
+                          </div>
+                        {/if}
 
                         <label>
                           <span>ワールドプリセット</span>
@@ -4079,6 +4168,14 @@
   }
 
   /* world search */
+  .world-search {
+    background: #11151d; /* ヘッダーと同色 */
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+  }
+
   .world-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
