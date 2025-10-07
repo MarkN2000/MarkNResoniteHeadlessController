@@ -1881,12 +1881,11 @@
             <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>基本・詳細設定</h2>
+                  <h2>基本設定</h2>
                 </div>
                 <div class="card status-card">
                   <form class="status-form" on:submit|preventDefault={generateConfigFile}>
                     <!-- 基本設定 -->
-                    <h3>基本設定</h3>
                     <label>
                       <span>設定名</span>
                       <div class="field-row">
@@ -1916,7 +1915,6 @@
                     </label>
 
                     <!-- 詳細設定 -->
-                    <h3>詳細設定</h3>
                     <label>
                       <span>Universe ID</span>
                       <div class="field-row">
