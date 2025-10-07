@@ -76,6 +76,26 @@
       pushToast(message, 'error');
     }
   };
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        pushToast('コピーしました', 'success');
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        pushToast('コピーしました', 'success');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コピーに失敗しました';
+      pushToast(message, 'error');
+    }
+  };
+
   let actionInProgress = false;
   const LOG_DISPLAY_LIMIT = 1000;
   const INITIAL_RETRY_DELAY = 3000;
@@ -232,7 +252,7 @@
   let sessionNameInput = '';
   let sessionDescriptionInput = '';
   let maxUsersInput: number | null = null;
-  let awayKickIntervalInput: number | null = null;
+  let awayKickMinutesInput: number | null = null;
   let accessLevelInput = '';
   let hiddenFromListingInput = false;
   let statusActionLoading: Record<string, boolean> = {};
@@ -332,7 +352,7 @@
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
         maxUsersInput = runtimeStatus.data.maxUsers ?? null;
-        awayKickIntervalInput = runtimeStatus.data.awayKickInterval ?? null;
+        awayKickMinutesInput = (runtimeStatus.data as any).awayKickMinutes ?? null;
         accessLevelInput = runtimeStatus.data.accessLevel ?? '';
         hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
         const combinedLevels = new Set([...DEFAULT_ACCESS_LEVELS]);
@@ -344,7 +364,7 @@
         sessionNameInput = '';
         sessionDescriptionInput = '';
         maxUsersInput = null;
-        awayKickIntervalInput = null;
+        awayKickMinutesInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -634,7 +654,7 @@
         sessionNameInput = '';
         sessionDescriptionInput = '';
         maxUsersInput = null;
-        awayKickIntervalInput = null;
+        awayKickMinutesInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -827,15 +847,15 @@
   };
 
   const applyAwayKickInterval = async () => {
-    if (awayKickIntervalInput === null || Number.isNaN(awayKickIntervalInput)) {
+    if (awayKickMinutesInput === null || Number.isNaN(awayKickMinutesInput)) {
       pushToast('最大AFK時間を入力してください', 'error');
       return;
     }
-    if (!Number.isFinite(awayKickIntervalInput) || awayKickIntervalInput < 0) {
+    if (!Number.isFinite(awayKickMinutesInput) || awayKickMinutesInput < 0) {
       pushToast('0以上の数値を入力してください', 'error');
       return;
     }
-    await sendStatusCommand('awayKickInterval', `awaykickinterval ${Math.floor(awayKickIntervalInput)}`, '最大AFK時間を更新しました');
+    await sendStatusCommand('awayKickMinutes', `awaykickinterval ${Math.floor(awayKickMinutesInput)}`, '最大AFK時間を更新しました');
   };
 
   const applyAccessLevel = async (value?: string) => {
@@ -1077,7 +1097,8 @@
     if (commandLoading) return;
     commandLoading = true;
     try {
-      commandResult = await postCommand(commandText);
+      const result = await postCommand(commandText);
+      commandResult = typeof result === 'string' ? result : JSON.stringify(result);
     } catch (error) {
       commandResult = error instanceof Error ? error.message : 'コマンドを実行できませんでした';
     } finally {
@@ -1134,7 +1155,7 @@
         sessionNameInput = runtimeStatus.data.name ?? '';
         sessionDescriptionInput = runtimeStatus.data.description ?? '';
         maxUsersInput = runtimeStatus.data.maxUsers ?? null;
-        awayKickIntervalInput = runtimeStatus.data.awayKickInterval ?? null;
+        awayKickMinutesInput = (runtimeStatus.data as any).awayKickMinutes ?? null;
         accessLevelInput = runtimeStatus.data.accessLevel ?? '';
         hiddenFromListingInput = runtimeStatus.data.hiddenFromListing ?? false;
 
@@ -1147,7 +1168,7 @@
         sessionNameInput = '';
         sessionDescriptionInput = '';
         maxUsersInput = null;
-        awayKickIntervalInput = null;
+        awayKickMinutesInput = null;
         accessLevelInput = '';
         hiddenFromListingInput = false;
         accessLevelOptions = [...DEFAULT_ACCESS_LEVELS];
@@ -1237,7 +1258,7 @@
   $: headlessUserName = $status.userName ?? headlessUserName;
   $: headlessUserId = $status.userId ?? headlessUserId;
 
-  const isHeadlessAccount = (user: RuntimeUserEntry) => {
+  const isHeadlessAccount = (user: any) => {
     if (headlessUserId) {
       if (user.id === headlessUserId) return true;
     }
@@ -1359,7 +1380,7 @@
         {/if}
         <div class="session-list">
           {#if runtimeWorlds?.data?.length}
-            {#each runtimeWorlds.data as world}
+            {#each runtimeWorlds?.data || [] as world}
               <button
                 type="button"
                 class="session"
@@ -1510,13 +1531,13 @@
                           <input
                             type="number"
                             min="0"
-                            bind:value={awayKickIntervalInput}
+                            bind:value={awayKickMinutesInput}
                             on:input={(event) => {
                               const value = (event.target as HTMLInputElement).value;
-                              awayKickIntervalInput = value === '' ? null : Number(value);
+                              awayKickMinutesInput = value === '' ? null : Number(value);
                             }}
                           />
-                          <button type="button" class="status-action-button" on:click={applyAwayKickInterval} disabled={statusActionLoading.awayKickInterval}>
+                          <button type="button" class="status-action-button" on:click={applyAwayKickInterval} disabled={statusActionLoading.awayKickMinutes}>
                             適用
                           </button>
                         </div>
@@ -1660,8 +1681,7 @@
                               <td>
                                 <div class="user-actions">
                                   {#each USER_ACTIONS as action}
-                                    {#if action.key === 'silence' || action.key === 'unsilence'}
-                                    {:else}
+                                    {#if action.key !== 'silence' && action.key !== 'unsilence'}
                                       <button
                                         type="button"
                                         class:disabled-control={isHeadlessAccount(user)}
@@ -1778,10 +1798,38 @@
                                 <div class="thumb-placeholder">No Image</div>
                               {/if}
                             </div>
-                            <div class="meta">
-                              <strong class="title">{item.name}</strong>
-                              <span class="sub">{item.recordId}</span>
-                            </div>
+                              <div class="meta">
+                                <div class="title-row">
+                                  <strong class="title">{item.name}</strong>
+                                  <span
+                                    class="copy-button"
+                                    role="button"
+                                    tabindex="0"
+                                    on:click|stopPropagation={() => copyToClipboard(item.name)}
+                                    on:keydown={(e) => e.key === 'Enter' && copyToClipboard(item.name)}
+                                    title="ワールド名をコピー"
+                                  >
+                                    <svg viewBox="0 0 24 24" class="copy-icon" aria-hidden="true">
+                                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16h13c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/>
+                                    </svg>
+                                  </span>
+                                </div>
+                                <div class="sub-row">
+                                  <span class="sub">{item.recordId}</span>
+                                  <span
+                                    class="copy-button"
+                                    role="button"
+                                    tabindex="0"
+                                    on:click|stopPropagation={() => copyToClipboard(item.recordId)}
+                                    on:keydown={(e) => e.key === 'Enter' && copyToClipboard(item.recordId)}
+                                    title="レコードIDをコピー"
+                                  >
+                                    <svg viewBox="0 0 24 24" class="copy-icon" aria-hidden="true">
+                                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16h13c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/>
+                                    </svg>
+                                  </span>
+                                </div>
+                              </div>
                           </button>
                         {/each}
                       </div>
@@ -3633,19 +3681,28 @@
   /* world search */
   .world-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .world-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .world-card {
-    background: #2b2f35;
+    background: #11151d;
     border: 2px solid transparent;
     border-radius: 0.75rem;
-    display: grid;
-    grid-template-rows: 120px auto;
-    padding: 0;
-    text-align: left;
-    color: #e1f6ff;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .world-card:hover {
+    border-color: #61d1fa;
+    box-shadow: 0 0 0 2px rgba(97, 209, 250, 0.2);
   }
 
   .world-card.selected {
@@ -3654,13 +3711,14 @@
   }
 
   .world-card .thumb {
+    width: 100%;
+    height: 140px;
     background: #11151d;
-    border-top-left-radius: 0.75rem;
-    border-top-right-radius: 0.75rem;
-    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
   }
 
   .world-card .thumb img {
@@ -3676,15 +3734,76 @@
   }
 
   .world-card .meta {
-    padding: 0.6rem 0.7rem 0.7rem;
-    display: grid;
-    gap: 0.25rem;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .world-card .title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .world-card .sub-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .world-card .title {
     font-size: 0.95rem;
     color: #f5f5f5;
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+
+  .world-card .sub {
+    font-size: 0.8rem;
+    color: #9aa3b3;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .copy-button {
+    background: rgba(97, 209, 250, 0.1);
+    border: 1px solid rgba(97, 209, 250, 0.3);
+    color: #61d1fa;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
+
+  .copy-button:hover {
+    background: rgba(97, 209, 250, 0.2);
+    border-color: rgba(97, 209, 250, 0.5);
+  }
+
+  .copy-button:focus-visible {
+    outline: 2px solid #61d1fa;
+    outline-offset: 1px;
+  }
+
+  .copy-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    fill: currentColor;
+  }
+
 
   .startup-overlay {
     position: fixed;
