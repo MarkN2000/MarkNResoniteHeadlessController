@@ -215,7 +215,7 @@
     denyUserCloudVariable: '',
     requiredUserJoinCloudVariable: '',
     requiredUserJoinCloudVariableDenyMessage: '',
-    awayKickMinutes: -1.0,
+    awayKickMinutes: 5,
     parentSessionIds: '',
     autoInviteUsernames: '',
     autoInviteMessage: '',
@@ -2477,12 +2477,12 @@
                         </label>
 
                         <label>
-                          <span>ワールドURL</span>
+                          <span>ワールド <small class="note">レコードURLを入力</small></span>
                           <div class="field-row">
                             <button type="button" class="status-action-button" on:click={() => { session.showWorldSearch = !session.showWorldSearch; sessions = [...sessions]; }} aria-pressed={session.showWorldSearch}>
                               検索{session.showWorldSearch ? '▲' : '▼'}
                             </button>
-                            <input type="text" bind:value={session.loadWorldURL} placeholder="resrec:///U-UserID/R-RecordID" />
+                            <input type="text" bind:value={session.loadWorldURL} placeholder="例：resrec:///U-***/R-***" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('loadWorldURL')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -2538,13 +2538,15 @@
                         {/if}
 
                         <label>
-                          <span>ワールドプリセット</span>
+                          <span>ワールドプリセット <small class="note">レコードURL未入力時使用</small></span>
                           <div class="field-row">
-                            <select bind:value={session.loadWorldPresetName}>
+                            <div class="select-wrapper narrow">
+                              <select bind:value={session.loadWorldPresetName}>
                               <option value="Grid">Grid</option>
                               <option value="Platform">Platform</option>
                               <option value="Blank">Blank</option>
-                            </select>
+                              </select>
+                            </div>
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('loadWorldPresetName')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -2552,7 +2554,7 @@
                         </label>
 
                         <label>
-                          <span>タグ</span>
+                          <span>タグ <small class="note">カンマ（,）で区切ってください</small></span>
                           <div class="field-row">
                             <input type="text" bind:value={session.tags} placeholder="tag1,tag2,tag3" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('tags')} title="リセット" aria-label="リセット">
@@ -2572,7 +2574,7 @@
                         </label>
 
                         <label>
-                          <span>AFKキック時間（分）</span>
+                          <span>AFKキック時間（分） <small class="note">-1で無効</small></span>
                           <div class="field-row">
                             <input type="number" bind:value={session.awayKickMinutes} min="-1" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('awayKickMinutes')} title="リセット" aria-label="リセット">
