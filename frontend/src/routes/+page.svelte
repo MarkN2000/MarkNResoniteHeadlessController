@@ -164,10 +164,12 @@
   let configName = 'default';
   let configUsername = '';
   let configPassword = '';
+  let showPassword = false;
   let configGenerationLoading = false;
   
   // Advanced config settings
   let configComment = '';
+  // Universe ID は UI から削除（生成時はデフォルト固定）
   let configUniverseId = '';
   let configTickRate = 60.0;
   let configMaxConcurrentAssetTransfers = 128;
@@ -683,7 +685,7 @@
 
       const configData = {
         comment: configComment.trim() || `${trimmedName}の設定ファイル`,
-        universeId: configUniverseId.trim() ? configUniverseId.trim() : null,
+        universeId: null,
         tickRate: configTickRate,
         maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
         usernameOverride: configUsernameOverride.trim() ? configUsernameOverride.trim() : null,
@@ -825,7 +827,7 @@
     const configObject = {
       $schema: 'https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json',
       comment: configComment.trim() || `${trimmedName}の設定ファイル`,
-      universeId: configUniverseId.trim() || null,
+      universeId: null,
       tickRate: configTickRate,
       maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
       usernameOverride: configUsernameOverride.trim() ? configUsernameOverride.trim() : null,
@@ -2216,9 +2218,9 @@
                     </label>
 
                     <label>
-                      <span>Resoniteユーザー名</span>
+                      <span>ユーザー名</span>
                       <div class="field-row">
-                        <input type="text" bind:value={configUsername} placeholder="あなたのResoniteユーザー名" />
+                        <input type="text" bind:value={configUsername} placeholder="Headlessのユーザー名" />
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('username')} title="リセット" aria-label="リセット">
                           <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                         </button>
@@ -2228,7 +2230,10 @@
                     <label>
                       <span>パスワード</span>
                       <div class="field-row">
-                        <input type="password" bind:value={configPassword} placeholder="あなたのResoniteパスワード" />
+                        <input type={showPassword ? 'text' : 'password'} bind:value={configPassword} placeholder="あなたのResoniteパスワード" />
+                        <button type="button" class="refresh-config-button eye" class:active={showPassword} aria-pressed={showPassword} on:click={() => (showPassword = !showPassword)} title={showPassword ? '非表示' : '表示'} aria-label="表示切替">
+                          <svg viewBox="0 0 24 24" class="refresh-icon" aria-hidden="true"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 .002 6.002A3 3 0 0 0 12 9z"/></svg>
+                        </button>
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('password')} title="リセット" aria-label="リセット">
                           <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                         </button>
@@ -2236,7 +2241,7 @@
                     </label>
 
                     <label>
-                      <span>コメント</span>
+                      <span>コメント <small class="note">特に効果はありません</small></span>
                       <div class="field-row">
                         <input type="text" bind:value={configComment} placeholder="設定ファイルの説明" />
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('comment')} title="リセット" aria-label="リセット">
@@ -2246,15 +2251,6 @@
                     </label>
 
                     <!-- 詳細設定 -->
-                    <label>
-                      <span>Universe ID</span>
-                      <div class="field-row">
-                        <input type="text" bind:value={configUniverseId} placeholder="Universe ID (オプション)" />
-                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('universeId')} title="リセット" aria-label="リセット">
-                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
-                        </button>
-                      </div>
-                    </label>
 
                     <label>
                       <span>Tick Rate</span>
@@ -2791,6 +2787,11 @@
     width: 16px;
     height: 16px;
     fill: currentColor;
+  }
+
+  .refresh-config-button.eye.active {
+    background: #61d1fa;
+    color: #11151d;
   }
 
   .topbar-controls select {
