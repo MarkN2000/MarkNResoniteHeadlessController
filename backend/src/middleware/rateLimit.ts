@@ -67,7 +67,7 @@ export const strictRateLimit = rateLimit({
  */
 export const normalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分
-  maxRequests: 100, // 100回まで
+  maxRequests: 1000, // 1000回まで
   skipSuccessfulRequests: false
 });
 
@@ -76,6 +76,6 @@ export const normalRateLimit = rateLimit({
  */
 export const lenientRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分
-  maxRequests: 300, // 300回まで
+  maxRequests: 1000, // 1000回まで
   skipSuccessfulRequests: false
 });
