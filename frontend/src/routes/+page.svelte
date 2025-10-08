@@ -321,6 +321,10 @@
   let showConfigPreview = false;
   let configPreviewText = '';
   
+  // コンフィグ読み込み用の変数
+  let selectedConfigToLoad = '';
+  let configLoadLoading = false;
+  
   // 下書き保存/復元: コンフィグ作成タブの編集中データをLocalStorageに自動保存
   const loadDraft = () => {
     try {
@@ -396,6 +400,91 @@
 
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_STORAGE_KEY);
+  };
+
+  // コンフィグファイル読み込み機能
+  const loadConfigFile = async () => {
+    if (!selectedConfigToLoad || configLoadLoading) return;
+    
+    configLoadLoading = true;
+    try {
+      // バックエンドからコンフィグファイルの内容を取得
+      const response = await fetch(`/api/configs/${encodeURIComponent(selectedConfigToLoad)}`);
+      if (!response.ok) {
+        throw new Error('コンフィグファイルの読み込みに失敗しました');
+      }
+      
+      const configData = await response.json();
+      
+      // 基本設定に反映
+      configName = configData.comment?.replace('の設定ファイル', '') || 'default';
+      configUsername = configData.username || '';
+      configComment = configData.comment || '';
+      configTickRate = configData.tickRate || 60.0;
+      configMaxConcurrentAssetTransfers = configData.maxConcurrentAssetTransfers || 128;
+      configUsernameOverride = configData.usernameOverride || '';
+      configDataFolder = configData.dataFolder || '';
+      configCacheFolder = configData.cacheFolder || '';
+      configLogsFolder = configData.logsFolder || '';
+      configAllowedUrlHosts = (configData.allowedUrlHosts || []).join(', ');
+      configAutoSpawnItems = (configData.autoSpawnItems || []).join(', ');
+      
+      // セッション設定に反映
+      if (configData.startWorlds && Array.isArray(configData.startWorlds)) {
+        sessions = configData.startWorlds.map((world: any, index: number) => ({
+          id: index + 1,
+          isEnabled: world.isEnabled !== false,
+          sessionName: world.sessionName || '',
+          customSessionId: world.customSessionId || '',
+          customSessionIdSuffix: world.customSessionId ? world.customSessionId.split(':').pop() || '' : '',
+          description: world.description || '',
+          maxUsers: world.maxUsers || 16,
+          accessLevel: world.accessLevel || 'Anyone',
+          useCustomJoinVerifier: world.useCustomJoinVerifier || false,
+          hideFromPublicListing: world.hideFromPublicListing,
+          tags: Array.isArray(world.tags) ? world.tags.join(',') : (world.tags || ''),
+          mobileFriendly: world.mobileFriendly || false,
+          loadWorldURL: world.loadWorldURL || '',
+          loadWorldPresetName: world.loadWorldPresetName || 'Grid',
+          overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
+          forcePort: world.forcePort,
+          keepOriginalRoles: world.keepOriginalRoles || false,
+          defaultUserRoles: world.defaultUserRoles || '',
+          roleCloudVariable: world.roleCloudVariable || '',
+          allowUserCloudVariable: world.allowUserCloudVariable || '',
+          denyUserCloudVariable: world.denyUserCloudVariable || '',
+          requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
+          requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
+          awayKickMinutes: world.awayKickMinutes || -1.0,
+          parentSessionIds: world.parentSessionIds || '',
+          autoInviteUsernames: world.autoInviteUsernames || '',
+          autoInviteMessage: world.autoInviteMessage || '',
+          saveAsOwner: world.saveAsOwner || '',
+          autoRecover: world.autoRecover !== false,
+          idleRestartInterval: world.idleRestartInterval || 1800,
+          forcedRestartInterval: world.forcedRestartInterval || -1.0,
+          saveOnExit: world.saveOnExit || false,
+          autosaveInterval: world.autosaveInterval || -1.0,
+          autoSleep: world.autoSleep !== false,
+          showWorldSearch: false,
+          worldSearchTerm: '',
+          worldSearchLoading: false,
+          worldSearchError: '',
+          worldSearchResults: []
+        }));
+        
+        activeSessionTab = 1;
+        nextSessionId = sessions.length + 1;
+      }
+      
+      pushToast('コンフィグファイルを読み込みました', 'success');
+      
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コンフィグファイルの読み込みに失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      configLoadLoading = false;
+    }
   };
 
   const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'];
@@ -826,29 +915,34 @@
     }
   };
 
-  // プレビュー生成（保存は行わず、UIにJSONを表示）
-  const openConfigPreview = () => {
-    const trimmedName = configName.trim() || 'Config';
-    const trimmedUsername = configUsername.trim();
-    const trimmedPassword = configPassword.trim();
-    // セッション整形（generateConfigFileのロジックと同一）
-    const processedSessions = sessions.map(session => {
-      const processedSession: any = {
-        isEnabled: session.isEnabled,
-        maxUsers: session.maxUsers,
-        accessLevel: session.accessLevel,
-        useCustomJoinVerifier: session.useCustomJoinVerifier,
-        mobileFriendly: session.mobileFriendly,
-        keepOriginalRoles: session.keepOriginalRoles,
-        awayKickMinutes: session.awayKickMinutes,
-        autoRecover: session.autoRecover,
-        idleRestartInterval: session.idleRestartInterval,
-        forcedRestartInterval: session.forcedRestartInterval,
-        saveOnExit: session.saveOnExit,
-        autosaveInterval: session.autosaveInterval,
-        autoSleep: session.autoSleep
-      };
-      if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
+  // プレビューをリアクティブに更新
+  $: {
+    if (activeTab === 'settings') {
+      const trimmedName = configName.trim() || 'Config';
+      const trimmedUsername = configUsername.trim();
+      const trimmedPassword = configPassword.trim();
+      
+      if (!trimmedUsername || !trimmedPassword) {
+        configPreviewText = 'ユーザー名とパスワードを入力してください。';
+      } else {
+
+      const processedSessions = sessions.map(session => {
+        const processedSession: any = {
+          isEnabled: session.isEnabled,
+          maxUsers: session.maxUsers,
+          accessLevel: session.accessLevel,
+          useCustomJoinVerifier: session.useCustomJoinVerifier,
+          mobileFriendly: session.mobileFriendly,
+          keepOriginalRoles: session.keepOriginalRoles,
+          awayKickMinutes: session.awayKickMinutes,
+          autoRecover: session.autoRecover,
+          idleRestartInterval: session.idleRestartInterval,
+          forcedRestartInterval: session.forcedRestartInterval,
+          saveOnExit: session.saveOnExit,
+          autosaveInterval: session.autosaveInterval,
+          autoSleep: session.autoSleep
+        };
+        if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
         // customSessionId: サフィックスが空なら null、あれば prefix + suffix
         const suffix = (session as any).customSessionIdSuffix?.trim?.() ?? '';
         if (suffix) {
@@ -856,48 +950,49 @@
         } else {
           processedSession.customSessionId = null;
         }
-      if (session.description.trim()) processedSession.description = session.description.trim();
-      if (session.tags.trim()) processedSession.tags = session.tags.split(',').map(t => t.trim()).filter(Boolean);
-      if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
-      if (session.loadWorldPresetName.trim()) processedSession.loadWorldPresetName = session.loadWorldPresetName.trim();
-      if (session.overrideCorrespondingWorldId.trim()) processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim();
-      if (session.forcePort !== null && session.forcePort !== '') processedSession.forcePort = Number(session.forcePort);
-      if (session.defaultUserRoles.trim()) {
-        try {
-          processedSession.defaultUserRoles = JSON.parse(session.defaultUserRoles);
-        } catch {}
+        if (session.description.trim()) processedSession.description = session.description.trim();
+        if (session.tags.trim()) processedSession.tags = session.tags.split(',').map(t => t.trim()).filter(Boolean);
+        if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
+        if (session.loadWorldPresetName.trim()) processedSession.loadWorldPresetName = session.loadWorldPresetName.trim();
+        if (session.overrideCorrespondingWorldId.trim()) processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim();
+        if (session.forcePort !== null && session.forcePort !== '') processedSession.forcePort = Number(session.forcePort);
+        if (session.defaultUserRoles.trim()) {
+          try {
+            processedSession.defaultUserRoles = JSON.parse(session.defaultUserRoles);
+          } catch {}
+        }
+        if (session.roleCloudVariable.trim()) processedSession.roleCloudVariable = session.roleCloudVariable.trim();
+        if (session.allowUserCloudVariable.trim()) processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim();
+        if (session.denyUserCloudVariable.trim()) processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim();
+        if (session.requiredUserJoinCloudVariable.trim()) processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim();
+        if (session.requiredUserJoinCloudVariableDenyMessage.trim()) processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim();
+        if (session.parentSessionIds.trim()) processedSession.parentSessionIds = session.parentSessionIds.split(',').map(s => s.trim()).filter(Boolean);
+        if (session.autoInviteUsernames.trim()) processedSession.autoInviteUsernames = session.autoInviteUsernames.split(',').map(s => s.trim()).filter(Boolean);
+        if (session.autoInviteMessage.trim()) processedSession.autoInviteMessage = session.autoInviteMessage.trim();
+        if (session.saveAsOwner.trim()) processedSession.saveAsOwner = session.saveAsOwner.trim();
+        return processedSession;
+      });
+
+      const configObject = {
+        $schema: 'https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json',
+        comment: configComment.trim() || `${trimmedName}の設定ファイル`,
+        universeId: null,
+        tickRate: configTickRate,
+        maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
+        usernameOverride: configUsernameOverride.trim() ? configUsernameOverride.trim() : null,
+        loginCredential: trimmedUsername,
+        loginPassword: trimmedPassword,
+        startWorlds: processedSessions,
+        dataFolder: configDataFolder.trim() || null,
+        cacheFolder: configCacheFolder.trim() || null,
+        logsFolder: configLogsFolder.trim() || null,
+        allowedUrlHosts: configAllowedUrlHosts.trim() ? configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean) : null,
+        autoSpawnItems: configAutoSpawnItems.trim() ? configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean) : null
+      };
+
+        configPreviewText = JSON.stringify(configObject, null, 2);
       }
-      if (session.roleCloudVariable.trim()) processedSession.roleCloudVariable = session.roleCloudVariable.trim();
-      if (session.allowUserCloudVariable.trim()) processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim();
-      if (session.denyUserCloudVariable.trim()) processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim();
-      if (session.requiredUserJoinCloudVariable.trim()) processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim();
-      if (session.requiredUserJoinCloudVariableDenyMessage.trim()) processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim();
-      if (session.parentSessionIds.trim()) processedSession.parentSessionIds = session.parentSessionIds.split(',').map(s => s.trim()).filter(Boolean);
-      if (session.autoInviteUsernames.trim()) processedSession.autoInviteUsernames = session.autoInviteUsernames.split(',').map(s => s.trim()).filter(Boolean);
-      if (session.autoInviteMessage.trim()) processedSession.autoInviteMessage = session.autoInviteMessage.trim();
-      if (session.saveAsOwner.trim()) processedSession.saveAsOwner = session.saveAsOwner.trim();
-      return processedSession;
-    });
-
-    const configObject = {
-      $schema: 'https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json',
-      comment: configComment.trim() || `${trimmedName}の設定ファイル`,
-      universeId: null,
-      tickRate: configTickRate,
-      maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
-      usernameOverride: configUsernameOverride.trim() ? configUsernameOverride.trim() : null,
-      loginCredential: trimmedUsername,
-      loginPassword: trimmedPassword,
-      startWorlds: processedSessions,
-      dataFolder: configDataFolder.trim() || null,
-      cacheFolder: configCacheFolder.trim() || null,
-      logsFolder: configLogsFolder.trim() || null,
-      allowedUrlHosts: configAllowedUrlHosts.trim() ? configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean) : null,
-      autoSpawnItems: configAutoSpawnItems.trim() ? configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean) : null
-    };
-
-    configPreviewText = JSON.stringify(configObject, null, 2);
-    showConfigPreview = true;
+    }
   };
 
   const applyConfigList = (configList: ConfigEntry[]) => {
@@ -2267,11 +2362,25 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'settings'}>
-            <!-- コンフィグ作成ボタン（独立配置） -->
+            <!-- コンフィグ読み込み・作成セクション -->
             <div class="config-create-section">
               <div class="card status-card">
+                <div class="config-load-section">
+                  <div class="field-row">
+                    <div class="select-wrapper">
+                      <select bind:value={selectedConfigToLoad} disabled={configLoadLoading}>
+                        <option value="">コンフィグファイルを選択してください</option>
+                        {#each $configs as config}
+                          <option value={config.path}>{config.name}</option>
+                        {/each}
+                      </select>
+                    </div>
+                    <button type="button" on:click={loadConfigFile} disabled={!selectedConfigToLoad || configLoadLoading}>
+                      {configLoadLoading ? '読み込み中...' : '読み込み'}
+                    </button>
+                  </div>
+                </div>
                 <div class="action-buttons">
-                  <button type="button" on:click={openConfigPreview} disabled={configGenerationLoading}>プレビュー</button>
                   <button type="button" on:click={generateConfigFile} class="save" disabled={configGenerationLoading}>
                     {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
                   </button>
@@ -2288,7 +2397,7 @@
                   <form class="status-form" on:submit|preventDefault={() => {}}>
                     <!-- 基本設定 -->
                     <label>
-                      <span>ファイル名 <small class="note">一部使用できない文字があります</small></span>
+                      <span><span class="required">*</span>ファイル名 <small class="note">一部使用できない文字があります</small></span>
                       <div class="field-row">
                         <input type="text" bind:value={configName} placeholder="例: イベント用" />
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('name')} title="リセット" aria-label="リセット">
@@ -2300,7 +2409,7 @@
                     </label>
 
                     <label>
-                      <span>ユーザー名</span>
+                      <span><span class="required">*</span>ユーザー名</span>
                       <div class="field-row">
                         <input type="text" bind:value={configUsername} placeholder="Headlessのユーザー名" />
                         <button type="button" class="refresh-config-button" on:click={() => resetBasicField('username')} title="リセット" aria-label="リセット">
@@ -2310,7 +2419,7 @@
                     </label>
 
                     <label>
-                      <span>パスワード</span>
+                      <span><span class="required">*</span>パスワード</span>
                       <div class="field-row">
                         <input type={showPassword ? 'text' : 'password'} bind:value={configPassword} placeholder="あなたのResoniteパスワード" />
                         <button type="button" class="refresh-config-button eye" class:active={showPassword} aria-pressed={showPassword} on:click={() => (showPassword = !showPassword)} title={showPassword ? '非表示' : '表示'} aria-label="表示切替">
@@ -2419,7 +2528,7 @@
 
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>セッション</h2>
+                  <h2>セッション設定</h2>
                 </div>
                 <div class="card status-card">
                   <!-- Session tab buttons -->
@@ -2727,6 +2836,16 @@
               </div>
             </div>
           </section>
+
+          <!-- プレビューエリア（常時表示） -->
+          <section class="panel" class:active={activeTab === 'settings'}>
+            <div class="panel-heading">
+              <h2>プレビュー</h2>
+            </div>
+            <div class="card status-card">
+              <pre class="config-preview">{configPreviewText || '設定を入力すると、ここにプレビューが表示されます。'}</pre>
+            </div>
+          </section>
         </div>
       {/if}
     </main>
@@ -2861,6 +2980,12 @@
     color: rgba(225, 225, 224, 0.65);
     font-size: 0.85em;
     font-weight: normal;
+  }
+
+  .required {
+    color: #ff6b6b;
+    font-weight: bold;
+    margin-right: 0.25rem;
   }
 
   .refresh-config-button {
@@ -3800,6 +3925,35 @@
 
   .config-create-section .action-buttons {
     margin-top: 0.5rem;
+  }
+
+  .config-load-section {
+    margin-bottom: 1rem;
+  }
+
+  .config-load-section .field-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .config-load-section .select-wrapper {
+    flex: 1;
+  }
+
+  .config-preview {
+    background: #1a1f2e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #e1e1e0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
   }
 
   .action-buttons button {
