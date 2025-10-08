@@ -2365,25 +2365,27 @@
             <!-- コンフィグ読み込み・作成セクション -->
             <div class="config-create-section">
               <div class="card status-card">
-                <div class="config-load-section">
-                  <div class="field-row">
-                    <div class="select-wrapper">
-                      <select bind:value={selectedConfigToLoad} disabled={configLoadLoading}>
-                        <option value="">コンフィグファイルを選択してください</option>
-                        {#each $configs as config}
-                          <option value={config.path}>{config.name}</option>
-                        {/each}
-                      </select>
+                <div class="config-controls">
+                  <div class="config-load-section">
+                    <div class="field-row">
+                      <div class="select-wrapper">
+                        <select bind:value={selectedConfigToLoad} disabled={configLoadLoading}>
+                          <option value="">コンフィグファイルを選択してください</option>
+                          {#each $configs as config}
+                            <option value={config.path}>{config.name}</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <button type="button" on:click={loadConfigFile} disabled={!selectedConfigToLoad || configLoadLoading}>
+                        {configLoadLoading ? '読み込み中...' : '読み込み'}
+                      </button>
                     </div>
-                    <button type="button" on:click={loadConfigFile} disabled={!selectedConfigToLoad || configLoadLoading}>
-                      {configLoadLoading ? '読み込み中...' : '読み込み'}
+                  </div>
+                  <div class="config-create-button">
+                    <button type="button" on:click={generateConfigFile} class="save" disabled={configGenerationLoading}>
+                      {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
                     </button>
                   </div>
-                </div>
-                <div class="action-buttons">
-                  <button type="button" on:click={generateConfigFile} class="save" disabled={configGenerationLoading}>
-                    {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
-                  </button>
                 </div>
               </div>
             </div>
@@ -3927,8 +3929,14 @@
     margin-top: 0.5rem;
   }
 
+  .config-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+
   .config-load-section {
-    margin-bottom: 1rem;
+    flex: 1;
   }
 
   .config-load-section .field-row {
@@ -3939,6 +3947,10 @@
 
   .config-load-section .select-wrapper {
     flex: 1;
+  }
+
+  .config-create-button {
+    flex-shrink: 0;
   }
 
   .config-preview {
