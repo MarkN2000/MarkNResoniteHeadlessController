@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE } from '../config/index.js';
+import { getResoniteConfigSettings } from '../utils/auth.js';
 import { LogBuffer } from './logBuffer.js';
 import type { LogEntry } from './logBuffer.js';
 import iconv from 'iconv-lite';
@@ -80,6 +81,11 @@ export class ProcessManager extends EventEmitter {
       }
     }
 
+    // 入力が空の場合は auth.json の resoniteConfig をデフォルトに使用
+    const authResonite = getResoniteConfigSettings();
+    const finalUsername = (typeof username === 'string' && username.length > 0) ? username : (authResonite.loginUsername || '');
+    const finalPassword = (typeof password === 'string' && password.length > 0) ? password : (authResonite.loginPassword || '');
+
     // 設定ファイルを生成
     const config = {
       "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
@@ -91,8 +97,8 @@ export class ProcessManager extends EventEmitter {
       "usernameOverride": typeof configData.usernameOverride === 'string' && configData.usernameOverride.trim() !== ''
         ? configData.usernameOverride
         : null,
-      "loginCredential": username ?? '',
-      "loginPassword": password ?? '',
+      "loginCredential": finalUsername ?? '',
+      "loginPassword": finalPassword ?? '',
       "startWorlds": configData.startWorlds || [],
       "dataFolder": configData.dataFolder || null,
       "cacheFolder": configData.cacheFolder || null,

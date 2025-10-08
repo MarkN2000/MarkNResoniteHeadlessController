@@ -112,6 +112,15 @@ export const logSecurityEvent = (event: string, ip: string, details?: any) => {
   console.log(`[SECURITY] ${timestamp} - ${event} from ${ip}`, details ? JSON.stringify(details) : '');
 };
 
+export const cidrAllowlistMiddleware = (req: any, res: any, next: any) => {
+  const clientIp = getClientIp(req);
+  if (!isIpAllowed(clientIp)) {
+    logSecurityEvent('CIDR_BLOCKED', clientIp, { path: req.path, method: req.method });
+    return res.status(403).json({ error: 'Access denied by CIDR policy' });
+  }
+  next();
+};
+
 /**
  * 開発環境でのデバッグ情報を出力
  */
