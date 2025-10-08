@@ -2364,8 +2364,12 @@
           <section class="panel" class:active={activeTab === 'settings'}>
             <!-- コンフィグ読み込み・作成セクション -->
             <div class="config-create-section">
-              <div class="card status-card">
-                <div class="config-controls">
+              <div class="config-controls">
+                  <div class="config-create-button">
+                    <button type="button" on:click={generateConfigFile} class="config-create-btn" disabled={configGenerationLoading}>
+                      {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
+                    </button>
+                  </div>
                   <div class="config-load-section">
                     <div class="field-row">
                       <div class="select-wrapper">
@@ -2381,13 +2385,7 @@
                       </button>
                     </div>
                   </div>
-                  <div class="config-create-button">
-                    <button type="button" on:click={generateConfigFile} class="save" disabled={configGenerationLoading}>
-                      {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
-                    </button>
-                  </div>
                 </div>
-              </div>
             </div>
 
             <div class="panel-grid two">
@@ -3921,22 +3919,62 @@
     margin-top: 1rem;
   }
 
-  .config-create-section {
-    margin-bottom: 2rem;
-  }
+    .config-create-section {
+      margin-bottom: 2rem;
+    }
+
+    .config-create-btn {
+      background: #3f9e44;
+      color: #ffffff;
+      border: 1px solid #2d7a32;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 200px;
+    }
+
+    .config-create-btn:hover:not(:disabled) {
+      background: #2d7a32;
+      border-color: #1b5e20;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(63, 158, 68, 0.3);
+    }
+
+    .config-create-btn:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(63, 158, 68, 0.2);
+    }
+
+    .config-create-btn:disabled {
+      background: #6b7280;
+      border-color: #4b5563;
+      color: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
 
   .config-create-section .action-buttons {
     margin-top: 0.5rem;
   }
 
-  .config-controls {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-end;
-  }
+    .config-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-end;
+      justify-content: flex-start;
+    }
 
   .config-load-section {
-    flex: 1;
+    flex: 0 0 auto;
+    max-width: 450px;
   }
 
   .config-load-section .field-row {
@@ -3947,6 +3985,7 @@
 
   .config-load-section .select-wrapper {
     flex: 1;
+    min-width: 200px;
   }
 
   .config-create-button {
@@ -4622,7 +4661,7 @@
   }
 
   .add-session-btn {
-    background: #59eb5c;
+    background: #3f9e44;
     color: #ffffff;
     border: none;
     border-radius: 0.5rem;
@@ -4637,7 +4676,7 @@
   }
 
   .add-session-btn:hover {
-    background: #4ddb50;
+    background: #2d7a32;
   }
 
   /* レスポンシブ対応 */
