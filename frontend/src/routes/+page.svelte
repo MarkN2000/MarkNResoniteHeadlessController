@@ -17,6 +17,11 @@
     startServer,
     stopServer,
     getWorldSearch,
+    login,
+    verifyAuth,
+    logout,
+    setAuthToken,
+    getAuthToken,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -39,6 +44,12 @@
 
   let activeTab: (typeof tabs)[number]['id'] = 'dashboard';
 
+  // 認証状態
+  let isAuthenticated = false;
+  let loginPassword = '';
+  let loginLoading = false;
+  let showLogin = true; // 初期状態でログイン画面を表示
+
   let initialLoading = true;
   let selectedConfig: string | undefined;
   let appMessage: { type: 'error' | 'warning' | 'info'; text: string } | null = null;
@@ -48,8 +59,68 @@
     const id = Date.now() + Math.random();
     notificationsStore.update(items => [...items, { id, message, type }]);
     setTimeout(() => {
-      notificationsStore.update(items => items.filter((item: any) => item.id !== id));
+      notificationsStore.update(items => items.filter((item: { id: number }) => item.id !== id));
     }, duration);
+  };
+
+  // 認証関数
+  const handleLogin = async () => {
+    if (!loginPassword.trim()) {
+      pushToast('パスワードを入力してください', 'error');
+      return;
+    }
+
+    loginLoading = true;
+    try {
+      const response = await login(loginPassword);
+      setAuthToken(response.token);
+      isAuthenticated = true;
+      showLogin = false;
+      loginPassword = '';
+      pushToast('ログインしました', 'success');
+      
+      // 認証後に初期データを読み込み
+      await loadInitialData();
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : 'ログインに失敗しました', 'error');
+    } finally {
+      loginLoading = false;
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setAuthToken(null);
+      isAuthenticated = false;
+      pushToast('ログアウトしました', 'info');
+    }
+  };
+
+  const checkAuth = async () => {
+    // ブラウザ環境でのみ実行
+    if (typeof window === 'undefined') {
+      showLogin = true;
+      return;
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+      showLogin = true;
+      return;
+    }
+
+    try {
+      await verifyAuth();
+      isAuthenticated = true;
+      showLogin = false;
+    } catch (error) {
+      setAuthToken(null);
+      showLogin = true;
+    }
   };
 
   const copyLogsToClipboard = async () => {
@@ -1014,7 +1085,7 @@
         processedSession.sessionName = session.sessionName.trim() ? session.sessionName.trim() : null;
         processedSession.customSessionId = session.customSessionId.trim() ? session.customSessionId.trim() : null;
         processedSession.description = session.description.trim() ? session.description.trim() : null;
-        processedSession.tags = session.tags.trim() ? session.tags.split(',').map(t => t.trim()).filter(Boolean) : null;
+        processedSession.tags = session.tags.trim() ? session.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null;
         processedSession.loadWorldURL = session.loadWorldURL.trim() ? session.loadWorldURL.trim() : null;
         processedSession.loadWorldPresetName = session.loadWorldPresetName.trim() ? session.loadWorldPresetName.trim() : 'Grid';
         processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() ? session.overrideCorrespondingWorldId.trim() : null;
@@ -1034,8 +1105,8 @@
         processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim() ? session.denyUserCloudVariable.trim() : null;
         processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim() ? session.requiredUserJoinCloudVariable.trim() : null;
         processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim() ? session.requiredUserJoinCloudVariableDenyMessage.trim() : null;
-        processedSession.parentSessionIds = session.parentSessionIds.trim() ? session.parentSessionIds.split(',').map(s => s.trim()).filter(Boolean) : null;
-        processedSession.autoInviteUsernames = session.autoInviteUsernames.trim() ? session.autoInviteUsernames.split(',').map(s => s.trim()).filter(Boolean) : null;
+        processedSession.parentSessionIds = session.parentSessionIds.trim() ? session.parentSessionIds.split(',').map((s: string) => s.trim()).filter(Boolean) : null;
+        processedSession.autoInviteUsernames = session.autoInviteUsernames.trim() ? session.autoInviteUsernames.split(',').map((s: string) => s.trim()).filter(Boolean) : null;
         processedSession.autoInviteMessage = session.autoInviteMessage.trim() ? session.autoInviteMessage.trim() : null;
         processedSession.saveAsOwner = session.saveAsOwner.trim() ? session.saveAsOwner.trim() : null;
 
@@ -1188,7 +1259,7 @@
           processedSession.customSessionId = null;
         }
         if (session.description.trim()) processedSession.description = session.description.trim();
-        if (session.tags.trim()) processedSession.tags = session.tags.split(',').map(t => t.trim()).filter(Boolean);
+        if (session.tags.trim()) processedSession.tags = session.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
         if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
         if (session.loadWorldPresetName.trim()) processedSession.loadWorldPresetName = session.loadWorldPresetName.trim();
         if (session.overrideCorrespondingWorldId.trim()) processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim();
@@ -1203,8 +1274,8 @@
         if (session.denyUserCloudVariable.trim()) processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim();
         if (session.requiredUserJoinCloudVariable.trim()) processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim();
         if (session.requiredUserJoinCloudVariableDenyMessage.trim()) processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim();
-        if (session.parentSessionIds.trim()) processedSession.parentSessionIds = session.parentSessionIds.split(',').map(s => s.trim()).filter(Boolean);
-        if (session.autoInviteUsernames.trim()) processedSession.autoInviteUsernames = session.autoInviteUsernames.split(',').map(s => s.trim()).filter(Boolean);
+        if (session.parentSessionIds.trim()) processedSession.parentSessionIds = session.parentSessionIds.split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (session.autoInviteUsernames.trim()) processedSession.autoInviteUsernames = session.autoInviteUsernames.split(',').map((s: string) => s.trim()).filter(Boolean);
         if (session.autoInviteMessage.trim()) processedSession.autoInviteMessage = session.autoInviteMessage.trim();
         if (session.saveAsOwner.trim()) processedSession.saveAsOwner = session.saveAsOwner.trim();
         return processedSession;
@@ -1296,6 +1367,11 @@
   };
 
   onMount(() => {
+    // 認証チェック（ブラウザ環境でのみ）
+    if (typeof window !== 'undefined') {
+      checkAuth();
+    }
+    
     // 起動時に下書き復元を試行
     const restored = loadDraft();
     if (restored) {
@@ -1953,6 +2029,41 @@
   <title>MarkN Resonite Headless Controller</title>
 </svelte:head>
 
+{#if showLogin}
+  <!-- ログイン画面 -->
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <h1>MarkN Resonite Headless Controller</h1>
+        <p>ログインが必要です</p>
+      </div>
+      <form on:submit|preventDefault={handleLogin} class="login-form">
+        <div class="field">
+          <label for="password">パスワード</label>
+          <input 
+            id="password"
+            type="password" 
+            bind:value={loginPassword} 
+            placeholder="パスワードを入力"
+            disabled={loginLoading}
+            autocomplete="current-password"
+          />
+        </div>
+        <button type="submit" class="login-button" disabled={loginLoading}>
+          {#if loginLoading}
+            ログイン中...
+          {:else}
+            ログイン
+          {/if}
+        </button>
+      </form>
+      <div class="login-info">
+        <p>デフォルトパスワード: <code>admin123</code></p>
+        <p><small>本番環境では必ずパスワードを変更してください</small></p>
+      </div>
+    </div>
+  </div>
+{:else}
 <div class="layout">
   <header class="topbar">
     <div class="brand">
@@ -2013,6 +2124,7 @@
         </div>
         <button type="button" on:click={handleStart} disabled={$status.running || actionInProgress || !$configs.length}>起動</button>
         <button type="button" on:click={handleStop} class="danger" disabled={!$status.running || actionInProgress}>停止</button>
+        <button type="button" on:click={handleLogout} class="logout-button" title="ログアウト">ログアウト</button>
       </div>
     </div>
   </header>
@@ -3137,6 +3249,7 @@
     {/each}
   </div>
 </div>
+{/if}
 
 <style>
   :global(body) {
@@ -5112,6 +5225,122 @@
       width: 2.5rem;
       height: 2.5rem;
     }
+  }
+
+  /* ログイン画面のスタイル */
+  .login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1d23 0%, #2b2f35 100%);
+    padding: 2rem;
+  }
+
+  .login-card {
+    background: #2b2f35;
+    border-radius: 1rem;
+    padding: 2.5rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 100%;
+  }
+
+  .login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .login-header h1 {
+    color: #ffffff;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .login-header p {
+    color: #a0a0a0;
+    font-size: 0.9rem;
+  }
+
+  .login-form {
+    margin-bottom: 1.5rem;
+  }
+
+  .login-form .field {
+    margin-bottom: 1.5rem;
+  }
+
+  .login-form label {
+    display: block;
+    color: #ffffff;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .login-form input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #404040;
+    border-radius: 0.5rem;
+    background: #1a1d23;
+    color: #ffffff;
+    font-size: 1rem;
+  }
+
+  .login-form input:focus {
+    outline: none;
+    border-color: #4a9eff;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+  }
+
+  .login-button {
+    width: 100%;
+    padding: 0.75rem;
+    background: #4a9eff;
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .login-button:hover:not(:disabled) {
+    background: #3a8eef;
+  }
+
+  .login-button:disabled {
+    background: #404040;
+    cursor: not-allowed;
+  }
+
+  .login-info {
+    text-align: center;
+    color: #a0a0a0;
+    font-size: 0.85rem;
+  }
+
+  .login-info code {
+    background: #404040;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+  }
+
+  .logout-button {
+    background: #dc3545;
+    color: #ffffff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .logout-button:hover {
+    background: #c82333;
   }
 
 </style>

@@ -4,8 +4,13 @@ import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import { processManager } from '../../services/processManager.js';
 import type { ExecuteCommandOptions } from '../../services/processManager.js';
+import { authenticateToken } from '../../middleware/auth.js';
+import type { AuthenticatedRequest } from '../../middleware/auth.js';
 
 export const serverRoutes = Router();
+
+// 認証が必要なルートにミドルウェアを適用
+serverRoutes.use(authenticateToken);
 
 serverRoutes.get('/status', (_req, res) => {
   res.json(processManager.getStatus());
