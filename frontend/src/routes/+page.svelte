@@ -48,7 +48,7 @@
     const id = Date.now() + Math.random();
     notificationsStore.update(items => [...items, { id, message, type }]);
     setTimeout(() => {
-      notificationsStore.update(items => items.filter(item => item.id !== id));
+      notificationsStore.update(items => items.filter((item: any) => item.id !== id));
     }, duration);
   };
 
@@ -325,6 +325,11 @@
   let selectedConfigToLoad = '';
   let configLoadLoading = false;
   
+  // プレビュー編集用の変数
+  let isPreviewEditing = false;
+  let editedPreviewText = '';
+  let previewEditError = '';
+  
   // 下書き保存/復元: コンフィグ作成タブの編集中データをLocalStorageに自動保存
   const loadDraft = () => {
     try {
@@ -484,6 +489,135 @@
       pushToast(message, 'error');
     } finally {
       configLoadLoading = false;
+    }
+  };
+
+  // パスワードマスク機能
+  const maskPasswordInJson = (jsonString: string): string => {
+    try {
+      const obj = JSON.parse(jsonString);
+      const maskPasswords = (obj: any): any => {
+        if (typeof obj === 'object' && obj !== null) {
+          const masked = { ...obj };
+          for (const key in masked) {
+            if ((key.toLowerCase().includes('password') || key === 'loginPassword') && typeof masked[key] === 'string') {
+              masked[key] = '****';
+            } else if (typeof masked[key] === 'object') {
+              masked[key] = maskPasswords(masked[key]);
+            }
+          }
+          return masked;
+        }
+        return obj;
+      };
+      return JSON.stringify(maskPasswords(obj), null, 2);
+    } catch {
+      return jsonString;
+    }
+  };
+
+  // プレビュー編集機能
+  const startPreviewEdit = () => {
+    isPreviewEditing = true;
+    // 元のパスワードを含むJSONを編集用に設定
+    // configPreviewTextは既に元のパスワードを含んでいる
+    editedPreviewText = configPreviewText;
+    previewEditError = '';
+    
+  };
+
+  const cancelPreviewEdit = () => {
+    isPreviewEditing = false;
+    editedPreviewText = '';
+    previewEditError = '';
+  };
+
+  const savePreviewEdit = () => {
+    try {
+      // JSON構文チェック
+      const parsed = JSON.parse(editedPreviewText);
+      
+      // 必須フィールドの検証（実際のプロパティ名を使用）
+      const username = parsed.loginCredential;
+      const password = parsed.loginPassword;
+      
+      if (!username || !password) {
+        previewEditError = 'ユーザー名とパスワードは必須です';
+        return;
+      }
+
+      // 編集内容を各フィールドに反映
+      applyPreviewEditToFields(parsed);
+      
+      isPreviewEditing = false;
+      editedPreviewText = '';
+      previewEditError = '';
+      
+      pushToast('プレビューの編集を保存しました', 'success');
+      
+    } catch (error) {
+      previewEditError = 'JSONの構文が正しくありません';
+    }
+  };
+
+  const applyPreviewEditToFields = (parsed: any) => {
+    // 基本設定の反映
+    if (parsed.comment) configName = parsed.comment.replace('の設定ファイル', '');
+    
+    // usernameとpasswordの取得（実際のプロパティ名を使用）
+    const username = parsed.loginCredential;
+    const password = parsed.loginPassword;
+    
+    if (username) configUsername = username;
+    if (password) configPassword = password;
+    if (parsed.comment) configComment = parsed.comment;
+    if (parsed.tickRate !== undefined) configTickRate = parsed.tickRate;
+    
+    // セッション設定の反映
+    if (parsed.startWorlds && Array.isArray(parsed.startWorlds)) {
+      sessions = parsed.startWorlds.map((world: any, index: number) => ({
+        id: index + 1,
+        isEnabled: world.isEnabled !== false,
+        sessionName: world.sessionName || '',
+        customSessionId: world.customSessionId || '',
+        customSessionIdSuffix: world.customSessionIdSuffix || '',
+        description: world.description || '',
+        maxUsers: world.maxUsers || 16,
+        accessLevel: world.accessLevel || 'Anyone',
+        useCustomJoinVerifier: world.useCustomJoinVerifier || false,
+        hideFromPublicListing: world.hideFromPublicListing,
+        tags: world.tags || '',
+        mobileFriendly: world.mobileFriendly || false,
+        loadWorldURL: world.loadWorldURL || '',
+        loadWorldPresetName: world.loadWorldPresetName || 'Grid',
+        overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
+        forcePort: world.forcePort,
+        keepOriginalRoles: world.keepOriginalRoles || false,
+        defaultUserRoles: world.defaultUserRoles || '',
+        roleCloudVariable: world.roleCloudVariable || '',
+        allowUserCloudVariable: world.allowUserCloudVariable || '',
+        denyUserCloudVariable: world.denyUserCloudVariable || '',
+        requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
+        requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
+        awayKickMinutes: world.awayKickMinutes || -1.0,
+        parentSessionIds: world.parentSessionIds || '',
+        autoInviteUsernames: world.autoInviteUsernames || '',
+        autoInviteMessage: world.autoInviteMessage || '',
+        saveAsOwner: world.saveAsOwner || '',
+        autoRecover: world.autoRecover !== false,
+        idleRestartInterval: world.idleRestartInterval || 1800,
+        forcedRestartInterval: world.forcedRestartInterval || -1.0,
+        saveOnExit: world.saveOnExit || false,
+        autosaveInterval: world.autosaveInterval || -1.0,
+        autoSleep: world.autoSleep !== false,
+        showWorldSearch: false,
+        worldSearchTerm: '',
+        worldSearchLoading: false,
+        worldSearchError: '',
+        worldSearchResults: []
+      }));
+      activeSessionTab = 1;
+      nextSessionId = sessions.length + 1;
     }
   };
 
@@ -2841,9 +2975,34 @@
           <section class="panel" class:active={activeTab === 'settings'}>
             <div class="panel-heading">
               <h2>プレビュー</h2>
+              <div class="preview-controls">
+                {#if !isPreviewEditing}
+                  <button type="button" class="edit-preview-btn" on:click={startPreviewEdit}>
+                    編集
+                  </button>
+                {:else}
+                  <button type="button" class="save-preview-btn" on:click={savePreviewEdit}>
+                    保存
+                  </button>
+                  <button type="button" class="cancel-preview-btn" on:click={cancelPreviewEdit}>
+                    キャンセル
+                  </button>
+                {/if}
+              </div>
             </div>
             <div class="card status-card">
-              <pre class="config-preview">{configPreviewText || '設定を入力すると、ここにプレビューが表示されます。'}</pre>
+              {#if !isPreviewEditing}
+                <pre class="config-preview">{maskPasswordInJson(configPreviewText) || '設定を入力すると、ここにプレビューが表示されます。'}</pre>
+              {:else}
+                <textarea 
+                  class="config-preview-edit" 
+                  bind:value={editedPreviewText}
+                  placeholder="JSONを編集してください..."
+                ></textarea>
+                {#if previewEditError}
+                  <div class="preview-error">{previewEditError}</div>
+                {/if}
+              {/if}
             </div>
           </section>
         </div>
@@ -4005,6 +4164,86 @@
     word-wrap: break-word;
     max-height: 400px;
     overflow-y: auto;
+  }
+
+  .preview-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+
+  .edit-preview-btn, .save-preview-btn, .cancel-preview-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid;
+  }
+
+  .edit-preview-btn {
+    background: #3f9e44;
+    color: #ffffff;
+    border-color: #2d7a32;
+  }
+
+  .edit-preview-btn:hover {
+    background: #2d7a32;
+    border-color: #1b5e20;
+  }
+
+  .save-preview-btn {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+  }
+
+  .save-preview-btn:hover {
+    background: #2563eb;
+    border-color: #1d4ed8;
+  }
+
+  .cancel-preview-btn {
+    background: #6b7280;
+    color: #ffffff;
+    border-color: #4b5563;
+  }
+
+  .cancel-preview-btn:hover {
+    background: #4b5563;
+    border-color: #374151;
+  }
+
+  .config-preview-edit {
+    background: #1a1f2e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #e1e1e0;
+    width: 100%;
+    min-height: 300px;
+    max-height: 400px;
+    resize: vertical;
+    outline: none;
+  }
+
+  .config-preview-edit:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+
+  .preview-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
   }
 
   .action-buttons button {
