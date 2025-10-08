@@ -260,7 +260,7 @@
       (cur as any).customSessionIdSuffix = '';
     } else if (field === 'customSessionId') {
       // カスタムセッションIDのリセット時はプレフィックスとサフィックス両方をリセット
-      customSessionIdPrefix = '';
+      (cur as any).customSessionIdPrefix = '';
       (cur as any).customSessionIdSuffix = '';
     } else {
       (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
@@ -329,7 +329,10 @@
     useridDebounceTimer = setTimeout(async () => {
       const userid = await fetchUseridFromUsername(username);
       if (userid) {
-        customSessionIdPrefix = userid;
+        // 現在のセッションのプレフィックスに設定
+        const cur = getCurrentSession();
+        (cur as any).customSessionIdPrefix = userid;
+        sessions = sessions.map(s => (s.id === cur.id ? cur : s));
       }
     }, 500);
   };
@@ -350,6 +353,7 @@
       isEnabled: true,
       sessionName: '',
       customSessionId: '',
+      customSessionIdPrefix: '',
       customSessionIdSuffix: '',
       description: '',
       maxUsers: 16,
@@ -917,6 +921,7 @@
       isEnabled: true,
       sessionName: '',
       customSessionId: '',
+      customSessionIdPrefix: '',
       customSessionIdSuffix: '',
       description: '',
       maxUsers: 16,
@@ -1173,8 +1178,8 @@
           autoSleep: session.autoSleep
         };
         if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
-        // customSessionId: プレフィックスまたはサフィックスのどちらかが空なら null、両方あれば prefix + suffix
-        const prefix = customSessionIdPrefix.trim();
+        // customSessionId: プレフィックスとサフィックスの両方が必要
+        const prefix = (session as any).customSessionIdPrefix?.trim?.() ?? '';
         const suffix = (session as any).customSessionIdSuffix?.trim?.() ?? '';
         
         if (prefix && suffix) {
@@ -2815,10 +2820,7 @@
                           <span>カスタムセッションID</span>
                           <div class="field-row">
                             <div class="field-row" style="gap:0.4rem; align-items:center;">
-                              <input type="text" bind:value={customSessionIdPrefix} placeholder="U-userID" class="prefix" disabled={useridLoading} />
-                              {#if useridLoading}
-                                <span class="loading-spinner">⏳</span>
-                              {/if}
+                              <input type="text" bind:value={session.customSessionIdPrefix} placeholder="U-userID" class="prefix" />
                               <span class="separator">:</span>
                               <input type="text" bind:value={session.customSessionIdSuffix} placeholder="空欄で無効" />
                             </div>
