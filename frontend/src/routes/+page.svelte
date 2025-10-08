@@ -99,7 +99,7 @@
   let actionInProgress = false;
   const LOG_DISPLAY_LIMIT = 1000;
   const INITIAL_RETRY_DELAY = 3000;
-  let backendReachable = true;
+  let backendReachable = false;
   let logContainer: HTMLDivElement | null = null;
   let runtimeStatus: RuntimeStatusData | null = null;
   let runtimeUsers: RuntimeUsersData | null = null;
@@ -272,7 +272,7 @@
   };
   
   // Session management (default.json と同値になるよう初期値設定)
-  let sessions = [
+  let sessions: any[] = [
     {
       id: 1,
       isEnabled: true,
@@ -307,7 +307,13 @@
       forcedRestartInterval: -1.0,
       saveOnExit: false,
       autosaveInterval: -1.0,
-      autoSleep: true
+      autoSleep: true,
+      // ワールド検索関連のプロパティを追加
+      showWorldSearch: false,
+      worldSearchTerm: '',
+      worldSearchLoading: false,
+      worldSearchError: '',
+      worldSearchResults: []
     }
   ];
   let activeSessionTab = 1;
@@ -321,9 +327,17 @@
       const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return false;
       const draft = JSON.parse(raw);
+      
+      // 期限切れチェック（30分）
+      if (draft._expires && Date.now() > draft._expires) {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        return false;
+      }
+      
       configName = draft.configName ?? '';
       configUsername = draft.configUsername ?? '';
-      configPassword = draft.configPassword ?? '';
+      // パスワードは一時保存から除外（セキュリティ対策）
+      configPassword = '';
       configComment = draft.configComment ?? '';
       configUniverseId = draft.configUniverseId ?? '';
       configTickRate = typeof draft.configTickRate === 'number' ? draft.configTickRate : 60.0;
@@ -359,7 +373,8 @@
       const draft = {
         configName,
         configUsername,
-        configPassword,
+        // パスワードは一時保存から除外（セキュリティ対策）
+        // configPassword を削除
         configComment,
         configUniverseId,
         configTickRate,
@@ -370,7 +385,8 @@
         configLogsFolder,
         configAllowedUrlHosts: configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean),
         configAutoSpawnItems: configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean),
-        sessions: draftSessions
+        sessions: draftSessions,
+        _expires: Date.now() + (30 * 60 * 1000) // 30分で期限切れ
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
     } catch {
@@ -625,7 +641,13 @@
       forcedRestartInterval: -1.0,
       saveOnExit: false,
       autosaveInterval: -1.0,
-      autoSleep: true
+      autoSleep: true,
+      // ワールド検索関連のプロパティを追加
+      showWorldSearch: false,
+      worldSearchTerm: '',
+      worldSearchLoading: false,
+      worldSearchError: '',
+      worldSearchResults: []
     };
     sessions = [...sessions, newSession];
     activeSessionTab = newSession.id;
@@ -925,7 +947,7 @@
         appMessage = { type: 'warning', text: '設定ファイルが見つかりません。設定タブで設定ファイルを作成してください。' };
       } else {
         backendReachable = false;
-        const message = error instanceof Error ? error.message : '初期データの取得に失敗しました';
+        const message = error instanceof Error ? error.message : 'バックエンドに接続できません。バックエンドが起動しているか確認してください。';
         appMessage = { type: 'error', text: message };
         if (error instanceof Error && (error as { retryable?: boolean }).retryable) {
           setTimeout(() => {
@@ -947,6 +969,21 @@
     if (restored) {
       pushToast('編集中の下書きを復元しました', 'info');
     }
+    
+    // ページ離脱時に一時保存データを自動削除
+    const handleBeforeUnload = () => {
+      clearDraft();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // クリーンアップ関数
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  });
+
+  onMount(() => {
     const unsubscribeConfigs = configs.subscribe(current => {
       if (!initialLoading) {
         if (current.length === 0) {
