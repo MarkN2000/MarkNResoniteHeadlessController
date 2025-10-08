@@ -2267,13 +2267,25 @@
           </section>
 
           <section class="panel" class:active={activeTab === 'settings'}>
+            <!-- コンフィグ作成ボタン（独立配置） -->
+            <div class="config-create-section">
+              <div class="card status-card">
+                <div class="action-buttons">
+                  <button type="button" on:click={openConfigPreview} disabled={configGenerationLoading}>プレビュー</button>
+                  <button type="button" on:click={generateConfigFile} class="save" disabled={configGenerationLoading}>
+                    {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>基本設定</h2>
                 </div>
                 <div class="card status-card">
-                  <form class="status-form" on:submit|preventDefault={generateConfigFile}>
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
                     <!-- 基本設定 -->
                     <label>
                       <span>ファイル名 <small class="note">一部使用できない文字があります</small></span>
@@ -2401,14 +2413,6 @@
                         </button>
                       </div>
                     </label>
-
-
-                    <div class="action-buttons">
-                      <button type="button" on:click={openConfigPreview} disabled={configGenerationLoading}>プレビュー</button>
-                      <button type="submit" class="save" disabled={configGenerationLoading}>
-                        {configGenerationLoading ? '作成中...' : 'コンフィグファイルを作成'}
-                      </button>
-                    </div>
                   </form>
                 </div>
               </div>
@@ -3788,6 +3792,14 @@
     display: flex;
     gap: 0.75rem;
     margin-top: 1rem;
+  }
+
+  .config-create-section {
+    margin-bottom: 2rem;
+  }
+
+  .config-create-section .action-buttons {
+    margin-top: 0.5rem;
   }
 
   .action-buttons button {
