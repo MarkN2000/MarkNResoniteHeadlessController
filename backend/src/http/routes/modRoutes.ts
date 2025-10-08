@@ -4,14 +4,14 @@ import { processManager } from '../../services/processManager.js';
 import { cidrRestriction } from '../../middleware/cidr.js';
 import { lenientRateLimit } from '../../middleware/rateLimit.js';
 import { modCors } from '../../config/cors.js';
-import { getDefaultPassword } from '../../utils/auth.js';
+import { getPlainPassword } from '../../utils/auth.js';
 import type { ExecuteCommandOptions } from '../../services/processManager.js';
 
 const router = Router();
 
 // Mod専用の軽量認証（APIキーベース）
-// ログインパスワードと同じキーを使用
-const modApiKey = process.env.MOD_API_KEY || getDefaultPassword();
+// 既定ではアプリのログインパスワードと同一キーを使用
+const modApiKey = process.env.MOD_API_KEY || getPlainPassword();
 
 const authenticateMod = (req: any, res: any, next: any) => {
   const apiKey = req.headers['x-mod-api-key'] || req.query.apiKey;

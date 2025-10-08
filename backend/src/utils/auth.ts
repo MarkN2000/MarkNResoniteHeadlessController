@@ -6,18 +6,30 @@ import path from 'path';
 interface AuthConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
-  defaultPassword: string;
+  defaultPassword?: string; // 互換のため残す
+  password?: string; // プレーンパスワード（ユーザー設定）
 }
 
 let authConfig: AuthConfig | null = null;
 
+const getConfigPath = (): string => {
+  return path.join(process.cwd(), '..', 'config', 'auth.json');
+};
+
 const loadAuthConfig = (): AuthConfig => {
   if (!authConfig) {
-    const configPath = path.join(process.cwd(), '..', 'config', 'auth.json');
+    const configPath = getConfigPath();
     const configData = fs.readFileSync(configPath, 'utf-8');
     authConfig = JSON.parse(configData);
   }
   return authConfig;
+};
+
+const saveAuthConfig = (config: AuthConfig) => {
+  const configPath = getConfigPath();
+  // インデントと整形を一定にする
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+  authConfig = null; // 次回読み込みでリロード
 };
 
 export const generateToken = (payload: any): string => {
@@ -40,5 +52,18 @@ export const comparePassword = async (password: string, hashedPassword: string):
 
 export const getDefaultPassword = (): string => {
   const config = loadAuthConfig();
-  return config.defaultPassword;
+  // 後方互換: defaultPassword が残っている場合に参照
+  return config.defaultPassword || '';
+};
+
+export const getPlainPassword = (): string => {
+  const config = loadAuthConfig();
+  // 優先: password（ユーザー設定）。未設定時はdefaultPasswordへフォールバック
+  return (config.password && String(config.password)) || getDefaultPassword();
+};
+
+export const updatePlainPassword = (newPassword: string) => {
+  const config = loadAuthConfig();
+  const nextConfig: AuthConfig = { ...config, password: newPassword };
+  saveAuthConfig(nextConfig);
 };
