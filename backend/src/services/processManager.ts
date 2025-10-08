@@ -54,6 +54,17 @@ export class ProcessManager extends EventEmitter {
       .map(file => path.join(HEADLESS_CONFIG_DIR, file));
   }
 
+  async loadConfig(configPath: string): Promise<any> {
+    const fullPath = path.isAbsolute(configPath) ? configPath : path.join(HEADLESS_CONFIG_DIR, configPath);
+    
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`Config file not found: ${configPath}`);
+    }
+
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    return JSON.parse(content);
+  }
+
   async generateConfig(name: string, username: string, password: string, configData: any, overwrite = false): Promise<string> {
     // 設定ディレクトリが存在しない場合は作成
     if (!fs.existsSync(HEADLESS_CONFIG_DIR)) {

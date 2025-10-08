@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { Router } from 'express';
 import * as cheerio from 'cheerio';
+import fetch from 'node-fetch';
 import { processManager } from '../../services/processManager.js';
 import type { ExecuteCommandOptions } from '../../services/processManager.js';
 
@@ -21,6 +22,61 @@ serverRoutes.get('/configs', (_req, res) => {
     name: path.basename(filePath)
   }));
   res.json(configs);
+});
+
+serverRoutes.get('/configs/:path', async (req, res, next) => {
+  try {
+    const configPath = req.params.path;
+    const configData = await processManager.loadConfig(configPath);
+    res.json(configData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Resonite API経由でユーザーIDを取得
+serverRoutes.get('/resonite-user/:username', async (req, res, next) => {
+  try {
+    const username = req.params.username;
+    if (!username) {
+      return res.status(400).json({ error: 'username is required' });
+    }
+
+    const response = await fetch(`https://api.resonite.com/users/?name=${encodeURIComponent(username)}`, {
+      headers: {
+        'User-Agent': 'MRHC/1.0',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ 
+        error: `API呼び出しに失敗しました: ${response.status}`,
+        details: errorText
+      });
+    }
+
+    const users = await response.json();
+    
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(404).json({ error: 'ユーザーが見つかりませんでした' });
+    }
+
+    const userid = users[0]?.id;
+    if (!userid) {
+      return res.status(404).json({ error: 'ユーザーIDが取得できませんでした' });
+    }
+
+    res.json({ userid });
+  } catch (error) {
+    console.error('Resonite API error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ 
+      error: 'Resonite API呼び出し中にエラーが発生しました',
+      details: errorMessage
+    });
+  }
 });
 
 serverRoutes.post('/configs/generate', async (req, res, next) => {

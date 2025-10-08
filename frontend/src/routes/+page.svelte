@@ -258,16 +258,88 @@
     const cur = getCurrentSession();
     if (field === 'customSessionIdSuffix') {
       (cur as any).customSessionIdSuffix = '';
+    } else if (field === 'customSessionId') {
+      // カスタムセッションIDのリセット時はプレフィックスとサフィックス両方をリセット
+      customSessionIdPrefix = '';
+      (cur as any).customSessionIdSuffix = '';
     } else {
       (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
-      if (field === 'customSessionId') (cur as any).customSessionIdSuffix = '';
     }
     // sessions 配列を更新して再描画
     sessions = sessions.map(s => (s.id === cur.id ? cur : s));
   };
 
+  // usernameからuseridを取得するAPI関数（デバウンス・キャッシュ機能付き）
+  const fetchUseridFromUsername = async (username: string): Promise<string | null> => {
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername) return null;
+    
+    // キャッシュをチェック
+    if (useridCache.has(trimmedUsername)) {
+      return useridCache.get(trimmedUsername)!;
+    }
+    
+    // 同じユーザー名の場合は重複リクエストを避ける
+    if (lastFetchedUsername === trimmedUsername && useridLoading) {
+      return null;
+    }
+    
+    try {
+      useridLoading = true;
+      useridError = '';
+      lastFetchedUsername = trimmedUsername;
+      
+      // バックエンド経由でAPIを呼び出し（CORS問題を回避）
+      const response = await fetch(`/api/server/resonite-user/${encodeURIComponent(trimmedUsername)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`API呼び出しに失敗しました: ${response.status} - ${errorData.error || 'Unknown error'}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.userid) {
+        throw new Error('ユーザーIDが取得できませんでした');
+      }
+      
+      // キャッシュに保存
+      useridCache.set(trimmedUsername, data.userid);
+      
+      return data.userid;
+      
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ユーザーIDの取得に失敗しました';
+      useridError = message;
+      pushToast(`ユーザーID取得エラー: ${message}`, 'error');
+      return null;
+    } finally {
+      useridLoading = false;
+    }
+  };
+
+  // デバウンス機能付きのuserid取得
+  const debouncedFetchUserid = (username: string) => {
+    // 既存のタイマーをクリア
+    if (useridDebounceTimer) {
+      clearTimeout(useridDebounceTimer);
+    }
+    
+    // 新しいタイマーを設定（500ms後に実行）
+    useridDebounceTimer = setTimeout(async () => {
+      const userid = await fetchUseridFromUsername(username);
+      if (userid) {
+        customSessionIdPrefix = userid;
+      }
+    }, 500);
+  };
+
   // カスタムセッションIDの接頭辞
   const getCustomIdPrefix = () => {
+    // カスタムプレフィックスが設定されている場合はそれを使用、そうでなければデフォルト
+    if (customSessionIdPrefix.trim()) {
+      return customSessionIdPrefix.trim();
+    }
     return headlessUserId ? `S-${headlessUserId}:` : 'S-<UserID>:';
   };
   
@@ -329,6 +401,16 @@
   let isPreviewEditing = false;
   let editedPreviewText = '';
   let previewEditError = '';
+  
+  // カスタムセッションIDプレフィックス用の変数
+  let customSessionIdPrefix = '';
+  
+  // ユーザーID取得用の変数
+  let useridLoading = false;
+  let useridError = '';
+  let useridDebounceTimer: NodeJS.Timeout | null = null;
+  let lastFetchedUsername = '';
+  let useridCache = new Map<string, string>();
   
   // 下書き保存/復元: コンフィグ作成タブの編集中データをLocalStorageに自動保存
   const loadDraft = () => {
@@ -1049,6 +1131,20 @@
     }
   };
 
+  // username変更時のuserid自動取得（デバウンス機能付き）
+  $: {
+    if (configUsername.trim()) {
+      debouncedFetchUserid(configUsername);
+    } else {
+      // ユーザー名が空の場合はタイマーをクリア
+      if (useridDebounceTimer) {
+        clearTimeout(useridDebounceTimer);
+        useridDebounceTimer = null;
+      }
+      useridError = '';
+    }
+  }
+
   // プレビューをリアクティブに更新
   $: {
     if (activeTab === 'settings') {
@@ -1077,10 +1173,12 @@
           autoSleep: session.autoSleep
         };
         if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
-        // customSessionId: サフィックスが空なら null、あれば prefix + suffix
+        // customSessionId: プレフィックスまたはサフィックスのどちらかが空なら null、両方あれば prefix + suffix
+        const prefix = customSessionIdPrefix.trim();
         const suffix = (session as any).customSessionIdSuffix?.trim?.() ?? '';
-        if (suffix) {
-          processedSession.customSessionId = `${getCustomIdPrefix()}${suffix}`;
+        
+        if (prefix && suffix) {
+          processedSession.customSessionId = `${prefix}:${suffix}`;
         } else {
           processedSession.customSessionId = null;
         }
@@ -1209,6 +1307,11 @@
     // クリーンアップ関数
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      // デバウンスタイマーをクリア
+      if (useridDebounceTimer) {
+        clearTimeout(useridDebounceTimer);
+        useridDebounceTimer = null;
+      }
     };
   });
 
@@ -2712,13 +2815,20 @@
                           <span>カスタムセッションID</span>
                           <div class="field-row">
                             <div class="field-row" style="gap:0.4rem; align-items:center;">
-                              <input type="text" value={getCustomIdPrefix()} readonly class="prefix" />
-                              <input type="text" bind:value={session.customSessionIdSuffix} placeholder="<custom text>（空欄可）" />
+                              <input type="text" bind:value={customSessionIdPrefix} placeholder="U-userID" class="prefix" disabled={useridLoading} />
+                              {#if useridLoading}
+                                <span class="loading-spinner">⏳</span>
+                              {/if}
+                              <span class="separator">:</span>
+                              <input type="text" bind:value={session.customSessionIdSuffix} placeholder="空欄で無効" />
                             </div>
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('customSessionId')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
                           </div>
+                          {#if useridError}
+                            <div class="userid-error">{useridError}</div>
+                          {/if}
                         </label>
 
                         <label>
@@ -4244,6 +4354,39 @@
     border-radius: 0.375rem;
     margin-top: 0.5rem;
     font-size: 0.875rem;
+  }
+
+  .separator {
+    color: #888;
+    font-weight: bold;
+    font-size: 1.1rem;
+    user-select: none;
+  }
+
+  .prefix {
+    min-width: 80px;
+    max-width: 120px;
+  }
+
+  .loading-spinner {
+    color: #3b82f6;
+    font-size: 0.875rem;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .userid-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
   }
 
   .action-buttons button {
