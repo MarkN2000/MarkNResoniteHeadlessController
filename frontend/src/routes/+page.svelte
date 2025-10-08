@@ -22,6 +22,8 @@
     logout,
     setAuthToken,
     getAuthToken,
+    getSecurityConfig,
+    getClientInfo,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -49,6 +51,10 @@
   let loginPassword = '';
   let loginLoading = false;
   let showLogin = true; // 初期状態でログイン画面を表示
+
+  // セキュリティ情報
+  let clientInfo: any = null;
+  let securityConfig: any = null;
 
   let initialLoading = true;
   let selectedConfig: string | undefined;
@@ -81,6 +87,9 @@
       
       // 認証後に初期データを読み込み
       await loadInitialData();
+      
+      // セキュリティ情報を読み込み
+      await loadSecurityInfo();
     } catch (error) {
       pushToast(error instanceof Error ? error.message : 'ログインに失敗しました', 'error');
     } finally {
@@ -120,6 +129,19 @@
     } catch (error) {
       setAuthToken(null);
       showLogin = true;
+    }
+  };
+
+  const loadSecurityInfo = async () => {
+    try {
+      const [clientInfoData, securityConfigData] = await Promise.all([
+        getClientInfo(),
+        getSecurityConfig()
+      ]);
+      clientInfo = clientInfoData;
+      securityConfig = securityConfigData;
+    } catch (error) {
+      console.error('Failed to load security info:', error);
     }
   };
 

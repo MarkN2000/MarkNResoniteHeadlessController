@@ -6,8 +6,12 @@ import { Server as SocketIOServer } from 'socket.io';
 import { SERVER_PORT } from './config/index.js';
 import { apiRouter } from './http/index.js';
 import { registerSocketHandlers } from './ws/index.js';
+import { cidrRestriction } from './middleware/cidr.js';
 
 const app = express();
+
+// CIDR制限を最初に適用
+app.use(cidrRestriction);
 
 app.use(cors());
 app.use(express.json());

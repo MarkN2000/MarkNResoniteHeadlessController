@@ -207,3 +207,16 @@ export const verifyAuth = () =>
 
 export const logout = () => 
   request('/auth/logout', { method: 'POST' }) as Promise<{ message: string }>;
+
+// セキュリティ関連API
+export const getSecurityConfig = () => 
+  request('/security/config') as Promise<{ allowedCidrs: string[] }>;
+
+export const getClientInfo = () => 
+  request('/security/client-info') as Promise<{ 
+    clientIp: string; 
+    isAllowed: boolean; 
+    userAgent: string;
+    forwardedFor?: string;
+    realIp?: string;
+  }>;
