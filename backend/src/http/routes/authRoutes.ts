@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { generateToken, hashPassword, comparePassword, getDefaultPassword } from '../../utils/auth.js';
 import { authenticateToken } from '../../middleware/auth.js';
+import { strictRateLimit } from '../../middleware/rateLimit.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.js';
 
 const router = Router();
 
-// ログイン
-router.post('/login', async (req, res) => {
+// ログイン（厳しいレート制限を適用）
+router.post('/login', strictRateLimit, async (req, res) => {
   try {
     const { password } = req.body;
     

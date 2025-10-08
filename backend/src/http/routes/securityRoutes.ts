@@ -3,13 +3,15 @@ import fs from 'fs';
 import path from 'path';
 import { authenticateToken } from '../../middleware/auth.js';
 import { optionalCidrRestriction } from '../../middleware/cidr.js';
+import { lenientRateLimit } from '../../middleware/rateLimit.js';
 import { getClientIp, logSecurityEvent, isIpAllowed } from '../../utils/cidr.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.js';
 
 const router = Router();
 
-// 認証が必要なルート
+// 認証とレート制限を適用
 router.use(authenticateToken);
+router.use(lenientRateLimit);
 
 // セキュリティ設定の取得
 router.get('/config', (req: AuthenticatedRequest, res) => {

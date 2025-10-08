@@ -55,6 +55,7 @@
   // セキュリティ情報
   let clientInfo: any = null;
   let securityConfig: any = null;
+  let rateLimitInfo: any = null;
 
   let initialLoading = true;
   let selectedConfig: string | undefined;

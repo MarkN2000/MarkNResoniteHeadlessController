@@ -5,12 +5,14 @@ import fetch from 'node-fetch';
 import { processManager } from '../../services/processManager.js';
 import type { ExecuteCommandOptions } from '../../services/processManager.js';
 import { authenticateToken } from '../../middleware/auth.js';
+import { normalRateLimit } from '../../middleware/rateLimit.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.js';
 
 export const serverRoutes = Router();
 
-// 認証が必要なルートにミドルウェアを適用
+// 認証とレート制限を適用
 serverRoutes.use(authenticateToken);
+serverRoutes.use(normalRateLimit);
 
 serverRoutes.get('/status', (_req, res) => {
   res.json(processManager.getStatus());

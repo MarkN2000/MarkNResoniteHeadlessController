@@ -14,7 +14,8 @@ const app = express();
 app.use(cidrRestriction);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // リクエストサイズ制限
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URLエンコードされたデータの制限
 app.use('/api', apiRouter);
 
 const httpServer = createServer(app);
