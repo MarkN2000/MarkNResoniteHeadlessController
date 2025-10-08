@@ -17,9 +17,6 @@
     startServer,
     stopServer,
     getWorldSearch,
-    getResoniteAuth,
-    updateResoniteAuth,
-    deleteResoniteAuth,
     login,
     verifyAuth,
     logout,
@@ -34,8 +31,7 @@
     type RuntimeWorldsData,
     type RuntimeWorldEntry,
     type ConfigEntry,
-    type LogEntry,
-    type ResoniteAuthSettings
+    type LogEntry
   } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
@@ -45,7 +41,7 @@
     { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
     { id: 'settings', label: 'コンフィグ作成' },
-    { id: 'others', label: 'その他' }
+    { id: 'commands', label: 'コマンド' }
   ];
 
   let activeTab: (typeof tabs)[number]['id'] = 'dashboard';
@@ -60,64 +56,6 @@
   let clientInfo: any = null;
   let securityConfig: any = null;
   let rateLimitInfo: any = null;
-
-  // Resonite 認証設定
-  let resoniteAuth: ResoniteAuthSettings = {
-    loginUsername: '',
-    loginUserid: '',
-    loginPassword: '',
-    isEncrypted: false
-  };
-  let resoniteLoading = false;
-  const loadResoniteAuth = async () => {
-    resoniteLoading = true;
-    try {
-      const s = await getResoniteAuth();
-      resoniteAuth.loginUsername = s.loginUsername || '';
-      resoniteAuth.loginUserid = s.loginUserid || '';
-      // 取得時のパスワードはマスクされるため空にしておく
-      resoniteAuth.loginPassword = '';
-      resoniteAuth.isEncrypted = Boolean(s.isEncrypted);
-      pushToast('Resonite認証設定を読み込みました', 'success');
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : '設定の読み込みに失敗しました', 'error');
-    } finally {
-      resoniteLoading = false;
-    }
-  };
-  const saveResoniteAuth = async () => {
-    resoniteLoading = true;
-    try {
-      await updateResoniteAuth({
-        loginUsername: resoniteAuth.loginUsername,
-        loginUserid: resoniteAuth.loginUserid,
-        loginPassword: resoniteAuth.loginPassword,
-        isEncrypted: false
-      });
-      // 保存後はパスワード入力欄をクリア
-      resoniteAuth.loginPassword = '';
-      pushToast('Resonite認証設定を保存しました', 'success');
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : '設定の保存に失敗しました', 'error');
-    } finally {
-      resoniteLoading = false;
-    }
-  };
-  const removeResoniteAuth = async () => {
-    if (!confirm('Resonite認証設定を削除しますか？\n（ユーザー名・ユーザーID・パスワードが空になります）')) return;
-    resoniteLoading = true;
-    try {
-      await deleteResoniteAuth();
-      resoniteAuth.loginUsername = '';
-      resoniteAuth.loginUserid = '';
-      resoniteAuth.loginPassword = '';
-      pushToast('Resonite認証設定を削除しました', 'success');
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : '削除に失敗しました', 'error');
-    } finally {
-      resoniteLoading = false;
-    }
-  };
 
   let initialLoading = true;
   let selectedConfig: string | undefined;
@@ -3244,70 +3182,37 @@
 
           </section>
 
-          <section class="panel" class:active={activeTab === 'others'}>
-            <div class="panel-grid two">
+          <section class="panel" class:active={activeTab === 'commands'}>
+            <div class="panel-grid one">
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>コマンド手動実行</h2>
+                  <h2>/console</h2>
                 </div>
-                <div class="card status-card" aria-busy={commandLoading}>
-                  <form class="status-form" on:submit|preventDefault={executeCommand}>
-                    <label>
-                      <span>コマンド</span>
-                      <input
-                        type="text"
-                        bind:value={commandText}
-                        placeholder="例: worlds"
-                        on:keydown={(event) => {
-                          if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault();
-                            executeCommand();
-                          }
-                        }}
-                        disabled={!$status.running || commandLoading}
-                      />
-                    </label>
-
-                    <div class="action-buttons">
-                      <button type="button" on:click={executeCommand} disabled={!$status.running || commandLoading || !commandText.trim()}>
-                        実行
-                      </button>
-                    </div>
-
-                    {#if commandLoading}
-                      <div class="feedback">実行中...</div>
-                    {:else if commandResult}
-                      <pre class="config-preview">{commandResult}</pre>
-                    {/if}
-                  </form>
-                </div>
-              </div>
-
-              <div class="panel-column">
-                <div class="panel-heading">
-                  <h2>Resonite認証設定</h2>
-                </div>
-                <div class="card status-card" aria-busy={resoniteLoading}>
-                  <form class="status-form" on:submit|preventDefault={() => {}}>
-                    <label>
-                      <span>ユーザー名</span>
-                      <input id="loginUsername" type="text" bind:value={resoniteAuth.loginUsername} placeholder="例: MarkN" />
-                    </label>
-                    <label>
-                      <span>ユーザーID</span>
-                      <input id="loginUserid" type="text" bind:value={resoniteAuth.loginUserid} placeholder="例: U-xxxxxxxxxxxx" />
-                    </label>
-                    <label>
-                      <span>パスワード</span>
-                      <input id="loginPassword" type="password" bind:value={resoniteAuth.loginPassword} placeholder="保存時に上書き（空は未変更）" />
-                    </label>
-
-                    <div class="action-buttons">
-                      <button type="button" on:click={loadResoniteAuth} disabled={resoniteLoading}>読み込み</button>
-                      <button type="button" on:click={saveResoniteAuth} disabled={resoniteLoading}>保存</button>
-                      <button type="button" on:click={removeResoniteAuth} disabled={resoniteLoading}>削除</button>
-                    </div>
-                  </form>
+                <div class="card command-card">
+                  <h2>コマンドコンソール</h2>
+                  <p class="command-help">ヘッドレスが起動している間に直接コマンドを実行できます。</p>
+                  <div class="command-input">
+                    <input
+                      type="text"
+                      bind:value={commandText}
+                      placeholder="例: worlds"
+                      on:keydown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          executeCommand();
+                        }
+                      }}
+                      disabled={!$status.running || commandLoading}
+                    />
+                    <button type="button" on:click={executeCommand} disabled={!$status.running || commandLoading || !commandText.trim()}>
+                      実行
+                    </button>
+                  </div>
+                  {#if commandLoading}
+                    <p class="command-status">実行中...</p>
+                  {:else if commandResult}
+                    <pre class="command-result">{commandResult}</pre>
+                  {/if}
                 </div>
               </div>
             </div>

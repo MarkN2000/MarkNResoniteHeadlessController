@@ -220,23 +220,3 @@ export const getClientInfo = () =>
     forwardedFor?: string;
     realIp?: string;
   }>;
-
-// Resonite 認証設定 API
-export interface ResoniteAuthSettings {
-  loginUsername: string;
-  loginUserid: string;
-  loginPassword: string; // masked on GET
-  isEncrypted: boolean;
-}
-
-export const getResoniteAuth = () =>
-  request('/auth/resonite') as Promise<ResoniteAuthSettings>;
-
-export const updateResoniteAuth = (payload: Partial<ResoniteAuthSettings>) =>
-  request('/auth/resonite', {
-    method: 'PUT',
-    body: JSON.stringify(payload)
-  }) as Promise<{ ok: boolean; settings: ResoniteAuthSettings }>;
-
-export const deleteResoniteAuth = () =>
-  request('/auth/resonite', { method: 'DELETE' }) as Promise<{ ok: boolean }>;
