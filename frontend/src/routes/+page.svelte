@@ -2124,23 +2124,20 @@
   };
 
   const searchFriendByUserId = async () => {
-    const userId = friendSearchUserId.trim();
-    if (!userId) {
+    const userIdSuffix = friendSearchUserId.trim();
+    if (!userIdSuffix) {
       pushToast('ユーザーIDを入力してください', 'error');
       return;
     }
 
-    // ユーザーIDの簡易バリデーション
-    if (!userId.startsWith('U-')) {
-      pushToast('ユーザーIDは「U-」で始まる必要があります', 'error');
-      return;
-    }
+    // プレフィックスを自動で付与
+    const fullUserId = `U-${userIdSuffix}`;
 
     if (friendSearchUserIdLoading) return;
     friendSearchUserIdLoading = true;
 
     try {
-      const user = await getResoniteUserFull(userId);
+      const user = await getResoniteUserFull(fullUserId);
       // 検索結果に追加（重複チェック）
       const exists = friendSearchResults.some(u => u.id === user.id);
       if (!exists) {
@@ -3162,10 +3159,10 @@
                 <div class="panel-heading">
                   <h2>ユーザー検索</h2>
                 </div>
-                <div class="card form-card">
-                  <!-- ユーザー名で検索 -->
-                  <form on:submit|preventDefault={searchFriendByUsername}>
-                    <label class="field">
+                <div class="card status-card">
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
+                    <!-- ユーザー名で検索 -->
+                    <label>
                       <span>ユーザー名で検索</span>
                       <div class="field-row">
                         <input 
@@ -3174,81 +3171,84 @@
                           placeholder="ユーザー名を入力" 
                         />
                         <button 
-                          type="submit" 
+                          type="button" 
                           class="status-action-button" 
+                          on:click={searchFriendByUsername}
                           disabled={friendSearchUsernameLoading}
                         >
                           {friendSearchUsernameLoading ? '検索中...' : '検索'}
                         </button>
                       </div>
                     </label>
-                  </form>
 
-                  <!-- ユーザーIDで検索 -->
-                  <form on:submit|preventDefault={searchFriendByUserId} style="margin-top: 1rem;">
-                    <label class="field">
+                    <!-- ユーザーIDで検索 -->
+                    <label>
                       <span>ユーザーIDで検索</span>
                       <div class="field-row">
+                        <span class="field-prefix">U-</span>
                         <input 
                           type="text" 
                           bind:value={friendSearchUserId} 
-                          placeholder="U-xxxxxxxx" 
+                          placeholder="ユーザーIDを入力" 
                         />
                         <button 
-                          type="submit" 
+                          type="button" 
                           class="status-action-button" 
+                          on:click={searchFriendByUserId}
                           disabled={friendSearchUserIdLoading}
                         >
                           {friendSearchUserIdLoading ? '検索中...' : '検索'}
                         </button>
                       </div>
                     </label>
-                  </form>
 
-                  <div class="action-buttons" style="margin-top: 1.5rem;">
-                    <button 
-                      type="button" 
-                      on:click={loadFriendRequestsList} 
-                      disabled={!$status.running || friendRequestsLoading}
-                    >
-                      {friendRequestsLoading ? '取得中...' : 'フレンドリクエスト一覧'}
-                    </button>
-                    <button 
-                      type="button" 
-                      on:click={loadBannedUsersList} 
-                      disabled={!$status.running}
-                    >
-                      BAN一覧
-                    </button>
-                  </div>
-
-                  {#if friendSearchResults.length > 0}
-                    <div class="user-list" style="margin-top: 1.5rem;">
-                      <h3 style="margin-bottom: 0.75rem; font-size: 0.95rem; color: #c7cad3;">検索結果</h3>
-                      {#each friendSearchResults as user}
-                        <button
-                          type="button"
-                          class="user-card"
-                          class:selected={selectedFriendUser?.id === user.id}
-                          on:click={() => selectFriendUser(user)}
-                        >
-                          <div class="user-avatar">
-                            {#if user.profile.iconUrl}
-                              <img src={user.profile.iconUrl} alt={user.username || 'User'} />
-                            {:else}
-                              <div class="avatar-placeholder">?</div>
-                            {/if}
-                          </div>
-                          <div class="user-info">
-                            <strong>{user.username || 'Unknown'}</strong>
-                            <span class="sub">{user.id}</span>
-                          </div>
-                        </button>
-                      {/each}
+                    <div class="action-buttons">
+                      <button 
+                        type="button" 
+                        class="info"
+                        on:click={loadFriendRequestsList} 
+                        disabled={!$status.running || friendRequestsLoading}
+                      >
+                        {friendRequestsLoading ? '取得中...' : 'フレンドリクエスト一覧'}
+                      </button>
+                      <button 
+                        type="button" 
+                        class="info"
+                        on:click={loadBannedUsersList} 
+                        disabled={!$status.running}
+                      >
+                        BAN一覧
+                      </button>
                     </div>
-                  {:else}
-                    <p class="empty" style="margin-top: 1rem;">検索結果が表示されます</p>
-                  {/if}
+
+                    {#if friendSearchResults.length > 0}
+                      <div class="user-list">
+                        <h3 style="margin-bottom: 0.75rem; font-size: 0.95rem; color: #c7cad3;">検索結果</h3>
+                        {#each friendSearchResults as user}
+                          <button
+                            type="button"
+                            class="user-card"
+                            class:selected={selectedFriendUser?.id === user.id}
+                            on:click={() => selectFriendUser(user)}
+                          >
+                            <div class="user-avatar">
+                              {#if user.profile.iconUrl}
+                                <img src={user.profile.iconUrl} alt={user.username || 'User'} />
+                              {:else}
+                                <div class="avatar-placeholder">?</div>
+                              {/if}
+                            </div>
+                            <div class="user-info">
+                              <strong>{user.username || 'Unknown'}</strong>
+                              <span class="sub">{user.id}</span>
+                            </div>
+                          </button>
+                        {/each}
+                      </div>
+                    {:else}
+                      <p class="empty">検索結果が表示されます</p>
+                    {/if}
+                  </form>
                 </div>
               </div>
 
@@ -3257,61 +3257,61 @@
                 <div class="panel-heading">
                   <h2>ユーザー操作</h2>
                 </div>
-                <div class="card form-card">
+                <div class="card status-card">
                   {#if selectedFriendUser}
-                    <div class="selected-user-display" style="margin-bottom: 1.5rem;">
-                      <div class="user-card selected" style="cursor: default;">
-                        <div class="user-avatar">
-                          {#if selectedFriendUser.profile.iconUrl}
-                            <img src={selectedFriendUser.profile.iconUrl} alt={selectedFriendUser.username || 'User'} />
-                          {:else}
-                            <div class="avatar-placeholder">?</div>
-                          {/if}
-                        </div>
-                        <div class="user-info">
-                          <strong>{selectedFriendUser.username || 'Unknown'}</strong>
-                          <span class="sub">{selectedFriendUser.id}</span>
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <div class="selected-user-display">
+                        <div class="user-card selected" style="cursor: default;">
+                          <div class="user-avatar">
+                            {#if selectedFriendUser.profile.iconUrl}
+                              <img src={selectedFriendUser.profile.iconUrl} alt={selectedFriendUser.username || 'User'} />
+                            {:else}
+                              <div class="avatar-placeholder">?</div>
+                            {/if}
+                          </div>
+                          <div class="user-info">
+                            <strong>{selectedFriendUser.username || 'Unknown'}</strong>
+                            <span class="sub">{selectedFriendUser.id}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div class="action-buttons">
-                      <button 
-                        type="button" 
-                        class="save"
-                        on:click={acceptFriendRequestFromSelected}
-                        disabled={
-                          !$status.running || 
-                          friendAcceptLoading || 
-                          !friendRequests?.data?.some(username => 
-                            username.toLowerCase() === selectedFriendUser?.username?.toLowerCase()
-                          )
-                        }
-                      >
-                        {friendAcceptLoading ? '承認中...' : 'フレンド申請を承認'}
-                      </button>
-                    </div>
+                      <div class="action-buttons">
+                        <button 
+                          type="button" 
+                          class="save"
+                          on:click={acceptFriendRequestFromSelected}
+                          disabled={
+                            !$status.running || 
+                            friendAcceptLoading || 
+                            !friendRequests?.data?.some(username => 
+                              username.toLowerCase() === selectedFriendUser?.username?.toLowerCase()
+                            )
+                          }
+                        >
+                          {friendAcceptLoading ? '承認中...' : 'フレンド申請を承認'}
+                        </button>
+                      </div>
 
-                    <div class="action-buttons">
-                      <button 
-                        type="button" 
-                        on:click={sendFriendRequestToSelected}
-                        disabled={!$status.running || friendSendLoading}
-                      >
-                        {friendSendLoading ? '送信中...' : 'フレンド申請を送る'}
-                      </button>
-                      <button 
-                        type="button" 
-                        class="close"
-                        on:click={removeFriendFromSelected}
-                        disabled={!$status.running || friendRemoveLoading}
-                      >
-                        {friendRemoveLoading ? '解除中...' : 'フレンド解除'}
-                      </button>
-                    </div>
+                      <div class="action-buttons">
+                        <button 
+                          type="button" 
+                          on:click={sendFriendRequestToSelected}
+                          disabled={!$status.running || friendSendLoading}
+                        >
+                          {friendSendLoading ? '送信中...' : 'フレンド申請を送る'}
+                        </button>
+                        <button 
+                          type="button" 
+                          class="close"
+                          on:click={removeFriendFromSelected}
+                          disabled={!$status.running || friendRemoveLoading}
+                        >
+                          {friendRemoveLoading ? '解除中...' : 'フレンド解除'}
+                        </button>
+                      </div>
 
-                    <div style="margin-top: 1.5rem;">
-                      <label class="field">
+                      <label>
                         <span>メッセージ送信</span>
                         <textarea 
                           rows="3" 
@@ -3327,7 +3327,7 @@
                       >
                         {friendMessageLoading ? '送信中...' : 'メッセージを送信'}
                       </button>
-                    </div>
+                    </form>
                   {:else}
                     <p class="empty">左側のリストからユーザーを選択してください</p>
                   {/if}
@@ -5185,6 +5185,7 @@
     color: #f5f5f5;
     font-weight: 600;
     transition: background 0.15s ease;
+    background: #2b2f35; /* デフォルト背景色 */
   }
 
   .action-buttons button.save {
@@ -5199,6 +5200,15 @@
     background: #48392a;
   }
 
+  .action-buttons button.info {
+    background: #2d4359; /* 情報系ボタン用の青系 */
+  }
+
+  .action-buttons button:hover:enabled {
+    transform: translateY(-1px);
+    filter: brightness(1.15);
+  }
+
   .action-buttons button.save:hover:enabled {
     background: #2f6d3b;
   }
@@ -5211,8 +5221,8 @@
     background: #5f4d33;
   }
 
-  .action-buttons button:hover:enabled {
-    transform: translateY(-1px);
+  .action-buttons button.info:hover:enabled {
+    background: #3a5a7a;
   }
 
   .status-card button:not(.status-action-button),
@@ -5773,6 +5783,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* フィールドプレフィックス */
+  .field-prefix {
+    color: #9aa3b3;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    user-select: none;
   }
 
 
