@@ -46,7 +46,11 @@
     // resdb:// プロトコルをHTTPSに変換
     if (url.startsWith('resdb:///')) {
       // resdb:///を除去してIDを取得
-      const id = url.replace('resdb:///', '');
+      let id = url.replace('resdb:///', '');
+      
+      // 拡張子を除去（.webp, .png, .jpg など）
+      id = id.replace(/\.(webp|png|jpg|jpeg|gif)$/i, '');
+      
       // Resoniteのアセットサーバーに変換
       return `https://assets.resonite.com/${id}`;
     }
@@ -2127,26 +2131,18 @@
     friendSearchUsernameLoading = true;
 
     try {
+      // 検索前に結果をリセット
+      friendSearchResults = [];
+      selectedFriendUser = null;
+
       const response = await searchResoniteUsers(username);
       
       if (response.count === 0) {
         pushToast('該当するユーザーが見つかりませんでした', 'info');
       } else {
-        // 既存のリストに追加（重複チェック）
-        let addedCount = 0;
-        response.users.forEach(user => {
-          const exists = friendSearchResults.some(u => u.id === user.id);
-          if (!exists) {
-            friendSearchResults = [...friendSearchResults, user];
-            addedCount++;
-          }
-        });
-        
-        if (addedCount > 0) {
-          pushToast(`${addedCount}件のユーザーを追加しました`, 'success');
-        } else {
-          pushToast('すべてのユーザーが既にリストに追加されています', 'info');
-        }
+        // 新しい検索結果を設定
+        friendSearchResults = response.users;
+        pushToast(`${response.count}件のユーザーが見つかりました`, 'success');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ユーザー情報の取得に失敗しました';
@@ -2170,15 +2166,14 @@
     friendSearchUserIdLoading = true;
 
     try {
+      // 検索前に結果をリセット
+      friendSearchResults = [];
+      selectedFriendUser = null;
+
       const user = await getResoniteUserFull(fullUserId);
-      // 検索結果に追加（重複チェック）
-      const exists = friendSearchResults.some(u => u.id === user.id);
-      if (!exists) {
-        friendSearchResults = [...friendSearchResults, user];
-        pushToast('ユーザーを追加しました', 'success');
-      } else {
-        pushToast('このユーザーは既にリストに追加されています', 'info');
-      }
+      // 検索結果を設定
+      friendSearchResults = [user];
+      pushToast('ユーザーを見つけました', 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ユーザー情報の取得に失敗しました';
       pushToast(`検索失敗: ${message}`, 'error');
