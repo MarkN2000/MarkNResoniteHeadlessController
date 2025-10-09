@@ -59,7 +59,30 @@ serverRoutes.get('/resonite-user/:username', normalRateLimit, async (req, res, n
   }
 });
 
-// 認証とレート制限を適用
+// コンフィグファイル一覧取得（認証不要）
+serverRoutes.get('/configs', normalRateLimit, (_req, res) => {
+  const configs = processManager.listConfigs().map(filePath => ({
+    path: filePath,
+    name: path.basename(filePath)
+  }));
+  res.json(configs);
+});
+
+// コンフィグファイル読み込み（認証不要）
+serverRoutes.get('/configs/:path', normalRateLimit, async (req, res, next) => {
+  try {
+    const configPath = req.params.path;
+    console.log(`[serverRoutes] Loading config: ${configPath}`);
+    const configData = await processManager.loadConfig(configPath);
+    console.log(`[serverRoutes] Config loaded successfully: ${configPath}`);
+    res.json(configData);
+  } catch (error) {
+    console.error(`[serverRoutes] Error loading config: ${configPath}`, error);
+    next(error);
+  }
+});
+
+// 認証とレート制限を適用（以降のすべてのエンドポイントに適用）
 serverRoutes.use(authenticateToken);
 serverRoutes.use(normalRateLimit);
 
@@ -70,24 +93,6 @@ serverRoutes.get('/status', (_req, res) => {
 serverRoutes.get('/logs', (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : undefined;
   res.json(processManager.getLogs(limit));
-});
-
-serverRoutes.get('/configs', (_req, res) => {
-  const configs = processManager.listConfigs().map(filePath => ({
-    path: filePath,
-    name: path.basename(filePath)
-  }));
-  res.json(configs);
-});
-
-serverRoutes.get('/configs/:path', async (req, res, next) => {
-  try {
-    const configPath = req.params.path;
-    const configData = await processManager.loadConfig(configPath);
-    res.json(configData);
-  } catch (error) {
-    next(error);
-  }
 });
 
 serverRoutes.post('/configs/generate', async (req, res, next) => {

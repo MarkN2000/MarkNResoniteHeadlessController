@@ -625,13 +625,23 @@
     
     configLoadLoading = true;
     try {
+      // パスからファイル名だけを抽出
+      const fileName = selectedConfigToLoad.split(/[/\\]/).pop() || selectedConfigToLoad;
+      
       // バックエンドからコンフィグファイルの内容を取得
-      const response = await fetch(`/api/configs/${encodeURIComponent(selectedConfigToLoad)}`);
+      const response = await fetch(`/api/server/configs/${encodeURIComponent(fileName)}`);
       if (!response.ok) {
-        throw new Error('コンフィグファイルの読み込みに失敗しました');
+        if (response.status === 404) {
+          throw new Error(`コンフィグファイル "${fileName}" が見つかりません`);
+        }
+        const errorText = await response.text();
+        throw new Error(`コンフィグファイルの読み込みに失敗しました (${response.status}): ${errorText}`);
       }
       
       const configData = await response.json();
+      
+      // フォーム更新中フラグを立てる
+      isFormClearing = true;
       
       // 基本設定に反映（ヘルパー関数を使用）
       configName = configData.comment?.replace('の設定ファイル', '') || 'default';
@@ -708,6 +718,10 @@
       pushToast(message, 'error');
     } finally {
       configLoadLoading = false;
+      // フラグをリセット
+      setTimeout(() => {
+        isFormClearing = false;
+      }, 0);
     }
   };
 
