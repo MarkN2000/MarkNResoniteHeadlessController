@@ -40,8 +40,7 @@
     { id: 'dashboard', label: 'ダッシュボード' },
     { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
-    { id: 'settings', label: 'コンフィグ作成' },
-    { id: 'commands', label: 'コマンド' }
+    { id: 'settings', label: 'コンフィグ作成' }
   ];
 
   let activeTab: (typeof tabs)[number]['id'] = 'dashboard';
@@ -2481,6 +2480,30 @@
             {/each}
           {/if}
         </div>
+        
+        <!-- コマンド入力エリア -->
+        <div class="command-section">
+          <div class="command-input">
+            <input
+              type="text"
+              bind:value={commandText}
+              placeholder="コマンドを入力（例: worlds）"
+              on:keydown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  executeCommand();
+                }
+              }}
+              disabled={!$status.running || commandLoading}
+            />
+            <button type="button" on:click={executeCommand} disabled={!$status.running || commandLoading || !commandText.trim()}>
+              {commandLoading ? '実行中...' : '実行'}
+            </button>
+          </div>
+          {#if commandResult}
+            <pre class="command-result">{commandResult}</pre>
+          {/if}
+        </div>
       </section>
     </aside>
 
@@ -3473,42 +3496,6 @@
 
           </section>
 
-          <section class="panel" class:active={activeTab === 'commands'}>
-            <div class="panel-grid one">
-              <div class="panel-column">
-                <div class="panel-heading">
-                  <h2>/console</h2>
-                </div>
-                <div class="card command-card">
-                  <h2>コマンドコンソール</h2>
-                  <p class="command-help">ヘッドレスが起動している間に直接コマンドを実行できます。</p>
-                  <div class="command-input">
-                    <input
-                      type="text"
-                      bind:value={commandText}
-                      placeholder="例: worlds"
-                      on:keydown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                          event.preventDefault();
-                          executeCommand();
-                        }
-                      }}
-                      disabled={!$status.running || commandLoading}
-                    />
-                    <button type="button" on:click={executeCommand} disabled={!$status.running || commandLoading || !commandText.trim()}>
-                      実行
-                    </button>
-                  </div>
-                  {#if commandLoading}
-                    <p class="command-status">実行中...</p>
-                  {:else if commandResult}
-                    <pre class="command-result">{commandResult}</pre>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </section>
-
           <!-- プレビューエリア（常時表示） -->
           <section class="panel" class:active={activeTab === 'settings'}>
             <div class="panel-heading">
@@ -4416,6 +4403,32 @@
     word-break: break-word;
   }
 
+  /* サイドバー内のコマンドセクション */
+  .command-section {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border-top: none;
+  }
+
+  .command-section .command-input {
+    margin-bottom: 0.25rem;
+  }
+
+  .command-section .command-input input {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .command-section .command-input button {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .command-section .command-result {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
   .form-card form {
     display: grid;
     gap: 0.75rem;
@@ -4430,7 +4443,7 @@
     flex: 1;
     padding: 0.5rem 0.75rem;
     border-radius: 0.6rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: none;
     background: rgba(17, 21, 29, 0.65);
     color: inherit;
   }
