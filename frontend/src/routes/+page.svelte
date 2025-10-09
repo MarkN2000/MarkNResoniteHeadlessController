@@ -254,8 +254,7 @@
   let selectedResoniteUrl: string | null = null;
 
   // Config generation state
-  // 仕様: 何も操作せず「作成」で default.json と同内容を生成するためデフォルト名を 'default' に設定
-  let configName = 'default';
+  let configName = '';
   let configUsername = '';
   let configPassword = '';
   let showPassword = false;
@@ -1377,6 +1376,8 @@
         isEnabled: true,
         sessionName: '',
         customSessionId: '',
+        customSessionIdPrefix: '',
+        customSessionIdSuffix: '',
         description: '',
         maxUsers: 16,
         accessLevel: 'Anyone',
@@ -1410,16 +1411,16 @@
       activeSessionTab = 1;
       nextSessionId = 2;
       clearDraft();
-      
-      // フラグをリセット
-      setTimeout(() => {
-        isFormClearing = false;
-      }, 0);
     } catch (error) {
       const message = error instanceof Error ? error.message : '設定ファイルの生成に失敗しました';
       pushToast(message, 'error');
     } finally {
+      // フラグをリセット（必ず実行される）
       configGenerationLoading = false;
+      // 次のティックでクリアフラグをリセット
+      setTimeout(() => {
+        isFormClearing = false;
+      }, 0);
     }
   };
 
