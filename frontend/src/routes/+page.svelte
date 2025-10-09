@@ -3339,22 +3339,25 @@
                         </button>
                       </div>
 
-                      <label>
-                        <span>メッセージ送信</span>
+                      <div class="description-block">
+                        <div class="description-header">
+                          <label for="friend-message-text">メッセージ送信</label>
+                          <button 
+                            type="button" 
+                            class="status-action-button"
+                            on:click={sendMessageToSelected}
+                            disabled={!$status.running || friendMessageLoading}
+                          >
+                            {friendMessageLoading ? '送信中...' : '送信'}
+                          </button>
+                        </div>
                         <textarea 
+                          id="friend-message-text"
                           rows="3" 
                           bind:value={friendMessageText}
                           placeholder="メッセージを入力..."
                         ></textarea>
-                      </label>
-                      <button 
-                        type="button" 
-                        on:click={sendMessageToSelected}
-                        disabled={!$status.running || friendMessageLoading}
-                        style="width: 100%; margin-top: 0.5rem;"
-                      >
-                        {friendMessageLoading ? '送信中...' : 'メッセージを送信'}
-                      </button>
+                      </div>
                     </form>
                   {:else}
                     <p class="empty">左側のリストからユーザーを選択してください</p>
