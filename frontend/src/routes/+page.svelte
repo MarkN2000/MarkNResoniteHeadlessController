@@ -324,6 +324,7 @@
     useCustomJoinVerifier: false,
     accessLevel: 'Anyone',
     maxUsers: 16,
+    hideFromPublicListing: null as boolean | null,
     showWorldSearch: false,
     worldSearchTerm: '',
     worldSearchLoading: false,
@@ -380,21 +381,29 @@
     
     try {
       useridLoading = true;
-      useridError = '';
       lastFetchedUsername = trimmedUsername;
       
       // バックエンド経由でAPIを呼び出し（CORS問題を回避）
       const response = await fetch(`/api/server/resonite-user/${encodeURIComponent(trimmedUsername)}`);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(`API呼び出しに失敗しました: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          if (errorData.details) {
+            errorMessage += ` (詳細: ${errorData.details})`;
+          }
+        } catch {
+          errorMessage += ' (レスポンスの解析に失敗)';
+        }
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
       
       if (!data.userid) {
-        throw new Error('ユーザーIDが取得できませんでした');
+        throw new Error('ユーザーIDが取得できませんでした（APIレスポンスにuseridが含まれていません）');
       }
       
       // キャッシュに保存
@@ -404,31 +413,55 @@
       
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ユーザーIDの取得に失敗しました';
-      useridError = message;
-      pushToast(`ユーザーID取得エラー: ${message}`, 'error');
+      pushToast(`ユーザーID取得に失敗: ${message}`, 'error');
       return null;
     } finally {
       useridLoading = false;
     }
   };
 
-  // デバウンス機能付きのuserid取得
-  const debouncedFetchUserid = (username: string) => {
-    // 既存のタイマーをクリア
-    if (useridDebounceTimer) {
-      clearTimeout(useridDebounceTimer);
+  // 手動でUserIDを取得してプレフィックスに設定
+  const autoFillUserid = async () => {
+    const username = configUsername.trim();
+    
+    if (!username) {
+      pushToast('ユーザー名を入力してください', 'error');
+      return;
     }
     
-    // 新しいタイマーを設定（500ms後に実行）
-    useridDebounceTimer = setTimeout(async () => {
+    if (useridLoading) {
+      return; // 既に実行中の場合は何もしない
+    }
+    
+    try {
+      // キャッシュをチェック
+      if (useridCache.has(username)) {
+        const userid = useridCache.get(username)!;
+        const cur = getCurrentSession();
+        (cur as any).customSessionIdPrefix = userid;
+        sessions = sessions.map(s => (s.id === cur.id ? cur : s));
+        pushToast('キャッシュから自動入力しました', 'success');
+        return;
+      }
+      
+      // lastFetchedUsernameをリセットして常に実行できるようにする
+      lastFetchedUsername = '';
+      
       const userid = await fetchUseridFromUsername(username);
+      
       if (userid) {
         // 現在のセッションのプレフィックスに設定
         const cur = getCurrentSession();
         (cur as any).customSessionIdPrefix = userid;
         sessions = sessions.map(s => (s.id === cur.id ? cur : s));
+        
+        pushToast('ユーザーIDを自動入力しました', 'success');
       }
-    }, 500);
+    } catch (error) {
+      // 予期しないエラーが発生した場合
+      const message = error instanceof Error ? error.message : '不明なエラーが発生しました';
+      pushToast(`予期しないエラー: ${message}`, 'error');
+    }
   };
 
   // カスタムセッションIDの接頭辞
@@ -499,14 +532,13 @@
   let isPreviewEditing = false;
   let editedPreviewText = '';
   let previewEditError = '';
+  let previewTextarea: HTMLTextAreaElement | null = null;
   
   // カスタムセッションIDプレフィックス用の変数
   let customSessionIdPrefix = '';
   
   // ユーザーID取得用の変数
   let useridLoading = false;
-  let useridError = '';
-  let useridDebounceTimer: NodeJS.Timeout | null = null;
   let lastFetchedUsername = '';
   let useridCache = new Map<string, string>();
   
@@ -601,62 +633,69 @@
       
       const configData = await response.json();
       
-      // 基本設定に反映
+      // 基本設定に反映（ヘルパー関数を使用）
       configName = configData.comment?.replace('の設定ファイル', '') || 'default';
-      configUsername = configData.username || '';
+      configUsername = configData.loginCredential || '';
+      configPassword = ''; // セキュリティのため、読み込み時はパスワードを空にする
       configComment = configData.comment || '';
-      configTickRate = configData.tickRate || 60.0;
-      configMaxConcurrentAssetTransfers = configData.maxConcurrentAssetTransfers || 128;
+      configUniverseId = configData.universeId || '';
+      configTickRate = configData.tickRate ?? 60.0;
+      configMaxConcurrentAssetTransfers = configData.maxConcurrentAssetTransfers ?? 128;
       configUsernameOverride = configData.usernameOverride || '';
       configDataFolder = configData.dataFolder || '';
       configCacheFolder = configData.cacheFolder || '';
       configLogsFolder = configData.logsFolder || '';
-      configAllowedUrlHosts = (configData.allowedUrlHosts || []).join(', ');
-      configAutoSpawnItems = (configData.autoSpawnItems || []).join(', ');
+      configAllowedUrlHosts = arrayToString(configData.allowedUrlHosts);
+      configAutoSpawnItems = arrayToString(configData.autoSpawnItems);
       
-      // セッション設定に反映
+      // セッション設定に反映（ヘルパー関数を使用）
       if (configData.startWorlds && Array.isArray(configData.startWorlds)) {
-        sessions = configData.startWorlds.map((world: any, index: number) => ({
-          id: index + 1,
-          isEnabled: world.isEnabled !== false,
-          sessionName: world.sessionName || '',
-          customSessionId: world.customSessionId || '',
-          customSessionIdSuffix: world.customSessionId ? world.customSessionId.split(':').pop() || '' : '',
-          description: world.description || '',
-          maxUsers: world.maxUsers || 16,
-          accessLevel: world.accessLevel || 'Anyone',
-          useCustomJoinVerifier: world.useCustomJoinVerifier || false,
-          hideFromPublicListing: world.hideFromPublicListing,
-          tags: Array.isArray(world.tags) ? world.tags.join(',') : (world.tags || ''),
-          mobileFriendly: world.mobileFriendly || false,
-          loadWorldURL: world.loadWorldURL || '',
-          loadWorldPresetName: world.loadWorldPresetName || 'Grid',
-          overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
-          forcePort: world.forcePort,
-          keepOriginalRoles: world.keepOriginalRoles || false,
-          defaultUserRoles: world.defaultUserRoles || '',
-          roleCloudVariable: world.roleCloudVariable || '',
-          allowUserCloudVariable: world.allowUserCloudVariable || '',
-          denyUserCloudVariable: world.denyUserCloudVariable || '',
-          requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
-          requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
-          awayKickMinutes: world.awayKickMinutes || -1.0,
-          parentSessionIds: world.parentSessionIds || '',
-          autoInviteUsernames: world.autoInviteUsernames || '',
-          autoInviteMessage: world.autoInviteMessage || '',
-          saveAsOwner: world.saveAsOwner || '',
-          autoRecover: world.autoRecover !== false,
-          idleRestartInterval: world.idleRestartInterval || 1800,
-          forcedRestartInterval: world.forcedRestartInterval || -1.0,
-          saveOnExit: world.saveOnExit || false,
-          autosaveInterval: world.autosaveInterval || -1.0,
-          autoSleep: world.autoSleep !== false,
-          showWorldSearch: false,
-          worldSearchTerm: '',
-          worldSearchLoading: false,
-          worldSearchError: '',
-          worldSearchResults: []
-        }));
+        sessions = configData.startWorlds.map((world: any, index: number) => {
+          const { prefix, suffix } = splitCustomSessionId(world.customSessionId);
+          
+          return {
+            id: index + 1,
+            isEnabled: world.isEnabled !== false,
+            sessionName: world.sessionName || '',
+            customSessionId: world.customSessionId || '',
+            customSessionIdPrefix: prefix,
+            customSessionIdSuffix: suffix,
+            description: world.description || '',
+            maxUsers: world.maxUsers ?? 16,
+            accessLevel: world.accessLevel || 'Anyone',
+            useCustomJoinVerifier: world.useCustomJoinVerifier || false,
+            hideFromPublicListing: world.hideFromPublicListing ?? null,
+            tags: arrayToString(world.tags),
+            mobileFriendly: world.mobileFriendly || false,
+            loadWorldURL: world.loadWorldURL || '',
+            loadWorldPresetName: world.loadWorldPresetName || 'Grid',
+            overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
+            forcePort: world.forcePort ?? null,
+            keepOriginalRoles: world.keepOriginalRoles || false,
+            defaultUserRoles: objectToJsonString(world.defaultUserRoles),
+            roleCloudVariable: world.roleCloudVariable || '',
+            allowUserCloudVariable: world.allowUserCloudVariable || '',
+            denyUserCloudVariable: world.denyUserCloudVariable || '',
+            requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
+            requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
+            awayKickMinutes: world.awayKickMinutes ?? 30,
+            parentSessionIds: arrayToString(world.parentSessionIds),
+            autoInviteUsernames: arrayToString(world.autoInviteUsernames),
+            autoInviteMessage: world.autoInviteMessage || '',
+            saveAsOwner: world.saveAsOwner || '',
+            autoRecover: world.autoRecover !== false,
+            idleRestartInterval: world.idleRestartInterval ?? 1800,
+            forcedRestartInterval: world.forcedRestartInterval ?? -1.0,
+            saveOnExit: world.saveOnExit || false,
+            autosaveInterval: world.autosaveInterval ?? -1.0,
+            autoSleep: world.autoSleep !== false,
+            showWorldSearch: false,
+            worldSearchTerm: '',
+            worldSearchLoading: false,
+            worldSearchError: '',
+            worldSearchResults: []
+          };
+        });
         
         activeSessionTab = 1;
         nextSessionId = sessions.length + 1;
@@ -696,6 +735,71 @@
     }
   };
 
+  // ヘルパー関数: 配列⇔文字列の相互変換
+  const arrayToString = (value: any): string => {
+    if (Array.isArray(value)) {
+      return value.map(v => String(v).trim()).filter(Boolean).join(', ');
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    return '';
+  };
+
+  const stringToArray = (value: string): string[] | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed.split(',').map(v => v.trim()).filter(Boolean);
+  };
+
+  // ヘルパー関数: customSessionIdの分割と結合
+  const splitCustomSessionId = (customSessionId: string | null | undefined): { prefix: string; suffix: string } => {
+    if (!customSessionId || typeof customSessionId !== 'string') {
+      return { prefix: '', suffix: '' };
+    }
+    const parts = customSessionId.split(':');
+    if (parts.length >= 2) {
+      return {
+        prefix: parts[0],
+        suffix: parts.slice(1).join(':') // コロンが複数ある場合に対応
+      };
+    }
+    // コロンがない場合は全体をサフィックスとして扱う
+    return { prefix: '', suffix: customSessionId };
+  };
+
+  const joinCustomSessionId = (prefix: string, suffix: string): string | null => {
+    const trimmedPrefix = prefix.trim();
+    const trimmedSuffix = suffix.trim();
+    if (trimmedPrefix && trimmedSuffix) {
+      return `${trimmedPrefix}:${trimmedSuffix}`;
+    }
+    return null;
+  };
+
+  // ヘルパー関数: defaultUserRolesの型変換
+  const objectToJsonString = (value: any): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  };
+
+  const jsonStringToObject = (value: string): any => {
+    if (!value || !value.trim()) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
+
   // プレビュー編集機能
   const startPreviewEdit = () => {
     isPreviewEditing = true;
@@ -717,13 +821,52 @@
       // JSON構文チェック
       const parsed = JSON.parse(editedPreviewText);
       
-      // 必須フィールドの検証（実際のプロパティ名を使用）
+      // 必須フィールドの検証
       const username = parsed.loginCredential;
       const password = parsed.loginPassword;
       
       if (!username || !password) {
-        previewEditError = 'ユーザー名とパスワードは必須です';
+        previewEditError = 'エラー: loginCredentialとloginPasswordは必須です';
         return;
+      }
+
+      // データ型の検証
+      if (parsed.tickRate !== undefined && (typeof parsed.tickRate !== 'number' || parsed.tickRate <= 0)) {
+        previewEditError = 'エラー: tickRateは正の数値である必要があります';
+        return;
+      }
+
+      if (parsed.maxConcurrentAssetTransfers !== undefined && (typeof parsed.maxConcurrentAssetTransfers !== 'number' || parsed.maxConcurrentAssetTransfers <= 0)) {
+        previewEditError = 'エラー: maxConcurrentAssetTransfersは正の数値である必要があります';
+        return;
+      }
+
+      // startWorldsの検証
+      if (parsed.startWorlds !== undefined && !Array.isArray(parsed.startWorlds)) {
+        previewEditError = 'エラー: startWorldsは配列である必要があります';
+        return;
+      }
+
+      if (parsed.startWorlds && parsed.startWorlds.length === 0) {
+        previewEditError = 'エラー: 最低1つのセッション設定が必要です';
+        return;
+      }
+
+      // セッション設定の検証
+      if (parsed.startWorlds) {
+        for (let i = 0; i < parsed.startWorlds.length; i++) {
+          const world = parsed.startWorlds[i];
+          
+          if (world.maxUsers !== undefined && (typeof world.maxUsers !== 'number' || world.maxUsers < 0)) {
+            previewEditError = `エラー: セッション${i + 1}のmaxUsersは0以上の数値である必要があります`;
+            return;
+          }
+
+          if (world.defaultUserRoles !== undefined && world.defaultUserRoles !== null && typeof world.defaultUserRoles !== 'object') {
+            previewEditError = `エラー: セッション${i + 1}のdefaultUserRolesはオブジェクトまたはnullである必要があります`;
+            return;
+          }
+        }
       }
 
       // 編集内容を各フィールドに反映
@@ -736,66 +879,91 @@
       pushToast('プレビューの編集を保存しました', 'success');
       
     } catch (error) {
-      previewEditError = 'JSONの構文が正しくありません';
+      if (error instanceof SyntaxError) {
+        previewEditError = `JSONの構文エラー: ${error.message}`;
+      } else {
+        previewEditError = `エラー: ${error instanceof Error ? error.message : '不明なエラーが発生しました'}`;
+      }
     }
   };
 
   const applyPreviewEditToFields = (parsed: any) => {
     // 基本設定の反映
-    if (parsed.comment) configName = parsed.comment.replace('の設定ファイル', '');
+    if (parsed.comment) {
+      configName = parsed.comment.replace('の設定ファイル', '');
+      configComment = parsed.comment;
+    }
     
-    // usernameとpasswordの取得（実際のプロパティ名を使用）
-    const username = parsed.loginCredential;
-    const password = parsed.loginPassword;
+    // ログイン情報の取得
+    if (parsed.loginCredential) configUsername = parsed.loginCredential;
+    if (parsed.loginPassword) configPassword = parsed.loginPassword;
     
-    if (username) configUsername = username;
-    if (password) configPassword = password;
-    if (parsed.comment) configComment = parsed.comment;
+    // 詳細設定の反映
+    if (parsed.universeId !== undefined) configUniverseId = parsed.universeId || '';
     if (parsed.tickRate !== undefined) configTickRate = parsed.tickRate;
+    if (parsed.maxConcurrentAssetTransfers !== undefined) configMaxConcurrentAssetTransfers = parsed.maxConcurrentAssetTransfers;
+    if (parsed.usernameOverride !== undefined) configUsernameOverride = parsed.usernameOverride || '';
+    if (parsed.dataFolder !== undefined) configDataFolder = parsed.dataFolder || '';
+    if (parsed.cacheFolder !== undefined) configCacheFolder = parsed.cacheFolder || '';
+    if (parsed.logsFolder !== undefined) configLogsFolder = parsed.logsFolder || '';
+    
+    // 配列フィールドの変換
+    if (parsed.allowedUrlHosts !== undefined) {
+      configAllowedUrlHosts = arrayToString(parsed.allowedUrlHosts);
+    }
+    if (parsed.autoSpawnItems !== undefined) {
+      configAutoSpawnItems = arrayToString(parsed.autoSpawnItems);
+    }
     
     // セッション設定の反映
     if (parsed.startWorlds && Array.isArray(parsed.startWorlds)) {
-      sessions = parsed.startWorlds.map((world: any, index: number) => ({
-        id: index + 1,
-        isEnabled: world.isEnabled !== false,
-        sessionName: world.sessionName || '',
-        customSessionId: world.customSessionId || '',
-        customSessionIdSuffix: world.customSessionIdSuffix || '',
-        description: world.description || '',
-        maxUsers: world.maxUsers || 16,
-        accessLevel: world.accessLevel || 'Anyone',
-        useCustomJoinVerifier: world.useCustomJoinVerifier || false,
-        hideFromPublicListing: world.hideFromPublicListing,
-        tags: world.tags || '',
-        mobileFriendly: world.mobileFriendly || false,
-        loadWorldURL: world.loadWorldURL || '',
-        loadWorldPresetName: world.loadWorldPresetName || 'Grid',
-        overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
-        forcePort: world.forcePort,
-        keepOriginalRoles: world.keepOriginalRoles || false,
-        defaultUserRoles: world.defaultUserRoles || '',
-        roleCloudVariable: world.roleCloudVariable || '',
-        allowUserCloudVariable: world.allowUserCloudVariable || '',
-        denyUserCloudVariable: world.denyUserCloudVariable || '',
-        requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
-        requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
-        awayKickMinutes: world.awayKickMinutes || -1.0,
-        parentSessionIds: world.parentSessionIds || '',
-        autoInviteUsernames: world.autoInviteUsernames || '',
-        autoInviteMessage: world.autoInviteMessage || '',
-        saveAsOwner: world.saveAsOwner || '',
-        autoRecover: world.autoRecover !== false,
-        idleRestartInterval: world.idleRestartInterval || 1800,
-        forcedRestartInterval: world.forcedRestartInterval || -1.0,
-        saveOnExit: world.saveOnExit || false,
-        autosaveInterval: world.autosaveInterval || -1.0,
-        autoSleep: world.autoSleep !== false,
-        showWorldSearch: false,
-        worldSearchTerm: '',
-        worldSearchLoading: false,
-        worldSearchError: '',
-        worldSearchResults: []
-      }));
+      sessions = parsed.startWorlds.map((world: any, index: number) => {
+        // customSessionIdの分割処理
+        const { prefix, suffix } = splitCustomSessionId(world.customSessionId);
+        
+        return {
+          id: index + 1,
+          isEnabled: world.isEnabled !== false,
+          sessionName: world.sessionName || '',
+          customSessionId: world.customSessionId || '',
+          customSessionIdPrefix: prefix,
+          customSessionIdSuffix: suffix,
+          description: world.description || '',
+          maxUsers: world.maxUsers ?? 16,
+          accessLevel: world.accessLevel || 'Anyone',
+          useCustomJoinVerifier: world.useCustomJoinVerifier || false,
+          hideFromPublicListing: world.hideFromPublicListing ?? null,
+          tags: arrayToString(world.tags),
+          mobileFriendly: world.mobileFriendly || false,
+          loadWorldURL: world.loadWorldURL || '',
+          loadWorldPresetName: world.loadWorldPresetName || 'Grid',
+          overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
+          forcePort: world.forcePort ?? null,
+          keepOriginalRoles: world.keepOriginalRoles || false,
+          defaultUserRoles: objectToJsonString(world.defaultUserRoles),
+          roleCloudVariable: world.roleCloudVariable || '',
+          allowUserCloudVariable: world.allowUserCloudVariable || '',
+          denyUserCloudVariable: world.denyUserCloudVariable || '',
+          requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
+          requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
+          awayKickMinutes: world.awayKickMinutes ?? 30,
+          parentSessionIds: arrayToString(world.parentSessionIds),
+          autoInviteUsernames: arrayToString(world.autoInviteUsernames),
+          autoInviteMessage: world.autoInviteMessage || '',
+          saveAsOwner: world.saveAsOwner || '',
+          autoRecover: world.autoRecover !== false,
+          idleRestartInterval: world.idleRestartInterval ?? 1800,
+          forcedRestartInterval: world.forcedRestartInterval ?? -1.0,
+          saveOnExit: world.saveOnExit || false,
+          autosaveInterval: world.autosaveInterval ?? -1.0,
+          autoSleep: world.autoSleep !== false,
+          showWorldSearch: false,
+          worldSearchTerm: '',
+          worldSearchLoading: false,
+          worldSearchError: '',
+          worldSearchResults: []
+        };
+      });
       activeSessionTab = 1;
       nextSessionId = sessions.length + 1;
     }
@@ -1080,21 +1248,31 @@
       const trimmedUsername = configUsername.trim();
       const trimmedPassword = configPassword.trim();
       
-      // 仕様: ユーザー名/パスワードは空でOK。name のみ必須。
+      // バリデーション: 設定名、ユーザー名、パスワードは必須
       if (!trimmedName) {
         pushToast('設定名を入力してください', 'error');
         return;
       }
+      
+      if (!trimmedUsername) {
+        pushToast('ユーザー名を入力してください', 'error');
+        return;
+      }
+      
+      if (!trimmedPassword) {
+        pushToast('パスワードを入力してください', 'error');
+        return;
+      }
 
-      // セッションデータを処理
+      // セッションデータを処理（ヘルパー関数を使用）
       const processedSessions = sessions.map(session => {
         const processedSession: any = {
-          isEnabled: true,
+          isEnabled: session.isEnabled,
           maxUsers: session.maxUsers,
           accessLevel: session.accessLevel,
-          useCustomJoinVerifier: false,
-          mobileFriendly: false,
-          keepOriginalRoles: false,
+          useCustomJoinVerifier: session.useCustomJoinVerifier,
+          mobileFriendly: session.mobileFriendly,
+          keepOriginalRoles: session.keepOriginalRoles,
           awayKickMinutes: session.awayKickMinutes,
           autoRecover: session.autoRecover,
           idleRestartInterval: session.idleRestartInterval,
@@ -1104,49 +1282,57 @@
           autoSleep: session.autoSleep
         };
 
-        // 文字列フィールド: 空は null、カンマ区切りは配列、JSONはパース。default.json と整合
-        processedSession.sessionName = session.sessionName.trim() ? session.sessionName.trim() : null;
-        processedSession.customSessionId = session.customSessionId.trim() ? session.customSessionId.trim() : null;
-        processedSession.description = session.description.trim() ? session.description.trim() : null;
-        processedSession.tags = session.tags.trim() ? session.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null;
-        processedSession.loadWorldURL = session.loadWorldURL.trim() ? session.loadWorldURL.trim() : null;
-        processedSession.loadWorldPresetName = session.loadWorldPresetName.trim() ? session.loadWorldPresetName.trim() : 'Grid';
-        processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() ? session.overrideCorrespondingWorldId.trim() : null;
-        if (session.forcePort !== null && session.forcePort !== '') processedSession.forcePort = Number(session.forcePort);
-        else processedSession.forcePort = null;
-        if (session.defaultUserRoles.trim()) {
-          try {
-            processedSession.defaultUserRoles = JSON.parse(session.defaultUserRoles);
-          } catch {
-            processedSession.defaultUserRoles = null;
-          }
-        } else {
-          processedSession.defaultUserRoles = null;
+        // 文字列フィールド: 空は null
+        processedSession.sessionName = session.sessionName.trim() || null;
+        
+        // customSessionId: ヘルパー関数を使用して結合
+        processedSession.customSessionId = joinCustomSessionId(
+          (session as any).customSessionIdPrefix, 
+          (session as any).customSessionIdSuffix
+        );
+        
+        processedSession.description = session.description.trim() || null;
+        processedSession.tags = stringToArray(session.tags);
+        processedSession.loadWorldURL = session.loadWorldURL.trim() || null;
+        processedSession.loadWorldPresetName = session.loadWorldPresetName.trim() || 'Grid';
+        processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() || null;
+        processedSession.forcePort = (session.forcePort !== null && session.forcePort !== '') ? Number(session.forcePort) : null;
+        
+        // defaultUserRoles: ヘルパー関数を使用
+        processedSession.defaultUserRoles = jsonStringToObject(session.defaultUserRoles);
+        
+        processedSession.roleCloudVariable = session.roleCloudVariable.trim() || null;
+        processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim() || null;
+        processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim() || null;
+        processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim() || null;
+        processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim() || null;
+        
+        // 配列フィールド: ヘルパー関数を使用
+        processedSession.parentSessionIds = stringToArray(session.parentSessionIds);
+        processedSession.autoInviteUsernames = stringToArray(session.autoInviteUsernames);
+        
+        processedSession.autoInviteMessage = session.autoInviteMessage.trim() || null;
+        processedSession.saveAsOwner = session.saveAsOwner.trim() || null;
+        
+        // hideFromPublicListing: 値がnull以外の場合のみ含める
+        if (session.hideFromPublicListing !== null && session.hideFromPublicListing !== undefined) {
+          processedSession.hideFromPublicListing = session.hideFromPublicListing;
         }
-        processedSession.roleCloudVariable = session.roleCloudVariable.trim() ? session.roleCloudVariable.trim() : null;
-        processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim() ? session.allowUserCloudVariable.trim() : null;
-        processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim() ? session.denyUserCloudVariable.trim() : null;
-        processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim() ? session.requiredUserJoinCloudVariable.trim() : null;
-        processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim() ? session.requiredUserJoinCloudVariableDenyMessage.trim() : null;
-        processedSession.parentSessionIds = session.parentSessionIds.trim() ? session.parentSessionIds.split(',').map((s: string) => s.trim()).filter(Boolean) : null;
-        processedSession.autoInviteUsernames = session.autoInviteUsernames.trim() ? session.autoInviteUsernames.split(',').map((s: string) => s.trim()).filter(Boolean) : null;
-        processedSession.autoInviteMessage = session.autoInviteMessage.trim() ? session.autoInviteMessage.trim() : null;
-        processedSession.saveAsOwner = session.saveAsOwner.trim() ? session.saveAsOwner.trim() : null;
 
         return processedSession;
       });
 
       const configData = {
         comment: configComment.trim() || `${trimmedName}の設定ファイル`,
-        universeId: null,
+        universeId: configUniverseId.trim() || null,
         tickRate: configTickRate,
         maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
-        usernameOverride: configUsernameOverride.trim() ? configUsernameOverride.trim() : null,
-        dataFolder: configDataFolder.trim() ? configDataFolder.trim() : null,
-        cacheFolder: configCacheFolder.trim() ? configCacheFolder.trim() : null,
-        logsFolder: configLogsFolder.trim() ? configLogsFolder.trim() : null,
-        allowedUrlHosts: configAllowedUrlHosts.trim() ? configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean) : null,
-        autoSpawnItems: configAutoSpawnItems.trim() ? configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean) : null,
+        usernameOverride: configUsernameOverride.trim() || null,
+        dataFolder: configDataFolder.trim() || null,
+        cacheFolder: configCacheFolder.trim() || null,
+        logsFolder: configLogsFolder.trim() || null,
+        allowedUrlHosts: stringToArray(configAllowedUrlHosts),
+        autoSpawnItems: stringToArray(configAutoSpawnItems),
         startWorlds: processedSessions
       };
 
@@ -1230,19 +1416,6 @@
     }
   };
 
-  // username変更時のuserid自動取得（デバウンス機能付き）
-  $: {
-    if (configUsername.trim()) {
-      debouncedFetchUserid(configUsername);
-    } else {
-      // ユーザー名が空の場合はタイマーをクリア
-      if (useridDebounceTimer) {
-        clearTimeout(useridDebounceTimer);
-        useridDebounceTimer = null;
-      }
-      useridError = '';
-    }
-  }
 
   // プレビューをリアクティブに更新
   $: {
@@ -1250,10 +1423,6 @@
       const trimmedName = configName.trim() || 'Config';
       const trimmedUsername = configUsername.trim();
       const trimmedPassword = configPassword.trim();
-      
-      if (!trimmedUsername || !trimmedPassword) {
-        configPreviewText = 'ユーザー名とパスワードを入力してください。';
-      } else {
 
       const processedSessions = sessions.map(session => {
         const processedSession: any = {
@@ -1271,58 +1440,71 @@
           autosaveInterval: session.autosaveInterval,
           autoSleep: session.autoSleep
         };
-        if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
-        // customSessionId: プレフィックスとサフィックスの両方が必要
-        const prefix = (session as any).customSessionIdPrefix?.trim?.() ?? '';
-        const suffix = (session as any).customSessionIdSuffix?.trim?.() ?? '';
         
-        if (prefix && suffix) {
-          processedSession.customSessionId = `${prefix}:${suffix}`;
-        } else {
-          processedSession.customSessionId = null;
-        }
+        // 文字列フィールド（空ならnull）
+        if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
+        
+        // customSessionId: ヘルパー関数を使用
+        const customId = joinCustomSessionId((session as any).customSessionIdPrefix, (session as any).customSessionIdSuffix);
+        if (customId) processedSession.customSessionId = customId;
+        
         if (session.description.trim()) processedSession.description = session.description.trim();
-        if (session.tags.trim()) processedSession.tags = session.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+        
+        // 配列フィールド: ヘルパー関数を使用
+        const tagsArray = stringToArray(session.tags);
+        if (tagsArray) processedSession.tags = tagsArray;
+        
         if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
         if (session.loadWorldPresetName.trim()) processedSession.loadWorldPresetName = session.loadWorldPresetName.trim();
         if (session.overrideCorrespondingWorldId.trim()) processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim();
         if (session.forcePort !== null && session.forcePort !== '') processedSession.forcePort = Number(session.forcePort);
-        if (session.defaultUserRoles.trim()) {
-          try {
-            processedSession.defaultUserRoles = JSON.parse(session.defaultUserRoles);
-          } catch {}
-        }
+        
+        // defaultUserRoles: ヘルパー関数を使用
+        const rolesObject = jsonStringToObject(session.defaultUserRoles);
+        if (rolesObject) processedSession.defaultUserRoles = rolesObject;
+        
         if (session.roleCloudVariable.trim()) processedSession.roleCloudVariable = session.roleCloudVariable.trim();
         if (session.allowUserCloudVariable.trim()) processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim();
         if (session.denyUserCloudVariable.trim()) processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim();
         if (session.requiredUserJoinCloudVariable.trim()) processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim();
         if (session.requiredUserJoinCloudVariableDenyMessage.trim()) processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim();
-        if (session.parentSessionIds.trim()) processedSession.parentSessionIds = session.parentSessionIds.split(',').map((s: string) => s.trim()).filter(Boolean);
-        if (session.autoInviteUsernames.trim()) processedSession.autoInviteUsernames = session.autoInviteUsernames.split(',').map((s: string) => s.trim()).filter(Boolean);
+        
+        // 配列フィールド: ヘルパー関数を使用
+        const parentSessions = stringToArray(session.parentSessionIds);
+        if (parentSessions) processedSession.parentSessionIds = parentSessions;
+        
+        const inviteUsernames = stringToArray(session.autoInviteUsernames);
+        if (inviteUsernames) processedSession.autoInviteUsernames = inviteUsernames;
+        
         if (session.autoInviteMessage.trim()) processedSession.autoInviteMessage = session.autoInviteMessage.trim();
         if (session.saveAsOwner.trim()) processedSession.saveAsOwner = session.saveAsOwner.trim();
+        
+        // hideFromPublicListing: 値がnull以外の場合のみ含める
+        if (session.hideFromPublicListing !== null && session.hideFromPublicListing !== undefined) {
+          processedSession.hideFromPublicListing = session.hideFromPublicListing;
+        }
+        
         return processedSession;
       });
 
       const configObject = {
         $schema: 'https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json',
         comment: configComment.trim() || `${trimmedName}の設定ファイル`,
-        universeId: null,
+        universeId: configUniverseId.trim() || null,
         tickRate: configTickRate,
         maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
-        usernameOverride: configUsernameOverride.trim() ? configUsernameOverride.trim() : null,
-        loginCredential: trimmedUsername,
-        loginPassword: trimmedPassword,
+        usernameOverride: configUsernameOverride.trim() || null,
+        loginCredential: trimmedUsername || null,
+        loginPassword: trimmedPassword || null,
         startWorlds: processedSessions,
         dataFolder: configDataFolder.trim() || null,
         cacheFolder: configCacheFolder.trim() || null,
         logsFolder: configLogsFolder.trim() || null,
-        allowedUrlHosts: configAllowedUrlHosts.trim() ? configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean) : null,
-        autoSpawnItems: configAutoSpawnItems.trim() ? configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean) : null
+        allowedUrlHosts: stringToArray(configAllowedUrlHosts),
+        autoSpawnItems: stringToArray(configAutoSpawnItems)
       };
 
-        configPreviewText = JSON.stringify(configObject, null, 2);
-      }
+      configPreviewText = JSON.stringify(configObject, null, 2);
     }
   };
 
@@ -1411,11 +1593,6 @@
     // クリーンアップ関数
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // デバウンスタイマーをクリア
-      if (useridDebounceTimer) {
-        clearTimeout(useridDebounceTimer);
-        useridDebounceTimer = null;
-      }
     };
   });
 
@@ -2046,6 +2223,14 @@
       console.error('Failed to focus selected world before command:', error);
     }
   };
+
+  // プレビュー編集モードになったときにtextareaの高さを自動調整
+  afterUpdate(() => {
+    if (isPreviewEditing && previewTextarea) {
+      previewTextarea.style.height = 'auto';
+      previewTextarea.style.height = previewTextarea.scrollHeight + 'px';
+    }
+  });
 </script>
 
 <svelte:head>
@@ -2956,6 +3141,16 @@
                           <div class="field-row">
                             <div class="field-row" style="gap:0.4rem; align-items:center;">
                               <input type="text" bind:value={session.customSessionIdPrefix} placeholder="U-userID" class="prefix" />
+                              <button 
+                                type="button" 
+                                class="status-action-button" 
+                                style="padding: 0.35rem 0.75rem; font-size: 0.85rem;"
+                                on:click={autoFillUserid}
+                                disabled={useridLoading}
+                                title="ユーザー名からUserIDを自動取得"
+                              >
+                                {useridLoading ? '取得中...' : '自動入力'}
+                              </button>
                               <span class="separator">:</span>
                               <input type="text" bind:value={session.customSessionIdSuffix} placeholder="空欄で無効" />
                             </div>
@@ -2963,9 +3158,6 @@
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
                           </div>
-                          {#if useridError}
-                            <div class="userid-error">{useridError}</div>
-                          {/if}
                         </label>
 
                         <label>
@@ -3006,6 +3198,25 @@
                             </button>
                           </div>
                         </label>
+
+                        <div class="toggle-row">
+                          <span>公開リストから非表示 <small class="note">セッションリストに表示しない</small></span>
+                          <button
+                            type="button"
+                            class={session.hideFromPublicListing ? 'status-action-button active' : 'status-action-button'}
+                            aria-pressed={session.hideFromPublicListing}
+                            on:click={() => {
+                              if (session.hideFromPublicListing === null || session.hideFromPublicListing === false) {
+                                session.hideFromPublicListing = true;
+                              } else {
+                                session.hideFromPublicListing = null;
+                              }
+                              sessions = [...sessions];
+                            }}
+                          >
+                            {session.hideFromPublicListing ? 'オン' : 'オフ'}
+                          </button>
+                        </div>
 
                         <label>
                           <span>ワールド <small class="note">レコードURLを入力</small></span>
@@ -3244,7 +3455,18 @@
                 <textarea 
                   class="config-preview-edit" 
                   bind:value={editedPreviewText}
+                  bind:this={previewTextarea}
                   placeholder="JSONを編集してください..."
+                  on:input={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = target.scrollHeight + 'px';
+                  }}
+                  on:focus={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = target.scrollHeight + 'px';
+                  }}
                 ></textarea>
                 {#if previewEditError}
                   <div class="preview-error">{previewEditError}</div>
@@ -4410,8 +4632,6 @@
     color: #e1e1e0;
     white-space: pre-wrap;
     word-wrap: break-word;
-    max-height: 400px;
-    overflow-y: auto;
   }
 
   .preview-controls {
@@ -4474,9 +4694,9 @@
     color: #e1e1e0;
     width: 100%;
     min-height: 300px;
-    max-height: 400px;
-    resize: vertical;
+    resize: none;
     outline: none;
+    overflow-y: hidden;
   }
 
   .config-preview-edit:focus {
@@ -4515,16 +4735,6 @@
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
-  }
-
-  .userid-error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    padding: 0.5rem;
-    border-radius: 0.375rem;
-    margin-top: 0.25rem;
-    font-size: 0.75rem;
   }
 
   .action-buttons button {
