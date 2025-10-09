@@ -25,6 +25,7 @@
     getSecurityConfig,
     getClientInfo,
     getResoniteUserFull,
+    searchResoniteUsers,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -37,6 +38,26 @@
   } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
+
+  // Resonite画像URLを変換する関数
+  const convertResoniteImageUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    
+    // resdb:// プロトコルをHTTPSに変換
+    if (url.startsWith('resdb:///')) {
+      // resdb:///を除去してIDを取得
+      const id = url.replace('resdb:///', '');
+      // Resoniteのアセットサーバーに変換
+      return `https://assets.resonite.com/${id}`;
+    }
+    
+    // 既にHTTPまたはHTTPSの場合はそのまま返す
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    
+    return null;
+  };
 
   const tabs = [
     { id: 'dashboard', label: 'ダッシュボード' },
@@ -2106,14 +2127,26 @@
     friendSearchUsernameLoading = true;
 
     try {
-      const user = await getResoniteUserFull(username);
-      // 検索結果に追加（重複チェック）
-      const exists = friendSearchResults.some(u => u.id === user.id);
-      if (!exists) {
-        friendSearchResults = [...friendSearchResults, user];
-        pushToast('ユーザーを追加しました', 'success');
+      const response = await searchResoniteUsers(username);
+      
+      if (response.count === 0) {
+        pushToast('該当するユーザーが見つかりませんでした', 'info');
       } else {
-        pushToast('このユーザーは既にリストに追加されています', 'info');
+        // 既存のリストに追加（重複チェック）
+        let addedCount = 0;
+        response.users.forEach(user => {
+          const exists = friendSearchResults.some(u => u.id === user.id);
+          if (!exists) {
+            friendSearchResults = [...friendSearchResults, user];
+            addedCount++;
+          }
+        });
+        
+        if (addedCount > 0) {
+          pushToast(`${addedCount}件のユーザーを追加しました`, 'success');
+        } else {
+          pushToast('すべてのユーザーが既にリストに追加されています', 'info');
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ユーザー情報の取得に失敗しました';
@@ -3232,8 +3265,8 @@
                             on:click={() => selectFriendUser(user)}
                           >
                             <div class="user-avatar">
-                              {#if user.profile.iconUrl}
-                                <img src={user.profile.iconUrl} alt={user.username || 'User'} />
+                              {#if convertResoniteImageUrl(user.profile.iconUrl)}
+                                <img src={convertResoniteImageUrl(user.profile.iconUrl)} alt={user.username || 'User'} />
                               {:else}
                                 <div class="avatar-placeholder">?</div>
                               {/if}
@@ -3263,8 +3296,8 @@
                       <div class="selected-user-display">
                         <div class="user-card selected" style="cursor: default;">
                           <div class="user-avatar">
-                            {#if selectedFriendUser.profile.iconUrl}
-                              <img src={selectedFriendUser.profile.iconUrl} alt={selectedFriendUser.username || 'User'} />
+                            {#if convertResoniteImageUrl(selectedFriendUser.profile.iconUrl)}
+                              <img src={convertResoniteImageUrl(selectedFriendUser.profile.iconUrl)} alt={selectedFriendUser.username || 'User'} />
                             {:else}
                               <div class="avatar-placeholder">?</div>
                             {/if}

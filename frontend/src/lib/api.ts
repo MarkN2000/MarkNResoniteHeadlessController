@@ -237,3 +237,11 @@ export interface ResoniteUserFull {
 
 export const getResoniteUserFull = (identifier: string) =>
   request(`/server/resonite-user-full/${encodeURIComponent(identifier)}`) as Promise<ResoniteUserFull>;
+
+export interface ResoniteUsersSearchResponse {
+  users: ResoniteUserFull[];
+  count: number;
+}
+
+export const searchResoniteUsers = (username: string) =>
+  request(`/server/resonite-users-search?name=${encodeURIComponent(username)}`) as Promise<ResoniteUsersSearchResponse>;

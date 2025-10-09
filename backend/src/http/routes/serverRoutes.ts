@@ -130,6 +130,62 @@ serverRoutes.get('/resonite-user-full/:identifier', normalRateLimit, async (req,
   }
 });
 
+// Resonite API経由で複数ユーザーを検索（認証不要）
+serverRoutes.get('/resonite-users-search', normalRateLimit, async (req, res, next) => {
+  try {
+    const username = req.query.name as string;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'name parameter is required' });
+    }
+
+    const response = await fetch(`https://api.resonite.com/users/?name=${encodeURIComponent(username)}`, {
+      headers: {
+        'User-Agent': 'MRHC/1.0',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Resonite API] エラー (${response.status}): ${errorText}`);
+      return res.status(response.status).json({ 
+        error: `API呼び出しに失敗しました: ${response.status}`,
+        details: errorText
+      });
+    }
+
+    const users = await response.json();
+    
+    if (!Array.isArray(users)) {
+      return res.status(500).json({ error: 'APIレスポンスの形式が不正です' });
+    }
+
+    // 複数ユーザーの情報を整形して返す
+    const formattedUsers = users.map(user => ({
+      id: user.id,
+      username: user.username || user.normalizedUsername || null,
+      profile: {
+        iconUrl: user.profile?.iconUrl || null,
+        displayBadges: user.profile?.displayBadges || [],
+        description: user.profile?.description || null,
+      },
+      registrationTime: user.registrationTime || null,
+      isPatreonSupporter: user.isPatreonSupporter || false,
+      tags: user.tags || []
+    }));
+
+    res.json({ users: formattedUsers, count: formattedUsers.length });
+  } catch (error) {
+    console.error('[Resonite API] 例外エラー:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ 
+      error: 'Resonite API呼び出し中にエラーが発生しました',
+      details: errorMessage
+    });
+  }
+});
+
 // コンフィグファイル一覧取得（認証不要）
 serverRoutes.get('/configs', normalRateLimit, (_req, res) => {
   const configs = processManager.listConfigs().map(filePath => ({
