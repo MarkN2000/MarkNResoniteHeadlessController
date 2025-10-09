@@ -2187,6 +2187,9 @@
     if (friendRequestsLoading) return;
     friendRequestsLoading = true;
     friendRequestsError = '';
+    
+    // フレンドリクエスト一覧を取得する際は検索結果をクリア
+    friendSearchResults = [];
 
     try {
       const requests = await getFriendRequests();
@@ -2207,13 +2210,8 @@
         const users = await Promise.all(promises);
         const validUsers = users.filter((u): u is ResoniteUserFull => u !== null);
 
-        // 既存のリストに追加（重複チェック）
-        validUsers.forEach(user => {
-          const exists = friendSearchResults.some(u => u.id === user.id);
-          if (!exists) {
-            friendSearchResults = [...friendSearchResults, user];
-          }
-        });
+        // 検索結果に設定
+        friendSearchResults = validUsers;
 
         pushToast(`${validUsers.length}件のフレンドリクエストを読み込みました`, 'success');
       } else {
