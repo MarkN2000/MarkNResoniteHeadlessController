@@ -6133,18 +6133,23 @@
   }
 
   .logout-button {
-    background: #dc3545;
-    color: #ffffff;
+    background: #61d1fa;
+    color: #000000;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+    min-width: 140px;
+    transition: transform 0.2s ease, filter 0.2s ease;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
+    border-radius: 0.85rem;
+    padding: 0 1.45rem;
+    min-height: 54px;
     cursor: pointer;
-    transition: background-color 0.2s;
   }
 
   .logout-button:hover {
-    background: #c82333;
+    transform: translateY(-1px);
+    filter: brightness(1.08);
   }
 
 </style>
