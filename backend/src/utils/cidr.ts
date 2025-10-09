@@ -56,16 +56,33 @@ export const isIpAllowed = (ip: string): boolean => {
   
   // ローカルホストは常に許可（開発環境対応）
   if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost') {
+    console.log(`[CIDR] Allowing localhost: ${ip}`);
     return true;
   }
   
-  // 開発環境のIPv6ローカルホスト
-  if (ip === '::1' || ip.startsWith('::ffff:127.0.0.1')) {
+  // IPv6ローカルホストのバリエーション
+  if (ip.startsWith('::ffff:127.0.0.1') || ip.includes('::1')) {
+    console.log(`[CIDR] Allowing IPv6 localhost: ${ip}`);
     return true;
   }
   
   // 許可されたCIDR範囲をチェック
-  return config.allowedCidrs.some(cidr => isIpInCidr(ip, cidr));
+  const allowed = config.allowedCidrs.some(cidr => {
+    try {
+      return isIpInCidr(ip, cidr);
+    } catch (error) {
+      console.error(`[CIDR] Error checking ${ip} against ${cidr}:`, error);
+      return false;
+    }
+  });
+  
+  if (allowed) {
+    console.log(`[CIDR] IP ${ip} allowed by CIDR rules`);
+  } else {
+    console.log(`[CIDR] IP ${ip} not allowed by CIDR rules`);
+  }
+  
+  return allowed;
 };
 
 /**

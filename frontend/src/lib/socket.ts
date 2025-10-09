@@ -1,8 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import type { HeadlessStatus, LogEntry } from './api';
 
-// 開発環境ではViteプロキシを使用、本番環境では環境変数から取得
-const SOCKET_BASE = import.meta.env.VITE_BACKEND_SOCKET_URL || '';
+// 開発環境では直接バックエンドに接続、本番環境では環境変数から取得
+const SOCKET_BASE = import.meta.env.VITE_BACKEND_SOCKET_URL || 'http://localhost:8080';
 
 export interface ServerSocketEvents {
   status: (status: HeadlessStatus) => void;
@@ -12,7 +12,7 @@ export interface ServerSocketEvents {
 
 export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
   const socket = io(`${SOCKET_BASE}/server`, {
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: 5,

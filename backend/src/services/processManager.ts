@@ -209,15 +209,15 @@ export class ProcessManager extends EventEmitter {
     const args = ['-HeadlessConfig', resolvedConfig];
     const child = spawn(HEADLESS_EXECUTABLE, args, { cwd: path.dirname(HEADLESS_EXECUTABLE) });
     this.child = child;
-    this.stopPromise = undefined;
+    this.stopPromise = undefined as any;
 
     this.status = {
       running: true,
-      pid: child.pid ?? undefined,
+      pid: child.pid as number | undefined,
       configPath: resolvedConfig,
       startedAt: new Date().toISOString(),
-      exitCode: undefined,
-      signal: undefined,
+      exitCode: undefined as any,
+      signal: undefined as any,
       userName: this.lastUserName,
       userId: this.lastUserId
     };
@@ -240,10 +240,10 @@ export class ProcessManager extends EventEmitter {
     });
 
     const handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
-      this.child = undefined;
+      this.child = undefined as any;
       this.status = {
         running: false,
-        pid: undefined,
+        pid: undefined as any,
         configPath: resolvedConfig,
         exitCode: code,
         signal,
@@ -251,7 +251,7 @@ export class ProcessManager extends EventEmitter {
         userId: this.lastUserId
       };
       this.emit('status', { ...this.status });
-      this.stopPromise = undefined;
+      this.stopPromise = undefined as any;
       
       // ランタイム状態を保存
       this.saveRuntimeState(resolvedConfig, 'stop');
@@ -347,7 +347,7 @@ export class ProcessManager extends EventEmitter {
         clearTimeout(killTimer);
         child.off('exit', handleExit);
         child.off('error', handleError);
-        this.stopPromise = undefined;
+        this.stopPromise = undefined as any;
       };
 
       const handleExit = () => {
@@ -416,7 +416,11 @@ export class ProcessManager extends EventEmitter {
   }
 
   private emitStatusUpdate(): void {
-    this.status = { ...this.status, userName: this.lastUserName, userId: this.lastUserId };
+    this.status = { 
+      ...this.status, 
+      userName: this.lastUserName as string | undefined, 
+      userId: this.lastUserId as string | undefined 
+    };
     this.emit('status', { ...this.status });
   }
 }

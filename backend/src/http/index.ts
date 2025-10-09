@@ -13,5 +13,6 @@ apiRouter.use('/mod', modRoutes);
 
 apiRouter.use((err: unknown, _req, res, _next) => {
   const message = err instanceof Error ? err.message : 'Unknown error';
+  console.error('[API ERROR]', err);
   res.status(500).json({ error: message });
 });

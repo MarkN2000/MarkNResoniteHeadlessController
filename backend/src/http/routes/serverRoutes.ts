@@ -267,9 +267,12 @@ serverRoutes.post('/configs/generate', async (req, res, next) => {
 serverRoutes.post('/start', (req, res, next) => {
   try {
     const { configPath } = req.body ?? {};
+    console.log('[serverRoutes] Starting server with config:', configPath);
     processManager.start(configPath);
+    console.log('[serverRoutes] Server started successfully');
     res.json({ ok: true });
   } catch (error) {
+    console.error('[serverRoutes] Failed to start server:', error);
     next(error);
   }
 });

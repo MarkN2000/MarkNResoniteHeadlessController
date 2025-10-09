@@ -28,10 +28,12 @@ const io = new SocketIOServer(httpServer, {
     origin: dynamicOriginCheck,
     credentials: true,
     methods: ['GET', 'POST']
-  }
+  },
+  transports: ['websocket', 'polling']
 });
 
-console.log('[Socket.IO] Server initialized');
+console.log('[Socket.IO] Server initialized with CORS');
+console.log('[Socket.IO] Allowed origins: localhost:5173, localhost:3000, 127.0.0.1:5173, 127.0.0.1:3000');
 
 registerSocketHandlers(io);
 

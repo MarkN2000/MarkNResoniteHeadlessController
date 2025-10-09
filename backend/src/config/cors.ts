@@ -81,17 +81,22 @@ export const getCorsConfig = (): CorsConfig => {
 };
 
 /**
- * 動的オリジンチェック（本番環境用）
+ * 動的オリジンチェック（Socket.IO用）
  */
-export const dynamicOriginCheck = (origin: string | undefined): boolean => {
+export const dynamicOriginCheck = (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
   const isDevelopment = process.env.NODE_ENV === 'development' || 
                        process.env.NODE_ENV !== 'production';
   
   if (isDevelopment) {
     // 開発環境: localhost系を許可
-    return !origin || 
-           origin.startsWith('http://localhost:') || 
-           origin.startsWith('http://127.0.0.1:');
+    if (!origin || 
+        origin.startsWith('http://localhost:') || 
+        origin.startsWith('http://127.0.0.1:')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'), false);
+    }
+    return;
   }
   
   // 本番環境: 許可されたドメインのみ
@@ -100,5 +105,9 @@ export const dynamicOriginCheck = (origin: string | undefined): boolean => {
     'https://www.yourdomain.com'
   ];
   
-  return !origin || allowedOrigins.includes(origin);
+  if (!origin || allowedOrigins.includes(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error('Not allowed by CORS'), false);
+  }
 };
