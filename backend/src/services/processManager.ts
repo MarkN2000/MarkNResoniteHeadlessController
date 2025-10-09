@@ -3,7 +3,7 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE } from '../config/index.js';
+import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE, RUNTIME_STATE_PATH } from '../config/index.js';
 import { LogBuffer } from './logBuffer.js';
 import type { LogEntry } from './logBuffer.js';
 import iconv from 'iconv-lite';
@@ -17,6 +17,12 @@ export interface HeadlessStatus {
   signal?: NodeJS.Signals | null;
   userName?: string;
   userId?: string;
+}
+
+interface RuntimeState {
+  lastStartedConfigPath: string | null;
+  lastStartedAt: string | null;
+  lastStoppedAt: string | null;
 }
 
 export interface ExecuteCommandOptions {
@@ -34,6 +40,76 @@ export class ProcessManager extends EventEmitter {
 
   constructor() {
     super();
+    // 起動時にランタイム状態を読み込む
+    this.loadRuntimeState();
+  }
+
+  /**
+   * ランタイム状態をファイルから読み込む
+   */
+  private loadRuntimeState(): void {
+    try {
+      if (fs.existsSync(RUNTIME_STATE_PATH)) {
+        const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
+        const state: RuntimeState = JSON.parse(content);
+        
+        // 最後に起動したコンフィグパスをステータスに反映
+        if (state.lastStartedConfigPath) {
+          this.status.configPath = state.lastStartedConfigPath;
+        }
+      }
+    } catch (error) {
+      console.error('[ProcessManager] Failed to load runtime state:', error);
+    }
+  }
+
+  /**
+   * ランタイム状態をファイルに保存する
+   */
+  private saveRuntimeState(configPath: string | null, event: 'start' | 'stop'): void {
+    try {
+      const state: RuntimeState = {
+        lastStartedConfigPath: configPath,
+        lastStartedAt: event === 'start' ? new Date().toISOString() : null,
+        lastStoppedAt: event === 'stop' ? new Date().toISOString() : null
+      };
+
+      // 既存の状態を読み込んで更新
+      if (fs.existsSync(RUNTIME_STATE_PATH)) {
+        const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
+        const existingState: RuntimeState = JSON.parse(content);
+        
+        if (event === 'start') {
+          state.lastStartedConfigPath = configPath;
+          state.lastStartedAt = new Date().toISOString();
+          state.lastStoppedAt = existingState.lastStoppedAt;
+        } else {
+          state.lastStartedConfigPath = existingState.lastStartedConfigPath;
+          state.lastStartedAt = existingState.lastStartedAt;
+          state.lastStoppedAt = new Date().toISOString();
+        }
+      }
+
+      fs.writeFileSync(RUNTIME_STATE_PATH, JSON.stringify(state, null, 2), 'utf-8');
+    } catch (error) {
+      console.error('[ProcessManager] Failed to save runtime state:', error);
+    }
+  }
+
+  /**
+   * 最後に起動したコンフィグファイルのパスを取得
+   */
+  getLastStartedConfigPath(): string | null {
+    try {
+      if (fs.existsSync(RUNTIME_STATE_PATH)) {
+        const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
+        const state: RuntimeState = JSON.parse(content);
+        return state.lastStartedConfigPath;
+      }
+    } catch (error) {
+      console.error('[ProcessManager] Failed to get last started config path:', error);
+    }
+    return null;
   }
 
   getStatus(): HeadlessStatus {
@@ -147,6 +223,9 @@ export class ProcessManager extends EventEmitter {
     };
     this.emit('status', { ...this.status });
 
+    // ランタイム状態を保存
+    this.saveRuntimeState(resolvedConfig, 'start');
+
     child.stdout.on('data', data => {
       const message = this.decodeBuffer(data as Buffer);
       this.updateAccountFromLog(message);
@@ -173,6 +252,9 @@ export class ProcessManager extends EventEmitter {
       };
       this.emit('status', { ...this.status });
       this.stopPromise = undefined;
+      
+      // ランタイム状態を保存
+      this.saveRuntimeState(resolvedConfig, 'stop');
     };
 
     child.on('close', handleExit);

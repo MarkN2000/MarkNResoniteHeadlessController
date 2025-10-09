@@ -231,6 +231,11 @@ serverRoutes.get('/status', (_req, res) => {
   res.json(processManager.getStatus());
 });
 
+serverRoutes.get('/last-config', (_req, res) => {
+  const lastConfigPath = processManager.getLastStartedConfigPath();
+  res.json({ lastStartedConfigPath: lastConfigPath });
+});
+
 serverRoutes.get('/logs', (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : undefined;
   res.json(processManager.getLogs(limit));
