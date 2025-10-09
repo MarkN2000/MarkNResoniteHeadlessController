@@ -1432,7 +1432,10 @@
       const trimmedUsername = configUsername.trim();
       const trimmedPassword = configPassword.trim();
 
-      const processedSessions = sessions.map(session => {
+      // sessionsを確実に配列として扱う
+      const sessionsList = [...sessions];
+      
+      const processedSessions = Array.from(sessionsList.map(session => {
         const processedSession: any = {
           isEnabled: session.isEnabled,
           maxUsers: session.maxUsers,
@@ -1487,7 +1490,7 @@
         }
         
         return processedSession;
-      });
+      }));
 
       const configObject = {
         "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
@@ -1498,7 +1501,7 @@
         "usernameOverride": configUsernameOverride.trim() || null,
         "loginCredential": trimmedUsername || null,
         "loginPassword": trimmedPassword || null,
-        "startWorlds": processedSessions,
+        "startWorlds": JSON.parse(JSON.stringify(processedSessions)),
         "dataFolder": configDataFolder.trim() || null,
         "cacheFolder": configCacheFolder.trim() || null,
         "logsFolder": configLogsFolder.trim() || null,
