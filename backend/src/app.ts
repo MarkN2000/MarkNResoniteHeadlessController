@@ -31,8 +31,11 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
+console.log('[Socket.IO] Server initialized');
+
 registerSocketHandlers(io);
 
 httpServer.listen(SERVER_PORT, () => {
   console.log(`Backend listening on port ${SERVER_PORT}`);
+  console.log(`WebSocket server available at ws://localhost:${SERVER_PORT}`);
 });

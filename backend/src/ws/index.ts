@@ -8,8 +8,10 @@ export const registerSocketHandlers = (io: Server): void => {
   namespace.on('connection', socket => {
     // WebSocket接続のCIDRチェック
     const clientIp = getClientIp(socket.request);
+    console.log(`[WebSocket] Connection attempt from ${clientIp}`);
     
     if (!isIpAllowed(clientIp)) {
+      console.error(`[WebSocket] Access denied for ${clientIp}`);
       logSecurityEvent('WEBSOCKET_ACCESS_DENIED', clientIp, {
         userAgent: socket.request.headers['user-agent']
       });
@@ -17,6 +19,7 @@ export const registerSocketHandlers = (io: Server): void => {
       return;
     }
     
+    console.log(`[WebSocket] Access allowed for ${clientIp}`);
     logSecurityEvent('WEBSOCKET_ACCESS_ALLOWED', clientIp);
     
     socket.emit('status', processManager.getStatus());
@@ -33,8 +36,11 @@ export const registerSocketHandlers = (io: Server): void => {
     processManager.on('status', handleStatus);
 
     socket.on('disconnect', () => {
+      console.log(`[WebSocket] Client ${clientIp} disconnected`);
       processManager.off('log', handleLog);
       processManager.off('status', handleStatus);
     });
   });
+  
+  console.log('[WebSocket] Socket handlers registered on /server namespace');
 };

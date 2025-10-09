@@ -527,6 +527,7 @@
   // コンフィグ読み込み用の変数
   let selectedConfigToLoad = '';
   let configLoadLoading = false;
+  let configDeleteLoading = false;
   
   // プレビュー編集用の変数
   let isPreviewEditing = false;
@@ -722,6 +723,47 @@
       setTimeout(() => {
         isFormClearing = false;
       }, 0);
+    }
+  };
+
+  // コンフィグファイル削除機能
+  const deleteConfigFile = async () => {
+    if (!selectedConfigToLoad || configDeleteLoading) return;
+    
+    const fileName = selectedConfigToLoad.split(/[/\\]/).pop() || selectedConfigToLoad;
+    
+    if (!confirm(`コンフィグファイル "${fileName}" を削除してもよろしいですか？\nこの操作は取り消せません。`)) {
+      return;
+    }
+    
+    configDeleteLoading = true;
+    try {
+      const response = await fetch(`/api/server/configs/${encodeURIComponent(fileName)}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`コンフィグファイル "${fileName}" が見つかりません`);
+        }
+        const errorText = await response.text();
+        throw new Error(`コンフィグファイルの削除に失敗しました (${response.status}): ${errorText}`);
+      }
+      
+      pushToast('コンフィグファイルを削除しました', 'success');
+      
+      // 選択をクリア
+      selectedConfigToLoad = '';
+      
+      // コンフィグファイル一覧を再取得
+      const configsResponse = await getConfigs();
+      setConfigs(configsResponse);
+      
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コンフィグファイルの削除に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      configDeleteLoading = false;
     }
   };
 
@@ -2954,15 +2996,18 @@
                   <div class="config-load-section">
                     <div class="field-row">
                       <div class="select-wrapper">
-                        <select bind:value={selectedConfigToLoad} disabled={configLoadLoading}>
+                        <select bind:value={selectedConfigToLoad} disabled={configLoadLoading || configDeleteLoading}>
                           <option value="">コンフィグファイルを選択してください</option>
                           {#each $configs as config}
                             <option value={config.path}>{config.name}</option>
                           {/each}
                         </select>
                       </div>
-                      <button type="button" on:click={loadConfigFile} disabled={!selectedConfigToLoad || configLoadLoading}>
+                      <button type="button" on:click={loadConfigFile} disabled={!selectedConfigToLoad || configLoadLoading || configDeleteLoading}>
                         {configLoadLoading ? '読み込み中...' : '読み込み'}
+                      </button>
+                      <button type="button" class="delete-button" on:click={deleteConfigFile} disabled={!selectedConfigToLoad || configLoadLoading || configDeleteLoading} title="削除">
+                        {configDeleteLoading ? '削除中...' : '削除'}
                       </button>
                     </div>
                   </div>
@@ -4650,6 +4695,20 @@
   .config-load-section .select-wrapper {
     flex: 1;
     min-width: 200px;
+  }
+
+  .config-load-section .delete-button {
+    background: #dc3545;
+  }
+
+  .config-load-section .delete-button:hover:not(:disabled) {
+    background: #c82333;
+  }
+
+  .config-load-section .delete-button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .config-create-button {

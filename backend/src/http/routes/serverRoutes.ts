@@ -82,6 +82,20 @@ serverRoutes.get('/configs/:path', normalRateLimit, async (req, res, next) => {
   }
 });
 
+// コンフィグファイル削除（認証不要）
+serverRoutes.delete('/configs/:path', normalRateLimit, async (req, res, next) => {
+  try {
+    const configPath = req.params.path;
+    console.log(`[serverRoutes] Deleting config: ${configPath}`);
+    await processManager.deleteConfig(configPath);
+    console.log(`[serverRoutes] Config deleted successfully: ${configPath}`);
+    res.json({ success: true, message: 'Config file deleted successfully' });
+  } catch (error) {
+    console.error(`[serverRoutes] Error deleting config: ${configPath}`, error);
+    next(error);
+  }
+});
+
 // 認証とレート制限を適用（以降のすべてのエンドポイントに適用）
 serverRoutes.use(authenticateToken);
 serverRoutes.use(normalRateLimit);
