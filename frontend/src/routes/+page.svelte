@@ -501,7 +501,7 @@
       denyUserCloudVariable: '',
       requiredUserJoinCloudVariable: '',
       requiredUserJoinCloudVariableDenyMessage: '',
-      awayKickMinutes: -1.0,
+      awayKickMinutes: null,
       parentSessionIds: '',
       autoInviteUsernames: '',
       autoInviteMessage: '',
@@ -679,7 +679,7 @@
             denyUserCloudVariable: world.denyUserCloudVariable || '',
             requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
             requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
-            awayKickMinutes: world.awayKickMinutes ?? 30,
+            awayKickMinutes: world.awayKickMinutes ?? null,
             parentSessionIds: arrayToString(world.parentSessionIds),
             autoInviteUsernames: arrayToString(world.autoInviteUsernames),
             autoInviteMessage: world.autoInviteMessage || '',
@@ -947,7 +947,7 @@
           denyUserCloudVariable: world.denyUserCloudVariable || '',
           requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
           requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
-          awayKickMinutes: world.awayKickMinutes ?? 30,
+          awayKickMinutes: world.awayKickMinutes ?? null,
           parentSessionIds: arrayToString(world.parentSessionIds),
           autoInviteUsernames: arrayToString(world.autoInviteUsernames),
           autoInviteMessage: world.autoInviteMessage || '',
@@ -1448,43 +1448,37 @@
           autoSleep: session.autoSleep
         };
         
-        // 文字列フィールド（空ならnull）
-        if (session.sessionName.trim()) processedSession.sessionName = session.sessionName.trim();
+        // 文字列フィールド: 空は null
+        processedSession.sessionName = session.sessionName.trim() || null;
         
-        // customSessionId: ヘルパー関数を使用
-        const customId = joinCustomSessionId((session as any).customSessionIdPrefix, (session as any).customSessionIdSuffix);
-        if (customId) processedSession.customSessionId = customId;
+        // customSessionId: ヘルパー関数を使用して結合
+        processedSession.customSessionId = joinCustomSessionId(
+          (session as any).customSessionIdPrefix, 
+          (session as any).customSessionIdSuffix
+        );
         
-        if (session.description.trim()) processedSession.description = session.description.trim();
-        
-        // 配列フィールド: ヘルパー関数を使用
-        const tagsArray = stringToArray(session.tags);
-        if (tagsArray) processedSession.tags = tagsArray;
-        
-        if (session.loadWorldURL.trim()) processedSession.loadWorldURL = session.loadWorldURL.trim();
-        if (session.loadWorldPresetName.trim()) processedSession.loadWorldPresetName = session.loadWorldPresetName.trim();
-        if (session.overrideCorrespondingWorldId.trim()) processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim();
-        if (session.forcePort !== null && session.forcePort !== '') processedSession.forcePort = Number(session.forcePort);
+        processedSession.description = session.description.trim() || null;
+        processedSession.tags = stringToArray(session.tags);
+        processedSession.loadWorldURL = session.loadWorldURL.trim() || null;
+        processedSession.loadWorldPresetName = session.loadWorldPresetName.trim() || 'Grid';
+        processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() || null;
+        processedSession.forcePort = (session.forcePort !== null && session.forcePort !== '') ? Number(session.forcePort) : null;
         
         // defaultUserRoles: ヘルパー関数を使用
-        const rolesObject = jsonStringToObject(session.defaultUserRoles);
-        if (rolesObject) processedSession.defaultUserRoles = rolesObject;
+        processedSession.defaultUserRoles = jsonStringToObject(session.defaultUserRoles);
         
-        if (session.roleCloudVariable.trim()) processedSession.roleCloudVariable = session.roleCloudVariable.trim();
-        if (session.allowUserCloudVariable.trim()) processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim();
-        if (session.denyUserCloudVariable.trim()) processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim();
-        if (session.requiredUserJoinCloudVariable.trim()) processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim();
-        if (session.requiredUserJoinCloudVariableDenyMessage.trim()) processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim();
+        processedSession.roleCloudVariable = session.roleCloudVariable.trim() || null;
+        processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim() || null;
+        processedSession.denyUserCloudVariable = session.denyUserCloudVariable.trim() || null;
+        processedSession.requiredUserJoinCloudVariable = session.requiredUserJoinCloudVariable.trim() || null;
+        processedSession.requiredUserJoinCloudVariableDenyMessage = session.requiredUserJoinCloudVariableDenyMessage.trim() || null;
         
         // 配列フィールド: ヘルパー関数を使用
-        const parentSessions = stringToArray(session.parentSessionIds);
-        if (parentSessions) processedSession.parentSessionIds = parentSessions;
+        processedSession.parentSessionIds = stringToArray(session.parentSessionIds);
+        processedSession.autoInviteUsernames = stringToArray(session.autoInviteUsernames);
         
-        const inviteUsernames = stringToArray(session.autoInviteUsernames);
-        if (inviteUsernames) processedSession.autoInviteUsernames = inviteUsernames;
-        
-        if (session.autoInviteMessage.trim()) processedSession.autoInviteMessage = session.autoInviteMessage.trim();
-        if (session.saveAsOwner.trim()) processedSession.saveAsOwner = session.saveAsOwner.trim();
+        processedSession.autoInviteMessage = session.autoInviteMessage.trim() || null;
+        processedSession.saveAsOwner = session.saveAsOwner.trim() || null;
         
         // hideFromPublicListing: 値がnull以外の場合のみ含める
         if (session.hideFromPublicListing !== null && session.hideFromPublicListing !== undefined) {
@@ -1495,20 +1489,20 @@
       });
 
       const configObject = {
-        $schema: 'https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json',
-        comment: configComment.trim() || null,
-        universeId: configUniverseId.trim() || null,
-        tickRate: configTickRate,
-        maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
-        usernameOverride: configUsernameOverride.trim() || null,
-        loginCredential: trimmedUsername || null,
-        loginPassword: trimmedPassword || null,
-        startWorlds: processedSessions,
-        dataFolder: configDataFolder.trim() || null,
-        cacheFolder: configCacheFolder.trim() || null,
-        logsFolder: configLogsFolder.trim() || null,
-        allowedUrlHosts: stringToArray(configAllowedUrlHosts),
-        autoSpawnItems: stringToArray(configAutoSpawnItems)
+        "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
+        "comment": configComment.trim() || null,
+        "universeId": configUniverseId.trim() || null,
+        "tickRate": configTickRate,
+        "maxConcurrentAssetTransfers": configMaxConcurrentAssetTransfers,
+        "usernameOverride": configUsernameOverride.trim() || null,
+        "loginCredential": trimmedUsername || null,
+        "loginPassword": trimmedPassword || null,
+        "startWorlds": processedSessions,
+        "dataFolder": configDataFolder.trim() || null,
+        "cacheFolder": configCacheFolder.trim() || null,
+        "logsFolder": configLogsFolder.trim() || null,
+        "allowedUrlHosts": stringToArray(configAllowedUrlHosts),
+        "autoSpawnItems": stringToArray(configAutoSpawnItems)
       };
 
       configPreviewText = JSON.stringify(configObject, null, 2);
