@@ -67,7 +67,8 @@
     { id: 'dashboard', label: 'ダッシュボード' },
     { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
-    { id: 'settings', label: 'コンフィグ作成' }
+    { id: 'settings', label: 'コンフィグ作成' },
+    { id: 'others', label: 'その他' }
   ];
 
   let activeTab: (typeof tabs)[number]['id'] = 'dashboard';
@@ -3899,6 +3900,27 @@
                   <div class="preview-error">{previewEditError}</div>
                 {/if}
               {/if}
+            </div>
+          </section>
+
+          <!-- その他タブ -->
+          <section class="panel" class:active={activeTab === 'others'}>
+            <div class="panel-heading">
+              <h2>その他</h2>
+            </div>
+            <div class="panel-grid two">
+              <div class="panel-column">
+                <div class="card status-card">
+                  <h3>システム情報</h3>
+                  <p class="empty">ここにシステム情報を表示できます。</p>
+                </div>
+              </div>
+              <div class="panel-column">
+                <div class="card status-card">
+                  <h3>追加機能</h3>
+                  <p class="empty">今後の機能拡張に使用できます。</p>
+                </div>
+              </div>
             </div>
           </section>
         </div>
