@@ -260,6 +260,7 @@
   let configPassword = '';
   let showPassword = false;
   let configGenerationLoading = false;
+  let isFormClearing = false; // フォームクリア中フラグ
   
   // Advanced config settings
   let configComment = '';
@@ -309,7 +310,7 @@
     denyUserCloudVariable: '',
     requiredUserJoinCloudVariable: '',
     requiredUserJoinCloudVariableDenyMessage: '',
-    awayKickMinutes: 5,
+    awayKickMinutes: null as number | null,
     parentSessionIds: '',
     autoInviteUsernames: '',
     autoInviteMessage: '',
@@ -1203,7 +1204,7 @@
       denyUserCloudVariable: '',
       requiredUserJoinCloudVariable: '',
       requiredUserJoinCloudVariableDenyMessage: '',
-      awayKickMinutes: 30,
+      awayKickMinutes: null,
       parentSessionIds: '',
       autoInviteUsernames: '',
       autoInviteMessage: '',
@@ -1323,7 +1324,7 @@
       });
 
       const configData = {
-        comment: configComment.trim() || `${trimmedName}の設定ファイル`,
+        comment: configComment.trim() || null,
         universeId: configUniverseId.trim() || null,
         tickRate: configTickRate,
         maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
@@ -1356,7 +1357,8 @@
       // 設定ファイル一覧を更新
       await refreshConfigsOnly();
       
-      // フォームをクリア
+      // フォームをクリア（リアクティブステートメントをスキップ）
+      isFormClearing = true;
       configName = '';
       configUsername = '';
       configPassword = '';
@@ -1393,7 +1395,7 @@
         denyUserCloudVariable: '',
         requiredUserJoinCloudVariable: '',
         requiredUserJoinCloudVariableDenyMessage: '',
-        awayKickMinutes: 30,
+        awayKickMinutes: null,
         parentSessionIds: '',
         autoInviteUsernames: '',
         autoInviteMessage: '',
@@ -1408,6 +1410,11 @@
       activeSessionTab = 1;
       nextSessionId = 2;
       clearDraft();
+      
+      // フラグをリセット
+      setTimeout(() => {
+        isFormClearing = false;
+      }, 0);
     } catch (error) {
       const message = error instanceof Error ? error.message : '設定ファイルの生成に失敗しました';
       pushToast(message, 'error');
@@ -1489,7 +1496,7 @@
 
       const configObject = {
         $schema: 'https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json',
-        comment: configComment.trim() || `${trimmedName}の設定ファイル`,
+        comment: configComment.trim() || null,
         universeId: configUniverseId.trim() || null,
         tickRate: configTickRate,
         maxConcurrentAssetTransfers: configMaxConcurrentAssetTransfers,
@@ -1671,7 +1678,7 @@
   };
 
   // 設定タブの関連変数が変化したときのみトリガー（ログ等の外部更新では発火しない）
-  $: if (activeTab === 'settings') {
+  $: if (activeTab === 'settings' && !isFormClearing) {
     // 依存として触れておくことで、これらの値が変わった時だけ反応
     configName; configUsername; configPassword; configComment; configUniverseId;
     configTickRate; configMaxConcurrentAssetTransfers; configUsernameOverride;
@@ -3127,9 +3134,9 @@
                     {#if activeSessionTab === session.id}
                       <form class="status-form">
                         <label>
-                          <span>セッション名 <small class="note">空欄だとワールド名になる</small></span>
+                          <span>セッション名</span>
                           <div class="field-row">
-                            <input type="text" bind:value={session.sessionName} placeholder="例：～の誕生日セッション" />
+                            <input type="text" bind:value={session.sessionName} placeholder="ワールド名を使用" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('sessionName')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -3198,25 +3205,6 @@
                             </button>
                           </div>
                         </label>
-
-                        <div class="toggle-row">
-                          <span>公開リストから非表示 <small class="note">セッションリストに表示しない</small></span>
-                          <button
-                            type="button"
-                            class={session.hideFromPublicListing ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.hideFromPublicListing}
-                            on:click={() => {
-                              if (session.hideFromPublicListing === null || session.hideFromPublicListing === false) {
-                                session.hideFromPublicListing = true;
-                              } else {
-                                session.hideFromPublicListing = null;
-                              }
-                              sessions = [...sessions];
-                            }}
-                          >
-                            {session.hideFromPublicListing ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
 
                         <label>
                           <span>ワールド <small class="note">レコードURLを入力</small></span>
@@ -3306,7 +3294,7 @@
                         </label>
 
                         <label>
-                          <span>デフォルトユーザーロール</span>
+                          <span>個別ユーザー権限設定</span>
                           <div class="field-row">
                             <input type="text" bind:value={session.defaultUserRoles} placeholder="JSON形式で入力してください" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('defaultUserRoles')} title="リセット" aria-label="リセット">
@@ -3318,7 +3306,7 @@
                         <label>
                           <span>AFKキック時間（分） <small class="note">-1で無効</small></span>
                           <div class="field-row">
-                            <input type="number" bind:value={session.awayKickMinutes} min="-1" />
+                            <input type="number" bind:value={session.awayKickMinutes} min="-1" placeholder="ワールド設定を使用" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('awayKickMinutes')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -3345,45 +3333,80 @@
                           </div>
                         </label>
 
+                        <label>
+                          <span>セッションリストに表示しない</span>
+                          <div class="field-row">
+                            <button
+                              type="button"
+                              class={session.hideFromPublicListing ? 'status-action-button active' : 'status-action-button'}
+                              aria-pressed={session.hideFromPublicListing}
+                              on:click={() => {
+                                if (session.hideFromPublicListing === null || session.hideFromPublicListing === false) {
+                                  session.hideFromPublicListing = true;
+                                } else {
+                                  session.hideFromPublicListing = null;
+                                }
+                                sessions = [...sessions];
+                              }}
+                            >
+                              {session.hideFromPublicListing ? 'オン' : 'オフ'}
+                            </button>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('hideFromPublicListing')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
 
-
-
-
-                        <div class="toggle-row">
+                        <label>
                           <span>自動復旧 <small class="note">落ちたのがセッションだけなら再起動される</small></span>
-                          <button
-                            type="button"
-                            class={session.autoRecover ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.autoRecover}
-                            on:click={() => session.autoRecover = !session.autoRecover}
-                          >
-                            {session.autoRecover ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
+                          <div class="field-row">
+                            <button
+                              type="button"
+                              class={session.autoRecover ? 'status-action-button active' : 'status-action-button'}
+                              aria-pressed={session.autoRecover}
+                              on:click={() => session.autoRecover = !session.autoRecover}
+                            >
+                              {session.autoRecover ? 'オン' : 'オフ'}
+                            </button>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('autoRecover')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
 
-                        <div class="toggle-row">
+                        <label>
                           <span>終了時に保存 <small class="note">権限必要</small></span>
-                          <button
-                            type="button"
-                            class={session.saveOnExit ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.saveOnExit}
-                            on:click={() => session.saveOnExit = !session.saveOnExit}
-                          >
-                            {session.saveOnExit ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
+                          <div class="field-row">
+                            <button
+                              type="button"
+                              class={session.saveOnExit ? 'status-action-button active' : 'status-action-button'}
+                              aria-pressed={session.saveOnExit}
+                              on:click={() => session.saveOnExit = !session.saveOnExit}
+                            >
+                              {session.saveOnExit ? 'オン' : 'オフ'}
+                            </button>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('saveOnExit')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
 
-                        <div class="toggle-row">
+                        <label>
                           <span>自動スリープ <small class="note">人がいないとエコモードに</small></span>
-                          <button
-                            type="button"
-                            class={session.autoSleep ? 'status-action-button active' : 'status-action-button'}
-                            aria-pressed={session.autoSleep}
-                            on:click={() => session.autoSleep = !session.autoSleep}
-                          >
-                            {session.autoSleep ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
+                          <div class="field-row">
+                            <button
+                              type="button"
+                              class={session.autoSleep ? 'status-action-button active' : 'status-action-button'}
+                              aria-pressed={session.autoSleep}
+                              on:click={() => session.autoSleep = !session.autoSleep}
+                            >
+                              {session.autoSleep ? 'オン' : 'オフ'}
+                            </button>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('autoSleep')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
                       </form>
                     {/if}
                   {/each}
@@ -4697,6 +4720,10 @@
     resize: none;
     outline: none;
     overflow-y: hidden;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
   }
 
   .config-preview-edit:focus {
