@@ -24,6 +24,7 @@
     getAuthToken,
     getSecurityConfig,
     getClientInfo,
+    getResoniteUserFull,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -31,7 +32,8 @@
     type RuntimeWorldsData,
     type RuntimeWorldEntry,
     type ConfigEntry,
-    type LogEntry
+    type LogEntry,
+    type ResoniteUserFull
   } from '$lib';
 
   const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
@@ -232,18 +234,23 @@
   let worldUrl = '';
   let worldUrlLoading = false;
 
-  let friendSendLoading = false;
-
-  let friendAcceptLoading = false;
-
-  let friendRemoveLoading = false;
-
   let friendTargetName = '';
   let friendMessageText = '';
   let friendMessageLoading = false;
   let friendRequests: FriendRequestsData | null = null;
   let friendRequestsLoading = false;
   let friendRequestsError = '';
+
+  // フレンド管理タブ - 新機能
+  let friendSearchUsername = ''; // ユーザー名検索
+  let friendSearchUserId = ''; // ユーザーID検索
+  let friendSearchUsernameLoading = false;
+  let friendSearchUserIdLoading = false;
+  let friendSearchResults: ResoniteUserFull[] = []; // 検索結果とリスト表示用
+  let selectedFriendUser: ResoniteUserFull | null = null; // 選択されたユーザー
+  let friendSendLoading = false;
+  let friendAcceptLoading = false;
+  let friendRemoveLoading = false;
 
   // World search state
   let worldSearchTerm = '';
@@ -2087,6 +2094,232 @@
     }
   };
 
+  // フレンド管理タブ - 新機能の関数
+  const searchFriendByUsername = async () => {
+    const username = friendSearchUsername.trim();
+    if (!username) {
+      pushToast('ユーザー名を入力してください', 'error');
+      return;
+    }
+
+    if (friendSearchUsernameLoading) return;
+    friendSearchUsernameLoading = true;
+
+    try {
+      const user = await getResoniteUserFull(username);
+      // 検索結果に追加（重複チェック）
+      const exists = friendSearchResults.some(u => u.id === user.id);
+      if (!exists) {
+        friendSearchResults = [...friendSearchResults, user];
+        pushToast('ユーザーを追加しました', 'success');
+      } else {
+        pushToast('このユーザーは既にリストに追加されています', 'info');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ユーザー情報の取得に失敗しました';
+      pushToast(`検索失敗: ${message}`, 'error');
+    } finally {
+      friendSearchUsernameLoading = false;
+    }
+  };
+
+  const searchFriendByUserId = async () => {
+    const userId = friendSearchUserId.trim();
+    if (!userId) {
+      pushToast('ユーザーIDを入力してください', 'error');
+      return;
+    }
+
+    // ユーザーIDの簡易バリデーション
+    if (!userId.startsWith('U-')) {
+      pushToast('ユーザーIDは「U-」で始まる必要があります', 'error');
+      return;
+    }
+
+    if (friendSearchUserIdLoading) return;
+    friendSearchUserIdLoading = true;
+
+    try {
+      const user = await getResoniteUserFull(userId);
+      // 検索結果に追加（重複チェック）
+      const exists = friendSearchResults.some(u => u.id === user.id);
+      if (!exists) {
+        friendSearchResults = [...friendSearchResults, user];
+        pushToast('ユーザーを追加しました', 'success');
+      } else {
+        pushToast('このユーザーは既にリストに追加されています', 'info');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ユーザー情報の取得に失敗しました';
+      pushToast(`検索失敗: ${message}`, 'error');
+    } finally {
+      friendSearchUserIdLoading = false;
+    }
+  };
+
+  const loadFriendRequestsList = async () => {
+    if (friendRequestsLoading) return;
+    friendRequestsLoading = true;
+    friendRequestsError = '';
+
+    try {
+      const requests = await getFriendRequests();
+      friendRequests = requests;
+
+      // フレンドリクエストを送ってきたユーザーの情報を取得
+      if (requests.data && requests.data.length > 0) {
+        const promises = requests.data.map(async (username) => {
+          try {
+            const user = await getResoniteUserFull(username);
+            return user;
+          } catch (error) {
+            console.error(`Failed to fetch user info for ${username}:`, error);
+            return null;
+          }
+        });
+
+        const users = await Promise.all(promises);
+        const validUsers = users.filter((u): u is ResoniteUserFull => u !== null);
+
+        // 既存のリストに追加（重複チェック）
+        validUsers.forEach(user => {
+          const exists = friendSearchResults.some(u => u.id === user.id);
+          if (!exists) {
+            friendSearchResults = [...friendSearchResults, user];
+          }
+        });
+
+        pushToast(`${validUsers.length}件のフレンドリクエストを読み込みました`, 'success');
+      } else {
+        pushToast('フレンドリクエストはありません', 'info');
+      }
+    } catch (error) {
+      friendRequestsError = error instanceof Error ? error.message : 'フレンドリクエストの取得に失敗しました';
+      pushToast(friendRequestsError, 'error');
+    } finally {
+      friendRequestsLoading = false;
+    }
+  };
+
+  const loadBannedUsersList = async () => {
+    // TODO: BANリストを取得するコマンドが必要（現状未実装の可能性）
+    pushToast('BAN一覧機能は実装予定です', 'info');
+  };
+
+  const selectFriendUser = (user: ResoniteUserFull) => {
+    selectedFriendUser = user;
+  };
+
+  const sendFriendRequestToSelected = async () => {
+    if (!selectedFriendUser) {
+      pushToast('ユーザーを選択してください', 'error');
+      return;
+    }
+
+    if (friendSendLoading) return;
+    friendSendLoading = true;
+
+    try {
+      const username = selectedFriendUser.username || selectedFriendUser.id;
+      await postCommand(`sendfriendrequest ${JSON.stringify(username)}`);
+      pushToast(`${username} にフレンド申請を送信しました`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'フレンド申請の送信に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      friendSendLoading = false;
+    }
+  };
+
+  const acceptFriendRequestFromSelected = async () => {
+    if (!selectedFriendUser) {
+      pushToast('ユーザーを選択してください', 'error');
+      return;
+    }
+
+    // フレンドリクエスト一覧に含まれているかチェック
+    const isInRequests = friendRequests?.data?.some(
+      username => username.toLowerCase() === selectedFriendUser?.username?.toLowerCase()
+    );
+
+    if (!isInRequests) {
+      pushToast('このユーザーからのフレンドリクエストはありません', 'error');
+      return;
+    }
+
+    if (friendAcceptLoading) return;
+    friendAcceptLoading = true;
+
+    try {
+      const username = selectedFriendUser.username || selectedFriendUser.id;
+      await postCommand(`acceptfriendrequest ${JSON.stringify(username)}`);
+      pushToast(`${username} からのフレンド申請を承認しました`, 'success');
+
+      // 承認後、リストから削除
+      friendSearchResults = friendSearchResults.filter(u => u.id !== selectedFriendUser?.id);
+      if (selectedFriendUser) {
+        selectedFriendUser = null;
+      }
+
+      // フレンドリクエストリストを再取得
+      await loadFriendRequestsList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'フレンド申請の承認に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      friendAcceptLoading = false;
+    }
+  };
+
+  const removeFriendFromSelected = async () => {
+    if (!selectedFriendUser) {
+      pushToast('ユーザーを選択してください', 'error');
+      return;
+    }
+
+    if (friendRemoveLoading) return;
+    friendRemoveLoading = true;
+
+    try {
+      const username = selectedFriendUser.username || selectedFriendUser.id;
+      await postCommand(`removefriend ${JSON.stringify(username)}`);
+      pushToast(`${username} をフレンドから解除しました`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'フレンドの解除に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      friendRemoveLoading = false;
+    }
+  };
+
+  const sendMessageToSelected = async () => {
+    if (!selectedFriendUser) {
+      pushToast('ユーザーを選択してください', 'error');
+      return;
+    }
+
+    const text = friendMessageText.trim();
+    if (!text) {
+      pushToast('メッセージを入力してください', 'error');
+      return;
+    }
+
+    if (friendMessageLoading) return;
+    friendMessageLoading = true;
+
+    try {
+      const username = selectedFriendUser.username || selectedFriendUser.id;
+      await postCommand(`message ${JSON.stringify(username)} ${JSON.stringify(text)}`);
+      pushToast(`${username} にメッセージを送信しました`, 'success');
+      friendMessageText = ''; // メッセージ送信後にクリア
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'メッセージの送信に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      friendMessageLoading = false;
+    }
+  };
+
   const executeCommand = async () => {
     if (commandLoading) return;
     commandLoading = true;
@@ -2923,85 +3156,181 @@
           {/if}
 
           <section class="panel" class:active={activeTab === 'friends'}>
-            <div class="panel-grid one">
+            <div class="panel-grid two">
+              <!-- 左側: ユーザー検索とリスト -->
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>/friends</h2>
+                  <h2>ユーザー検索</h2>
                 </div>
                 <div class="card form-card">
-                  <h2>対象ユーザー</h2>
-                  <label class="field">
-                    <span>フレンド名</span>
-                    <input type="text" bind:value={friendTargetName} placeholder="ユーザー名" />
-                  </label>
-                  <p class="info">以下の操作はすべてこの名前を使用します。</p>
-                  <button type="button" on:click={fetchFriendRequests} disabled={!$status.running || friendRequestsLoading}>
-                    フレンドリクエスト一覧を取得
-                  </button>
-                  {#if friendRequestsLoading}
-                    <p class="info">取得中...</p>
-                  {:else if friendRequestsError}
-                    <p class="feedback">{friendRequestsError}</p>
-                  {:else if friendRequests?.data?.length}
-                    <ul class="friend-requests">
-                      {#each friendRequests.data as request}
-                        <li>{request}</li>
+                  <!-- ユーザー名で検索 -->
+                  <form on:submit|preventDefault={searchFriendByUsername}>
+                    <label class="field">
+                      <span>ユーザー名で検索</span>
+                      <div class="field-row">
+                        <input 
+                          type="text" 
+                          bind:value={friendSearchUsername} 
+                          placeholder="ユーザー名を入力" 
+                        />
+                        <button 
+                          type="submit" 
+                          class="status-action-button" 
+                          disabled={friendSearchUsernameLoading}
+                        >
+                          {friendSearchUsernameLoading ? '検索中...' : '検索'}
+                        </button>
+                      </div>
+                    </label>
+                  </form>
+
+                  <!-- ユーザーIDで検索 -->
+                  <form on:submit|preventDefault={searchFriendByUserId} style="margin-top: 1rem;">
+                    <label class="field">
+                      <span>ユーザーIDで検索</span>
+                      <div class="field-row">
+                        <input 
+                          type="text" 
+                          bind:value={friendSearchUserId} 
+                          placeholder="U-xxxxxxxx" 
+                        />
+                        <button 
+                          type="submit" 
+                          class="status-action-button" 
+                          disabled={friendSearchUserIdLoading}
+                        >
+                          {friendSearchUserIdLoading ? '検索中...' : '検索'}
+                        </button>
+                      </div>
+                    </label>
+                  </form>
+
+                  <div class="action-buttons" style="margin-top: 1.5rem;">
+                    <button 
+                      type="button" 
+                      on:click={loadFriendRequestsList} 
+                      disabled={!$status.running || friendRequestsLoading}
+                    >
+                      {friendRequestsLoading ? '取得中...' : 'フレンドリクエスト一覧'}
+                    </button>
+                    <button 
+                      type="button" 
+                      on:click={loadBannedUsersList} 
+                      disabled={!$status.running}
+                    >
+                      BAN一覧
+                    </button>
+                  </div>
+
+                  {#if friendSearchResults.length > 0}
+                    <div class="user-list" style="margin-top: 1.5rem;">
+                      <h3 style="margin-bottom: 0.75rem; font-size: 0.95rem; color: #c7cad3;">検索結果</h3>
+                      {#each friendSearchResults as user}
+                        <button
+                          type="button"
+                          class="user-card"
+                          class:selected={selectedFriendUser?.id === user.id}
+                          on:click={() => selectFriendUser(user)}
+                        >
+                          <div class="user-avatar">
+                            {#if user.profile.iconUrl}
+                              <img src={user.profile.iconUrl} alt={user.username || 'User'} />
+                            {:else}
+                              <div class="avatar-placeholder">?</div>
+                            {/if}
+                          </div>
+                          <div class="user-info">
+                            <strong>{user.username || 'Unknown'}</strong>
+                            <span class="sub">{user.id}</span>
+                          </div>
+                        </button>
                       {/each}
-                    </ul>
-                  {:else if friendRequests}
-                    <p class="info">保留中のフレンドリクエストはありません。</p>
+                    </div>
+                  {:else}
+                    <p class="empty" style="margin-top: 1rem;">検索結果が表示されます</p>
                   {/if}
                 </div>
               </div>
-            </div>
 
-            <div class="panel-grid two">
+              <!-- 右側: 選択したユーザーへの操作 -->
               <div class="panel-column">
                 <div class="panel-heading">
-                  <h2>/send</h2>
+                  <h2>ユーザー操作</h2>
                 </div>
                 <div class="card form-card">
-                  <h2>フレンド申請を送る</h2>
-                  <form on:submit|preventDefault={submitFriendSend}>
-                    <button type="submit" disabled={!$status.running || friendSendLoading}>送信</button>
-                  </form>
-                </div>
-              </div>
-              <div class="panel-column">
-                <div class="panel-heading">
-                  <h2>/accept</h2>
-                </div>
-                <div class="card form-card">
-                  <h2>申請を承認する</h2>
-                  <form on:submit|preventDefault={submitFriendAccept}>
-                    <button type="submit" disabled={!$status.running || friendAcceptLoading}>承認</button>
-                  </form>
-                </div>
-              </div>
-              <div class="panel-column">
-                <div class="panel-heading">
-                  <h2>/remove</h2>
-                </div>
-                <div class="card form-card">
-                  <h2>フレンド解除</h2>
-                  <form on:submit|preventDefault={submitFriendRemove}>
-                    <button type="submit" disabled={!$status.running || friendRemoveLoading}>解除</button>
-                  </form>
-                </div>
-              </div>
-              <div class="panel-column">
-                <div class="panel-heading">
-                  <h2>/message</h2>
-                </div>
-                <div class="card form-card">
-                  <h2>メッセージ送信</h2>
-                  <form on:submit|preventDefault={submitFriendMessage}>
-                    <label class="field">
-                      <span>メッセージ</span>
-                      <textarea rows="3" bind:value={friendMessageText}></textarea>
-                    </label>
-                    <button type="submit" disabled={!$status.running || friendMessageLoading}>送信</button>
-                  </form>
+                  {#if selectedFriendUser}
+                    <div class="selected-user-display" style="margin-bottom: 1.5rem;">
+                      <div class="user-card selected" style="cursor: default;">
+                        <div class="user-avatar">
+                          {#if selectedFriendUser.profile.iconUrl}
+                            <img src={selectedFriendUser.profile.iconUrl} alt={selectedFriendUser.username || 'User'} />
+                          {:else}
+                            <div class="avatar-placeholder">?</div>
+                          {/if}
+                        </div>
+                        <div class="user-info">
+                          <strong>{selectedFriendUser.username || 'Unknown'}</strong>
+                          <span class="sub">{selectedFriendUser.id}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="action-buttons">
+                      <button 
+                        type="button" 
+                        class="save"
+                        on:click={acceptFriendRequestFromSelected}
+                        disabled={
+                          !$status.running || 
+                          friendAcceptLoading || 
+                          !friendRequests?.data?.some(username => 
+                            username.toLowerCase() === selectedFriendUser?.username?.toLowerCase()
+                          )
+                        }
+                      >
+                        {friendAcceptLoading ? '承認中...' : 'フレンド申請を承認'}
+                      </button>
+                    </div>
+
+                    <div class="action-buttons">
+                      <button 
+                        type="button" 
+                        on:click={sendFriendRequestToSelected}
+                        disabled={!$status.running || friendSendLoading}
+                      >
+                        {friendSendLoading ? '送信中...' : 'フレンド申請を送る'}
+                      </button>
+                      <button 
+                        type="button" 
+                        class="close"
+                        on:click={removeFriendFromSelected}
+                        disabled={!$status.running || friendRemoveLoading}
+                      >
+                        {friendRemoveLoading ? '解除中...' : 'フレンド解除'}
+                      </button>
+                    </div>
+
+                    <div style="margin-top: 1.5rem;">
+                      <label class="field">
+                        <span>メッセージ送信</span>
+                        <textarea 
+                          rows="3" 
+                          bind:value={friendMessageText}
+                          placeholder="メッセージを入力..."
+                        ></textarea>
+                      </label>
+                      <button 
+                        type="button" 
+                        on:click={sendMessageToSelected}
+                        disabled={!$status.running || friendMessageLoading}
+                        style="width: 100%; margin-top: 0.5rem;"
+                      >
+                        {friendMessageLoading ? '送信中...' : 'メッセージを送信'}
+                      </button>
+                    </div>
+                  {:else}
+                    <p class="empty">左側のリストからユーザーを選択してください</p>
+                  {/if}
                 </div>
               </div>
             </div>
@@ -5362,6 +5691,88 @@
     width: 0.875rem;
     height: 0.875rem;
     fill: currentColor;
+  }
+
+  /* ユーザーカードスタイル */
+  .user-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #11151d;
+    border: 2px solid transparent;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+  }
+
+  .user-card:hover {
+    border-color: #61d1fa;
+    box-shadow: 0 0 0 2px rgba(97, 209, 250, 0.2);
+    background: #171b26;
+  }
+
+  .user-card.selected {
+    border-color: #ba64f2;
+    box-shadow: 0 0 0 3px rgba(186, 100, 242, 0.35);
+    background: #1e2332;
+  }
+
+  .user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #2b2f35;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-placeholder {
+    color: #9aa3b3;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .user-info strong {
+    font-size: 0.95rem;
+    color: #f5f5f5;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-info .sub {
+    font-size: 0.75rem;
+    color: #9aa3b3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
 

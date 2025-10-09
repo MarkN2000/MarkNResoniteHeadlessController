@@ -220,3 +220,20 @@ export const getClientInfo = () =>
     forwardedFor?: string;
     realIp?: string;
   }>;
+
+// Resonite ユーザー情報取得API
+export interface ResoniteUserFull {
+  id: string;
+  username: string | null;
+  profile: {
+    iconUrl: string | null;
+    displayBadges: string[];
+    description: string | null;
+  };
+  registrationTime: string | null;
+  isPatreonSupporter: boolean;
+  tags: string[];
+}
+
+export const getResoniteUserFull = (identifier: string) =>
+  request(`/server/resonite-user-full/${encodeURIComponent(identifier)}`) as Promise<ResoniteUserFull>;

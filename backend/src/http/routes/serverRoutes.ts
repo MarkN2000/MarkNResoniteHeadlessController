@@ -59,6 +59,77 @@ serverRoutes.get('/resonite-user/:username', normalRateLimit, async (req, res, n
   }
 });
 
+// Resonite API経由でユーザー情報を完全に取得（認証不要）
+serverRoutes.get('/resonite-user-full/:identifier', normalRateLimit, async (req, res, next) => {
+  try {
+    const identifier = req.params.identifier;
+    
+    if (!identifier) {
+      return res.status(400).json({ error: 'identifier is required' });
+    }
+
+    // identifierがU-で始まる場合はユーザーID、それ以外はユーザー名として扱う
+    const isUserId = identifier.startsWith('U-');
+    const endpoint = isUserId 
+      ? `https://api.resonite.com/users/${encodeURIComponent(identifier)}`
+      : `https://api.resonite.com/users/?name=${encodeURIComponent(identifier)}`;
+
+    const response = await fetch(endpoint, {
+      headers: {
+        'User-Agent': 'MRHC/1.0',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Resonite API] エラー (${response.status}): ${errorText}`);
+      return res.status(response.status).json({ 
+        error: `API呼び出しに失敗しました: ${response.status}`,
+        details: errorText
+      });
+    }
+
+    const data = await response.json();
+    
+    let user;
+    if (isUserId) {
+      user = data;
+    } else {
+      if (!Array.isArray(data) || data.length === 0) {
+        return res.status(404).json({ error: 'ユーザーが見つかりませんでした' });
+      }
+      user = data[0];
+    }
+    
+    if (!user || !user.id) {
+      console.error('[Resonite API] ユーザーオブジェクトにIDが含まれていません');
+      return res.status(404).json({ error: 'ユーザー情報が取得できませんでした' });
+    }
+
+    // 必要な情報を抽出
+    res.json({
+      id: user.id,
+      username: user.username || user.normalizedUsername || null,
+      profile: {
+        iconUrl: user.profile?.iconUrl || null,
+        displayBadges: user.profile?.displayBadges || [],
+        description: user.profile?.description || null,
+      },
+      registrationTime: user.registrationTime || null,
+      isPatreonSupporter: user.isPatreonSupporter || false,
+      tags: user.tags || []
+    });
+  } catch (error) {
+    console.error('[Resonite API] 例外エラー:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ 
+      error: 'Resonite API呼び出し中にエラーが発生しました',
+      details: errorMessage
+    });
+  }
+});
+
 // コンフィグファイル一覧取得（認証不要）
 serverRoutes.get('/configs', normalRateLimit, (_req, res) => {
   const configs = processManager.listConfigs().map(filePath => ({
