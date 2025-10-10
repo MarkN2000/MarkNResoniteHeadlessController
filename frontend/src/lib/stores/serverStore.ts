@@ -1,10 +1,11 @@
 import { readable, writable } from 'svelte/store';
-import type { HeadlessStatus, LogEntry, ConfigEntry } from '$lib/api';
+import type { HeadlessStatus, LogEntry, ConfigEntry, SystemMetrics } from '$lib/api';
 import { connectServerSocket } from '$lib/socket';
 
 const statusStore = writable<HeadlessStatus>({ running: false });
 const logsStore = writable<LogEntry[]>([]);
 const configsStore = writable<ConfigEntry[]>([]);
+const metricsStore = writable<SystemMetrics | null>(null);
 
 let initialized = false;
 
@@ -20,7 +21,8 @@ export const createServerStores = () => {
           next.shift();
         }
         return next;
-      })
+      }),
+      metrics: metrics => metricsStore.set(metrics)
     });
   }
 
@@ -28,6 +30,7 @@ export const createServerStores = () => {
     status: readable<HeadlessStatus>({ running: false }, set => statusStore.subscribe(set)),
     logs: readable<LogEntry[]>([], set => logsStore.subscribe(set)),
     configs: readable<ConfigEntry[]>([], set => configsStore.subscribe(set)),
+    metrics: readable<SystemMetrics | null>(null, set => metricsStore.subscribe(set)),
     setStatus: (value: HeadlessStatus) => statusStore.set(value),
     setLogs: (entries: LogEntry[]) => logsStore.set(entries),
     appendLog: (entry: LogEntry) =>

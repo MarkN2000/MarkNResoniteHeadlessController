@@ -51,6 +51,17 @@ export interface LogEntry {
   message: string;
 }
 
+export interface SystemMetrics {
+  cpu: {
+    usage: number;
+  };
+  memory: {
+    total: number;
+    used: number;
+    usage: number;
+  };
+}
+
 export interface ConfigEntry {
   path: string;
   name: string;

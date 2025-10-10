@@ -37,7 +37,7 @@
     type ResoniteUserFull
   } from '$lib';
 
-  const { status, logs, configs, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
+  const { status, logs, configs, metrics, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
 
   // Resonite画像URLを変換する関数
   const convertResoniteImageUrl = (url: string | null): string | null => {
@@ -1078,9 +1078,16 @@
 
   const DEFAULT_ACCESS_LEVELS = ['Private', 'LAN', 'Contacts', 'ContactsPlus', 'RegisteredUsers', 'Anyone'];
 
-  const resourceMetrics = [
-    { label: 'CPU', value: '--- %' },
-    { label: 'メモリ', value: '--- GB' }
+  // システムメトリクスの表示用にリアクティブに変換
+  $: resourceMetrics = [
+    { 
+      label: 'CPU', 
+      value: $metrics ? `${$metrics.cpu.usage.toFixed(1)} %` : '--- %' 
+    },
+    { 
+      label: 'メモリ', 
+      value: $metrics ? `${($metrics.memory.used / 1024 / 1024 / 1024).toFixed(2)} GB` : '--- GB' 
+    }
   ];
 
   const ENGINE_READY_REGEX = /Engine Ready!?/i;

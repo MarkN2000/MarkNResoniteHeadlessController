@@ -8,6 +8,7 @@ import { apiRouter } from './http/index.js';
 import { registerSocketHandlers } from './ws/index.js';
 import { cidrRestriction } from './middleware/cidr.js';
 import { getCorsConfig, dynamicOriginCheck } from './config/cors.js';
+import { systemMetricsCollector } from './services/systemMetrics.js';
 
 const app = express();
 
@@ -36,6 +37,9 @@ console.log('[Socket.IO] Server initialized with CORS');
 console.log('[Socket.IO] Allowed origins: localhost:5173, localhost:3000, 127.0.0.1:5173, 127.0.0.1:3000');
 
 registerSocketHandlers(io);
+
+// システムメトリクスの収集を開始
+systemMetricsCollector.start();
 
 httpServer.listen(SERVER_PORT, () => {
   console.log(`Backend listening on port ${SERVER_PORT}`);

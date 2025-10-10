@@ -105,10 +105,9 @@ router.get('/users', async (req, res) => {
 router.post('/start', async (req, res) => {
   try {
     const { configPath } = req.body;
-    const result = await processManager.startServer(configPath);
+    processManager.start(configPath);
     res.json({ 
-      success: true, 
-      result,
+      success: true,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -123,10 +122,9 @@ router.post('/start', async (req, res) => {
 // サーバー停止
 router.post('/stop', async (req, res) => {
   try {
-    const result = await processManager.stopServer();
+    await processManager.stop();
     res.json({ 
-      success: true, 
-      result,
+      success: true,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { HeadlessStatus, LogEntry } from './api';
+import type { HeadlessStatus, LogEntry, SystemMetrics } from './api';
 
 // 開発環境では直接バックエンドに接続、本番環境では環境変数から取得
 const SOCKET_BASE = import.meta.env.VITE_BACKEND_SOCKET_URL || 'http://localhost:8080';
@@ -8,6 +8,7 @@ export interface ServerSocketEvents {
   status: (status: HeadlessStatus) => void;
   log: (entry: LogEntry) => void;
   logs: (entries: LogEntry[]) => void;
+  metrics: (metrics: SystemMetrics) => void;
 }
 
 export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
@@ -34,6 +35,7 @@ export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
   socket.on('status', handlers.status);
   socket.on('log', handlers.log);
   socket.on('logs', handlers.logs);
+  socket.on('metrics', handlers.metrics);
 
   return socket;
 };
