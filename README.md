@@ -284,6 +284,31 @@ npm run build
 npm run test
 ```
 
+### 共通型定義（shared パッケージ）について
+
+`shared/`ディレクトリには、バックエンドとフロントエンドで共有する型定義を配置しています。
+
+**現在の実装（開発環境）:**
+- `tsx`を使用して`.ts`ファイルを直接インポート
+- パス: `import type { Type } from '../../../shared/src/index.js'`
+- 開発中はビルド不要で動作
+
+**将来の本番対応（TODO）:**
+- `tsconfig.json`の`paths`を使用したエイリアス設定に移行予定
+- 設定例:
+  ```json
+  {
+    "compilerOptions": {
+      "baseUrl": ".",
+      "paths": {
+        "@shared/*": ["../shared/src/*"]
+      }
+    }
+  }
+  ```
+- 使用例: `import type { Type } from '@shared/index.js'`
+- これにより開発環境と本番環境で同じコードが動作
+
 ## ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。

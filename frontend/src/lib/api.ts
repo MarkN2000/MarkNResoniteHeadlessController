@@ -256,3 +256,124 @@ export interface ResoniteUsersSearchResponse {
 
 export const searchResoniteUsers = (username: string) =>
   request(`/server/resonite-users-search?name=${encodeURIComponent(username)}`) as Promise<ResoniteUsersSearchResponse>;
+
+// ============================================================
+// 自動再起動機能のAPI
+// ============================================================
+
+export interface ScheduledRestartEntry {
+  id: string;
+  enabled: boolean;
+  type: 'specific' | 'weekly' | 'daily';
+  specificDate?: {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+  };
+  weeklyDay?: number;
+  weeklyTime?: {
+    hour: number;
+    minute: number;
+  };
+  dailyTime?: {
+    hour: number;
+    minute: number;
+  };
+  configFile: string;
+}
+
+export interface RestartConfig {
+  triggers: {
+    scheduled: {
+      enabled: boolean;
+      schedules: ScheduledRestartEntry[];
+    };
+    highLoad: {
+      enabled: boolean;
+      cpuThreshold: number;
+      memoryThreshold: number;
+      durationMinutes: number;
+    };
+    userZero: {
+      enabled: boolean;
+      minUptimeMinutes: number;
+    };
+  };
+  preRestartActions: {
+    waitControl: {
+      waitForZeroUsers: number;
+      forceRestartTimeout: number;
+      actionTiming: number;
+    };
+    chatMessage: {
+      enabled: boolean;
+      message: string;
+    };
+    itemSpawn: {
+      enabled: boolean;
+      itemType: string;
+      message: string;
+    };
+    sessionChanges: {
+      setPrivate: boolean;
+      setMaxUserToOne: boolean;
+      changeSessionName: {
+        enabled: boolean;
+        newName: string;
+      };
+    };
+  };
+  failsafe: {
+    retryCount: number;
+    retryIntervalSeconds: number;
+  };
+}
+
+export interface RestartStatus {
+  nextScheduledRestart: {
+    scheduleId: string | null;
+    datetime: string | null;
+    configFile: string | null;
+  };
+  currentUptime: number;
+  lastRestart: {
+    timestamp: string | null;
+    trigger: 'scheduled' | 'highLoad' | 'userZero' | 'manual' | 'forced' | null;
+    scheduleId?: string;
+  };
+  highLoadTriggerDisabledUntil: string | null;
+  restartInProgress: boolean;
+  waitingForUsers: boolean;
+}
+
+/**
+ * 再起動設定を取得
+ */
+export const getRestartConfig = () =>
+  request('/restart/config') as Promise<RestartConfig>;
+
+/**
+ * 再起動設定を保存
+ */
+export const saveRestartConfig = (config: RestartConfig) =>
+  request('/restart/config', {
+    method: 'POST',
+    body: JSON.stringify(config)
+  }) as Promise<{ success: boolean; message: string }>;
+
+/**
+ * 再起動ステータスを取得
+ */
+export const getRestartStatus = () =>
+  request('/restart/status') as Promise<RestartStatus>;
+
+/**
+ * 手動で再起動をトリガー
+ */
+export const triggerRestart = (type: 'manual' | 'forced') =>
+  request('/restart/trigger', {
+    method: 'POST',
+    body: JSON.stringify({ type })
+  }) as Promise<{ success: boolean; message: string }>;

@@ -4,11 +4,13 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { SERVER_PORT } from './config/index.js';
-import { apiRouter } from './http/index.js';
+import { createApiRouter } from './http/index.js';
 import { registerSocketHandlers } from './ws/index.js';
 import { cidrRestriction } from './middleware/cidr.js';
 import { getCorsConfig, dynamicOriginCheck } from './config/cors.js';
 import { systemMetricsCollector } from './services/systemMetrics.js';
+import { processManager } from './services/processManager.js';
+import { RestartManager } from './services/restartManager.js';
 
 const app = express();
 
@@ -21,6 +23,15 @@ app.use(cors(corsConfig));
 
 app.use(express.json({ limit: '10mb' })); // リクエストサイズ制限
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URLエンコードされたデータの制限
+
+// RestartManagerを初期化
+const restartManager = new RestartManager(processManager);
+restartManager.initialize().catch((error) => {
+  console.error('[App] Failed to initialize RestartManager:', error);
+});
+
+// APIルートを設定（RestartManagerを渡す）
+const apiRouter = createApiRouter(restartManager);
 app.use('/api', apiRouter);
 
 const httpServer = createServer(app);

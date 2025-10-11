@@ -1,0 +1,46 @@
+{
+  "triggers": {
+    "scheduled": {
+      "enabled": true,
+      "schedules": []
+    },
+    "highLoad": {
+      "enabled": false,
+      "cpuThreshold": 80,
+      "memoryThreshold": 80,
+      "durationMinutes": 10
+    },
+    "userZero": {
+      "enabled": false,
+      "minUptimeMinutes": 240
+    }
+  },
+  "preRestartActions": {
+    "waitControl": {
+      "waitForZeroUsers": 5,
+      "forceRestartTimeout": 120,
+      "actionTiming": 2
+    },
+    "chatMessage": {
+      "enabled": false,
+      "message": "🔄 サーバーが間もなく再起動します。"
+    },
+    "itemSpawn": {
+      "enabled": false,
+      "itemType": "Dev Tooltip",
+      "message": "🔄 サーバー再起動通知"
+    },
+    "sessionChanges": {
+      "setPrivate": false,
+      "setMaxUserToOne": true,
+      "changeSessionName": {
+        "enabled": false,
+        "newName": "[再起動します]"
+      }
+    }
+  },
+  "failsafe": {
+    "retryCount": 3,
+    "retryIntervalSeconds": 30
+  }
+}

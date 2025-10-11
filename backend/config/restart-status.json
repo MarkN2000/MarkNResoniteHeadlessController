@@ -1,0 +1,15 @@
+{
+  "nextScheduledRestart": {
+    "scheduleId": null,
+    "datetime": null,
+    "configFile": null
+  },
+  "currentUptime": 0,
+  "lastRestart": {
+    "timestamp": null,
+    "trigger": null
+  },
+  "highLoadTriggerDisabledUntil": null,
+  "restartInProgress": false,
+  "waitingForUsers": false
+}
