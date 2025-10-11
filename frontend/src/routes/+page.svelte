@@ -2497,6 +2497,7 @@
     try {
       const result = await postCommand(commandText);
       commandResult = typeof result === 'string' ? result : JSON.stringify(result);
+      commandText = ''; // コマンド実行成功後に入力欄を空にする
     } catch (error) {
       commandResult = error instanceof Error ? error.message : 'コマンドを実行できませんでした';
     } finally {
