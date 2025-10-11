@@ -277,6 +277,7 @@
   let friendSendLoading = false;
   let friendAcceptLoading = false;
   let friendRemoveLoading = false;
+  let friendInviteLoading = false;
 
   // World search state
   let worldSearchTerm = '';
@@ -2351,6 +2352,32 @@
     }
   };
 
+  const inviteToFocusedSession = async () => {
+    if (!selectedFriendUser) {
+      pushToast('ユーザーを選択してください', 'error');
+      return;
+    }
+
+    if (!runtimeWorlds?.focusedSessionId) {
+      pushToast('フォーカス中のセッションがありません', 'error');
+      return;
+    }
+
+    if (friendInviteLoading) return;
+    friendInviteLoading = true;
+
+    try {
+      const username = selectedFriendUser.username || selectedFriendUser.id;
+      await postCommand(`invite ${JSON.stringify(username)}`);
+      pushToast(`${username} をフォーカス中のセッション (${runtimeWorlds.focusedSessionName || runtimeWorlds.focusedSessionId}) に招待しました`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '招待に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      friendInviteLoading = false;
+    }
+  };
+
   const executeCommand = async () => {
     if (commandLoading) return;
     commandLoading = true;
@@ -3342,6 +3369,17 @@
                           disabled={!$status.running || friendRemoveLoading}
                         >
                           {friendRemoveLoading ? '解除中...' : 'フレンド解除'}
+                        </button>
+                      </div>
+
+                      <div class="action-buttons">
+                        <button 
+                          type="button" 
+                          class="save"
+                          on:click={inviteToFocusedSession}
+                          disabled={!$status.running || friendInviteLoading || !runtimeWorlds?.focusedSessionId}
+                        >
+                          {friendInviteLoading ? '招待中...' : 'フォーカス中のセッションに招待'}
                         </button>
                       </div>
 
