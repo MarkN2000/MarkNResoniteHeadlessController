@@ -4315,11 +4315,33 @@
                         <label>
                           <span>アイテム種類</span>
                           <div class="field-row">
-                            <select bind:value={restartConfig.preRestartActions.itemSpawn.itemType}>
-                              <option value="Dev Tooltip">Dev Tooltip</option>
-                              <option value="Text">Text</option>
-                              <option value="Notification">Notification</option>
+                            <select 
+                              bind:value={restartConfig.preRestartActions.itemSpawn.itemType}
+                              on:change={(e) => {
+                                if (!restartConfig) return;
+                                const target = e.target as HTMLSelectElement;
+                                if (target.value === 'とらぞセッション閉店アナウンス') {
+                                  restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8';
+                                } else if (target.value === 'テキスト読み上げ') {
+                                  restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1';
+                                }
+                              }}
+                            >
+                              <option value="とらぞセッション閉店アナウンス">とらぞセッション閉店アナウンス</option>
+                              <option value="テキスト読み上げ">テキスト読み上げ</option>
                             </select>
+                          </div>
+                        </label>
+                        
+                        <label>
+                          <span>アイテムURL</span>
+                          <div class="field-row">
+                            <input 
+                              type="text"
+                              bind:value={restartConfig.preRestartActions.itemSpawn.itemUrl}
+                              placeholder="resrec:///U-MarkN/R-..."
+                              style="flex: 1;"
+                            />
                           </div>
                         </label>
                         

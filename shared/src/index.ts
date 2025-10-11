@@ -76,6 +76,7 @@ export interface RestartConfig {
     itemSpawn: {
       enabled: boolean;
       itemType: string;
+      itemUrl: string;
       message: string;
     };
     // セッション設定変更

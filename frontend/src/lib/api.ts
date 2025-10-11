@@ -314,6 +314,7 @@ export interface RestartConfig {
     itemSpawn: {
       enabled: boolean;
       itemType: string;
+      itemUrl: string;
       message: string;
     };
     sessionChanges: {

@@ -35,7 +35,8 @@ const DEFAULT_CONFIG: RestartConfig = {
     },
     itemSpawn: {
       enabled: false,
-      itemType: 'Dev Tooltip',
+      itemType: 'とらぞセッション閉店アナウンス',
+      itemUrl: 'resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8',
       message: '🔄 サーバー再起動通知'
     },
     sessionChanges: {

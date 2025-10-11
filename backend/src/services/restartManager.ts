@@ -471,17 +471,67 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
-   * 警告アイテムをスポーン
+   * 警告アイテムを全セッションにスポーン
    */
   private async spawnWarningItem(itemType: string, message: string): Promise<void> {
     console.log(`[RestartManager] Spawning warning item: ${itemType}`);
     
+    if (!this.config) return;
+    
     try {
-      // TODO: アイテムのURLを設定から取得
-      // 現時点では単純なスポーンコマンドのみ
+      const itemUrl = this.config.preRestartActions.itemSpawn.itemUrl;
       
-      // dynamicImpulseStringでメッセージを送信
-      await this.processManager.sendCommand(`dynamicimpulsestring RestartWarning "${message}"`);
+      if (!itemUrl) {
+        console.error('[RestartManager] Item URL not configured');
+        return;
+      }
+      
+      // worldsコマンドでセッション一覧を取得
+      const worldsOutput = await this.processManager.sendCommand('worlds');
+      const worlds = this.parseWorldsOutput(worldsOutput);
+      
+      if (worlds.length === 0) {
+        console.log('[RestartManager] No worlds found');
+        return;
+      }
+      
+      // 各セッションにアイテムをスポーン
+      for (const world of worlds) {
+        try {
+          // セッションにフォーカス
+          await this.processManager.sendCommand(`focus ${world.index}`);
+          console.log(`[RestartManager] Spawning item in ${world.name}...`);
+          
+          // アイテムをスポーン
+          await this.processManager.sendCommand(`spawn ${itemUrl} true`);
+          console.log(`[RestartManager] Spawned ${itemType} in ${world.name}`);
+          
+        } catch (error) {
+          console.error(`[RestartManager] Failed to spawn item in ${world.name}:`, error);
+          // エラーが発生しても次のセッションに進む
+        }
+      }
+      
+      console.log('[RestartManager] Waiting 10 seconds before sending dynamic impulse...');
+      // 10秒待機
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      // 全セッションに対してdynamicImpulseStringを送信
+      for (const world of worlds) {
+        try {
+          // セッションにフォーカス
+          await this.processManager.sendCommand(`focus ${world.index}`);
+          
+          // dynamicImpulseStringでメッセージを送信
+          await this.processManager.sendCommand(`dynamicimpulsestring MRHC "${message}"`);
+          console.log(`[RestartManager] Sent dynamic impulse to ${world.name}`);
+          
+        } catch (error) {
+          console.error(`[RestartManager] Failed to send dynamic impulse to ${world.name}:`, error);
+        }
+      }
+      
+      console.log('[RestartManager] Warning items spawned in all worlds');
       
     } catch (error) {
       console.error('[RestartManager] Failed to spawn warning item:', error);

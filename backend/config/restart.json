@@ -18,7 +18,7 @@
   "preRestartActions": {
     "waitControl": {
       "waitForZeroUsers": 1,
-      "forceRestartTimeout": 2,
+      "forceRestartTimeout": 3,
       "actionTiming": 2
     },
     "chatMessage": {
@@ -27,8 +27,9 @@
     },
     "itemSpawn": {
       "enabled": true,
-      "itemType": "Dev Tooltip",
-      "message": "🔄 サーバー再起動通知"
+      "itemType": "とらぞセッション閉店アナウンス",
+      "message": "🔄 サーバー再起動通知",
+      "itemUrl": "resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8"
     },
     "sessionChanges": {
       "setPrivate": true,
