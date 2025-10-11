@@ -374,25 +374,100 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
-   * チャットメッセージを全セッションに送信
+   * チャットメッセージを全セッションのAFKではないユーザーに送信
    */
   private async sendChatMessage(message: string): Promise<void> {
-    console.log('[RestartManager] Sending chat message:', message);
+    console.log('[RestartManager] Sending chat message to all active users:', message);
     
     try {
       // worldsコマンドでセッション一覧を取得
       const worldsOutput = await this.processManager.sendCommand('worlds');
+      const worlds = this.parseWorldsOutput(worldsOutput);
       
-      // 各セッションにフォーカスしてメッセージを送信
-      // TODO: worldsの出力をパースして各セッションに送信
-      // 現時点では単純にメッセージを送信
+      if (worlds.length === 0) {
+        console.log('[RestartManager] No worlds found');
+        return;
+      }
       
-      // 全体へのブロードキャストメッセージを送信（実装簡略化のため）
-      await this.processManager.sendCommand(`message * ${message}`);
+      // 各セッションに対して処理
+      for (const world of worlds) {
+        try {
+          // セッションにフォーカス
+          await this.processManager.sendCommand(`focus ${world.index}`);
+          
+          // そのセッションのユーザー一覧を取得
+          const usersOutput = await this.processManager.sendCommand('users');
+          const users = this.parseUsersOutput(usersOutput);
+          
+          // AFKではないユーザーにメッセージを送信
+          for (const user of users) {
+            if (!user.present) {
+              // AFKユーザーはスキップ
+              console.log(`[RestartManager] Skipping AFK user: ${user.username}`);
+              continue;
+            }
+            
+            // アクティブなユーザーにメッセージ送信
+            await this.processManager.sendCommand(`message "${user.username}" ${message}`);
+            console.log(`[RestartManager] Sent message to ${user.username} in ${world.name}`);
+          }
+        } catch (error) {
+          console.error(`[RestartManager] Failed to send message to world ${world.name}:`, error);
+          // エラーが発生しても次のセッションに進む
+        }
+      }
+      
+      console.log('[RestartManager] Chat message sent to all active users');
       
     } catch (error) {
       console.error('[RestartManager] Failed to send chat message:', error);
     }
+  }
+
+  /**
+   * worldsコマンドの出力をパース
+   * 例: [0] MarkN_headless_test             Users: 1    Present: 0      AccessLevel: LAN        MaxUsers: 16
+   */
+  private parseWorldsOutput(output: string): Array<{ index: number; name: string; users: number }> {
+    const worlds: Array<{ index: number; name: string; users: number }> = [];
+    const lines = output.split('\n');
+    
+    for (const line of lines) {
+      // [0] で始まる行を探す
+      const match = line.match(/^\[(\d+)\]\s+(.+?)\s+Users:\s+(\d+)/);
+      if (match) {
+        const index = parseInt(match[1], 10);
+        const name = match[2].trim();
+        const users = parseInt(match[3], 10);
+        
+        worlds.push({ index, name, users });
+      }
+    }
+    
+    return worlds;
+  }
+
+  /**
+   * usersコマンドの出力をパース
+   * 例: MarkN_headless  ID: U-1NzqeqewOpM       Role: Admin     Present: False  Ping: 0 ms      FPS: 60.073162  Silenced: False
+   */
+  private parseUsersOutput(output: string): Array<{ username: string; userId: string; present: boolean }> {
+    const users: Array<{ username: string; userId: string; present: boolean }> = [];
+    const lines = output.split('\n');
+    
+    for (const line of lines) {
+      // ユーザー情報の行をパース
+      const match = line.match(/^(.+?)\s+ID:\s+(U-[^\s]+)\s+.*Present:\s+(True|False)/);
+      if (match) {
+        const username = match[1].trim();
+        const userId = match[2].trim();
+        const present = match[3] === 'True';
+        
+        users.push({ username, userId, present });
+      }
+    }
+    
+    return users;
   }
 
   /**
@@ -414,26 +489,53 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
-   * セッション設定を変更
+   * セッション設定を全セッションに対して変更
    */
   private async applySessionChanges(changes: RestartConfig['preRestartActions']['sessionChanges']): Promise<void> {
-    console.log('[RestartManager] Applying session changes...');
+    console.log('[RestartManager] Applying session changes to all worlds...');
     
     try {
-      // アクセスレベルをプライベートに変更
-      if (changes.setPrivate) {
-        await this.processManager.sendCommand('accesslevel Private');
+      // worldsコマンドでセッション一覧を取得
+      const worldsOutput = await this.processManager.sendCommand('worlds');
+      const worlds = this.parseWorldsOutput(worldsOutput);
+      
+      if (worlds.length === 0) {
+        console.log('[RestartManager] No worlds found');
+        return;
       }
       
-      // MaxUserを1に変更
-      if (changes.setMaxUserToOne) {
-        await this.processManager.sendCommand('maxusers 1');
+      // 各セッションに対して設定変更を適用
+      for (const world of worlds) {
+        try {
+          // セッションにフォーカス
+          await this.processManager.sendCommand(`focus ${world.index}`);
+          console.log(`[RestartManager] Applying changes to ${world.name}...`);
+          
+          // アクセスレベルをプライベートに変更
+          if (changes.setPrivate) {
+            await this.processManager.sendCommand('accesslevel Private');
+            console.log(`[RestartManager] Set ${world.name} to Private`);
+          }
+          
+          // MaxUserを1に変更
+          if (changes.setMaxUserToOne) {
+            await this.processManager.sendCommand('maxusers 1');
+            console.log(`[RestartManager] Set MaxUsers to 1 for ${world.name}`);
+          }
+          
+          // セッション名を変更
+          if (changes.changeSessionName.enabled && changes.changeSessionName.newName) {
+            await this.processManager.sendCommand(`name "${changes.changeSessionName.newName}"`);
+            console.log(`[RestartManager] Changed name of ${world.name} to "${changes.changeSessionName.newName}"`);
+          }
+          
+        } catch (error) {
+          console.error(`[RestartManager] Failed to apply changes to ${world.name}:`, error);
+          // エラーが発生しても次のセッションに進む
+        }
       }
       
-      // セッション名を変更
-      if (changes.changeSessionName.enabled && changes.changeSessionName.newName) {
-        await this.processManager.sendCommand(`name "${changes.changeSessionName.newName}"`);
-      }
+      console.log('[RestartManager] Session changes applied to all worlds');
       
     } catch (error) {
       console.error('[RestartManager] Failed to apply session changes:', error);

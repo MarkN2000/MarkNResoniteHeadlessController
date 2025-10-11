@@ -5,8 +5,8 @@
       "schedules": []
     },
     "highLoad": {
-      "enabled": false,
-      "cpuThreshold": 10,
+      "enabled": true,
+      "cpuThreshold": 1,
       "memoryThreshold": 80,
       "durationMinutes": 1
     },
@@ -17,24 +17,24 @@
   },
   "preRestartActions": {
     "waitControl": {
-      "waitForZeroUsers": 5,
-      "forceRestartTimeout": 120,
+      "waitForZeroUsers": 1,
+      "forceRestartTimeout": 2,
       "actionTiming": 2
     },
     "chatMessage": {
-      "enabled": false,
+      "enabled": true,
       "message": "🔄 サーバーが間もなく再起動します。"
     },
     "itemSpawn": {
-      "enabled": false,
+      "enabled": true,
       "itemType": "Dev Tooltip",
       "message": "🔄 サーバー再起動通知"
     },
     "sessionChanges": {
-      "setPrivate": false,
+      "setPrivate": true,
       "setMaxUserToOne": true,
       "changeSessionName": {
-        "enabled": false,
+        "enabled": true,
         "newName": "再起動します"
       }
     }
