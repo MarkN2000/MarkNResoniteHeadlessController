@@ -68,6 +68,7 @@
     { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
     { id: 'settings', label: 'コンフィグ作成' },
+    { id: 'restart', label: '自動再起動設定' },
     { id: 'others', label: 'その他' }
   ];
 
@@ -3947,6 +3948,123 @@
             </div>
           </section>
 
+          <!-- 自動再起動設定タブ -->
+          <section class="panel" class:active={activeTab === 'restart'}>
+            <!-- 再起動ボタンセクション -->
+            <div class="config-create-section">
+              <div class="config-controls">
+                <div class="config-create-button">
+                  <button type="button" class="config-create-btn danger-button">
+                    強制再起動
+                  </button>
+                </div>
+                <div class="config-create-button">
+                  <button type="button" class="config-create-btn">
+                    手動再起動トリガー
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-grid two">
+              <!-- 左カラム -->
+              <div class="panel-column">
+                <!-- 1️⃣ 再起動トリガー設定 -->
+                <div class="panel-heading">
+                  <h2>1️⃣ 再起動トリガー設定</h2>
+                </div>
+                <div class="card status-card">
+                  <p class="empty">トリガー設定のUIをここに実装します</p>
+                </div>
+
+                <!-- 2️⃣ 再起動前アクション設定 -->
+                <div class="panel-heading">
+                  <h2>2️⃣ 再起動前アクション設定（全トリガー対象）</h2>
+                </div>
+                <div class="card status-card">
+                  <p class="empty">アクション設定のUIをここに実装します</p>
+                </div>
+              </div>
+
+              <!-- 右カラム -->
+              <div class="panel-column">
+                <!-- 3️⃣ フェールセーフ設定 -->
+                <div class="panel-heading">
+                  <h2>3️⃣ フェールセーフ設定</h2>
+                </div>
+                <div class="card status-card">
+                  <p class="empty">フェールセーフ設定のUIをここに実装します</p>
+                </div>
+
+                <!-- 📊 ステータス表示 -->
+                <div class="panel-heading">
+                  <h2>📊 ステータス表示</h2>
+                </div>
+                <div class="card status-card">
+                  <div class="status-display-list">
+                    <div class="status-display-item">
+                      <span class="status-display-label">次回の予定再起動</span>
+                      <div class="field-row">
+                        <div class="status-display-value">未設定</div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在の稼働時間</span>
+                      <div class="field-row">
+                        <div class="status-display-value">-</div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在のCPU使用率</span>
+                      <div class="field-row">
+                        <div class="status-display-value">-</div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在のメモリ使用率</span>
+                      <div class="field-row">
+                        <div class="status-display-value">-</div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在の合計ユーザー数</span>
+                      <div class="field-row">
+                        <div class="status-display-value">-</div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">最後の再起動</span>
+                      <div class="field-row">
+                        <div class="status-display-value">-</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 保存・リセットボタン -->
+            <div class="config-create-section">
+              <div class="config-controls">
+                <div class="config-create-button">
+                  <button type="button" class="config-create-btn">
+                    設定を保存
+                  </button>
+                </div>
+                <div class="config-create-button">
+                  <button type="button" class="config-create-btn">
+                    リセット
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- その他タブ -->
           <section class="panel" class:active={activeTab === 'others'}>
             <div class="panel-heading">
@@ -5380,6 +5498,39 @@
     justify-content: flex-end;
   }
 
+  /* ステータス表示用のスタイル */
+  .status-display-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .status-display-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.34rem 0.55rem;
+    background: #11151d;
+    border-radius: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .status-display-label {
+    color: #f5f5f5;
+    font-weight: 600;
+  }
+
+  .status-display-value {
+    padding: 0.5rem 0.75rem;
+    background: rgba(17, 21, 29, 0.6);
+    border-radius: 0.5rem;
+    color: #e1e1e0;
+    font-size: 0.9rem;
+    min-width: 150px;
+    text-align: right;
+  }
+
   .status-card .checkbox-field {
     display: flex;
     align-items: center;
@@ -6217,5 +6368,16 @@
     transform: translateY(-1px);
     filter: brightness(1.08);
   }
+
+  /* 自動再起動設定タブのスタイル */
+  .config-create-btn.danger-button {
+    background: #ff6b6b;
+    color: #ffffff;
+  }
+
+  .config-create-btn.danger-button:hover {
+    background: #ff8787;
+  }
+
 
 </style>
