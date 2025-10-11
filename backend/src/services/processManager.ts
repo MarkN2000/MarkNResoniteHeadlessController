@@ -331,7 +331,7 @@ export class ProcessManager extends EventEmitter {
     });
   }
 
-  stop(gracePeriodMs = 10000, killTimeoutMs = 15000): Promise<void> {
+  stop(gracePeriodMs = 20000, killTimeoutMs = 25000): Promise<void> {
     const child = this.child;
     if (!child) {
       return Promise.reject(new Error('Headless process is not running'));

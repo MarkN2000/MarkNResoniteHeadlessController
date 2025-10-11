@@ -305,23 +305,139 @@ export class RestartManager extends EventEmitter {
     if (!this.config) return;
     
     const { preRestartActions } = this.config;
+    const { waitControl } = preRestartActions;
     
-    // ユーザー0待機
-    await this.waitForZeroUsers(preRestartActions.waitControl);
+    console.log('[RestartManager] Starting pre-restart actions...');
     
-    // TODO: 各アクションの実装は後のタスクで追加
+    // 強制タイムアウトのタイマーを設定
+    const forceRestartTime = waitControl.forceRestartTimeout * 60 * 1000; // 分→ミリ秒
+    const actionTime = waitControl.actionTiming * 60 * 1000; // 分→ミリ秒
+    
+    // アクション実行タイミングを計算（強制再起動のX分前）
+    const actionDelay = forceRestartTime - actionTime;
+    
+    if (actionDelay > 0) {
+      console.log(`[RestartManager] Waiting ${actionDelay / 60000} minutes before executing actions...`);
+      
+      // アクション実行タイミングまで待機
+      await new Promise((resolve) => {
+        this.actionTimer = setTimeout(resolve, actionDelay);
+      });
+      
+      // アクションを実行
+      await this.executeActions();
+      
+      // 残り時間（actionTime）待機
+      console.log(`[RestartManager] Waiting ${actionTime / 60000} minutes before restart...`);
+      await new Promise((resolve) => {
+        this.waitTimer = setTimeout(resolve, actionTime);
+      });
+    } else {
+      // アクション実行タイミングが負の値の場合は即座にアクションを実行
+      await this.executeActions();
+    }
+    
     console.log('[RestartManager] Pre-restart actions completed');
   }
 
   /**
-   * ユーザー0まで待機
+   * 各種アクションを実行
    */
-  private async waitForZeroUsers(waitControl: RestartConfig['preRestartActions']['waitControl']): Promise<void> {
-    return new Promise((resolve) => {
-      // TODO: ユーザー数監視の実装（後のタスクで追加）
-      // 現時点では即座に解決
-      resolve();
-    });
+  private async executeActions(): Promise<void> {
+    if (!this.config) return;
+    
+    const { preRestartActions } = this.config;
+    
+    console.log('[RestartManager] Executing pre-restart actions...');
+    
+    try {
+      // チャットメッセージ送信
+      if (preRestartActions.chatMessage.enabled) {
+        await this.sendChatMessage(preRestartActions.chatMessage.message);
+      }
+      
+      // アイテムスポーン
+      if (preRestartActions.itemSpawn.enabled) {
+        await this.spawnWarningItem(
+          preRestartActions.itemSpawn.itemType,
+          preRestartActions.itemSpawn.message
+        );
+      }
+      
+      // セッション設定変更
+      await this.applySessionChanges(preRestartActions.sessionChanges);
+      
+    } catch (error) {
+      console.error('[RestartManager] Failed to execute some actions:', error);
+      // エラーが発生しても再起動は続行
+    }
+  }
+
+  /**
+   * チャットメッセージを全セッションに送信
+   */
+  private async sendChatMessage(message: string): Promise<void> {
+    console.log('[RestartManager] Sending chat message:', message);
+    
+    try {
+      // worldsコマンドでセッション一覧を取得
+      const worldsOutput = await this.processManager.sendCommand('worlds');
+      
+      // 各セッションにフォーカスしてメッセージを送信
+      // TODO: worldsの出力をパースして各セッションに送信
+      // 現時点では単純にメッセージを送信
+      
+      // 全体へのブロードキャストメッセージを送信（実装簡略化のため）
+      await this.processManager.sendCommand(`message * ${message}`);
+      
+    } catch (error) {
+      console.error('[RestartManager] Failed to send chat message:', error);
+    }
+  }
+
+  /**
+   * 警告アイテムをスポーン
+   */
+  private async spawnWarningItem(itemType: string, message: string): Promise<void> {
+    console.log(`[RestartManager] Spawning warning item: ${itemType}`);
+    
+    try {
+      // TODO: アイテムのURLを設定から取得
+      // 現時点では単純なスポーンコマンドのみ
+      
+      // dynamicImpulseStringでメッセージを送信
+      await this.processManager.sendCommand(`dynamicimpulsestring RestartWarning "${message}"`);
+      
+    } catch (error) {
+      console.error('[RestartManager] Failed to spawn warning item:', error);
+    }
+  }
+
+  /**
+   * セッション設定を変更
+   */
+  private async applySessionChanges(changes: RestartConfig['preRestartActions']['sessionChanges']): Promise<void> {
+    console.log('[RestartManager] Applying session changes...');
+    
+    try {
+      // アクセスレベルをプライベートに変更
+      if (changes.setPrivate) {
+        await this.processManager.sendCommand('accesslevel Private');
+      }
+      
+      // MaxUserを1に変更
+      if (changes.setMaxUserToOne) {
+        await this.processManager.sendCommand('maxusers 1');
+      }
+      
+      // セッション名を変更
+      if (changes.changeSessionName.enabled && changes.changeSessionName.newName) {
+        await this.processManager.sendCommand(`name "${changes.changeSessionName.newName}"`);
+      }
+      
+    } catch (error) {
+      console.error('[RestartManager] Failed to apply session changes:', error);
+    }
   }
 
   /**
@@ -353,8 +469,9 @@ export class RestartManager extends EventEmitter {
         }
         
         // コンフィグファイルが存在するか確認
-        const fs = await import('fs');
-        if (!fs.existsSync(lastConfig)) {
+        try {
+          await fs.access(lastConfig);
+        } catch {
           throw new Error(`Config file not found: ${lastConfig}`);
         }
         

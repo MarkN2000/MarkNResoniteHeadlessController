@@ -1,14 +1,14 @@
 {
   "triggers": {
     "scheduled": {
-      "enabled": true,
+      "enabled": false,
       "schedules": []
     },
     "highLoad": {
       "enabled": false,
-      "cpuThreshold": 80,
+      "cpuThreshold": 10,
       "memoryThreshold": 80,
-      "durationMinutes": 10
+      "durationMinutes": 1
     },
     "userZero": {
       "enabled": false,
@@ -35,7 +35,7 @@
       "setMaxUserToOne": true,
       "changeSessionName": {
         "enabled": false,
-        "newName": "[再起動します]"
+        "newName": "再起動します"
       }
     }
   },

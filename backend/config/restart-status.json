@@ -6,8 +6,8 @@
   },
   "currentUptime": 0,
   "lastRestart": {
-    "timestamp": null,
-    "trigger": null
+    "timestamp": "2025-10-11T07:57:55.129Z",
+    "trigger": "highLoad"
   },
   "highLoadTriggerDisabledUntil": null,
   "restartInProgress": false,
