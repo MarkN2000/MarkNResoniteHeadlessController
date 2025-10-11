@@ -26,6 +26,10 @@
     getClientInfo,
     getResoniteUserFull,
     searchResoniteUsers,
+    getRestartConfig,
+    saveRestartConfig,
+    getRestartStatus,
+    triggerRestart,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -34,7 +38,9 @@
     type RuntimeWorldEntry,
     type ConfigEntry,
     type LogEntry,
-    type ResoniteUserFull
+    type ResoniteUserFull,
+    type RestartConfig,
+    type RestartStatus
   } from '$lib';
 
   const { status, logs, configs, metrics, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
@@ -286,6 +292,15 @@
   let worldSearchError = '';
   let worldSearchResults: WorldSearchItem[] = [];
   let selectedResoniteUrl: string | null = null;
+
+  // Restart management state
+  let restartConfig: RestartConfig | null = null;
+  let restartStatus: RestartStatus | null = null;
+  let restartConfigLoading = false;
+  let restartStatusLoading = false;
+  let restartSaveLoading = false;
+  let forceRestartLoading = false;
+  let manualRestartLoading = false;
 
   // Config generation state
   let configName = '';
@@ -1673,6 +1688,11 @@
     }
   };
 
+  // リアクティブステートメント: 自動再起動タブ切り替え時の処理
+  $: if (activeTab === 'restart' && isAuthenticated && !restartConfig) {
+    loadRestartData();
+  }
+
   onMount(() => {
     // 認証チェック（ブラウザ環境でのみ）
     if (typeof window !== 'undefined') {
@@ -2127,6 +2147,98 @@
     } finally {
       friendMessageLoading = false;
     }
+  };
+
+  // 自動再起動機能 - データ読み込み
+  const loadRestartData = async () => {
+    try {
+      restartConfigLoading = true;
+      restartStatusLoading = true;
+      
+      const [config, status] = await Promise.all([
+        getRestartConfig(),
+        getRestartStatus()
+      ]);
+      
+      restartConfig = config;
+      restartStatus = status;
+    } catch (error) {
+      console.error('[RestartManagement] Failed to load data:', error);
+      pushToast('再起動設定の読み込みに失敗しました', 'error');
+    } finally {
+      restartConfigLoading = false;
+      restartStatusLoading = false;
+    }
+  };
+
+  // 強制再起動ボタン
+  const handleForceRestart = async () => {
+    if (forceRestartLoading) return;
+    
+    if (!confirm('⚠️ 強制再起動を実行しますか？\nこの操作は即座に実行されます。')) {
+      return;
+    }
+    
+    forceRestartLoading = true;
+    try {
+      await triggerRestart('forced');
+      pushToast('強制再起動を開始しました', 'success');
+    } catch (error: any) {
+      const message = error.message || '強制再起動の開始に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      forceRestartLoading = false;
+    }
+  };
+
+  // 手動再起動トリガーボタン
+  const handleManualRestart = async () => {
+    if (manualRestartLoading) return;
+    
+    if (!confirm('手動再起動をトリガーしますか？\n再起動前アクションが実行されます。')) {
+      return;
+    }
+    
+    manualRestartLoading = true;
+    try {
+      await triggerRestart('manual');
+      pushToast('手動再起動をトリガーしました', 'success');
+    } catch (error: any) {
+      const message = error.message || '手動再起動のトリガーに失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      manualRestartLoading = false;
+    }
+  };
+
+  // 再起動設定を保存
+  const handleSaveRestartConfig = async () => {
+    if (!restartConfig || restartSaveLoading) return;
+    
+    restartSaveLoading = true;
+    try {
+      await saveRestartConfig(restartConfig);
+      pushToast('再起動設定を保存しました', 'success');
+      
+      // 保存後にステータスを再読み込み
+      const status = await getRestartStatus();
+      restartStatus = status;
+    } catch (error: any) {
+      const message = error.message || '設定の保存に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      restartSaveLoading = false;
+    }
+  };
+
+  // 再起動設定をリセット
+  const handleResetRestartConfig = async () => {
+    if (!confirm('設定をリセットしますか？\n保存されていない変更は失われます。')) {
+      return;
+    }
+    
+    await loadRestartData();
+    pushToast('設定をリセットしました', 'info');
   };
 
   // フレンド管理タブ - 新機能の関数
@@ -3954,13 +4066,23 @@
             <div class="config-create-section">
               <div class="config-controls">
                 <div class="config-create-button">
-                  <button type="button" class="config-create-btn danger-button">
-                    強制再起動
+                  <button 
+                    type="button" 
+                    class="config-create-btn danger-button"
+                    on:click={handleForceRestart}
+                    disabled={forceRestartLoading}
+                  >
+                    {forceRestartLoading ? '実行中...' : '強制再起動'}
                   </button>
                 </div>
                 <div class="config-create-button">
-                  <button type="button" class="config-create-btn">
-                    手動再起動トリガー
+                  <button 
+                    type="button" 
+                    class="config-create-btn"
+                    on:click={handleManualRestart}
+                    disabled={manualRestartLoading}
+                  >
+                    {manualRestartLoading ? '実行中...' : '手動再起動トリガー'}
                   </button>
                 </div>
               </div>
@@ -3974,7 +4096,117 @@
                   <h2>1️⃣ 再起動トリガー設定</h2>
                 </div>
                 <div class="card status-card">
-                  <p class="empty">トリガー設定のUIをここに実装します</p>
+                  {#if restartConfig}
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <!-- 予定再起動（基本実装） -->
+                      <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem;">
+                        <span style="font-size: 1rem; font-weight: 700;">📅 予定再起動</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.triggers.scheduled.enabled}
+                          />
+                        </div>
+                      </label>
+                      
+                      {#if restartConfig.triggers.scheduled.enabled}
+                        <div style="padding: 0.5rem; background: rgba(97, 209, 250, 0.05); border-radius: 0.5rem; margin: 0.5rem 0;">
+                          <p style="font-size: 0.85rem; color: #61d1fa; margin: 0;">
+                            ℹ️ 予定再起動機能は後のアップデートで実装予定です
+                          </p>
+                        </div>
+                      {/if}
+                      
+                      <!-- 高負荷時再起動 -->
+                      <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem; margin-top: 1rem;">
+                        <span style="font-size: 1rem; font-weight: 700;">⚡ 高負荷時再起動</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.triggers.highLoad.enabled}
+                          />
+                        </div>
+                      </label>
+                      
+                      {#if restartConfig.triggers.highLoad.enabled}
+                        <label>
+                          <span>CPU閾値</span>
+                          <div class="field-row">
+                            <input 
+                              type="number" 
+                              min="10" 
+                              max="100"
+                              bind:value={restartConfig.triggers.highLoad.cpuThreshold}
+                              placeholder="80"
+                            />
+                            <span style="color: #a0a0a0; font-size: 0.9rem;">%</span>
+                          </div>
+                        </label>
+                        
+                        <label>
+                          <span>メモリ閾値</span>
+                          <div class="field-row">
+                            <input 
+                              type="number" 
+                              min="10" 
+                              max="100"
+                              bind:value={restartConfig.triggers.highLoad.memoryThreshold}
+                              placeholder="80"
+                            />
+                            <span style="color: #a0a0a0; font-size: 0.9rem;">%</span>
+                          </div>
+                        </label>
+                        
+                        <label>
+                          <span>継続時間</span>
+                          <div class="field-row">
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max="120"
+                              bind:value={restartConfig.triggers.highLoad.durationMinutes}
+                              placeholder="10"
+                            />
+                            <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
+                          </div>
+                        </label>
+                      {/if}
+                      
+                      <!-- ユーザー0時再起動 -->
+                      <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem; margin-top: 1rem;">
+                        <span style="font-size: 1rem; font-weight: 700;">👤 ユーザー0時再起動</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.triggers.userZero.enabled}
+                          />
+                        </div>
+                      </label>
+                      
+                      {#if restartConfig.triggers.userZero.enabled}
+                        <label>
+                          <span>最小稼働時間</span>
+                          <div class="field-row">
+                            <input 
+                              type="number" 
+                              min="0" 
+                              max="1440"
+                              bind:value={restartConfig.triggers.userZero.minUptimeMinutes}
+                              placeholder="240"
+                            />
+                            <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
+                          </div>
+                        </label>
+                        <div style="padding: 0.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.5rem; margin-top: 0.5rem;">
+                          <p style="font-size: 0.8rem; color: #a0a0a0; margin: 0;">
+                            ※ 複数人→0人に減った瞬間のみ発動（0人継続中は無視）
+                          </p>
+                        </div>
+                      {/if}
+                    </form>
+                  {:else}
+                    <p class="empty">設定を読み込み中...</p>
+                  {/if}
                 </div>
 
                 <!-- 2️⃣ 再起動前アクション設定 -->
@@ -3982,7 +4214,159 @@
                   <h2>2️⃣ 再起動前アクション設定（全トリガー対象）</h2>
                 </div>
                 <div class="card status-card">
-                  <p class="empty">アクション設定のUIをここに実装します</p>
+                  {#if restartConfig}
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <!-- 待機制御 -->
+                      <label>
+                        <span>再起動待機</span>
+                        <div class="field-row">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="120"
+                            bind:value={restartConfig.preRestartActions.waitControl.waitForZeroUsers}
+                            placeholder="5"
+                          />
+                          <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
+                        </div>
+                      </label>
+                      
+                      <label>
+                        <span>強制実行タイムアウト</span>
+                        <div class="field-row">
+                          <input 
+                            type="number" 
+                            min="1" 
+                            max="1440"
+                            bind:value={restartConfig.preRestartActions.waitControl.forceRestartTimeout}
+                            placeholder="120"
+                          />
+                          <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
+                        </div>
+                      </label>
+                      
+                      <label>
+                        <span>アクション実行タイミング</span>
+                        <div class="field-row">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="30"
+                            bind:value={restartConfig.preRestartActions.waitControl.actionTiming}
+                            placeholder="2"
+                          />
+                          <span style="color: #a0a0a0; font-size: 0.9rem;">分前</span>
+                        </div>
+                      </label>
+                      
+                      <!-- チャットメッセージ -->
+                      <label>
+                        <span>💬 チャットメッセージ送信</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.preRestartActions.chatMessage.enabled}
+                          />
+                        </div>
+                      </label>
+                      
+                      {#if restartConfig.preRestartActions.chatMessage.enabled}
+                        <label>
+                          <span>メッセージ内容</span>
+                          <div class="field-row">
+                            <textarea 
+                              bind:value={restartConfig.preRestartActions.chatMessage.message}
+                              placeholder="🔄 サーバーが間もなく再起動します。"
+                              rows="2"
+                              style="flex: 1; padding: 0.5rem; background: rgba(17, 21, 29, 0.6); border: 1px solid #2b2f35; border-radius: 0.5rem; color: #e1e1e0; resize: vertical;"
+                            ></textarea>
+                          </div>
+                        </label>
+                      {/if}
+                      
+                      <!-- アイテムスポーン警告 -->
+                      <label>
+                        <span>📦 アイテムスポーン警告</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.preRestartActions.itemSpawn.enabled}
+                          />
+                        </div>
+                      </label>
+                      
+                      {#if restartConfig.preRestartActions.itemSpawn.enabled}
+                        <label>
+                          <span>アイテム種類</span>
+                          <div class="field-row">
+                            <select bind:value={restartConfig.preRestartActions.itemSpawn.itemType}>
+                              <option value="Dev Tooltip">Dev Tooltip</option>
+                              <option value="Text">Text</option>
+                              <option value="Notification">Notification</option>
+                            </select>
+                          </div>
+                        </label>
+                        
+                        <label>
+                          <span>メッセージ内容</span>
+                          <div class="field-row">
+                            <textarea 
+                              bind:value={restartConfig.preRestartActions.itemSpawn.message}
+                              placeholder="🔄 サーバー再起動通知"
+                              rows="2"
+                              style="flex: 1; padding: 0.5rem; background: rgba(17, 21, 29, 0.6); border: 1px solid #2b2f35; border-radius: 0.5rem; color: #e1e1e0; resize: vertical;"
+                            ></textarea>
+                          </div>
+                        </label>
+                      {/if}
+                      
+                      <!-- セッション設定変更 -->
+                      <label>
+                        <span>🚫 アクセスレベル→プライベート</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.preRestartActions.sessionChanges.setPrivate}
+                          />
+                        </div>
+                      </label>
+                      
+                      <label>
+                        <span>👥 MaxUser→1</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.preRestartActions.sessionChanges.setMaxUserToOne}
+                          />
+                        </div>
+                      </label>
+                      
+                      <label>
+                        <span>📝 セッション名変更</span>
+                        <div class="field-row">
+                          <input 
+                            type="checkbox" 
+                            bind:checked={restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled}
+                          />
+                        </div>
+                      </label>
+                      
+                      {#if restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled}
+                        <label>
+                          <span>変更後の名前</span>
+                          <div class="field-row">
+                            <input 
+                              type="text" 
+                              bind:value={restartConfig.preRestartActions.sessionChanges.changeSessionName.newName}
+                              placeholder="[再起動します]"
+                            />
+                          </div>
+                        </label>
+                      {/if}
+                    </form>
+                  {:else}
+                    <p class="empty">設定を読み込み中...</p>
+                  {/if}
                 </div>
               </div>
 
@@ -3993,7 +4377,39 @@
                   <h2>3️⃣ フェールセーフ設定</h2>
                 </div>
                 <div class="card status-card">
-                  <p class="empty">フェールセーフ設定のUIをここに実装します</p>
+                  {#if restartConfig}
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <label>
+                        <span>リトライ回数</span>
+                        <div class="field-row">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="10"
+                            bind:value={restartConfig.failsafe.retryCount}
+                            placeholder="3"
+                          />
+                          <span style="color: #a0a0a0; font-size: 0.9rem;">回</span>
+                        </div>
+                      </label>
+                      
+                      <label>
+                        <span>リトライ間隔</span>
+                        <div class="field-row">
+                          <input 
+                            type="number" 
+                            min="1" 
+                            max="300"
+                            bind:value={restartConfig.failsafe.retryIntervalSeconds}
+                            placeholder="30"
+                          />
+                          <span style="color: #a0a0a0; font-size: 0.9rem;">秒</span>
+                        </div>
+                      </label>
+                    </form>
+                  {:else}
+                    <p class="empty">設定を読み込み中...</p>
+                  {/if}
                 </div>
 
                 <!-- 📊 ステータス表示 -->
@@ -4005,42 +4421,85 @@
                     <div class="status-display-item">
                       <span class="status-display-label">次回の予定再起動</span>
                       <div class="field-row">
-                        <div class="status-display-value">未設定</div>
+                        <div class="status-display-value">
+                          {#if restartStatus?.nextScheduledRestart.datetime}
+                            {new Date(restartStatus.nextScheduledRestart.datetime).toLocaleString('ja-JP')}
+                            {#if restartStatus.nextScheduledRestart.configFile}
+                              ({restartStatus.nextScheduledRestart.configFile})
+                            {/if}
+                          {:else}
+                            未設定
+                          {/if}
+                        </div>
                       </div>
                     </div>
                     
                     <div class="status-display-item">
                       <span class="status-display-label">現在の稼働時間</span>
                       <div class="field-row">
-                        <div class="status-display-value">-</div>
+                        <div class="status-display-value">
+                          {#if restartStatus && restartStatus.currentUptime > 0}
+                            {Math.floor(restartStatus.currentUptime / 3600)}時間
+                            {Math.floor((restartStatus.currentUptime % 3600) / 60)}分
+                          {:else}
+                            -
+                          {/if}
+                        </div>
                       </div>
                     </div>
                     
                     <div class="status-display-item">
                       <span class="status-display-label">現在のCPU使用率</span>
                       <div class="field-row">
-                        <div class="status-display-value">-</div>
+                        <div class="status-display-value">
+                          {#if $metrics}
+                            {$metrics.cpu.usage.toFixed(1)}%
+                          {:else}
+                            -
+                          {/if}
+                        </div>
                       </div>
                     </div>
                     
                     <div class="status-display-item">
                       <span class="status-display-label">現在のメモリ使用率</span>
                       <div class="field-row">
-                        <div class="status-display-value">-</div>
+                        <div class="status-display-value">
+                          {#if $metrics}
+                            {$metrics.memory.usage.toFixed(1)}%
+                          {:else}
+                            -
+                          {/if}
+                        </div>
                       </div>
                     </div>
                     
                     <div class="status-display-item">
                       <span class="status-display-label">現在の合計ユーザー数</span>
                       <div class="field-row">
-                        <div class="status-display-value">-</div>
+                        <div class="status-display-value">
+                          {#if runtimeWorlds}
+                            {runtimeWorlds.data.reduce((sum: number, w: RuntimeWorldEntry) => sum + Math.max(0, (w.currentUsers || 0) - 1), 0)}人
+                          {:else}
+                            -
+                          {/if}
+                        </div>
                       </div>
                     </div>
                     
                     <div class="status-display-item">
                       <span class="status-display-label">最後の再起動</span>
                       <div class="field-row">
-                        <div class="status-display-value">-</div>
+                        <div class="status-display-value">
+                          {#if restartStatus?.lastRestart.timestamp}
+                            {new Date(restartStatus.lastRestart.timestamp).toLocaleString('ja-JP')}
+                            {#if restartStatus.lastRestart.trigger}
+                              (トリガー: {restartStatus.lastRestart.trigger})
+                            {/if}
+                          {:else}
+                            -
+                          {/if}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -4052,12 +4511,21 @@
             <div class="config-create-section">
               <div class="config-controls">
                 <div class="config-create-button">
-                  <button type="button" class="config-create-btn">
-                    設定を保存
+                  <button 
+                    type="button" 
+                    class="config-create-btn"
+                    on:click={handleSaveRestartConfig}
+                    disabled={restartSaveLoading || !restartConfig}
+                  >
+                    {restartSaveLoading ? '保存中...' : '設定を保存'}
                   </button>
                 </div>
                 <div class="config-create-button">
-                  <button type="button" class="config-create-btn">
+                  <button 
+                    type="button" 
+                    class="config-create-btn"
+                    on:click={handleResetRestartConfig}
+                  >
                     リセット
                   </button>
                 </div>
