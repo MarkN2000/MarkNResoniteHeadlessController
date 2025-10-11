@@ -6,7 +6,7 @@
     },
     "highLoad": {
       "enabled": true,
-      "cpuThreshold": 1,
+      "cpuThreshold": 80,
       "memoryThreshold": 80,
       "durationMinutes": 1
     },

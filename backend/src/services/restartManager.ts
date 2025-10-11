@@ -29,6 +29,11 @@ export class RestartManager extends EventEmitter {
   private waitTimer: NodeJS.Timeout | null = null;
   private forceRestartTimer: NodeJS.Timeout | null = null;
   private actionTimer: NodeJS.Timeout | null = null;
+  private userCheckInterval: NodeJS.Timeout | null = null;
+  
+  // 待機制御用フラグ
+  private actionsExecuted = false;
+  private zeroUserWaitStartTime: number | null = null;
   
   // トリガー監視
   private scheduledWatcher: ScheduledRestartWatcher;
@@ -282,11 +287,15 @@ export class RestartManager extends EventEmitter {
     console.log(`[RestartManager] Restart triggered by: ${trigger}${scheduleId ? ` (schedule #${scheduleId})` : ''}`);
     
     try {
-      // 再起動前アクションを実行
-      await this.executePreRestartActions();
-      
-      // 再起動を実行
-      await this.executeRestart(trigger, scheduleId);
+      // 強制再起動の場合は待機制御をスキップして即座に再起動
+      if (trigger === 'forced') {
+        console.log('[RestartManager] Forced restart: Skipping wait control and actions');
+        await this.executeRestart(trigger, scheduleId);
+      } else {
+        // その他のトリガーは待機制御とアクションを実行
+        await this.executePreRestartActions();
+        await this.executeRestart(trigger, scheduleId);
+      }
       
     } catch (error) {
       console.error('[RestartManager] Restart failed:', error);
@@ -299,7 +308,7 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
-   * 再起動前アクションを実行
+   * 再起動前アクションを実行（待機制御付き）
    */
   private async executePreRestartActions(): Promise<void> {
     if (!this.config) return;
@@ -307,37 +316,127 @@ export class RestartManager extends EventEmitter {
     const { preRestartActions } = this.config;
     const { waitControl } = preRestartActions;
     
-    console.log('[RestartManager] Starting pre-restart actions...');
+    console.log('[RestartManager] Starting pre-restart wait control...');
+    console.log(`[RestartManager] - Wait for zero users: ${waitControl.waitForZeroUsers} minutes`);
+    console.log(`[RestartManager] - Force restart timeout: ${waitControl.forceRestartTimeout} minutes`);
+    console.log(`[RestartManager] - Action timing: ${waitControl.actionTiming} minutes before restart`);
     
-    // 強制タイムアウトのタイマーを設定
+    // フラグをリセット
+    this.actionsExecuted = false;
+    this.zeroUserWaitStartTime = null;
+    this.waitingForUsers = true;
+    this.status.waitingForUsers = true;
+    
     const forceRestartTime = waitControl.forceRestartTimeout * 60 * 1000; // 分→ミリ秒
     const actionTime = waitControl.actionTiming * 60 * 1000; // 分→ミリ秒
+    const actionDelay = forceRestartTime - actionTime; // アクション実行までの待機時間
+    const zeroUserWaitTime = waitControl.waitForZeroUsers * 60 * 1000; // ユーザー0人待機時間
     
-    // アクション実行タイミングを計算（強制再起動のX分前）
-    const actionDelay = forceRestartTime - actionTime;
+    const startTime = Date.now();
     
-    if (actionDelay > 0) {
-      console.log(`[RestartManager] Waiting ${actionDelay / 60000} minutes before executing actions...`);
+    // 待機制御のPromise
+    await new Promise<void>((resolve) => {
+      // 1. 強制再起動タイマー（最終的な強制再起動）
+      this.forceRestartTimer = setTimeout(async () => {
+        console.log('[RestartManager] Force restart timeout reached');
+        
+        // アクションがまだ実行されていない場合は実行
+        if (!this.actionsExecuted) {
+          console.log('[RestartManager] Executing actions before forced restart');
+          await this.executeActions();
+          this.actionsExecuted = true;
+        }
+        
+        resolve();
+      }, forceRestartTime);
       
-      // アクション実行タイミングまで待機
-      await new Promise((resolve) => {
-        this.actionTimer = setTimeout(resolve, actionDelay);
-      });
+      // 2. アクション実行タイマー（強制再起動のX分前）
+      if (actionDelay > 0) {
+        this.actionTimer = setTimeout(async () => {
+          if (!this.actionsExecuted) {
+            console.log(`[RestartManager] Action timing reached (${waitControl.actionTiming} minutes before forced restart)`);
+            await this.executeActions();
+            this.actionsExecuted = true;
+          }
+        }, actionDelay);
+      }
       
-      // アクションを実行
-      await this.executeActions();
+      // 3. ユーザー数チェックインターバル（1分ごと）
+      const USER_CHECK_INTERVAL = 60 * 1000; // 1分
       
-      // 残り時間（actionTime）待機
-      console.log(`[RestartManager] Waiting ${actionTime / 60000} minutes before restart...`);
-      await new Promise((resolve) => {
-        this.waitTimer = setTimeout(resolve, actionTime);
-      });
-    } else {
-      // アクション実行タイミングが負の値の場合は即座にアクションを実行
-      await this.executeActions();
-    }
+      this.userCheckInterval = setInterval(async () => {
+        const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+        console.log(`[RestartManager] User check (elapsed: ${elapsedMinutes} minutes)...`);
+        
+        const userCount = await this.getTotalUserCount();
+        
+        if (userCount < 0) {
+          console.log('[RestartManager] Failed to get user count, skipping this check');
+          return;
+        }
+        
+        console.log(`[RestartManager] Current user count: ${userCount}`);
+        
+        if (userCount === 0) {
+          // ユーザーが0人の場合
+          if (this.zeroUserWaitStartTime === null) {
+            // 0人待機を開始
+            this.zeroUserWaitStartTime = Date.now();
+            console.log(`[RestartManager] Users reached zero. Waiting ${waitControl.waitForZeroUsers} minutes...`);
+          } else {
+            // 0人待機中
+            const zeroWaitElapsed = Date.now() - this.zeroUserWaitStartTime;
+            const zeroWaitRemaining = zeroUserWaitTime - zeroWaitElapsed;
+            
+            console.log(`[RestartManager] Zero user wait: ${Math.floor(zeroWaitRemaining / 60000)} minutes remaining`);
+            
+            if (zeroWaitElapsed >= zeroUserWaitTime) {
+              // 待機時間が経過したので再起動
+              console.log('[RestartManager] Zero user wait completed. Proceeding to restart.');
+              
+              // アクションがまだ実行されていない場合は実行
+              if (!this.actionsExecuted) {
+                console.log('[RestartManager] Executing actions before restart');
+                await this.executeActions();
+                this.actionsExecuted = true;
+              }
+              
+              // タイマーをクリアしてresolve
+              if (this.forceRestartTimer) clearTimeout(this.forceRestartTimer);
+              if (this.actionTimer) clearTimeout(this.actionTimer);
+              if (this.userCheckInterval) clearInterval(this.userCheckInterval);
+              
+              resolve();
+            }
+          }
+        } else {
+          // ユーザーがいる場合は0人待機をリセット
+          if (this.zeroUserWaitStartTime !== null) {
+            console.log('[RestartManager] Users joined. Resetting zero user wait.');
+            this.zeroUserWaitStartTime = null;
+          }
+        }
+      }, USER_CHECK_INTERVAL);
+      
+      // 初回チェックを即座に実行
+      (async () => {
+        const userCount = await this.getTotalUserCount();
+        if (userCount >= 0) {
+          console.log(`[RestartManager] Initial user count: ${userCount}`);
+          if (userCount === 0) {
+            this.zeroUserWaitStartTime = Date.now();
+            console.log(`[RestartManager] Users already zero. Waiting ${waitControl.waitForZeroUsers} minutes...`);
+          }
+        }
+      })();
+    });
     
-    console.log('[RestartManager] Pre-restart actions completed');
+    // タイマーをクリア
+    this.clearAllTimers();
+    this.waitingForUsers = false;
+    this.status.waitingForUsers = false;
+    
+    console.log('[RestartManager] Pre-restart wait control completed');
   }
 
   /**
@@ -351,21 +450,34 @@ export class RestartManager extends EventEmitter {
     console.log('[RestartManager] Executing pre-restart actions...');
     
     try {
+      // worldsコマンドを1回だけ実行して全アクションで共有
+      console.log('[RestartManager] Fetching active worlds...');
+      const worldsOutput = await this.processManager.sendCommand('worlds');
+      const worlds = this.parseWorldsOutput(worldsOutput);
+      
+      if (worlds.length === 0) {
+        console.log('[RestartManager] No active worlds found. Skipping actions.');
+        return;
+      }
+      
+      console.log(`[RestartManager] Found ${worlds.length} active world(s)`);
+      
       // チャットメッセージ送信
       if (preRestartActions.chatMessage.enabled) {
-        await this.sendChatMessage(preRestartActions.chatMessage.message);
+        await this.sendChatMessage(preRestartActions.chatMessage.message, worlds);
       }
       
       // アイテムスポーン
       if (preRestartActions.itemSpawn.enabled) {
         await this.spawnWarningItem(
           preRestartActions.itemSpawn.itemType,
-          preRestartActions.itemSpawn.message
+          preRestartActions.itemSpawn.message,
+          worlds
         );
       }
       
       // セッション設定変更
-      await this.applySessionChanges(preRestartActions.sessionChanges);
+      await this.applySessionChanges(preRestartActions.sessionChanges, worlds);
       
     } catch (error) {
       console.error('[RestartManager] Failed to execute some actions:', error);
@@ -376,19 +488,10 @@ export class RestartManager extends EventEmitter {
   /**
    * チャットメッセージを全セッションのAFKではないユーザーに送信
    */
-  private async sendChatMessage(message: string): Promise<void> {
+  private async sendChatMessage(message: string, worlds: Array<{ index: number; name: string; users: number; present: number }>): Promise<void> {
     console.log('[RestartManager] Sending chat message to all active users:', message);
     
     try {
-      // worldsコマンドでセッション一覧を取得
-      const worldsOutput = await this.processManager.sendCommand('worlds');
-      const worlds = this.parseWorldsOutput(worldsOutput);
-      
-      if (worlds.length === 0) {
-        console.log('[RestartManager] No worlds found');
-        return;
-      }
-      
       // 各セッションに対して処理
       for (const world of worlds) {
         try {
@@ -425,22 +528,44 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
+   * 全セッションの総ユーザー数を取得（Present人数の合計）
+   */
+  private async getTotalUserCount(): Promise<number> {
+    try {
+      const worldsOutput = await this.processManager.sendCommand('worlds');
+      const worlds = this.parseWorldsOutput(worldsOutput);
+      
+      // Present（実際にいる）ユーザーの合計を計算
+      const totalUsers = worlds.reduce((sum, world) => sum + world.present, 0);
+      
+      console.log(`[RestartManager] Total present users: ${totalUsers}`);
+      
+      return totalUsers;
+    } catch (error) {
+      console.error('[RestartManager] Failed to get total user count:', error);
+      return -1; // エラーの場合は-1を返す
+    }
+  }
+
+  /**
    * worldsコマンドの出力をパース
    * 例: [0] MarkN_headless_test             Users: 1    Present: 0      AccessLevel: LAN        MaxUsers: 16
    */
-  private parseWorldsOutput(output: string): Array<{ index: number; name: string; users: number }> {
-    const worlds: Array<{ index: number; name: string; users: number }> = [];
+  private parseWorldsOutput(output: string): Array<{ index: number; name: string; users: number; present: number }> {
+    const worlds: Array<{ index: number; name: string; users: number; present: number }> = [];
     const lines = output.split('\n');
     
     for (const line of lines) {
       // [0] で始まる行を探す
-      const match = line.match(/^\[(\d+)\]\s+(.+?)\s+Users:\s+(\d+)/);
+      const match = line.match(/^\[(\d+)\]\s+(.+?)\s+Users:\s+(\d+)\s+Present:\s+(\d+)/);
       if (match) {
         const index = parseInt(match[1], 10);
         const name = match[2].trim();
         const users = parseInt(match[3], 10);
+        const present = parseInt(match[4], 10);
         
-        worlds.push({ index, name, users });
+        worlds.push({ index, name, users, present });
+        console.log(`[RestartManager] Parsed world: [${index}] ${name} - Users: ${users}, Present: ${present}`);
       }
     }
     
@@ -473,7 +598,7 @@ export class RestartManager extends EventEmitter {
   /**
    * 警告アイテムを全セッションにスポーン
    */
-  private async spawnWarningItem(itemType: string, message: string): Promise<void> {
+  private async spawnWarningItem(itemType: string, message: string, worlds: Array<{ index: number; name: string; users: number; present: number }>): Promise<void> {
     console.log(`[RestartManager] Spawning warning item: ${itemType}`);
     
     if (!this.config) return;
@@ -483,15 +608,6 @@ export class RestartManager extends EventEmitter {
       
       if (!itemUrl) {
         console.error('[RestartManager] Item URL not configured');
-        return;
-      }
-      
-      // worldsコマンドでセッション一覧を取得
-      const worldsOutput = await this.processManager.sendCommand('worlds');
-      const worlds = this.parseWorldsOutput(worldsOutput);
-      
-      if (worlds.length === 0) {
-        console.log('[RestartManager] No worlds found');
         return;
       }
       
@@ -541,19 +657,10 @@ export class RestartManager extends EventEmitter {
   /**
    * セッション設定を全セッションに対して変更
    */
-  private async applySessionChanges(changes: RestartConfig['preRestartActions']['sessionChanges']): Promise<void> {
+  private async applySessionChanges(changes: RestartConfig['preRestartActions']['sessionChanges'], worlds: Array<{ index: number; name: string; users: number; present: number }>): Promise<void> {
     console.log('[RestartManager] Applying session changes to all worlds...');
     
     try {
-      // worldsコマンドでセッション一覧を取得
-      const worldsOutput = await this.processManager.sendCommand('worlds');
-      const worlds = this.parseWorldsOutput(worldsOutput);
-      
-      if (worlds.length === 0) {
-        console.log('[RestartManager] No worlds found');
-        return;
-      }
-      
       // 各セッションに対して設定変更を適用
       for (const world of worlds) {
         try {
@@ -672,6 +779,14 @@ export class RestartManager extends EventEmitter {
       clearTimeout(this.actionTimer);
       this.actionTimer = null;
     }
+    if (this.userCheckInterval) {
+      clearInterval(this.userCheckInterval);
+      this.userCheckInterval = null;
+    }
+    
+    // フラグをリセット
+    this.actionsExecuted = false;
+    this.zeroUserWaitStartTime = null;
   }
 
   /**

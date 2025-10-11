@@ -6,7 +6,7 @@
   },
   "currentUptime": 0,
   "lastRestart": {
-    "timestamp": "2025-10-11T15:53:40.125Z",
+    "timestamp": "2025-10-11T16:35:02.953Z",
     "trigger": "highLoad"
   },
   "highLoadTriggerDisabledUntil": null,
