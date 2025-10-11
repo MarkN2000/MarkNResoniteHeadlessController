@@ -393,8 +393,39 @@ npm run test
   - 修正: 
     - `parseWorldsOutput()`を修正して`present`フィールドも取得するように変更
     - `getTotalUserCount()`をシンプルな`reduce`に変更し、`present`人数を正しく合計
-    - デバッグログを追加してパース結果とユーザー数を出力
+    - **詳細なデバッグログを追加**（原因特定のため）:
+      - worlds コマンドの raw output を出力
+      - パース結果（各セッションの Users / Present 人数）
+      - 総ユーザー数（Present の合計）
+      - 初回チェックと定期チェックの結果
+      - ゼロユーザー待機の経過時間
+      - アクション実行の詳細（どのアクションが実行されたか）
   - **この修正により、待機制御が正しく動作するようになりました**
+- **🔴🔴🔴 最重大バグ: sendCommand() vs executeCommand() の使用ミス**（2024-10-12修正）
+  - **症状**: `worlds` と `users` コマンドが `undefined` を返し、全てのアクションが実行できなかった
+  - **原因**: `ProcessManager.sendCommand()` は **void を返す**メソッドで、コマンドを送信するだけで出力を取得しない
+    - `sendCommand()`: コマンドを stdin に書き込むだけ（戻り値なし）
+    - `executeCommand()`: コマンドを実行して LogEntry[] を返す（出力を取得）
+  - **修正**: 出力を必要とするコマンドを `executeCommand()` に変更
+    - `getTotalUserCount()`: `executeCommand('worlds')` に変更
+    - `executeActions()`: `executeCommand('worlds')` に変更
+    - `sendChatMessage()`: `executeCommand('users')` に変更
+  - **この修正により、コマンド出力が正しく取得でき、アクションが実行されるようになりました**
+- **🔴 チャットメッセージのコマンド構文エラー**（2024-10-12修正）
+  - **症状**: `message "MarkN" 🔄 サーバーが間もなく再起動します。` → `Invalid number of arguments.`
+  - **原因**: 絵文字を含むメッセージが正しくエスケープされていない。メッセージ部分も引用符で囲む必要がある
+  - **修正**: `message "${username}" "${message}"` に変更
+- **🔴 worlds の重複パース問題**（2024-10-12修正）
+  - **症状**: 2つのセッションなのに4つとしてパースされ、各アクションが2回実行されていた
+  - **原因**: `executeCommand('worlds')` の出力に同じ内容が複数回含まれていた
+  - **修正**: `parseWorldsOutput()` で `Map` を使用して index をキーに重複を除去
+- **🔴 dynamicImpulseString のタグ修正**（2024-10-12修正）
+  - **症状**: `Triggered 0 receivers` - インパルスを受信するオブジェクトがない
+  - **原因**: タグが "MRHC" だったが、アイテム側は "MRHC.play" を期待していた
+  - **修正**: タグを `MRHC.play` に変更
+    ```typescript
+    dynamicimpulsestring MRHC.play "${message}"
+    ```
 
 #### ⚠️ 残りタスク（優先度低）
 1. **予定再起動のカード機能** - UI/UX向上（後回し可）
@@ -461,7 +492,7 @@ npm run test
 #### メッセージで警告
 - 強制再起動X分前に全セッションのAFKではないユーザーにチャットメッセージ送信（メッセージ内容を設定）
 #### アイテムで警告
-- 強制再起動X分前にメッセージアイテムをスポーンして、10秒後にdynamicImpulseString で特定の文字列と指定のメッセージをくっつけたstringを送る（アイテムの種類、メッセージを設定）
+- 強制再起動X分前にメッセージアイテムをスポーンして、10秒後にdynamicImpulseString で `MRHC.play` タグと指定のメッセージを送信する（アイテムの種類、メッセージを設定）
 
 #### アクセスレベルをプライベートに変更
 - 強制再起動X分前に全セッションに対してアクセスレベルをプライベートに変更（onoffトグルボタン、デフォルトoff）

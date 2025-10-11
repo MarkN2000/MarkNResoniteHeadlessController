@@ -693,8 +693,11 @@
       // フォーム更新中フラグを立てる
       isFormClearing = true;
       
+      // ファイル名から拡張子を除いた部分を取得
+      const nameWithoutExt = fileName.replace(/\.json$/i, '');
+      
       // 基本設定に反映（ヘルパー関数を使用）
-      configName = configData.comment?.replace('の設定ファイル', '') || 'default';
+      configName = nameWithoutExt || 'default';
       configUsername = configData.loginCredential || '';
       configPassword = ''; // セキュリティのため、読み込み時はパスワードを空にする
       configComment = configData.comment || '';
