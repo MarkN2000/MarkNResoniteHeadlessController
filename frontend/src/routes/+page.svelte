@@ -4102,10 +4102,13 @@
                       <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem;">
                         <span style="font-size: 1rem; font-weight: 700;">📅 予定再起動</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.triggers.scheduled.enabled}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.triggers.scheduled.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.triggers.scheduled.enabled = !restartConfig.triggers.scheduled.enabled; }}
+                          >
+                            {restartConfig && restartConfig.triggers.scheduled.enabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
@@ -4121,10 +4124,13 @@
                       <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem; margin-top: 1rem;">
                         <span style="font-size: 1rem; font-weight: 700;">⚡ 高負荷時再起動</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.triggers.highLoad.enabled}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.triggers.highLoad.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.triggers.highLoad.enabled = !restartConfig.triggers.highLoad.enabled; }}
+                          >
+                            {restartConfig && restartConfig.triggers.highLoad.enabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
@@ -4176,10 +4182,13 @@
                       <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem; margin-top: 1rem;">
                         <span style="font-size: 1rem; font-weight: 700;">👤 ユーザー0時再起動</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.triggers.userZero.enabled}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.triggers.userZero.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.triggers.userZero.enabled = !restartConfig.triggers.userZero.enabled; }}
+                          >
+                            {restartConfig && restartConfig.triggers.userZero.enabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
@@ -4263,10 +4272,13 @@
                       <label>
                         <span>💬 チャットメッセージ送信</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.preRestartActions.chatMessage.enabled}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.preRestartActions.chatMessage.enabled = !restartConfig.preRestartActions.chatMessage.enabled; }}
+                          >
+                            {restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
@@ -4288,10 +4300,13 @@
                       <label>
                         <span>📦 アイテムスポーン警告</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.preRestartActions.itemSpawn.enabled}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.preRestartActions.itemSpawn.enabled = !restartConfig.preRestartActions.itemSpawn.enabled; }}
+                          >
+                            {restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
@@ -4324,30 +4339,39 @@
                       <label>
                         <span>🚫 アクセスレベル→プライベート</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.preRestartActions.sessionChanges.setPrivate}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.setPrivate = !restartConfig.preRestartActions.sessionChanges.setPrivate; }}
+                          >
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
                       <label>
                         <span>👥 MaxUser→1</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.preRestartActions.sessionChanges.setMaxUserToOne}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.setMaxUserToOne = !restartConfig.preRestartActions.sessionChanges.setMaxUserToOne; }}
+                          >
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
                       <label>
                         <span>📝 セッション名変更</span>
                         <div class="field-row">
-                          <input 
-                            type="checkbox" 
-                            bind:checked={restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled}
-                          />
+                          <button
+                            type="button"
+                            class={restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled = !restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled; }}
+                          >
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'オン' : 'オフ'}
+                          </button>
                         </div>
                       </label>
                       
