@@ -3357,6 +3357,7 @@
                       <div class="action-buttons">
                         <button 
                           type="button" 
+                          class="info"
                           on:click={sendFriendRequestToSelected}
                           disabled={!$status.running || friendSendLoading}
                         >
