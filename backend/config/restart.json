@@ -6,7 +6,7 @@
         {
           "id": "schedule-1760245220463",
           "enabled": true,
-          "type": "once",
+          "type": "daily",
           "specificDate": {
             "year": 2025,
             "month": 10,
@@ -20,10 +20,10 @@
             "minute": 0
           },
           "dailyTime": {
-            "hour": 3,
+            "hour": 10,
             "minute": 0
           },
-          "configFile": "Config.json"
+          "configFile": "__previous__"
         }
       ]
     },

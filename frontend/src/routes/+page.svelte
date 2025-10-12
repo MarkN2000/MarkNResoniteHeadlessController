@@ -2226,7 +2226,7 @@
       weeklyDay: 0,
       weeklyTime: { hour: 3, minute: 0 },
       dailyTime: { hour: 3, minute: 0 },
-      configFile: 'default.json'
+      configFile: '__previous__'
     };
     scheduledRestartModalOpen = true;
   };
@@ -4511,7 +4511,7 @@
                                 </div>
                                 <div>
                                   <span style="color: #a0a0a0;">起動コンフィグ:</span>
-                                  {schedule.configFile}
+                                  {schedule.configFile === '__previous__' ? '直前のコンフィグを使用' : schedule.configFile}
                                 </div>
                               </div>
                             </div>
@@ -4595,7 +4595,7 @@
                           {#if restartStatus?.nextScheduledRestart.datetime}
                             {new Date(restartStatus.nextScheduledRestart.datetime).toLocaleString('ja-JP')}
                             {#if restartStatus.nextScheduledRestart.configFile}
-                              ({restartStatus.nextScheduledRestart.configFile})
+                              ({restartStatus.nextScheduledRestart.configFile === '__previous__' ? '直前のコンフィグを使用' : restartStatus.nextScheduledRestart.configFile})
                             {/if}
                           {:else}
                             未設定
@@ -4612,7 +4612,7 @@
                             {#if restartStatus.scheduledRestartPreparing.scheduledTime}
                               {new Date(restartStatus.scheduledRestartPreparing.scheduledTime).toLocaleString('ja-JP')} 予定
                               {#if restartStatus.scheduledRestartPreparing.configFile}
-                                ({restartStatus.scheduledRestartPreparing.configFile})
+                                ({restartStatus.scheduledRestartPreparing.configFile === '__previous__' ? '直前のコンフィグを使用' : restartStatus.scheduledRestartPreparing.configFile})
                               {/if}
                             {/if}
                           </div>
@@ -5073,6 +5073,7 @@
             <label class="modal-label" style="margin-top: 1rem;">
               <span>起動コンフィグファイル</span>
               <select bind:value={editingSchedule.configFile} required>
+                <option value="__previous__">直前のコンフィグを使用</option>
                 {#if $configs && $configs.length > 0}
                   {#each $configs as config}
                     <option value={config.name}>{config.name}</option>

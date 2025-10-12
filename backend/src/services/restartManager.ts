@@ -895,6 +895,44 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
+   * コンフィグファイル名を解決（"__previous__"の場合は現在のコンフィグを使用）
+   */
+  private async resolveConfigFile(configFile: string): Promise<{ fileName: string; fullPath: string } | null> {
+    const projectRoot = path.join(process.cwd(), '..');
+    
+    // "__previous__"の場合は現在のコンフィグを取得
+    if (configFile === '__previous__') {
+      try {
+        const runtimeStatePath = path.join(projectRoot, 'config', 'runtime-state.json');
+        const runtimeStateData = await fs.readFile(runtimeStatePath, 'utf-8');
+        const runtimeState = JSON.parse(runtimeStateData);
+        
+        if (runtimeState.lastStartedConfigPath) {
+          const fileName = path.basename(runtimeState.lastStartedConfigPath);
+          console.log(`[RestartManager] Resolved "__previous__" to: ${fileName}`);
+          return {
+            fileName,
+            fullPath: runtimeState.lastStartedConfigPath
+          };
+        } else {
+          console.error('[RestartManager] No previous config found in runtime-state.json');
+          return null;
+        }
+      } catch (error) {
+        console.error('[RestartManager] Failed to read runtime-state.json:', error);
+        return null;
+      }
+    }
+    
+    // 通常のコンフィグファイル名の場合
+    const configPath = path.join(projectRoot, 'config', 'headless', configFile);
+    return {
+      fileName: configFile,
+      fullPath: configPath
+    };
+  }
+
+  /**
    * 予定再起動の30分前制御を開始
    */
   private async startScheduledRestartPreparation(
@@ -932,22 +970,28 @@ export class RestartManager extends EventEmitter {
       console.log('[RestartManager] ✓ Waiting restart cancelled');
     }
     
-    // 2. lastusedコンフィグを予定のものに変更
+    // 2. コンフィグファイルを解決
+    const resolved = await this.resolveConfigFile(configFile);
+    if (!resolved) {
+      console.error('[RestartManager] ⚠️ Preparation failed: Cannot resolve config file');
+      this.clearScheduledRestartPreparation();
+      return;
+    }
+    
+    // 3. lastusedコンフィグを予定のものに変更
     try {
       // プロジェクトルートのパス（backend/ の親ディレクトリ）
       const projectRoot = path.join(process.cwd(), '..');
-      
       const runtimeStatePath = path.join(projectRoot, 'config', 'runtime-state.json');
-      const configPath = path.join(projectRoot, 'config', 'headless', configFile);
       
-      console.log(`[RestartManager] Checking config file: ${configPath}`);
+      console.log(`[RestartManager] Checking config file: ${resolved.fullPath}`);
       
       // ファイルの存在確認
       try {
-        await fs.access(configPath);
-        console.log(`[RestartManager] Config file exists: ${configPath}`);
+        await fs.access(resolved.fullPath);
+        console.log(`[RestartManager] Config file exists: ${resolved.fullPath}`);
       } catch {
-        console.error(`[RestartManager] Config file not found: ${configPath}`);
+        console.error(`[RestartManager] Config file not found: ${resolved.fullPath}`);
         console.error('[RestartManager] ⚠️ Preparation failed: Config file not found');
         this.clearScheduledRestartPreparation();
         return;
@@ -955,13 +999,13 @@ export class RestartManager extends EventEmitter {
       
       // runtime-state.jsonを更新
       const runtimeState = {
-        lastStartedConfigPath: configPath,
+        lastStartedConfigPath: resolved.fullPath,
         lastStartedAt: new Date().toISOString(),
         lastStoppedAt: null
       };
       
       await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');
-      console.log(`[RestartManager] ✓ Updated lastUsedConfig to: ${configFile}`);
+      console.log(`[RestartManager] ✓ Updated lastUsedConfig to: ${resolved.fileName}`);
       console.log(`[RestartManager] ✓ runtime-state.json path: ${runtimeStatePath}`);
       
     } catch (error) {
@@ -971,7 +1015,7 @@ export class RestartManager extends EventEmitter {
       return;
     }
     
-    // 3. 高負荷トリガーは既にイベントハンドラーで無効化済み
+    // 4. 高負荷トリガーは既にイベントハンドラーで無効化済み
     console.log('[RestartManager] ✓ High load trigger disabled (handled in event listener)');
     
     // ステータスを保存
@@ -1005,33 +1049,39 @@ export class RestartManager extends EventEmitter {
     configFile: string
   ): Promise<void> {
     try {
+      // コンフィグファイルを解決
+      const resolved = await this.resolveConfigFile(configFile);
+      if (!resolved) {
+        console.error('[RestartManager] Cannot resolve config file, restart aborted');
+        return;
+      }
+      
       // プロジェクトルートのパス（backend/ の親ディレクトリ）
       const projectRoot = path.join(process.cwd(), '..');
       
       // runtime-state.jsonを更新
       const runtimeStatePath = path.join(projectRoot, 'config', 'runtime-state.json');
-      const configPath = path.join(projectRoot, 'config', 'headless', configFile);
       
-      console.log(`[RestartManager] Updating config to: ${configPath}`);
+      console.log(`[RestartManager] Updating config to: ${resolved.fullPath}`);
       
       // ファイルの存在確認
       try {
-        await fs.access(configPath);
-        console.log(`[RestartManager] Config file exists: ${configPath}`);
+        await fs.access(resolved.fullPath);
+        console.log(`[RestartManager] Config file exists: ${resolved.fullPath}`);
       } catch {
-        console.error(`[RestartManager] Config file not found: ${configPath}`);
+        console.error(`[RestartManager] Config file not found: ${resolved.fullPath}`);
         return;
       }
       
       // runtime-state.jsonを更新
       const runtimeState = {
-        lastStartedConfigPath: configPath,
+        lastStartedConfigPath: resolved.fullPath,
         lastStartedAt: new Date().toISOString(),
         lastStoppedAt: null
       };
       
       await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');
-      console.log(`[RestartManager] runtime-state.json updated with config: ${configFile}`);
+      console.log(`[RestartManager] runtime-state.json updated with config: ${resolved.fileName}`);
       
       // 再起動を実行
       await this.triggerRestart(trigger, scheduleId);
