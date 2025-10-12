@@ -376,7 +376,7 @@
     denyUserCloudVariable: '',
     requiredUserJoinCloudVariable: '',
     requiredUserJoinCloudVariableDenyMessage: '',
-    awayKickMinutes: null as number | null,
+    awayKickMinutes: 5,
     parentSessionIds: '',
     autoInviteUsernames: '',
     autoInviteMessage: '',
@@ -391,7 +391,7 @@
     useCustomJoinVerifier: false,
     accessLevel: 'Anyone',
     maxUsers: 16,
-    hideFromPublicListing: null as boolean | null,
+    hideFromPublicListing: false,
     showWorldSearch: false,
     worldSearchTerm: '',
     worldSearchLoading: false,
@@ -1447,10 +1447,8 @@
         processedSession.autoInviteMessage = session.autoInviteMessage.trim() || null;
         processedSession.saveAsOwner = session.saveAsOwner.trim() || null;
         
-        // hideFromPublicListing: 値がnull以外の場合のみ含める
-        if (session.hideFromPublicListing !== null && session.hideFromPublicListing !== undefined) {
-          processedSession.hideFromPublicListing = session.hideFromPublicListing;
-        }
+        // hideFromPublicListing: 常に含める（デフォルトはfalse）
+        processedSession.hideFromPublicListing = !!session.hideFromPublicListing;
 
         return processedSession;
       });
@@ -4216,7 +4214,7 @@
                         <label>
                           <span>AFKキック時間（分） <small class="note">-1で無効</small></span>
                           <div class="field-row">
-                            <input type="number" bind:value={session.awayKickMinutes} min="-1" placeholder="ワールド設定を使用" />
+                            <input type="number" bind:value={session.awayKickMinutes} min="-1" placeholder="5" required />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('awayKickMinutes')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -4249,13 +4247,9 @@
                             <button
                               type="button"
                               class={session.hideFromPublicListing ? 'status-action-button active' : 'status-action-button'}
-                              aria-pressed={session.hideFromPublicListing}
+                              aria-pressed={!!session.hideFromPublicListing}
                               on:click={() => {
-                                if (session.hideFromPublicListing === null || session.hideFromPublicListing === false) {
-                                  session.hideFromPublicListing = true;
-                                } else {
-                                  session.hideFromPublicListing = null;
-                                }
+                                session.hideFromPublicListing = !session.hideFromPublicListing;
                                 sessions = [...sessions];
                               }}
                             >
