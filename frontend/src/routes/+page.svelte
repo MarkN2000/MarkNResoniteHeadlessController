@@ -78,8 +78,7 @@
     { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
     { id: 'settings', label: 'コンフィグ作成' },
-    { id: 'restart', label: '自動再起動設定' },
-    { id: 'others', label: 'その他' }
+    { id: 'restart', label: '自動再起動設定' }
   ];
 
   let activeTab: (typeof tabs)[number]['id'] = 'dashboard';
@@ -4534,6 +4533,7 @@
                       </label>
                       
                       {#if restartConfig.triggers.highLoad.enabled}
+                        <div class="sub-settings">
                         <label>
                           <span>CPU閾値</span>
                           <div class="field-row">
@@ -4575,6 +4575,7 @@
                             <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
                           </div>
                         </label>
+                        </div>
                       {/if}
                     </form>
                   {:else}
@@ -4590,7 +4591,7 @@
                   <div class="status-display-list">
                     <div class="status-display-item">
                       <span class="status-display-label">次回の予定再起動</span>
-                      <div class="field-row">
+                        <div class="field-row">
                         <div class="status-display-value">
                           {#if restartStatus?.nextScheduledRestart.datetime}
                             {new Date(restartStatus.nextScheduledRestart.datetime).toLocaleString('ja-JP')}
@@ -4607,7 +4608,7 @@
                     {#if restartStatus?.scheduledRestartPreparing?.preparing}
                       <div class="status-display-item" style="background: rgba(97, 209, 250, 0.1); border: 1px solid rgba(97, 209, 250, 0.3); border-radius: 0.5rem; padding: 0.75rem;">
                         <span class="status-display-label" style="color: #61d1fa;">🔔 予定再起動準備中</span>
-                        <div class="field-row">
+                          <div class="field-row">
                           <div class="status-display-value" style="color: #61d1fa;">
                             {#if restartStatus.scheduledRestartPreparing.scheduledTime}
                               {new Date(restartStatus.scheduledRestartPreparing.scheduledTime).toLocaleString('ja-JP')} 予定
@@ -4619,9 +4620,9 @@
                         </div>
                         <p style="font-size: 0.8rem; color: #a0a0a0; margin: 0.5rem 0 0 0;">
                           高負荷トリガーは無効化されています。強制再起動ボタンは使用可能です。
-                        </p>
-                      </div>
-                    {/if}
+                          </p>
+                        </div>
+                      {/if}
                     
                     <div class="status-display-item">
                       <span class="status-display-label">現在の稼働時間</span>
@@ -4630,13 +4631,13 @@
                           {#if restartStatus && restartStatus.currentUptime > 0}
                             {Math.floor(restartStatus.currentUptime / 3600)}時間
                             {Math.floor((restartStatus.currentUptime % 3600) / 60)}分
-                          {:else}
+                  {:else}
                             -
-                          {/if}
+                  {/if}
                         </div>
                       </div>
-                    </div>
-                    
+                </div>
+
                     <div class="status-display-item">
                       <span class="status-display-label">現在のCPU使用率</span>
                       <div class="field-row">
@@ -4762,7 +4763,8 @@
                       </label>
                       
                       {#if restartConfig.preRestartActions.chatMessage.enabled}
-                        <label>
+                        <div class="sub-settings">
+                          <label class="full-width-field">
                           <span>メッセージ内容</span>
                           <div class="field-row">
                             <textarea 
@@ -4773,6 +4775,7 @@
                             ></textarea>
                           </div>
                         </label>
+                        </div>
                       {/if}
                       
                       <!-- アイテムスポーン警告 -->
@@ -4790,40 +4793,39 @@
                       </label>
                       
                       {#if restartConfig.preRestartActions.itemSpawn.enabled}
+                        <div class="sub-settings">
                         <label>
                           <span>アイテム種類</span>
-                          <div class="field-row">
-                            <select 
-                              bind:value={restartConfig.preRestartActions.itemSpawn.itemType}
-                              on:change={(e) => {
-                                if (!restartConfig) return;
-                                const target = e.target as HTMLSelectElement;
-                                if (target.value === 'とらぞセッション閉店アナウンス') {
-                                  restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8';
-                                } else if (target.value === 'テキスト読み上げ') {
-                                  restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1';
-                                }
-                              }}
-                            >
-                              <option value="とらぞセッション閉店アナウンス">とらぞセッション閉店アナウンス</option>
-                              <option value="テキスト読み上げ">テキスト読み上げ</option>
+                            <div class="field-row" style="gap: 0.5rem;">
+                              <div class="select-wrapper" style="min-width: 200px;">
+                                <select 
+                                  bind:value={restartConfig.preRestartActions.itemSpawn.itemType}
+                                  on:change={(e) => {
+                                    if (!restartConfig) return;
+                                    const target = e.target as HTMLSelectElement;
+                                    if (target.value === 'とらぞセッション閉店アナウンス') {
+                                      restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8';
+                                    } else if (target.value === 'テキスト読み上げ') {
+                                      restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1';
+                                    }
+                                  }}
+                                >
+                                  <option value="とらぞセッション閉店アナウンス">とらぞセッション閉店アナウンス</option>
+                                  <option value="テキスト読み上げ">テキスト読み上げ</option>
                             </select>
+                              </div>
+                              <span style="color: #a0a0a0; font-size: 0.85rem; white-space: nowrap;">URL</span>
+                              <input 
+                                type="text"
+                                bind:value={restartConfig.preRestartActions.itemSpawn.itemUrl}
+                                placeholder="resrec:///U-MarkN/R-..."
+                                style="flex: 1;"
+                              />
                           </div>
                         </label>
                         
-                        <label>
-                          <span>アイテムURL</span>
-                          <div class="field-row">
-                            <input 
-                              type="text"
-                              bind:value={restartConfig.preRestartActions.itemSpawn.itemUrl}
-                              placeholder="resrec:///U-MarkN/R-..."
-                              style="flex: 1;"
-                            />
-                          </div>
-                        </label>
-                        
-                        <label>
+                          {#if restartConfig.preRestartActions.itemSpawn.itemType !== 'とらぞセッション閉店アナウンス'}
+                            <label class="full-width-field">
                           <span>メッセージ内容</span>
                           <div class="field-row">
                             <textarea 
@@ -4834,6 +4836,8 @@
                             ></textarea>
                           </div>
                         </label>
+                          {/if}
+                        </div>
                       {/if}
                       
                       <!-- セッション設定変更 -->
@@ -4877,6 +4881,7 @@
                       </label>
                       
                       {#if restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled}
+                        <div class="sub-settings">
                         <label>
                           <span>変更後の名前</span>
                           <div class="field-row">
@@ -4887,6 +4892,7 @@
                             />
                           </div>
                         </label>
+                </div>
                       {/if}
                       
                       <!-- リトライ設定 -->
@@ -4920,50 +4926,29 @@
                     <p class="empty">設定を読み込み中...</p>
                   {/if}
                 </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- その他タブ -->
-          <section class="panel" class:active={activeTab === 'others'}>
-            <div class="panel-heading">
-              <h2>その他</h2>
-            </div>
-            <div class="panel-grid two">
-              <div class="panel-column">
-                <div class="card status-card">
-                  <h3>システム情報</h3>
-                  <p class="empty">ここにシステム情報を表示できます。</p>
                 </div>
-              </div>
-              <div class="panel-column">
-                <div class="card status-card">
-                  <h3>追加機能</h3>
-                  <p class="empty">今後の機能拡張に使用できます。</p>
-                </div>
-              </div>
-            </div>
+                        </div>
           </section>
-        </div>
-      {/if}
+                      </div>
+                          {/if}
     </main>
-  </div>
-
+                    </div>
+                    
   {#if $status.running && pendingStartup && showStartupMessage}
     <div class="startup-overlay">
       <div class="loader"></div>
       <p>セッション情報を読み込んでいます...</p>
-    </div>
-  {/if}
+                        </div>
+                          {/if}
 
   <div class="toast-container" aria-live="polite">
     {#each $notifications as notification (notification.id)}
       <div class={`toast ${notification.type}`}>
         <span>{notification.message}</span>
-      </div>
+                        </div>
     {/each}
-  </div>
-
+                    </div>
+                    
   <!-- 予定再起動編集モーダル -->
   {#if scheduledRestartModalOpen && editingSchedule}
     <div class="modal-overlay" on:click={closeScheduleModal}>
@@ -4971,23 +4956,23 @@
         <div class="modal-header">
           <h2>{editingScheduleId ? '予定を編集' : '予定を追加'}</h2>
           <button type="button" class="modal-close" on:click={closeScheduleModal}>×</button>
-        </div>
-        
+            </div>
+
         <div class="modal-body">
           <form on:submit|preventDefault={saveSchedule}>
             <!-- タイプ選択 -->
             <label class="modal-label">
               <span>再起動タイプ</span>
               <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                <button
-                  type="button"
+                  <button 
+                    type="button" 
                   class={editingSchedule.type === 'once' ? 'schedule-type-button active' : 'schedule-type-button'}
                   on:click={() => editingSchedule.type = 'once'}
-                >
+                  >
                   指定日時
-                </button>
-                <button
-                  type="button"
+                  </button>
+                  <button 
+                    type="button" 
                   class={editingSchedule.type === 'weekly' ? 'schedule-type-button active' : 'schedule-type-button'}
                   on:click={() => editingSchedule.type = 'weekly'}
                 >
@@ -4999,8 +4984,8 @@
                   on:click={() => editingSchedule.type = 'daily'}
                 >
                   毎日
-                </button>
-              </div>
+                  </button>
+                </div>
             </label>
 
             <!-- 指定日時の入力 -->
@@ -5026,8 +5011,8 @@
                   <span>分</span>
                   <input type="number" bind:value={editingSchedule.specificDate.minute} min="0" max="59" required />
                 </label>
-              </div>
-            {/if}
+        </div>
+      {/if}
 
             <!-- 毎週の入力 -->
             {#if editingSchedule.type === 'weekly'}
@@ -5052,8 +5037,8 @@
                   <span>分</span>
                   <input type="number" bind:value={editingSchedule.weeklyTime.minute} min="0" max="59" required />
                 </label>
-              </div>
-            {/if}
+    </div>
+  {/if}
 
             <!-- 毎日の入力 -->
             {#if editingSchedule.type === 'daily'}
@@ -5066,7 +5051,7 @@
                   <span>分</span>
                   <input type="number" bind:value={editingSchedule.dailyTime.minute} min="0" max="59" required />
                 </label>
-              </div>
+      </div>
             {/if}
 
             <!-- コンフィグファイル選択 -->
@@ -5077,7 +5062,7 @@
                 {#if $configs && $configs.length > 0}
                   {#each $configs as config}
                     <option value={config.name}>{config.name}</option>
-                  {/each}
+    {/each}
                 {:else}
                   <option value="default.json">default.json</option>
                 {/if}
@@ -5091,7 +5076,7 @@
               <button type="submit" class="modal-save-btn">
                 保存
               </button>
-            </div>
+  </div>
           </form>
         </div>
       </div>
@@ -6489,6 +6474,39 @@
     background: #11151d;
     border-radius: 0.75rem;
     font-size: 0.9rem;
+  }
+
+  /* サブ設定項目のスタイル */
+  .sub-settings {
+    margin-top: 0.5rem;
+    padding: 0.75rem 0 0.25rem 1rem;
+    border-left: 2px solid rgba(97, 209, 250, 0.3);
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  .sub-settings label {
+    background: rgba(17, 21, 29, 0.5);
+    opacity: 0.9;
+  }
+
+  .sub-settings label span:first-child {
+    color: rgba(225, 225, 224, 0.8);
+    font-size: 0.85rem;
+  }
+
+  /* メッセージ内容などの全幅フィールド */
+  .full-width-field {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .full-width-field > span:first-child {
+    margin-bottom: 0.5rem;
+  }
+
+  .full-width-field .field-row {
+    width: 100%;
   }
 
   .status-form label > span {
