@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { SERVER_PORT } from './config/index.js';
 import { createApiRouter } from './http/index.js';
 import { registerSocketHandlers } from './ws/index.js';
@@ -12,14 +14,23 @@ import { systemMetricsCollector } from './services/systemMetrics.js';
 import { processManager } from './services/processManager.js';
 import { RestartManager } from './services/restartManager.js';
 
-const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// CIDR制限を最初に適用
-app.use(cidrRestriction);
+const app = express();
 
 // 環境に応じたCORS設定を適用
 const corsConfig = getCorsConfig();
 app.use(cors(corsConfig));
+
+// CIDR制限を適用（Socket.IOパスは除外）
+app.use((req, res, next) => {
+  // Socket.IOリクエストはスキップ（WebSocket接続時に個別にチェック）
+  if (req.path.startsWith('/socket.io')) {
+    return next();
+  }
+  cidrRestriction(req, res, next);
+});
 
 app.use(express.json({ limit: '10mb' })); // リクエストサイズ制限
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URLエンコードされたデータの制限
@@ -34,18 +45,42 @@ restartManager.initialize().catch((error) => {
 const apiRouter = createApiRouter(restartManager);
 app.use('/api', apiRouter);
 
+// 本番環境: フロントエンドの静的ファイルを配信
+if (process.env.NODE_ENV === 'production') {
+  // dist/backend/src/app.js から見て ../../../../frontend/build
+  const frontendBuildPath = path.join(__dirname, '../../../../frontend/build');
+  
+  // 静的ファイル配信
+  app.use(express.static(frontendBuildPath));
+  
+  // SPAのフォールバック: 存在しないルートはindex.htmlを返す
+  app.get('*', (req, res, next) => {
+    // API、WebSocket、静的ファイルリクエストは除外
+    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendBuildPath, 'index.html'));
+  });
+  
+  console.log('[Static] Serving frontend from:', frontendBuildPath);
+}
+
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: dynamicOriginCheck,
+    origin: true, // 本番環境でのテスト用に全てのオリジンを許可
     credentials: true,
     methods: ['GET', 'POST']
   },
-  transports: ['websocket', 'polling']
+  transports: ['polling', 'websocket'], // pollingを先に試す
+  allowEIO3: true, // Engine.IO v3互換性
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
-console.log('[Socket.IO] Server initialized with CORS');
-console.log('[Socket.IO] Allowed origins: localhost:5173, localhost:3000, 127.0.0.1:5173, 127.0.0.1:3000');
+console.log('[Socket.IO] Server initialized');
+console.log('[Socket.IO] CORS enabled for localhost and local network');
+console.log('[Socket.IO] Transports: websocket, polling');
 
 registerSocketHandlers(io);
 

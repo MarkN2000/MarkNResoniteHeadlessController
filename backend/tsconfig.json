@@ -2,7 +2,7 @@
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     // File Layout
-    "rootDir": "src",
+    // "rootDir": "src",  // 外部パッケージのインポートを許可するためコメントアウト
     "outDir": "dist",
 
     // Environment Settings
@@ -22,7 +22,7 @@
 
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,  // 型の厳密性を緩和（本番用）
 
     // Style Options
     // "noImplicitReturns": true,

@@ -1,8 +1,8 @@
 {
   "nextScheduledRestart": {
-    "scheduleId": "schedule-1760245220463",
-    "datetime": "2025-10-12T06:13:00.000Z",
-    "configFile": "Config.json"
+    "scheduleId": "schedule-1760282360993",
+    "datetime": "2025-10-12T15:25:00.000Z",
+    "configFile": "__previous__"
   },
   "currentUptime": 0,
   "lastRestart": {
@@ -14,9 +14,9 @@
   "restartInProgress": false,
   "waitingForUsers": false,
   "scheduledRestartPreparing": {
-    "preparing": false,
-    "scheduleId": null,
-    "scheduledTime": null,
-    "configFile": null
+    "preparing": true,
+    "scheduleId": "schedule-1760282360993",
+    "scheduledTime": "2025-10-12T15:25:00.000Z",
+    "configFile": "__previous__"
   }
 }

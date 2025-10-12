@@ -26,6 +26,10 @@ const loadSecurityConfig = (): SecurityConfig => {
       console.log('Using default security config:', securityConfig);
     }
   }
+  // 型ガード: 必ずSecurityConfigを返す
+  if (!securityConfig) {
+    securityConfig = { allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8'] };
+  }
   return securityConfig;
 };
 
@@ -34,6 +38,8 @@ const loadSecurityConfig = (): SecurityConfig => {
  */
 export const isIpInCidr = (ip: string, cidr: string): boolean => {
   const [network, prefixLength] = cidr.split('/');
+  if (!network || !prefixLength) return false;
+  
   const prefix = parseInt(prefixLength, 10);
   
   // IPv4アドレスを32ビット整数に変換

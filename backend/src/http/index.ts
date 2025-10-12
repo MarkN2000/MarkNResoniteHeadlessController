@@ -19,7 +19,7 @@ export function createApiRouter(restartManager?: RestartManager): Router {
     apiRouter.use('/restart', createRestartRoutes(restartManager));
   }
 
-  apiRouter.use((err: unknown, _req, res, _next) => {
+  apiRouter.use((err: unknown, _req: any, res: any, _next: any) => {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[API ERROR]', err);
     res.status(500).json({ error: message });

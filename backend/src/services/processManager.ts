@@ -265,7 +265,7 @@ export class ProcessManager extends EventEmitter {
     });
   }
 
-  private sendCommand(command: string): void {
+  public sendCommand(command: string): void {
     if (!this.child || !this.child.stdin) return;
     try {
       const payload = `${command}\n`;

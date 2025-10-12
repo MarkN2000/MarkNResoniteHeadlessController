@@ -1,0 +1,48 @@
+{
+  "triggers": {
+    "scheduled": {
+      "enabled": false,
+      "schedules": []
+    },
+    "highLoad": {
+      "enabled": false,
+      "cpuThreshold": 80,
+      "memoryThreshold": 80,
+      "durationMinutes": 10
+    },
+    "userZero": {
+      "enabled": false,
+      "minUptimeMinutes": 240
+    }
+  },
+  "preRestartActions": {
+    "waitControl": {
+      "waitForZeroUsers": 5,
+      "forceRestartTimeout": 120,
+      "actionTiming": 2
+    },
+    "chatMessage": {
+      "enabled": true,
+      "message": "🔄 サーバーが間もなく再起動します。\nThe server will restart shortly."
+    },
+    "itemSpawn": {
+      "enabled": true,
+      "itemType": "とらぞセッション閉店アナウンス",
+      "itemUrl": "resrec:///U-torazo/R-6ab61ab2-dc71-4ec5-badc-ad6c9fa3e0ea",
+      "message": "サーバーが再起動します"
+    },
+    "sessionChanges": {
+      "setPrivate": false,
+      "setMaxUserToOne": true,
+      "changeSessionName": {
+        "enabled": false,
+        "newName": "[Restarting...]"
+      }
+    }
+  },
+  "failsafe": {
+    "retryCount": 3,
+    "retryIntervalSeconds": 30
+  }
+}
+

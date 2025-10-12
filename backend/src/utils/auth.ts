@@ -20,7 +20,15 @@ const loadAuthConfig = (): AuthConfig => {
   if (!authConfig) {
     const configPath = getConfigPath();
     const configData = fs.readFileSync(configPath, 'utf-8');
-    authConfig = JSON.parse(configData);
+    const fileConfig = JSON.parse(configData);
+    
+    // 環境変数で上書き可能
+    authConfig = {
+      jwtSecret: process.env.AUTH_SHARED_SECRET || fileConfig.jwtSecret,
+      jwtExpiresIn: process.env.JWT_EXPIRES_IN || fileConfig.jwtExpiresIn,
+      defaultPassword: process.env.DEFAULT_PASSWORD || fileConfig.defaultPassword,
+      password: process.env.DEFAULT_PASSWORD || fileConfig.password,
+    };
   }
   return authConfig;
 };
@@ -34,7 +42,7 @@ const saveAuthConfig = (config: AuthConfig) => {
 
 export const generateToken = (payload: any): string => {
   const config = loadAuthConfig();
-  return jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+  return jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn } as jwt.SignOptions);
 };
 
 export const verifyToken = (token: string): any => {

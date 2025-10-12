@@ -198,12 +198,13 @@ serverRoutes.get('/configs', normalRateLimit, (_req, res) => {
 // コンフィグファイル読み込み（認証不要）
 serverRoutes.get('/configs/:path', normalRateLimit, async (req, res, next) => {
   try {
-    const configPath = req.params.path;
+    const configPath = req.params.path!;
     console.log(`[serverRoutes] Loading config: ${configPath}`);
     const configData = await processManager.loadConfig(configPath);
     console.log(`[serverRoutes] Config loaded successfully: ${configPath}`);
     res.json(configData);
   } catch (error) {
+    const configPath = req.params.path;
     console.error(`[serverRoutes] Error loading config: ${configPath}`, error);
     next(error);
   }
@@ -212,12 +213,13 @@ serverRoutes.get('/configs/:path', normalRateLimit, async (req, res, next) => {
 // コンフィグファイル削除（認証不要）
 serverRoutes.delete('/configs/:path', normalRateLimit, async (req, res, next) => {
   try {
-    const configPath = req.params.path;
+    const configPath = req.params.path!;
     console.log(`[serverRoutes] Deleting config: ${configPath}`);
     await processManager.deleteConfig(configPath);
     console.log(`[serverRoutes] Config deleted successfully: ${configPath}`);
     res.json({ success: true, message: 'Config file deleted successfully' });
   } catch (error) {
+    const configPath = req.params.path;
     console.error(`[serverRoutes] Error deleting config: ${configPath}`, error);
     next(error);
   }
@@ -365,6 +367,7 @@ const parseStatusOutput = (output: string) => {
     const match = line.match(/^([^:]+):\s*(.*)$/);
     if (!match) continue;
     const [, rawKey, rawValue] = match;
+    if (!rawKey || !rawValue) continue;
     map[rawKey.trim()] = rawValue.trim();
   }
 
@@ -424,13 +427,13 @@ const parseUsersOutput = (output: string) => {
       const match = line.match(usersLineRegex);
       if (!match || !match.groups) return null;
       return {
-        name: match.groups.name,
-        id: match.groups.id,
-        role: match.groups.role,
-        present: match.groups.present.toLowerCase() === 'true',
-        pingMs: Number(match.groups.ping),
-        fps: Number(match.groups.fps),
-        silenced: match.groups.silenced.toLowerCase() === 'true'
+        name: match.groups.name!,
+        id: match.groups.id!,
+        role: match.groups.role!,
+        present: match.groups.present!.toLowerCase() === 'true',
+        pingMs: Number(match.groups.ping!),
+        fps: Number(match.groups.fps!),
+        silenced: match.groups.silenced!.toLowerCase() === 'true'
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
@@ -466,15 +469,15 @@ const parseWorldsOutput = (output: string) => {
   for (const line of trimmedLines) {
     const match = line.match(indexLineRegex);
     if (match?.groups) {
-      const name = match.groups.name.trim();
-      const focusTarget = match.groups.index;
+      const name = match.groups.name!.trim();
+      const focusTarget = match.groups.index!;
       sessions.push({
         name,
         sessionId: name,
-        currentUsers: Number(match.groups.users),
-        presentUsers: Number(match.groups.present),
-        maxUsers: Number(match.groups.max),
-        accessLevel: match.groups.access,
+        currentUsers: Number(match.groups.users!),
+        presentUsers: Number(match.groups.present!),
+        maxUsers: Number(match.groups.max!),
+        accessLevel: match.groups.access!,
         hiddenFromListing: undefined,
         focusTarget,
         raw: line,
@@ -543,6 +546,7 @@ const parseWorldsOutput = (output: string) => {
     }
 
     const [, rawKey, rawValue] = kv;
+    if (!rawKey || !rawValue) continue;
     const key = rawKey.trim().toLowerCase();
     const value = rawValue.trim();
 
@@ -714,10 +718,10 @@ const parseBansOutput = (output: string) => {
     const match = line.match(banLineRegex);
     if (match?.groups) {
       bans.push({
-        index: parseInt(match.groups.index, 10),
-        username: match.groups.username,
-        userId: match.groups.userId,
-        machineIds: match.groups.machineIds.trim()
+        index: parseInt(match.groups.index!, 10),
+        username: match.groups.username!,
+        userId: match.groups.userId!,
+        machineIds: match.groups.machineIds!.trim()
       });
     }
   }

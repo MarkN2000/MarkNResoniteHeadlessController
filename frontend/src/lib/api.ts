@@ -1,4 +1,20 @@
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080/api';
+// 開発環境では直接バックエンドに接続、本番環境では相対パスを使用
+const getApiBase = () => {
+  // 環境変数が設定されている場合はそれを使用（開発環境）
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  
+  // ブラウザ環境の場合、相対パスを使用（本番環境）
+  if (typeof window !== 'undefined') {
+    return '/api';
+  }
+  
+  // フォールバック（SSR等）
+  return 'http://localhost:8080/api';
+};
+
+const API_BASE = getApiBase();
 
 // 認証トークンの管理
 let authToken: string | null = null;

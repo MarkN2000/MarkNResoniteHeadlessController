@@ -1,11 +1,11 @@
 {
   "triggers": {
     "scheduled": {
-      "enabled": false,
+      "enabled": true,
       "schedules": [
         {
           "id": "schedule-1760245220463",
-          "enabled": true,
+          "enabled": false,
           "type": "daily",
           "specificDate": {
             "year": 2025,
@@ -40,9 +40,9 @@
   },
   "preRestartActions": {
     "waitControl": {
-      "waitForZeroUsers": 5,
-      "forceRestartTimeout": 180,
-      "actionTiming": 2
+      "waitForZeroUsers": 2,
+      "forceRestartTimeout": 31,
+      "actionTiming": 30
     },
     "chatMessage": {
       "enabled": true,
@@ -50,15 +50,15 @@
     },
     "itemSpawn": {
       "enabled": true,
-      "itemType": "テキスト読み上げ",
-      "itemUrl": "resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1",
+      "itemType": "とらぞセッション閉店アナウンス",
+      "itemUrl": "resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8",
       "message": "まもなくこのセッションは再起動されます"
     },
     "sessionChanges": {
       "setPrivate": false,
       "setMaxUserToOne": true,
       "changeSessionName": {
-        "enabled": false,
+        "enabled": true,
         "newName": "[再起動します]"
       }
     }

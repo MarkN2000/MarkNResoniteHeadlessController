@@ -1,0 +1,8 @@
+{
+  "jwtSecret": "your-secret-key-change-in-production",
+  "jwtExpiresIn": "24h",
+  "defaultPassword": "admin123",
+  "password": "admin123",
+  "modApiKey": "mod-secret-key"
+}
+

@@ -65,6 +65,51 @@ Resoniteのヘッドレスサーバーを、ローカルネットワーク内の
 
 ### インストール
 
+#### 方法1: 自動セットアップ（推奨・Windows）
+
+1. **リポジトリのクローン**
+```bash
+git clone <repository-url>
+cd MarkNResoniteHeadlessController
+```
+
+2. **依存関係のインストール**
+```bash
+npm install
+
+# フロントエンド用のadapter-staticをインストール（重要）
+npm install --save-dev @sveltejs/adapter-static --workspace frontend
+```
+
+3. **自動セットアップの実行**
+```bash
+# Windowsの場合
+scripts\setup.bat
+
+# または手動で
+npm run setup
+```
+
+このスクリプトが以下を自動的に行います：
+- 設定ファイルのサンプルから実際のファイルを生成
+- 共通型定義のビルド
+
+4. **設定ファイルの編集**
+
+生成された設定ファイルを環境に合わせて編集してください：
+
+- `.env` - 環境変数（シークレットキー、パス等）
+- `config/auth.json` - 認証設定（パスワード等）
+- `config/security.json` - セキュリティ設定（CIDR範囲等）
+
+⚠️ **重要**: 本番環境では必ず以下を変更してください：
+- `.env` の `AUTH_SHARED_SECRET`（JWTシークレット）
+- `.env` の `MOD_API_KEY`（Mod APIキー）
+- `.env` の `RESONITE_HEADLESS_PATH`（Resonite実行ファイルパス）
+- `config/auth.json` の `password`（管理者パスワード）
+
+#### 方法2: 手動セットアップ
+
 1. **リポジトリのクローン**
 ```bash
 git clone <repository-url>
@@ -78,36 +123,86 @@ npm install
 
 3. **設定ファイルの準備**
 ```bash
+# 環境変数
+cp env.example .env
+
 # 認証設定
 cp config/auth.json.example config/auth.json
+
 # セキュリティ設定
 cp config/security.json.example config/security.json
+
+# ランタイム状態
+cp config/runtime-state.json.example config/runtime-state.json
+
+# 再起動設定
+cp backend/config/restart.json.example backend/config/restart.json
+cp backend/config/restart-status.json.example backend/config/restart-status.json
 ```
 
-4. **環境変数の設定**
+4. **環境変数の編集（.env）**
 ```bash
-# .envファイルを作成
 NODE_ENV=development
-AUTH_SHARED_SECRET=your-secret-key-change-in-production
 SERVER_PORT=8080
+AUTH_SHARED_SECRET=your-secret-key-change-in-production
 MOD_API_KEY=mod-secret-key
+DEFAULT_PASSWORD=admin123
+RESONITE_HEADLESS_PATH=C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe
 ```
 
 ### 起動
 
-1. **バックエンドの起動**
+#### 開発環境
+
+1. **開発サーバーの起動（バックエンド + フロントエンド）**
 ```bash
-npm run dev --workspace backend
+npm run dev
 ```
 
-2. **フロントエンドの起動**
+または個別に起動：
+
 ```bash
+# バックエンドのみ
+npm run dev --workspace backend
+
+# フロントエンドのみ
 npm run dev --workspace frontend
 ```
 
-3. **アクセス**
+2. **アクセス**
 - WebUI: `http://localhost:5173`
-- デフォルトパスワード: `admin123`
+- API: `http://localhost:8080/api`
+- デフォルトパスワード: `admin123`（変更推奨）
+
+#### 本番環境
+
+1. **ビルド**
+```bash
+# Windowsの場合
+scripts\build-all.bat
+
+# または
+npm run build
+```
+
+2. **起動**
+```bash
+# Windowsの場合
+scripts\start-production.bat
+
+# または
+npm start
+```
+
+3. **アクセス**
+- WebUI & API: `http://localhost:8080`
+- パスワード: `.env` または `config/auth.json` で設定したもの
+
+⚠️ **本番環境の注意点**:
+- 必ず `.env` で `NODE_ENV=production` を設定
+- セキュリティ設定を厳密に確認
+- ファイアウォールでポート8080を適切に設定
+- 可能であればリバースプロキシ（nginx等）の使用を推奨
 
 ## Mod連携API
 

@@ -631,10 +631,10 @@ export class RestartManager extends EventEmitter {
       // [0] で始まる行を探す（タブ文字にも対応）
       const match = line.match(/^\[(\d+)\]\s+(.+?)\s+Users:\s+(\d+)[\s\t]+Present:\s+(\d+)/);
       if (match) {
-        const index = parseInt(match[1], 10);
-        const name = match[2].trim();
-        const users = parseInt(match[3], 10);
-        const present = parseInt(match[4], 10);
+        const index = parseInt(match[1]!, 10);
+        const name = match[2]!.trim();
+        const users = parseInt(match[3]!, 10);
+        const present = parseInt(match[4]!, 10);
         
         // indexが既に存在する場合は上書きしない（最初のものを保持）
         if (!worldsMap.has(index)) {
@@ -668,8 +668,8 @@ export class RestartManager extends EventEmitter {
       // ユーザー情報の行をパース
       const match = line.match(/^(.+?)\s+ID:\s+(U-[^\s]+)\s+.*Present:\s+(True|False)/);
       if (match) {
-        const username = match[1].trim();
-        const userId = match[2].trim();
+        const username = match[1]!.trim();
+        const userId = match[2]!.trim();
         const present = match[3] === 'True';
         
         users.push({ username, userId, present });

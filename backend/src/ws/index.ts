@@ -10,6 +10,7 @@ export const registerSocketHandlers = (io: Server): void => {
     // WebSocket接続のCIDRチェック
     const clientIp = getClientIp(socket.request);
     console.log(`[WebSocket] Connection attempt from ${clientIp}`);
+    console.log(`[WebSocket] Request headers:`, socket.request.headers);
     
     if (!isIpAllowed(clientIp)) {
       console.error(`[WebSocket] Access denied for ${clientIp}`);

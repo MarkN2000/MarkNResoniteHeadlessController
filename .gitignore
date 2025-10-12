@@ -18,4 +18,11 @@ yarn-error.log*
 config/headless/*.json
 !config/headless/*.template.json
 
+# Configuration files (keep examples only)
+config/auth.json
+config/security.json
+config/runtime-state.json
+backend/config/*.json
+
+# Sample files
 sample/バニラで起動したときのコンソール画面.txt
