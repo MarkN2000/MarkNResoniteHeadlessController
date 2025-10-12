@@ -694,6 +694,46 @@ serverRoutes.get('/runtime/friend-requests', async (_req, res, next) => {
   }
 });
 
+const parseBansOutput = (output: string) => {
+  const lines = output
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(line => line && !line.endsWith('>'));
+
+  const bans: Array<{
+    index: number;
+    username: string;
+    userId: string;
+    machineIds: string;
+  }> = [];
+
+  // Format: [0]     Username: xxxx UserID: U-xxxxxx   MachineIds: xxxxxxx
+  const banLineRegex = /^\[(?<index>\d+)\]\s+Username:\s+(?<username>\S+)\s+UserID:\s+(?<userId>U-[A-Za-z0-9_-]+)\s+MachineIds:\s+(?<machineIds>.*)$/i;
+
+  for (const line of lines) {
+    const match = line.match(banLineRegex);
+    if (match?.groups) {
+      bans.push({
+        index: parseInt(match.groups.index, 10),
+        username: match.groups.username,
+        userId: match.groups.userId,
+        machineIds: match.groups.machineIds.trim()
+      });
+    }
+  }
+
+  return bans;
+};
+
+serverRoutes.get('/runtime/bans', async (_req, res, next) => {
+  try {
+    const output = await runCommand('listbans', { stopWhenPrompt: true, settleDurationMs: 120, timeoutMs: 2000 });
+    res.json({ raw: output, data: parseBansOutput(output) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 serverRoutes.post('/runtime/worlds/focus', async (req, res, next) => {
   try {
     const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';

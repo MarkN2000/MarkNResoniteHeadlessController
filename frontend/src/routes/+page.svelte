@@ -10,6 +10,7 @@
     getRuntimeStatus,
     getRuntimeUsers,
     getFriendRequests,
+    getBans,
     getRuntimeWorlds,
     postCommand,
     postFocusWorld,
@@ -34,6 +35,8 @@
     type RuntimeStatusData,
     type RuntimeUsersData,
     type FriendRequestsData,
+    type BansData,
+    type BanEntry,
     type RuntimeWorldsData,
     type RuntimeWorldEntry,
     type ConfigEntry,
@@ -285,6 +288,14 @@
   let friendAcceptLoading = false;
   let friendRemoveLoading = false;
   let friendInviteLoading = false;
+  
+  // BAN一覧
+  let bansList: BanEntry[] = [];
+  let bansLoading = false;
+  let selectedBanEntry: BanEntry | null = null;
+  
+  // フォーカスセッション内ユーザー一覧
+  let focusedSessionUsersLoading = false;
 
   // World search state
   let worldSearchTerm = '';
@@ -2372,9 +2383,11 @@
     friendSearchUsernameLoading = true;
 
     try {
-      // 検索前に結果をリセット
+      // 検索前に結果とBAN一覧をリセット
       friendSearchResults = [];
+      bansList = [];
       selectedFriendUser = null;
+      selectedBanEntry = null;
 
       const response = await searchResoniteUsers(username);
       
@@ -2407,9 +2420,11 @@
     friendSearchUserIdLoading = true;
 
     try {
-      // 検索前に結果をリセット
+      // 検索前に結果とBAN一覧をリセット
       friendSearchResults = [];
+      bansList = [];
       selectedFriendUser = null;
+      selectedBanEntry = null;
 
       const user = await getResoniteUserFull(fullUserId);
       // 検索結果を設定
@@ -2428,8 +2443,10 @@
     friendRequestsLoading = true;
     friendRequestsError = '';
     
-    // フレンドリクエスト一覧を取得する際は検索結果をクリア
+    // フレンドリクエスト一覧を取得する際は検索結果と検索フィールドをクリア
     friendSearchResults = [];
+    friendSearchUsername = '';
+    friendSearchUserId = '';
 
     try {
       const requests = await getFriendRequests();
@@ -2466,12 +2483,109 @@
   };
 
   const loadBannedUsersList = async () => {
-    // TODO: BANリストを取得するコマンドが必要（現状未実装の可能性）
-    pushToast('BAN一覧機能は実装予定です', 'info');
+    if (bansLoading) return;
+    bansLoading = true;
+    
+    try {
+      // 検索結果とBAN一覧を切り替えるため、検索結果と検索フィールドをクリア
+      friendSearchResults = [];
+      friendSearchUsername = '';
+      friendSearchUserId = '';
+      selectedFriendUser = null;
+      
+      const response = await getBans();
+      bansList = response.data;
+      selectedBanEntry = null;
+      
+      if (bansList.length === 0) {
+        pushToast('BANリストは空です', 'info');
+      } else {
+        pushToast(`${bansList.length}件のBANエントリを読み込みました`, 'success');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'BAN一覧の取得に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      bansLoading = false;
+    }
+  };
+  
+  const loadFocusedSessionUsers = async () => {
+    if (focusedSessionUsersLoading) return;
+    focusedSessionUsersLoading = true;
+    
+    try {
+      // 検索結果とBAN一覧をクリア
+      friendSearchResults = [];
+      friendSearchUsername = '';
+      friendSearchUserId = '';
+      bansList = [];
+      selectedFriendUser = null;
+      selectedBanEntry = null;
+      
+      const response = await getRuntimeUsers();
+      
+      if (response.data && response.data.length > 0) {
+        // 各ユーザーのIDから完全な情報を取得
+        const promises = response.data.map(async (user) => {
+          try {
+            const fullUser = await getResoniteUserFull(user.id);
+            return fullUser;
+          } catch (error) {
+            console.error(`Failed to fetch user info for ${user.id}:`, error);
+            return null;
+          }
+        });
+        
+        const users = await Promise.all(promises);
+        const validUsers = users.filter((u): u is ResoniteUserFull => u !== null);
+        
+        // 検索結果に設定
+        friendSearchResults = validUsers;
+        
+        pushToast(`${validUsers.length}件のユーザーを読み込みました`, 'success');
+      } else {
+        pushToast('フォーカス中のセッションにユーザーがいません', 'info');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ユーザー一覧の取得に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      focusedSessionUsersLoading = false;
+    }
   };
 
   const selectFriendUser = (user: ResoniteUserFull) => {
     selectedFriendUser = user;
+    selectedBanEntry = null; // BAN選択を解除
+  };
+  
+  const selectBanEntry = (entry: BanEntry) => {
+    selectedBanEntry = entry;
+    selectedFriendUser = null; // フレンドユーザー選択を解除
+  };
+  
+  const unbanSelectedUser = async () => {
+    if (!selectedBanEntry) {
+      pushToast('BANエントリを選択してください', 'error');
+      return;
+    }
+    
+    if (!confirm(`${selectedBanEntry.username} (${selectedBanEntry.userId}) のBANを解除しますか？`)) {
+      return;
+    }
+    
+    try {
+      // unbanコマンドはユーザーIDを使用
+      await postCommand(`unban ${selectedBanEntry.userId}`);
+      pushToast(`${selectedBanEntry.username} のBANを解除しました`, 'success');
+      
+      // BAN一覧を再読み込み
+      await loadBannedUsersList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'BANの解除に失敗しました';
+      pushToast(message, 'error');
+    }
   };
 
   const sendFriendRequestToSelected = async () => {
@@ -2959,10 +3073,13 @@
                   <div class="session-row">
                     <span class="session-access">{world.accessLevel ?? 'Unknown'}</span>
                     <span class="session-counts">
+                      <span class="count-label">active</span>
                       <span class="present">{world.presentUsers ?? '-'}</span>
                       <span class="slash">/</span>
+                      <span class="count-label">users</span>
                       <span class="total">{world.currentUsers ?? '-'}</span>
                       <span class="slash">/</span>
+                      <span class="count-label">max</span>
                       <span class="max">{world.maxUsers ?? '-'}</span>
                     </span>
                   </div>
@@ -3509,9 +3626,17 @@
                         type="button" 
                         class="info"
                         on:click={loadBannedUsersList} 
-                        disabled={!$status.running}
+                        disabled={!$status.running || bansLoading}
                       >
-                        BAN一覧
+                        {bansLoading ? '取得中...' : 'BAN一覧'}
+                      </button>
+                      <button 
+                        type="button" 
+                        class="info"
+                        on:click={loadFocusedSessionUsers} 
+                        disabled={!$status.running || focusedSessionUsersLoading || !runtimeWorlds?.focusedSessionId}
+                      >
+                        {focusedSessionUsersLoading ? '取得中...' : 'フォーカスセッション内'}
                       </button>
                     </div>
 
@@ -3539,8 +3664,31 @@
                           </button>
                         {/each}
                       </div>
+                    {:else if bansList.length > 0}
+                      <div class="user-list">
+                        <h3 style="margin-bottom: 0.75rem; font-size: 0.95rem; color: #ff6b6b;">BAN一覧</h3>
+                        {#each bansList as ban}
+                          <button
+                            type="button"
+                            class="user-card ban-card"
+                            class:selected={selectedBanEntry?.userId === ban.userId}
+                            on:click={() => selectBanEntry(ban)}
+                          >
+                            <div class="user-avatar">
+                              <div class="avatar-placeholder ban">🚫</div>
+                            </div>
+                            <div class="user-info">
+                              <strong>{ban.username}</strong>
+                              <span class="sub">{ban.userId}</span>
+                              {#if ban.machineIds}
+                                <span class="sub machine-id" title={ban.machineIds}>Machine: {ban.machineIds.substring(0, 16)}...</span>
+                              {/if}
+                            </div>
+                          </button>
+                        {/each}
+                      </div>
                     {:else}
-                      <p class="empty">検索結果が表示されます</p>
+                      <p class="empty">検索結果またはBAN一覧が表示されます</p>
                     {/if}
                   </form>
                 </div>
@@ -3570,7 +3718,7 @@
                         </div>
                       </div>
 
-                      <div class="action-buttons">
+                      <div class="action-buttons" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
                         <button 
                           type="button" 
                           class="save"
@@ -3585,9 +3733,6 @@
                         >
                           {friendAcceptLoading ? '承認中...' : 'フレンド申請を承認'}
                         </button>
-                      </div>
-
-                      <div class="action-buttons">
                         <button 
                           type="button" 
                           class="info"
@@ -3604,9 +3749,6 @@
                         >
                           {friendRemoveLoading ? '解除中...' : 'フレンド解除'}
                         </button>
-                      </div>
-
-                      <div class="action-buttons">
                         <button 
                           type="button" 
                           class="save"
@@ -3637,8 +3779,42 @@
                         ></textarea>
                       </div>
                     </form>
+                  {:else if selectedBanEntry}
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <div class="selected-user-display">
+                        <div class="user-card ban-card selected" style="cursor: default;">
+                          <div class="user-avatar">
+                            <div class="avatar-placeholder ban">🚫</div>
+                          </div>
+                          <div class="user-info">
+                            <strong>{selectedBanEntry.username}</strong>
+                            <span class="sub">{selectedBanEntry.userId}</span>
+                            {#if selectedBanEntry.machineIds}
+                              <span class="sub machine-id" title={selectedBanEntry.machineIds}>Machine: {selectedBanEntry.machineIds}</span>
+                            {/if}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="action-buttons">
+                        <button 
+                          type="button" 
+                          class="danger"
+                          on:click={unbanSelectedUser}
+                          disabled={!$status.running}
+                        >
+                          BAN解除
+                        </button>
+                      </div>
+                      
+                      <div style="padding: 0.75rem; background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 0.5rem; margin-top: 1rem;">
+                        <p style="font-size: 0.85rem; color: #ff6b6b; margin: 0; line-height: 1.5;">
+                          ⚠️ このユーザーはBANされています。BAN解除ボタンを押すと、このユーザーは再びサーバーに接続できるようになります。
+                        </p>
+                      </div>
+                    </form>
                   {:else}
-                    <p class="empty">左側のリストからユーザーを選択してください</p>
+                    <p class="empty">左側のリストからユーザーまたはBANエントリを選択してください</p>
                   {/if}
                 </div>
               </div>
@@ -4424,6 +4600,121 @@
                   {/if}
                 </div>
 
+                <!-- 📊 ステータス表示 -->
+                <div class="panel-heading">
+                  <h2>📊 ステータス表示</h2>
+                </div>
+                <div class="card status-card">
+                  <div class="status-display-list">
+                    <div class="status-display-item">
+                      <span class="status-display-label">次回の予定再起動</span>
+                      <div class="field-row">
+                        <div class="status-display-value">
+                          {#if restartStatus?.nextScheduledRestart.datetime}
+                            {new Date(restartStatus.nextScheduledRestart.datetime).toLocaleString('ja-JP')}
+                            {#if restartStatus.nextScheduledRestart.configFile}
+                              ({restartStatus.nextScheduledRestart.configFile})
+                            {/if}
+                          {:else}
+                            未設定
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+
+                    {#if restartStatus?.scheduledRestartPreparing?.preparing}
+                      <div class="status-display-item" style="background: rgba(97, 209, 250, 0.1); border: 1px solid rgba(97, 209, 250, 0.3); border-radius: 0.5rem; padding: 0.75rem;">
+                        <span class="status-display-label" style="color: #61d1fa;">🔔 予定再起動準備中</span>
+                        <div class="field-row">
+                          <div class="status-display-value" style="color: #61d1fa;">
+                            {#if restartStatus.scheduledRestartPreparing.scheduledTime}
+                              {new Date(restartStatus.scheduledRestartPreparing.scheduledTime).toLocaleString('ja-JP')} 予定
+                              {#if restartStatus.scheduledRestartPreparing.configFile}
+                                ({restartStatus.scheduledRestartPreparing.configFile})
+                              {/if}
+                            {/if}
+                          </div>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #a0a0a0; margin: 0.5rem 0 0 0;">
+                          高負荷トリガーは無効化されています。強制再起動ボタンは使用可能です。
+                        </p>
+                      </div>
+                    {/if}
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在の稼働時間</span>
+                      <div class="field-row">
+                        <div class="status-display-value">
+                          {#if restartStatus && restartStatus.currentUptime > 0}
+                            {Math.floor(restartStatus.currentUptime / 3600)}時間
+                            {Math.floor((restartStatus.currentUptime % 3600) / 60)}分
+                          {:else}
+                            -
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在のCPU使用率</span>
+                      <div class="field-row">
+                        <div class="status-display-value">
+                          {#if $metrics}
+                            {$metrics.cpu.usage.toFixed(1)}%
+                          {:else}
+                            -
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在のメモリ使用率</span>
+                      <div class="field-row">
+                        <div class="status-display-value">
+                          {#if $metrics}
+                            {$metrics.memory.usage.toFixed(1)}%
+                          {:else}
+                            -
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">現在の合計ユーザー数</span>
+                      <div class="field-row">
+                        <div class="status-display-value">
+                          {#if runtimeWorlds}
+                            {runtimeWorlds.data.reduce((sum: number, w: RuntimeWorldEntry) => sum + Math.max(0, (w.currentUsers || 0) - 1), 0)}人
+                          {:else}
+                            -
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-display-item">
+                      <span class="status-display-label">最後の再起動</span>
+                      <div class="field-row">
+                        <div class="status-display-value">
+                          {#if restartStatus?.lastRestart.timestamp}
+                            {new Date(restartStatus.lastRestart.timestamp).toLocaleString('ja-JP')}
+                            {#if restartStatus.lastRestart.trigger}
+                              (トリガー: {restartStatus.lastRestart.trigger})
+                            {/if}
+                          {:else}
+                            -
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 右カラム -->
+              <div class="panel-column">
                 <!-- 2️⃣ 再起動前アクション設定 -->
                 <div class="panel-heading">
                   <h2>2️⃣ 再起動前アクション設定（全トリガー対象）</h2>
@@ -4615,45 +4906,29 @@
                           </div>
                         </label>
                       {/if}
-                    </form>
-                  {:else}
-                    <p class="empty">設定を読み込み中...</p>
-                  {/if}
-                </div>
-              </div>
-
-              <!-- 右カラム -->
-              <div class="panel-column">
-                <!-- 3️⃣ フェールセーフ設定 -->
-                <div class="panel-heading">
-                  <h2>3️⃣ フェールセーフ設定</h2>
-                </div>
-                <div class="card status-card">
-                  {#if restartConfig}
-                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      
+                      <!-- リトライ設定 -->
                       <label>
-                        <span>リトライ回数</span>
-                        <div class="field-row">
+                        <span>🔄 リトライ</span>
+                        <div class="field-row" style="display: flex; align-items: center; gap: 0.5rem;">
+                          <span style="color: #e9f9ff; font-size: 0.9rem;">回数</span>
                           <input 
                             type="number" 
                             min="0" 
                             max="10"
                             bind:value={restartConfig.failsafe.retryCount}
                             placeholder="3"
+                            style="width: 80px;"
                           />
                           <span style="color: #a0a0a0; font-size: 0.9rem;">回</span>
-                        </div>
-                      </label>
-                      
-                      <label>
-                        <span>リトライ間隔</span>
-                        <div class="field-row">
+                          <span style="color: #e9f9ff; font-size: 0.9rem; margin-left: 0.5rem;">間隔</span>
                           <input 
                             type="number" 
                             min="1" 
                             max="300"
                             bind:value={restartConfig.failsafe.retryIntervalSeconds}
                             placeholder="30"
+                            style="width: 80px;"
                           />
                           <span style="color: #a0a0a0; font-size: 0.9rem;">秒</span>
                         </div>
@@ -4662,118 +4937,6 @@
                   {:else}
                     <p class="empty">設定を読み込み中...</p>
                   {/if}
-                </div>
-
-                <!-- 📊 ステータス表示 -->
-                <div class="panel-heading">
-                  <h2>📊 ステータス表示</h2>
-                </div>
-                <div class="card status-card">
-                  <div class="status-display-list">
-                    <div class="status-display-item">
-                      <span class="status-display-label">次回の予定再起動</span>
-                      <div class="field-row">
-                        <div class="status-display-value">
-                          {#if restartStatus?.nextScheduledRestart.datetime}
-                            {new Date(restartStatus.nextScheduledRestart.datetime).toLocaleString('ja-JP')}
-                            {#if restartStatus.nextScheduledRestart.configFile}
-                              ({restartStatus.nextScheduledRestart.configFile})
-                            {/if}
-                          {:else}
-                            未設定
-                          {/if}
-                        </div>
-                      </div>
-                    </div>
-
-                    {#if restartStatus?.scheduledRestartPreparing?.preparing}
-                      <div class="status-display-item" style="background: rgba(97, 209, 250, 0.1); border: 1px solid rgba(97, 209, 250, 0.3); border-radius: 0.5rem; padding: 0.75rem;">
-                        <span class="status-display-label" style="color: #61d1fa;">🔔 予定再起動準備中</span>
-                        <div class="field-row">
-                          <div class="status-display-value" style="color: #61d1fa;">
-                            {#if restartStatus.scheduledRestartPreparing.scheduledTime}
-                              {new Date(restartStatus.scheduledRestartPreparing.scheduledTime).toLocaleString('ja-JP')} 予定
-                              {#if restartStatus.scheduledRestartPreparing.configFile}
-                                ({restartStatus.scheduledRestartPreparing.configFile})
-                              {/if}
-                            {/if}
-                          </div>
-                        </div>
-                        <p style="font-size: 0.8rem; color: #a0a0a0; margin: 0.5rem 0 0 0;">
-                          高負荷トリガーは無効化されています。強制再起動ボタンは使用可能です。
-                        </p>
-                      </div>
-                    {/if}
-                    
-                    <div class="status-display-item">
-                      <span class="status-display-label">現在の稼働時間</span>
-                      <div class="field-row">
-                        <div class="status-display-value">
-                          {#if restartStatus && restartStatus.currentUptime > 0}
-                            {Math.floor(restartStatus.currentUptime / 3600)}時間
-                            {Math.floor((restartStatus.currentUptime % 3600) / 60)}分
-                          {:else}
-                            -
-                          {/if}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="status-display-item">
-                      <span class="status-display-label">現在のCPU使用率</span>
-                      <div class="field-row">
-                        <div class="status-display-value">
-                          {#if $metrics}
-                            {$metrics.cpu.usage.toFixed(1)}%
-                          {:else}
-                            -
-                          {/if}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="status-display-item">
-                      <span class="status-display-label">現在のメモリ使用率</span>
-                      <div class="field-row">
-                        <div class="status-display-value">
-                          {#if $metrics}
-                            {$metrics.memory.usage.toFixed(1)}%
-                          {:else}
-                            -
-                          {/if}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="status-display-item">
-                      <span class="status-display-label">現在の合計ユーザー数</span>
-                      <div class="field-row">
-                        <div class="status-display-value">
-                          {#if runtimeWorlds}
-                            {runtimeWorlds.data.reduce((sum: number, w: RuntimeWorldEntry) => sum + Math.max(0, (w.currentUsers || 0) - 1), 0)}人
-                          {:else}
-                            -
-                          {/if}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="status-display-item">
-                      <span class="status-display-label">最後の再起動</span>
-                      <div class="field-row">
-                        <div class="status-display-value">
-                          {#if restartStatus?.lastRestart.timestamp}
-                            {new Date(restartStatus.lastRestart.timestamp).toLocaleString('ja-JP')}
-                            {#if restartStatus.lastRestart.trigger}
-                              (トリガー: {restartStatus.lastRestart.trigger})
-                            {/if}
-                          {:else}
-                            -
-                          {/if}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -5395,6 +5558,13 @@
     align-items: baseline;
     gap: 0.18rem;
     font-family: 'JetBrains Mono', monospace;
+  }
+
+  .session-counts .count-label {
+    font-size: 0.65rem;
+    color: #7a8696;
+    font-weight: 500;
+    margin-right: 0.1rem;
   }
 
   .session-counts .present {
@@ -6265,6 +6435,11 @@
   .action-buttons button.info {
     background: #2d4359; /* 情報系ボタン用の青系 */
   }
+  
+  .action-buttons button.danger {
+    background: #c03434; /* BAN解除などの危険な操作用 */
+    color: #ffffff;
+  }
 
   .action-buttons button:hover:enabled {
     transform: translateY(-1px);
@@ -6285,6 +6460,10 @@
 
   .action-buttons button.info:hover:enabled {
     background: #3a5a7a;
+  }
+  
+  .action-buttons button.danger:hover:enabled {
+    background: #d94545;
   }
 
   .status-card button:not(.status-action-button),
@@ -6860,6 +7039,33 @@
     font-size: 1.25rem;
     font-weight: 600;
   }
+  
+  .avatar-placeholder.ban {
+    color: #ff6b6b;
+    font-size: 1.5rem;
+  }
+  
+  .user-card.ban-card {
+    border-color: rgba(255, 107, 107, 0.3);
+    background: rgba(255, 107, 107, 0.05);
+  }
+  
+  .user-card.ban-card:hover {
+    border-color: #ff6b6b;
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+    background: rgba(255, 107, 107, 0.1);
+  }
+  
+  .user-card.ban-card.selected {
+    border-color: #ff6b6b;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.35);
+    background: rgba(255, 107, 107, 0.15);
+  }
+  
+  .machine-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+  }
 
   .user-info {
     display: flex;
@@ -7226,10 +7432,12 @@
   .config-create-btn.danger-button {
     background: #ff6b6b;
     color: #ffffff;
+    border: none;
   }
 
   .config-create-btn.danger-button:hover {
     background: #ff8787;
+    border: none;
   }
 
   /* モーダルスタイル */

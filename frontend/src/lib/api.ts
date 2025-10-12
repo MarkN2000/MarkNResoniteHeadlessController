@@ -169,6 +169,19 @@ export interface RuntimeWorldsData {
 export const getRuntimeStatus = () => request('/server/runtime/status') as Promise<RuntimeStatusData>;
 export const getRuntimeUsers = () => request('/server/runtime/users') as Promise<RuntimeUsersData>;
 export const getFriendRequests = () => request('/server/runtime/friend-requests') as Promise<FriendRequestsData>;
+
+export interface BanEntry {
+  index: number;
+  username: string;
+  userId: string;
+  machineIds: string;
+}
+export interface BansData {
+  raw: string;
+  data: BanEntry[];
+}
+export const getBans = () => request('/server/runtime/bans') as Promise<BansData>;
+
 export const getRuntimeWorlds = () => request('/server/runtime/worlds') as Promise<RuntimeWorldsData>;
 export const postFocusWorld = (sessionId: string) =>
   request('/server/runtime/worlds/focus', {
