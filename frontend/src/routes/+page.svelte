@@ -338,7 +338,7 @@
   let configDataFolder = '';
   let configCacheFolder = '';
   let configLogsFolder = '';
-  let configAllowedUrlHosts = '';
+  let configAllowedUrlHosts = 'https://ttsapi.markn2000.com/';
   let configAutoSpawnItems = '';
 
   // リセット用デフォルト値（default.json 準拠）
@@ -354,7 +354,7 @@
     dataFolder: '',
     cacheFolder: '',
     logsFolder: '',
-    allowedUrlHosts: '',
+    allowedUrlHosts: 'https://ttsapi.markn2000.com/',
     autoSpawnItems: ''
   } as const;
 
@@ -1500,7 +1500,7 @@
       configDataFolder = '';
       configCacheFolder = '';
       configLogsFolder = '';
-      configAllowedUrlHosts = '';
+      configAllowedUrlHosts = 'https://ttsapi.markn2000.com/';
       configAutoSpawnItems = '';
       sessions = [{
         id: 1,
@@ -2187,7 +2187,9 @@
       if (!target || !text) {
         pushToast('ユーザー名とメッセージを入力してください。', 'error');
       } else {
-        await postCommand(`message ${JSON.stringify(target)} ${JSON.stringify(text)}`);
+        // 改行を<br>に置き換え
+        const formattedText = text.replace(/\n/g, '<br>');
+        await postCommand(`message ${JSON.stringify(target)} ${JSON.stringify(formattedText)}`);
         pushToast('メッセージを送信しました。', 'success');
       }
     } catch (error) {
@@ -2718,7 +2720,9 @@
 
     try {
       const username = selectedFriendUser.username || selectedFriendUser.id;
-      await postCommand(`message ${JSON.stringify(username)} ${JSON.stringify(text)}`);
+      // 改行を<br>に置き換え
+      const formattedText = text.replace(/\n/g, '<br>');
+      await postCommand(`message ${JSON.stringify(username)} ${JSON.stringify(formattedText)}`);
       pushToast(`${username} にメッセージを送信しました`, 'success');
       friendMessageText = ''; // メッセージ送信後にクリア
     } catch (error) {

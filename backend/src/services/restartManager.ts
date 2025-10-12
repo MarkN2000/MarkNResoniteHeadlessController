@@ -551,6 +551,9 @@ export class RestartManager extends EventEmitter {
   private async sendChatMessage(message: string, worlds: Array<{ index: number; name: string; users: number; present: number }>): Promise<void> {
     console.log('[RestartManager] Sending chat message to all active users:', message);
     
+    // 改行を<br>に置き換え
+    const formattedMessage = message.replace(/\n/g, '<br>');
+    
     try {
       // 各セッションに対して処理
       for (const world of worlds) {
@@ -573,7 +576,7 @@ export class RestartManager extends EventEmitter {
             
             // アクティブなユーザーにメッセージ送信
             // メッセージ全体を引用符で囲む
-            await this.processManager.sendCommand(`message "${user.username}" "${message}"`);
+            await this.processManager.sendCommand(`message "${user.username}" "${formattedMessage}"`);
             console.log(`[RestartManager] Sent message to ${user.username} in ${world.name}`);
           }
         } catch (error) {
