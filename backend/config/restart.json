@@ -1,7 +1,7 @@
 {
   "triggers": {
     "scheduled": {
-      "enabled": true,
+      "enabled": false,
       "schedules": [
         {
           "id": "schedule-1760245220463",
@@ -40,7 +40,7 @@
   },
   "preRestartActions": {
     "waitControl": {
-      "waitForZeroUsers": 2,
+      "waitForZeroUsers": 1,
       "forceRestartTimeout": 31,
       "actionTiming": 30
     },

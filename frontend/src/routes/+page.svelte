@@ -1922,6 +1922,23 @@
     }
   };
 
+  const copyPasteSessionUrl = async () => {
+    const sessionId = runtimeStatus?.data?.sessionId;
+    if (!sessionId) return;
+    const pasteUrl = `ressession:///${sessionId}`;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(pasteUrl);
+        pushToast('貼付け用URLをコピーしました', 'success');
+      } else {
+        pushToast('クリップボードに対応していません', 'error');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'コピーに失敗しました';
+      pushToast(message, 'error');
+    }
+  };
+
   const applyMaxUsers = async () => {
     if (maxUsersInput === null || Number.isNaN(maxUsersInput)) {
       pushToast('最大人数を入力してください', 'error');
@@ -3220,7 +3237,10 @@
                         <div class="field-row">
                           <input class="muted" type="text" value={runtimeStatus.data.sessionId ?? ''} readonly />
                           <button type="button" class="status-action-button" on:click={copySessionId}>
-                            コピー
+                            IDコピー
+                          </button>
+                          <button type="button" class="status-action-button" on:click={copyPasteSessionUrl}>
+                            貼付け用URL
                           </button>
                         </div>
                       </label>
@@ -4722,6 +4742,15 @@
                             min="1" 
                             max="1440"
                             bind:value={restartConfig.preRestartActions.waitControl.forceRestartTimeout}
+                            on:input={(e) => {
+                              const target = e.target as HTMLInputElement;
+                              const value = Number(target.value);
+                              
+                              // アクション実行タイミングが強制実行タイムアウトより大きい場合は自動調整
+                              if (restartConfig.preRestartActions.waitControl.actionTiming > value) {
+                                restartConfig.preRestartActions.waitControl.actionTiming = value;
+                              }
+                            }}
                             placeholder="120"
                           />
                           <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
@@ -4733,13 +4762,30 @@
                         <div class="field-row">
                           <input 
                             type="number" 
-                            min="0" 
-                            max="30"
+                            min="1" 
+                            max={restartConfig.preRestartActions.waitControl.forceRestartTimeout}
                             bind:value={restartConfig.preRestartActions.waitControl.actionTiming}
+                            on:input={(e) => {
+                              const target = e.target as HTMLInputElement;
+                              const value = Number(target.value);
+                              const maxValue = restartConfig.preRestartActions.waitControl.forceRestartTimeout;
+                              
+                              // 強制実行タイムアウトより大きい場合は補正
+                              if (value > maxValue) {
+                                restartConfig.preRestartActions.waitControl.actionTiming = maxValue;
+                              }
+                              // 1未満の場合は1に補正
+                              if (value < 1) {
+                                restartConfig.preRestartActions.waitControl.actionTiming = 1;
+                              }
+                            }}
                             placeholder="2"
                           />
                           <span style="color: #a0a0a0; font-size: 0.9rem;">分前</span>
                         </div>
+                        <small style="color: #86888b; font-size: 0.85rem;">
+                          最大: {restartConfig.preRestartActions.waitControl.forceRestartTimeout}分（強制実行タイムアウト）
+                        </small>
                       </label>
                       
                       <!-- チャットメッセージ -->
