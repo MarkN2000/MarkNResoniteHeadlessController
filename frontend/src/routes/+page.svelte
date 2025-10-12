@@ -31,6 +31,7 @@
     saveRestartConfig,
     getRestartStatus,
     triggerRestart,
+    resetRestartConfig,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -2354,21 +2355,37 @@
 
   // 再起動設定をリセット
   const handleResetRestartConfig = async () => {
-    if (!confirm('設定をリセットしますか？')) {
+    if (!confirm('設定をデフォルトにリセットしますか？\n\n現在の設定は失われます。')) {
       return;
     }
     
-    // デバウンスタイマーをクリア
-    if (restartConfigDebounceTimer) {
-      clearTimeout(restartConfigDebounceTimer);
-      restartConfigDebounceTimer = null;
+    try {
+      // デバウンスタイマーをクリア
+      if (restartConfigDebounceTimer) {
+        clearTimeout(restartConfigDebounceTimer);
+        restartConfigDebounceTimer = null;
+      }
+      
+      // 初期化フラグをリセット
+      restartConfigInitialized = false;
+      
+      // リセットAPIを呼び出し
+      const result = await resetRestartConfig();
+      
+      // 返されたデフォルト設定を適用
+      restartConfig = result.config;
+      
+      // ステータスも再取得
+      restartStatus = await getRestartStatus();
+      
+      // 初期化フラグをセット
+      restartConfigInitialized = true;
+      
+      pushToast('設定をデフォルトにリセットしました', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '設定のリセットに失敗しました';
+      pushToast(message, 'error');
     }
-    
-    // 初期化フラグをリセット
-    restartConfigInitialized = false;
-    
-    await loadRestartData();
-    pushToast('設定をリセットしました', 'info');
   };
 
   // フレンド管理タブ - 新機能の関数
@@ -4558,41 +4575,6 @@
                             <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
                           </div>
                         </label>
-                      {/if}
-                      
-                      <!-- ユーザー0時再起動 -->
-                      <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem; margin-top: 1rem;">
-                        <span style="font-size: 1rem; font-weight: 700;">👤 ユーザー0時再起動</span>
-                        <div class="field-row">
-                          <button
-                            type="button"
-                            class={restartConfig && restartConfig.triggers.userZero.enabled ? 'status-action-button active' : 'status-action-button'}
-                            on:click={() => { if (restartConfig) restartConfig.triggers.userZero.enabled = !restartConfig.triggers.userZero.enabled; }}
-                          >
-                            {restartConfig && restartConfig.triggers.userZero.enabled ? 'オン' : 'オフ'}
-                          </button>
-                        </div>
-                      </label>
-                      
-                      {#if restartConfig.triggers.userZero.enabled}
-                        <label>
-                          <span>最小稼働時間</span>
-                          <div class="field-row">
-                            <input 
-                              type="number" 
-                              min="0" 
-                              max="1440"
-                              bind:value={restartConfig.triggers.userZero.minUptimeMinutes}
-                              placeholder="240"
-                            />
-                            <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
-                          </div>
-                        </label>
-                        <div style="padding: 0.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.5rem; margin-top: 0.5rem;">
-                          <p style="font-size: 0.8rem; color: #a0a0a0; margin: 0;">
-                            ※ 複数人→0人に減った瞬間のみ発動（0人継続中は無視）
-                          </p>
-                        </div>
                       {/if}
                     </form>
                   {:else}

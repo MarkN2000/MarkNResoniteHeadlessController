@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { RestartManager } from '../../services/restartManager.js';
-import { loadRestartConfig, saveRestartConfig } from '../../services/restartConfig.js';
+import { loadRestartConfig, saveRestartConfig, getDefaultRestartConfig } from '../../services/restartConfig.js';
 import type { RestartConfig } from '../../../../shared/src/index.js';
 
 export function createRestartRoutes(restartManager: RestartManager): Router {
@@ -91,6 +91,42 @@ export function createRestartRoutes(restartManager: RestartManager): Router {
       res.status(500).json({ 
         success: false, 
         error: error.message || '再起動のトリガーに失敗しました' 
+      });
+    }
+  });
+
+  /**
+   * POST /api/restart/config/reset
+   * 再起動設定をデフォルトにリセット
+   */
+  router.post('/config/reset', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // 現在の設定を読み込んでスケジュールを保持
+      const currentConfig = await loadRestartConfig();
+      const defaultConfig = getDefaultRestartConfig();
+      
+      // スケジュールを保持（デフォルト設定のschedulesを現在のものに置き換え）
+      defaultConfig.triggers.scheduled.schedules = currentConfig.triggers.scheduled.schedules;
+      
+      // デフォルト設定を保存
+      await saveRestartConfig(defaultConfig);
+      
+      // RestartManagerの設定も更新
+      await restartManager.reloadConfig();
+      
+      // 次回の予定再起動を更新
+      restartManager.updateNextScheduledRestart();
+      
+      res.json({ 
+        success: true, 
+        message: '設定をデフォルトにリセットしました',
+        config: defaultConfig
+      });
+    } catch (error: any) {
+      console.error('[RestartRoutes] Failed to reset config:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || '設定のリセットに失敗しました' 
       });
     }
   });

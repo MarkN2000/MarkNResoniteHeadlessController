@@ -397,3 +397,11 @@ export const triggerRestart = (type: 'manual' | 'forced') =>
     method: 'POST',
     body: JSON.stringify({ type })
   }) as Promise<{ success: boolean; message: string }>;
+
+/**
+ * 再起動設定をデフォルトにリセット
+ */
+export const resetRestartConfig = () =>
+  request('/restart/config/reset', {
+    method: 'POST'
+  }) as Promise<{ success: boolean; message: string; config: RestartConfig }>;

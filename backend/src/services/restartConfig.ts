@@ -9,7 +9,7 @@ const RESTART_CONFIG_FILE = path.join(CONFIG_DIR, 'restart.json');
 const DEFAULT_CONFIG: RestartConfig = {
   triggers: {
     scheduled: {
-      enabled: true,
+      enabled: false,
       schedules: []
     },
     highLoad: {
@@ -26,18 +26,18 @@ const DEFAULT_CONFIG: RestartConfig = {
   preRestartActions: {
     waitControl: {
       waitForZeroUsers: 5,
-      forceRestartTimeout: 120,
+      forceRestartTimeout: 180,
       actionTiming: 2
     },
     chatMessage: {
-      enabled: false,
-      message: '🔄 サーバーが間もなく再起動します。'
+      enabled: true,
+      message: 'まもなくこのセッションは再起動されます\nThis session will be restarted shortly'
     },
     itemSpawn: {
-      enabled: false,
-      itemType: 'とらぞセッション閉店アナウンス',
-      itemUrl: 'resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8',
-      message: '🔄 サーバー再起動通知'
+      enabled: true,
+      itemType: 'テキスト読み上げ',
+      itemUrl: 'resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1',
+      message: 'まもなくこのセッションは再起動されます'
     },
     sessionChanges: {
       setPrivate: false,

@@ -1,7 +1,7 @@
 {
   "triggers": {
     "scheduled": {
-      "enabled": true,
+      "enabled": false,
       "schedules": [
         {
           "id": "schedule-1760245220463",
@@ -40,26 +40,26 @@
   },
   "preRestartActions": {
     "waitControl": {
-      "waitForZeroUsers": 1,
-      "forceRestartTimeout": 3,
+      "waitForZeroUsers": 5,
+      "forceRestartTimeout": 180,
       "actionTiming": 2
     },
     "chatMessage": {
       "enabled": true,
-      "message": "まもなくこのセッションは再起動されます"
+      "message": "まもなくこのセッションは再起動されます\nThis session will be restarted shortly"
     },
     "itemSpawn": {
       "enabled": true,
-      "itemType": "とらぞセッション閉店アナウンス",
-      "message": "サーバー再起動通知",
-      "itemUrl": "resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8"
+      "itemType": "テキスト読み上げ",
+      "itemUrl": "resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1",
+      "message": "まもなくこのセッションは再起動されます"
     },
     "sessionChanges": {
-      "setPrivate": true,
+      "setPrivate": false,
       "setMaxUserToOne": true,
       "changeSessionName": {
-        "enabled": true,
-        "newName": "まもなく再起動されます"
+        "enabled": false,
+        "newName": "[再起動します]"
       }
     }
   },
