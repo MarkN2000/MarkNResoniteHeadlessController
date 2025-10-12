@@ -8,7 +8,7 @@
       "enabled": true,
       "cpuThreshold": 80,
       "memoryThreshold": 80,
-      "durationMinutes": 1
+      "durationMinutes": 10
     },
     "userZero": {
       "enabled": false,
@@ -23,7 +23,7 @@
     },
     "chatMessage": {
       "enabled": true,
-      "message": "サーバーが間もなく再起動します。"
+      "message": "まもなくこのセッションは再起動されます"
     },
     "itemSpawn": {
       "enabled": true,
@@ -36,7 +36,7 @@
       "setMaxUserToOne": true,
       "changeSessionName": {
         "enabled": true,
-        "newName": "再起動します"
+        "newName": "まもなく再起動されます"
       }
     }
   },
