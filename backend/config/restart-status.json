@@ -11,5 +11,11 @@
   },
   "highLoadTriggerDisabledUntil": null,
   "restartInProgress": false,
-  "waitingForUsers": false
+  "waitingForUsers": false,
+  "scheduledRestartPreparing": {
+    "preparing": false,
+    "scheduleId": null,
+    "scheduledTime": null,
+    "configFile": null
+  }
 }

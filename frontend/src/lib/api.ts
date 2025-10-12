@@ -264,7 +264,7 @@ export const searchResoniteUsers = (username: string) =>
 export interface ScheduledRestartEntry {
   id: string;
   enabled: boolean;
-  type: 'specific' | 'weekly' | 'daily';
+  type: 'once' | 'weekly' | 'daily';
   specificDate?: {
     year: number;
     month: number;
@@ -347,6 +347,12 @@ export interface RestartStatus {
   highLoadTriggerDisabledUntil: string | null;
   restartInProgress: boolean;
   waitingForUsers: boolean;
+  scheduledRestartPreparing: {
+    preparing: boolean;
+    scheduleId: string | null;
+    scheduledTime: string | null;
+    configFile: string | null;
+  };
 }
 
 /**

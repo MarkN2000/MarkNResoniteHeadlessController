@@ -11,6 +11,7 @@ export class ScheduledRestartWatcher extends EventEmitter {
   private enabled = false;
   private checkTimer: NodeJS.Timeout | null = null;
   private triggeredSpecificDates = new Set<string>(); // 既に発動した指定日時を記録
+  private preparingSchedules = new Set<string>(); // 既に準備中のスケジュールを記録
 
   constructor() {
     super();
@@ -61,16 +62,59 @@ export class ScheduledRestartWatcher extends EventEmitter {
   private checkSchedules(): void {
     const now = new Date();
     
+    // 30分前チェック（準備開始）
+    this.check30MinutesBefore(now);
+    
+    // トリガーチェック（予定時刻）
     for (const schedule of this.schedules) {
       if (this.shouldTrigger(schedule, now)) {
         console.log(`[ScheduledRestartWatcher] Triggering schedule: ${schedule.id}`);
         this.emit('trigger', schedule.id, schedule.configFile);
         
+        // 準備中フラグをクリア
+        this.preparingSchedules.delete(schedule.id);
+        
         // 指定日時の場合は発動済みとしてマーク
-        if (schedule.type === 'specific') {
+        if (schedule.type === 'once') {
           const key = this.getSpecificDateKey(schedule);
           this.triggeredSpecificDates.add(key);
         }
+      }
+    }
+  }
+
+  /**
+   * 30分前チェック（準備開始の通知）
+   */
+  private check30MinutesBefore(now: Date): void {
+    const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+    
+    for (const schedule of this.schedules) {
+      const nextTime = this.getNextTriggerTime(schedule, now);
+      if (!nextTime) {
+        // 予定時刻がない場合は準備中フラグをクリア
+        this.preparingSchedules.delete(schedule.id);
+        continue;
+      }
+      
+      const timeDiff = nextTime.getTime() - now.getTime();
+      
+      // 30分前〜予定時刻の間の場合
+      if (timeDiff > 0 && timeDiff <= THIRTY_MINUTES_MS) {
+        // 既に準備中の場合はスキップ
+        if (this.preparingSchedules.has(schedule.id)) {
+          continue;
+        }
+        
+        // 準備中としてマーク
+        this.preparingSchedules.add(schedule.id);
+        
+        // 準備開始イベントを発火
+        this.emit('preparing', schedule.id, schedule.configFile, nextTime.toISOString());
+        console.log(`[ScheduledRestartWatcher] Preparing for schedule: ${schedule.id} (scheduled at ${nextTime.toISOString()})`);
+      } else if (timeDiff > THIRTY_MINUTES_MS) {
+        // 30分前より前の場合は準備中フラグをクリア（リセット）
+        this.preparingSchedules.delete(schedule.id);
       }
     }
   }
@@ -82,7 +126,7 @@ export class ScheduledRestartWatcher extends EventEmitter {
     if (!schedule.enabled) return false;
     
     switch (schedule.type) {
-      case 'specific':
+      case 'once':
         return this.shouldTriggerSpecific(schedule, now);
       case 'weekly':
         return this.shouldTriggerWeekly(schedule, now);
@@ -194,7 +238,7 @@ export class ScheduledRestartWatcher extends EventEmitter {
    */
   private getNextTriggerTime(schedule: ScheduledRestartEntry, from: Date): Date | null {
     switch (schedule.type) {
-      case 'specific':
+      case 'once':
         return this.getNextSpecificTime(schedule, from);
       case 'weekly':
         return this.getNextWeeklyTime(schedule, from);

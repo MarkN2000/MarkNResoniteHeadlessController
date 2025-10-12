@@ -302,6 +302,11 @@
   let forceRestartLoading = false;
   let manualRestartLoading = false;
 
+  // Scheduled restart edit state
+  let editingScheduleId: string | null = null;
+  let editingSchedule: any = null;
+  let scheduledRestartModalOpen = false;
+
   // Config generation state
   let configName = '';
   let configUsername = '';
@@ -2171,6 +2176,90 @@
     } finally {
       restartConfigLoading = false;
       restartStatusLoading = false;
+    }
+  };
+
+  // 予定再起動 - 新規追加モーダルを開く
+  const openAddScheduleModal = () => {
+    editingScheduleId = null;
+    editingSchedule = {
+      id: '',
+      enabled: true,
+      type: 'once',
+      specificDate: {
+        year: new Date().getFullYear(),
+        month: new Date().getMonth() + 1,
+        day: new Date().getDate(),
+        hour: 3,
+        minute: 0
+      },
+      weeklyDay: 0,
+      weeklyTime: { hour: 3, minute: 0 },
+      dailyTime: { hour: 3, minute: 0 },
+      configFile: 'default.json'
+    };
+    scheduledRestartModalOpen = true;
+  };
+
+  // 予定再起動 - 編集モーダルを開く
+  const openEditScheduleModal = (schedule: any) => {
+    editingScheduleId = schedule.id;
+    editingSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
+    scheduledRestartModalOpen = true;
+  };
+
+  // 予定再起動 - モーダルを閉じる
+  const closeScheduleModal = () => {
+    scheduledRestartModalOpen = false;
+    editingScheduleId = null;
+    editingSchedule = null;
+  };
+
+  // 予定再起動 - 保存
+  const saveSchedule = () => {
+    if (!restartConfig || !editingSchedule) return;
+
+    if (editingScheduleId) {
+      // 編集
+      const index = restartConfig.triggers.scheduled.schedules.findIndex(
+        (s: any) => s.id === editingScheduleId
+      );
+      if (index !== -1) {
+        restartConfig.triggers.scheduled.schedules[index] = { ...editingSchedule };
+      }
+    } else {
+      // 新規追加
+      editingSchedule.id = `schedule-${Date.now()}`;
+      restartConfig.triggers.scheduled.schedules = [
+        ...restartConfig.triggers.scheduled.schedules,
+        { ...editingSchedule }
+      ];
+    }
+
+    closeScheduleModal();
+    pushToast('予定を保存しました（設定を保存ボタンで確定してください）', 'info');
+  };
+
+  // 予定再起動 - 削除
+  const deleteSchedule = (scheduleId: string) => {
+    if (!restartConfig) return;
+    
+    if (confirm('この予定を削除しますか？')) {
+      restartConfig.triggers.scheduled.schedules = restartConfig.triggers.scheduled.schedules.filter(
+        (s: any) => s.id !== scheduleId
+      );
+      pushToast('予定を削除しました（設定を保存ボタンで確定してください）', 'info');
+    }
+  };
+
+  // 予定再起動 - 有効/無効切り替え
+  const toggleScheduleEnabled = (scheduleId: string) => {
+    if (!restartConfig) return;
+    
+    const schedule = restartConfig.triggers.scheduled.schedules.find((s: any) => s.id === scheduleId);
+    if (schedule) {
+      schedule.enabled = !schedule.enabled;
+      restartConfig = restartConfig; // Trigger reactivity
     }
   };
 
@@ -4102,10 +4191,10 @@
                 <div class="card status-card">
                   {#if restartConfig}
                     <form class="status-form" on:submit|preventDefault={() => {}}>
-                      <!-- 予定再起動（基本実装） -->
+                      <!-- 予定再起動 -->
                       <label style="border-bottom: 1px solid #2b2f35; padding-bottom: 0.5rem;">
                         <span style="font-size: 1rem; font-weight: 700;">📅 予定再起動</span>
-                        <div class="field-row">
+                        <div class="field-row" style="gap: 0.5rem;">
                           <button
                             type="button"
                             class={restartConfig && restartConfig.triggers.scheduled.enabled ? 'status-action-button active' : 'status-action-button'}
@@ -4113,14 +4202,85 @@
                           >
                             {restartConfig && restartConfig.triggers.scheduled.enabled ? 'オン' : 'オフ'}
                           </button>
+                          <button
+                            type="button"
+                            class="status-action-button"
+                            on:click={openAddScheduleModal}
+                          >
+                            + 予定を追加
+                          </button>
                         </div>
                       </label>
                       
-                      {#if restartConfig.triggers.scheduled.enabled}
-                        <div style="padding: 0.5rem; background: rgba(97, 209, 250, 0.05); border-radius: 0.5rem; margin: 0.5rem 0;">
-                          <p style="font-size: 0.85rem; color: #61d1fa; margin: 0;">
-                            ℹ️ 予定再起動機能は後のアップデートで実装予定です
+                      {#if restartConfig.triggers.scheduled.schedules.length === 0}
+                        <div style="padding: 0.75rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.5rem; margin: 0.5rem 0; text-align: center;">
+                          <p style="font-size: 0.9rem; color: #a0a0a0; margin: 0;">
+                            予定が登録されていません
                           </p>
+                        </div>
+                      {:else}
+                        {#if !restartConfig.triggers.scheduled.enabled}
+                          <div style="padding: 0.75rem; background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); border-radius: 0.5rem; margin: 0.5rem 0;">
+                            <p style="font-size: 0.85rem; color: #ffa500; margin: 0;">
+                              ⚠️ 予定再起動がオフです。予定を実行するには、予定再起動をオンにしてください。
+                            </p>
+                          </div>
+                        {/if}
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem;">
+                          {#each restartConfig.triggers.scheduled.schedules as schedule, index (schedule.id)}
+                            <div style="padding: 0.75rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.5rem; border: 1px solid {schedule.enabled ? '#61d1fa' : '#2b2f35'};">
+                              <!-- ヘッダー行 -->
+                              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <span style="font-weight: 600; color: {schedule.enabled ? '#61d1fa' : '#a0a0a0'};">
+                                  予定 #{index + 1}
+                                </span>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                  <button
+                                    type="button"
+                                    class={schedule.enabled ? 'status-action-button active' : 'status-action-button'}
+                                    style="font-size: 0.8rem; padding: 0.25rem 0.5rem;"
+                                    on:click={() => toggleScheduleEnabled(schedule.id)}
+                                  >
+                                    {schedule.enabled ? 'ON' : 'OFF'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="status-action-button"
+                                    style="font-size: 0.8rem; padding: 0.25rem 0.5rem;"
+                                    on:click={() => openEditScheduleModal(schedule)}
+                                  >
+                                    編集
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="status-action-button"
+                                    style="font-size: 0.8rem; padding: 0.25rem 0.5rem; background: rgba(255, 107, 107, 0.1); border-color: #ff6b6b;"
+                                    on:click={() => deleteSchedule(schedule.id)}
+                                  >
+                                    削除
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              <!-- 内容 -->
+                              <div style="font-size: 0.85rem; color: #d0d0d0; display: flex; flex-direction: column; gap: 0.25rem;">
+                                <div>
+                                  <span style="color: #a0a0a0;">タイプ:</span>
+                                  {#if schedule.type === 'once' && schedule.specificDate}
+                                    指定日時 - {schedule.specificDate.year}/{String(schedule.specificDate.month).padStart(2, '0')}/{String(schedule.specificDate.day).padStart(2, '0')} {String(schedule.specificDate.hour).padStart(2, '0')}:{String(schedule.specificDate.minute).padStart(2, '0')}
+                                  {:else if schedule.type === 'weekly' && schedule.weeklyDay !== undefined && schedule.weeklyTime}
+                                    毎週 - {['日', '月', '火', '水', '木', '金', '土'][schedule.weeklyDay]}曜日 {String(schedule.weeklyTime.hour).padStart(2, '0')}:{String(schedule.weeklyTime.minute).padStart(2, '0')}
+                                  {:else if schedule.type === 'daily' && schedule.dailyTime}
+                                    毎日 - {String(schedule.dailyTime.hour).padStart(2, '0')}:{String(schedule.dailyTime.minute).padStart(2, '0')}
+                                  {/if}
+                                </div>
+                                <div>
+                                  <span style="color: #a0a0a0;">起動コンフィグ:</span>
+                                  {schedule.configFile}
+                                </div>
+                              </div>
+                            </div>
+                          {/each}
                         </div>
                       {/if}
                       
@@ -4483,6 +4643,25 @@
                         </div>
                       </div>
                     </div>
+
+                    {#if restartStatus?.scheduledRestartPreparing?.preparing}
+                      <div class="status-display-item" style="background: rgba(97, 209, 250, 0.1); border: 1px solid rgba(97, 209, 250, 0.3); border-radius: 0.5rem; padding: 0.75rem;">
+                        <span class="status-display-label" style="color: #61d1fa;">🔔 予定再起動準備中</span>
+                        <div class="field-row">
+                          <div class="status-display-value" style="color: #61d1fa;">
+                            {#if restartStatus.scheduledRestartPreparing.scheduledTime}
+                              {new Date(restartStatus.scheduledRestartPreparing.scheduledTime).toLocaleString('ja-JP')} 予定
+                              {#if restartStatus.scheduledRestartPreparing.configFile}
+                                ({restartStatus.scheduledRestartPreparing.configFile})
+                              {/if}
+                            {/if}
+                          </div>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #a0a0a0; margin: 0.5rem 0 0 0;">
+                          高負荷トリガーは無効化されています。強制再起動ボタンは使用可能です。
+                        </p>
+                      </div>
+                    {/if}
                     
                     <div class="status-display-item">
                       <span class="status-display-label">現在の稼働時間</span>
@@ -4622,6 +4801,139 @@
       </div>
     {/each}
   </div>
+
+  <!-- 予定再起動編集モーダル -->
+  {#if scheduledRestartModalOpen && editingSchedule}
+    <div class="modal-overlay" on:click={closeScheduleModal}>
+      <div class="modal-content" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>{editingScheduleId ? '予定を編集' : '予定を追加'}</h2>
+          <button type="button" class="modal-close" on:click={closeScheduleModal}>×</button>
+        </div>
+        
+        <div class="modal-body">
+          <form on:submit|preventDefault={saveSchedule}>
+            <!-- タイプ選択 -->
+            <label class="modal-label">
+              <span>再起動タイプ</span>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button
+                  type="button"
+                  class={editingSchedule.type === 'once' ? 'schedule-type-button active' : 'schedule-type-button'}
+                  on:click={() => editingSchedule.type = 'once'}
+                >
+                  指定日時
+                </button>
+                <button
+                  type="button"
+                  class={editingSchedule.type === 'weekly' ? 'schedule-type-button active' : 'schedule-type-button'}
+                  on:click={() => editingSchedule.type = 'weekly'}
+                >
+                  毎週
+                </button>
+                <button
+                  type="button"
+                  class={editingSchedule.type === 'daily' ? 'schedule-type-button active' : 'schedule-type-button'}
+                  on:click={() => editingSchedule.type = 'daily'}
+                >
+                  毎日
+                </button>
+              </div>
+            </label>
+
+            <!-- 指定日時の入力 -->
+            {#if editingSchedule.type === 'once'}
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem; margin-top: 1rem;">
+                <label class="modal-label">
+                  <span>年</span>
+                  <input type="number" bind:value={editingSchedule.specificDate.year} min="2024" max="2100" required />
+                </label>
+                <label class="modal-label">
+                  <span>月</span>
+                  <input type="number" bind:value={editingSchedule.specificDate.month} min="1" max="12" required />
+                </label>
+                <label class="modal-label">
+                  <span>日</span>
+                  <input type="number" bind:value={editingSchedule.specificDate.day} min="1" max="31" required />
+                </label>
+                <label class="modal-label">
+                  <span>時</span>
+                  <input type="number" bind:value={editingSchedule.specificDate.hour} min="0" max="23" required />
+                </label>
+                <label class="modal-label">
+                  <span>分</span>
+                  <input type="number" bind:value={editingSchedule.specificDate.minute} min="0" max="59" required />
+                </label>
+              </div>
+            {/if}
+
+            <!-- 毎週の入力 -->
+            {#if editingSchedule.type === 'weekly'}
+              <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.5rem; margin-top: 1rem;">
+                <label class="modal-label">
+                  <span>曜日</span>
+                  <select bind:value={editingSchedule.weeklyDay} required>
+                    <option value={0}>日曜日</option>
+                    <option value={1}>月曜日</option>
+                    <option value={2}>火曜日</option>
+                    <option value={3}>水曜日</option>
+                    <option value={4}>木曜日</option>
+                    <option value={5}>金曜日</option>
+                    <option value={6}>土曜日</option>
+                  </select>
+                </label>
+                <label class="modal-label">
+                  <span>時</span>
+                  <input type="number" bind:value={editingSchedule.weeklyTime.hour} min="0" max="23" required />
+                </label>
+                <label class="modal-label">
+                  <span>分</span>
+                  <input type="number" bind:value={editingSchedule.weeklyTime.minute} min="0" max="59" required />
+                </label>
+              </div>
+            {/if}
+
+            <!-- 毎日の入力 -->
+            {#if editingSchedule.type === 'daily'}
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1rem;">
+                <label class="modal-label">
+                  <span>時</span>
+                  <input type="number" bind:value={editingSchedule.dailyTime.hour} min="0" max="23" required />
+                </label>
+                <label class="modal-label">
+                  <span>分</span>
+                  <input type="number" bind:value={editingSchedule.dailyTime.minute} min="0" max="59" required />
+                </label>
+              </div>
+            {/if}
+
+            <!-- コンフィグファイル選択 -->
+            <label class="modal-label" style="margin-top: 1rem;">
+              <span>起動コンフィグファイル</span>
+              <select bind:value={editingSchedule.configFile} required>
+                {#if $configs && $configs.length > 0}
+                  {#each $configs as config}
+                    <option value={config.name}>{config.name}</option>
+                  {/each}
+                {:else}
+                  <option value="default.json">default.json</option>
+                {/if}
+              </select>
+            </label>
+
+            <div class="modal-actions">
+              <button type="button" class="modal-cancel-btn" on:click={closeScheduleModal}>
+                キャンセル
+              </button>
+              <button type="submit" class="modal-save-btn">
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 {/if}
 
@@ -6895,6 +7207,149 @@
 
   .config-create-btn.danger-button:hover {
     background: #ff8787;
+  }
+
+  /* モーダルスタイル */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    backdrop-filter: blur(3px);
+  }
+
+  .modal-content {
+    background: #1a1e27;
+    border-radius: 0.75rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid #2b2f35;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #2b2f35;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #61d1fa;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: #a0a0a0;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-close:hover {
+    color: #ffffff;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .modal-label span {
+    font-weight: 600;
+    color: #e9f9ff;
+  }
+
+  .modal-label input,
+  .modal-label select {
+    padding: 0.5rem 0.75rem;
+    background: #11151d;
+    border: 1px solid #2b2f35;
+    border-radius: 0.5rem;
+    color: #e9f9ff;
+    font-size: 0.95rem;
+  }
+
+  .modal-label input:focus,
+  .modal-label select:focus {
+    outline: none;
+    border-color: #61d1fa;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+  }
+
+  .modal-cancel-btn,
+  .modal-save-btn {
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+  }
+
+  .modal-cancel-btn {
+    background: #2b2f35;
+    color: #e9f9ff;
+  }
+
+  .modal-cancel-btn:hover {
+    background: #34404c;
+  }
+
+  .modal-save-btn {
+    background: #61d1fa;
+    color: #11151d;
+  }
+
+  .modal-save-btn:hover {
+    background: #7dd9fc;
+  }
+
+  /* 予定タイプ選択ボタン（ホバー無効） */
+  .schedule-type-button {
+    padding: 0.5rem 1rem;
+    background: #2b2f35;
+    color: #e9f9ff;
+    border: 1px solid #2b2f35;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: none;
+  }
+
+  .schedule-type-button.active {
+    background: #61d1fa;
+    color: #11151d;
+    border-color: #61d1fa;
   }
 
 

@@ -139,7 +139,7 @@ function validateConfig(config: RestartConfig): void {
     }
     
     // タイプ別のバリデーション
-    if (schedule.type === 'specific' && !schedule.specificDate) {
+    if (schedule.type === 'once' && !schedule.specificDate) {
       throw new Error('指定日時の設定が不正です');
     }
     if (schedule.type === 'weekly' && (schedule.weeklyDay === undefined || !schedule.weeklyTime)) {

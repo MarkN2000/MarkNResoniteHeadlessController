@@ -61,7 +61,13 @@ export class RestartManager extends EventEmitter {
       },
       highLoadTriggerDisabledUntil: null,
       restartInProgress: false,
-      waitingForUsers: false
+      waitingForUsers: false,
+      scheduledRestartPreparing: {
+        preparing: false,
+        scheduleId: null,
+        scheduledTime: null,
+        configFile: null
+      }
     };
     
     // イベントリスナー設定
@@ -149,6 +155,10 @@ export class RestartManager extends EventEmitter {
       this.waitingForUsers = false;
       this.status.waitingForUsers = false;
       
+      // 予定再起動準備中フラグをクリア
+      // ※サーバー停止時でも、lastusedコンフィグは予定のものが保持される
+      this.clearScheduledRestartPreparation();
+      
       // 監視を停止
       this.scheduledWatcher.stop();
       this.highLoadWatcher.stop();
@@ -156,7 +166,15 @@ export class RestartManager extends EventEmitter {
       
       this.saveStatus();
       
-      console.log('[RestartManager] Server stopped, all timers cleared');
+      console.log('[RestartManager] Server stopped, all timers and flags cleared');
+    });
+    
+    // 予定再起動準備イベント（30分前）
+    this.scheduledWatcher.on('preparing', (scheduleId: string, configFile: string, scheduledTime: string) => {
+      console.log(`[RestartManager] Scheduled restart preparing: ${scheduleId}, config: ${configFile}, time: ${scheduledTime}`);
+      
+      // 30分前制御を開始
+      this.startScheduledRestartPreparation(scheduleId, configFile, scheduledTime);
     });
     
     // 予定再起動トリガーイベント
@@ -169,6 +187,12 @@ export class RestartManager extends EventEmitter {
     
     // 高負荷トリガーイベント
     this.highLoadWatcher.on('trigger', () => {
+      // 予定再起動準備中の場合はスキップ
+      if (this.status.scheduledRestartPreparing.preparing) {
+        console.log('[RestartManager] High load trigger skipped: Scheduled restart is preparing');
+        return;
+      }
+      
       console.log('[RestartManager] High load restart triggered');
       
       // 最後に使用したコンフィグで再起動
@@ -871,6 +895,101 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
+   * 予定再起動の30分前制御を開始
+   */
+  private async startScheduledRestartPreparation(
+    scheduleId: string,
+    configFile: string,
+    scheduledTime: string
+  ): Promise<void> {
+    console.log('[RestartManager] ========================================');
+    console.log('[RestartManager] 🔔 SCHEDULED RESTART PREPARATION STARTED');
+    console.log(`[RestartManager] Schedule ID: ${scheduleId}`);
+    console.log(`[RestartManager] Config File: ${configFile}`);
+    console.log(`[RestartManager] Scheduled Time: ${scheduledTime}`);
+    console.log('[RestartManager] ========================================');
+    
+    // 既に準備中の場合は何もしない
+    if (this.status.scheduledRestartPreparing.preparing) {
+      console.log('[RestartManager] Already preparing for another scheduled restart');
+      return;
+    }
+    
+    // 準備中フラグをセット
+    this.status.scheduledRestartPreparing = {
+      preparing: true,
+      scheduleId,
+      scheduledTime,
+      configFile
+    };
+    
+    // 1. 待機中の再起動をキャンセル
+    if (this.waitingForUsers) {
+      console.log('[RestartManager] Cancelling waiting restart...');
+      this.clearAllTimers();
+      this.waitingForUsers = false;
+      this.status.waitingForUsers = false;
+      console.log('[RestartManager] ✓ Waiting restart cancelled');
+    }
+    
+    // 2. lastusedコンフィグを予定のものに変更
+    try {
+      const runtimeStatePath = path.join(process.cwd(), 'config', 'runtime-state.json');
+      const configPath = path.join(process.cwd(), 'config', 'headless', configFile);
+      
+      // ファイルの存在確認
+      try {
+        await fs.access(configPath);
+      } catch {
+        console.error(`[RestartManager] Config file not found: ${configPath}`);
+        console.error('[RestartManager] ⚠️ Preparation failed: Config file not found');
+        this.clearScheduledRestartPreparation();
+        return;
+      }
+      
+      // runtime-state.jsonを更新
+      const runtimeState = {
+        lastStartedConfigPath: configPath,
+        lastStartedAt: new Date().toISOString(),
+        lastStoppedAt: null
+      };
+      
+      await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');
+      console.log(`[RestartManager] ✓ Updated lastUsedConfig to: ${configFile}`);
+      
+    } catch (error) {
+      console.error('[RestartManager] Failed to update runtime state:', error);
+      console.error('[RestartManager] ⚠️ Preparation failed: Cannot update config');
+      this.clearScheduledRestartPreparation();
+      return;
+    }
+    
+    // 3. 高負荷トリガーは既にイベントハンドラーで無効化済み
+    console.log('[RestartManager] ✓ High load trigger disabled (handled in event listener)');
+    
+    // ステータスを保存
+    await this.saveStatus();
+    
+    console.log('[RestartManager] ========================================');
+    console.log('[RestartManager] ✓ PREPARATION COMPLETED');
+    console.log('[RestartManager] High load triggers will be skipped until scheduled time');
+    console.log('[RestartManager] Force restart button remains available');
+    console.log('[RestartManager] ========================================');
+  }
+
+  /**
+   * 予定再起動準備中フラグをクリア
+   */
+  private clearScheduledRestartPreparation(): void {
+    this.status.scheduledRestartPreparing = {
+      preparing: false,
+      scheduleId: null,
+      scheduledTime: null,
+      configFile: null
+    };
+  }
+
+  /**
    * 最後に使用したコンフィグを更新してから再起動
    */
   private async updateLastUsedConfigAndRestart(
@@ -902,6 +1021,13 @@ export class RestartManager extends EventEmitter {
       
       // 再起動を実行
       await this.triggerRestart(trigger, scheduleId);
+      
+      // 予定再起動の準備中フラグをクリア
+      if (trigger === 'scheduled') {
+        this.clearScheduledRestartPreparation();
+        await this.saveStatus();
+        console.log('[RestartManager] ✓ Scheduled restart preparation cleared');
+      }
       
     } catch (error) {
       console.error('[RestartManager] Failed to update config and restart:', error);

@@ -14,8 +14,8 @@ export interface LogEntry {
 export interface ScheduledRestartEntry {
   id: string;
   enabled: boolean;
-  type: 'specific' | 'weekly' | 'daily';
-  // 指定日時の場合
+  type: 'once' | 'weekly' | 'daily';
+  // 指定日時の場合（type === 'once'）
   specificDate?: {
     year: number;
     month: number;
@@ -23,13 +23,13 @@ export interface ScheduledRestartEntry {
     hour: number;
     minute: number;
   };
-  // 毎週の場合
+  // 毎週の場合（type === 'weekly'）
   weeklyDay?: number; // 0=日曜, 1=月曜, ..., 6=土曜
   weeklyTime?: {
     hour: number;
     minute: number;
   };
-  // 毎日の場合
+  // 毎日の場合（type === 'daily'）
   dailyTime?: {
     hour: number;
     minute: number;
@@ -119,4 +119,11 @@ export interface RestartStatus {
   restartInProgress: boolean;
   // 待機中フラグ
   waitingForUsers: boolean;
+  // 予定再起動準備中（30分前〜予定時刻）
+  scheduledRestartPreparing: {
+    preparing: boolean;
+    scheduleId: string | null;
+    scheduledTime: string | null; // ISO 8601形式
+    configFile: string | null;
+  };
 }
