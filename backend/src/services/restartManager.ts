@@ -934,12 +934,18 @@ export class RestartManager extends EventEmitter {
     
     // 2. lastusedコンフィグを予定のものに変更
     try {
-      const runtimeStatePath = path.join(process.cwd(), 'config', 'runtime-state.json');
-      const configPath = path.join(process.cwd(), 'config', 'headless', configFile);
+      // プロジェクトルートのパス（backend/ の親ディレクトリ）
+      const projectRoot = path.join(process.cwd(), '..');
+      
+      const runtimeStatePath = path.join(projectRoot, 'config', 'runtime-state.json');
+      const configPath = path.join(projectRoot, 'config', 'headless', configFile);
+      
+      console.log(`[RestartManager] Checking config file: ${configPath}`);
       
       // ファイルの存在確認
       try {
         await fs.access(configPath);
+        console.log(`[RestartManager] Config file exists: ${configPath}`);
       } catch {
         console.error(`[RestartManager] Config file not found: ${configPath}`);
         console.error('[RestartManager] ⚠️ Preparation failed: Config file not found');
@@ -956,6 +962,7 @@ export class RestartManager extends EventEmitter {
       
       await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');
       console.log(`[RestartManager] ✓ Updated lastUsedConfig to: ${configFile}`);
+      console.log(`[RestartManager] ✓ runtime-state.json path: ${runtimeStatePath}`);
       
     } catch (error) {
       console.error('[RestartManager] Failed to update runtime state:', error);
@@ -998,13 +1005,19 @@ export class RestartManager extends EventEmitter {
     configFile: string
   ): Promise<void> {
     try {
+      // プロジェクトルートのパス（backend/ の親ディレクトリ）
+      const projectRoot = path.join(process.cwd(), '..');
+      
       // runtime-state.jsonを更新
-      const runtimeStatePath = path.join(process.cwd(), 'config', 'runtime-state.json');
-      const configPath = path.join(process.cwd(), 'config', 'headless', configFile);
+      const runtimeStatePath = path.join(projectRoot, 'config', 'runtime-state.json');
+      const configPath = path.join(projectRoot, 'config', 'headless', configFile);
+      
+      console.log(`[RestartManager] Updating config to: ${configPath}`);
       
       // ファイルの存在確認
       try {
         await fs.access(configPath);
+        console.log(`[RestartManager] Config file exists: ${configPath}`);
       } catch {
         console.error(`[RestartManager] Config file not found: ${configPath}`);
         return;
@@ -1018,6 +1031,7 @@ export class RestartManager extends EventEmitter {
       };
       
       await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');
+      console.log(`[RestartManager] runtime-state.json updated with config: ${configFile}`);
       
       // 再起動を実行
       await this.triggerRestart(trigger, scheduleId);

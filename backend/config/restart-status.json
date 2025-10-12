@@ -1,13 +1,14 @@
 {
   "nextScheduledRestart": {
-    "scheduleId": null,
-    "datetime": null,
-    "configFile": null
+    "scheduleId": "schedule-1760245220463",
+    "datetime": "2025-10-12T06:13:00.000Z",
+    "configFile": "Config.json"
   },
   "currentUptime": 0,
   "lastRestart": {
-    "timestamp": "2025-10-11T18:23:20.464Z",
-    "trigger": "manual"
+    "timestamp": "2025-10-12T06:16:39.617Z",
+    "trigger": "scheduled",
+    "scheduleId": "schedule-1760245220463"
   },
   "highLoadTriggerDisabledUntil": null,
   "restartInProgress": false,

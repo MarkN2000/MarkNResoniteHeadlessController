@@ -12,6 +12,7 @@ export class ScheduledRestartWatcher extends EventEmitter {
   private checkTimer: NodeJS.Timeout | null = null;
   private triggeredSpecificDates = new Set<string>(); // 既に発動した指定日時を記録
   private preparingSchedules = new Set<string>(); // 既に準備中のスケジュールを記録
+  private lastTriggeredTime = new Map<string, number>(); // 最後にトリガーされた時刻（scheduleId -> timestamp）
 
   constructor() {
     super();
@@ -25,6 +26,7 @@ export class ScheduledRestartWatcher extends EventEmitter {
     this.enabled = enabled;
     
     if (!this.enabled || this.schedules.length === 0) {
+      console.log(`[ScheduledRestartWatcher] Stopped - enabled: ${this.enabled}, schedules: ${schedules.length}, enabled schedules: ${this.schedules.length}`);
       this.stop();
       return;
     }
@@ -42,7 +44,16 @@ export class ScheduledRestartWatcher extends EventEmitter {
     // 即座に1回チェック
     this.checkSchedules();
     
-    console.log(`[ScheduledRestartWatcher] Started monitoring ${this.schedules.length} schedule(s)`);
+    console.log(`[ScheduledRestartWatcher] Started monitoring ${this.schedules.length} schedule(s):`);
+    this.schedules.forEach((schedule, index) => {
+      console.log(`  [${index + 1}] ID: ${schedule.id}, Type: ${schedule.type}, Config: ${schedule.configFile}`);
+      if (schedule.type === 'once' && schedule.specificDate) {
+        const { year, month, day, hour, minute } = schedule.specificDate;
+        console.log(`      Scheduled at: ${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+      }
+      const nextTime = this.getNextTriggerTime(schedule, new Date());
+      console.log(`      Next trigger: ${nextTime ? nextTime.toISOString() : 'null (past or invalid)'}`);
+    });
   }
 
   /**
@@ -61,6 +72,7 @@ export class ScheduledRestartWatcher extends EventEmitter {
    */
   private checkSchedules(): void {
     const now = new Date();
+    // console.log(`[ScheduledRestartWatcher] Checking schedules at ${now.toISOString()}`);
     
     // 30分前チェック（準備開始）
     this.check30MinutesBefore(now);
@@ -68,8 +80,18 @@ export class ScheduledRestartWatcher extends EventEmitter {
     // トリガーチェック（予定時刻）
     for (const schedule of this.schedules) {
       if (this.shouldTrigger(schedule, now)) {
+        // 最後のトリガーから3分以上経過しているかチェック（重複トリガー防止）
+        const lastTriggered = this.lastTriggeredTime.get(schedule.id);
+        const THREE_MINUTES_MS = 3 * 60 * 1000;
+        if (lastTriggered && (now.getTime() - lastTriggered < THREE_MINUTES_MS)) {
+          continue; // 3分以内に既にトリガー済みなのでスキップ
+        }
+        
         console.log(`[ScheduledRestartWatcher] Triggering schedule: ${schedule.id}`);
         this.emit('trigger', schedule.id, schedule.configFile);
+        
+        // 最後のトリガー時刻を記録
+        this.lastTriggeredTime.set(schedule.id, now.getTime());
         
         // 準備中フラグをクリア
         this.preparingSchedules.delete(schedule.id);
@@ -141,7 +163,9 @@ export class ScheduledRestartWatcher extends EventEmitter {
    * 指定日時のスケジュールをトリガーすべきか判定
    */
   private shouldTriggerSpecific(schedule: ScheduledRestartEntry, now: Date): boolean {
-    if (!schedule.specificDate) return false;
+    if (!schedule.specificDate) {
+      return false;
+    }
     
     const { year, month, day, hour, minute } = schedule.specificDate;
     
@@ -151,12 +175,15 @@ export class ScheduledRestartWatcher extends EventEmitter {
       return false;
     }
     
-    // 指定日時と現在時刻を比較（分単位）
+    // 指定日時と現在時刻を比較
     const targetDate = new Date(year, month - 1, day, hour, minute, 0, 0);
-    const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
     
-    // 指定日時が現在時刻と一致する場合にトリガー
-    return targetDate.getTime() === currentMinute.getTime();
+    // 予定時刻を過ぎている、または現在時刻が予定時刻から2分以内の場合にトリガー
+    // （チェック間隔が1分なので、多少の余裕を持たせる）
+    const timeDiff = now.getTime() - targetDate.getTime();
+    const TWO_MINUTES_MS = 2 * 60 * 1000;
+    
+    return timeDiff >= 0 && timeDiff < TWO_MINUTES_MS;
   }
 
   /**
@@ -173,7 +200,14 @@ export class ScheduledRestartWatcher extends EventEmitter {
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
-    return currentDay === weeklyDay && currentHour === hour && currentMinute === minute;
+    // 曜日が一致し、時刻が予定時刻から2分以内の場合にトリガー
+    if (currentDay !== weeklyDay) return false;
+    
+    const targetMinutes = hour * 60 + minute;
+    const currentMinutes = currentHour * 60 + currentMinute;
+    const diff = currentMinutes - targetMinutes;
+    
+    return diff >= 0 && diff < 2;
   }
 
   /**
@@ -186,7 +220,12 @@ export class ScheduledRestartWatcher extends EventEmitter {
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
-    return currentHour === hour && currentMinute === minute;
+    // 時刻が予定時刻から2分以内の場合にトリガー
+    const targetMinutes = hour * 60 + minute;
+    const currentMinutes = currentHour * 60 + currentMinute;
+    const diff = currentMinutes - targetMinutes;
+    
+    return diff >= 0 && diff < 2;
   }
 
   /**

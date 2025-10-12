@@ -1,11 +1,34 @@
 {
   "triggers": {
     "scheduled": {
-      "enabled": false,
-      "schedules": []
+      "enabled": true,
+      "schedules": [
+        {
+          "id": "schedule-1760245220463",
+          "enabled": true,
+          "type": "once",
+          "specificDate": {
+            "year": 2025,
+            "month": 10,
+            "day": 12,
+            "hour": 15,
+            "minute": 13
+          },
+          "weeklyDay": 0,
+          "weeklyTime": {
+            "hour": 3,
+            "minute": 0
+          },
+          "dailyTime": {
+            "hour": 3,
+            "minute": 0
+          },
+          "configFile": "Config.json"
+        }
+      ]
     },
     "highLoad": {
-      "enabled": true,
+      "enabled": false,
       "cpuThreshold": 80,
       "memoryThreshold": 80,
       "durationMinutes": 10

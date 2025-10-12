@@ -301,6 +301,8 @@
   let restartSaveLoading = false;
   let forceRestartLoading = false;
   let manualRestartLoading = false;
+  let restartConfigDebounceTimer: NodeJS.Timeout | null = null;
+  let restartConfigInitialized = false; // 初回読み込み完了フラグ
 
   // Scheduled restart edit state
   let editingScheduleId: string | null = null;
@@ -1701,6 +1703,19 @@
     loadRestartData();
   }
 
+  // リアクティブステートメント: restartConfigの自動保存（デバウンス5秒）
+  $: if (restartConfig && restartConfigInitialized && activeTab === 'restart') {
+    // 既存のタイマーをクリア
+    if (restartConfigDebounceTimer) {
+      clearTimeout(restartConfigDebounceTimer);
+    }
+    
+    // 5秒後に自動保存
+    restartConfigDebounceTimer = setTimeout(() => {
+      autoSaveRestartConfig();
+    }, 5000);
+  }
+
   onMount(() => {
     // 認証チェック（ブラウザ環境でのみ）
     if (typeof window !== 'undefined') {
@@ -2170,6 +2185,9 @@
       
       restartConfig = config;
       restartStatus = status;
+      
+      // 初回読み込み完了フラグをセット
+      restartConfigInitialized = true;
     } catch (error) {
       console.error('[RestartManagement] Failed to load data:', error);
       pushToast('再起動設定の読み込みに失敗しました', 'error');
@@ -2237,7 +2255,7 @@
     }
 
     closeScheduleModal();
-    pushToast('予定を保存しました（設定を保存ボタンで確定してください）', 'info');
+    pushToast('予定を保存しました（5秒後に自動保存されます）', 'info');
   };
 
   // 予定再起動 - 削除
@@ -2248,7 +2266,7 @@
       restartConfig.triggers.scheduled.schedules = restartConfig.triggers.scheduled.schedules.filter(
         (s: any) => s.id !== scheduleId
       );
-      pushToast('予定を削除しました（設定を保存ボタンで確定してください）', 'info');
+      pushToast('予定を削除しました（5秒後に自動保存されます）', 'info');
     }
   };
 
@@ -2303,20 +2321,20 @@
     }
   };
 
-  // 再起動設定を保存
-  const handleSaveRestartConfig = async () => {
+  // 自動保存処理（デバウンス付き）
+  const autoSaveRestartConfig = async () => {
     if (!restartConfig || restartSaveLoading) return;
     
     restartSaveLoading = true;
     try {
       await saveRestartConfig(restartConfig);
-      pushToast('再起動設定を保存しました', 'success');
+      console.log('[RestartManagement] Auto-saved configuration');
       
       // 保存後にステータスを再読み込み
       const status = await getRestartStatus();
       restartStatus = status;
     } catch (error: any) {
-      const message = error.message || '設定の保存に失敗しました';
+      const message = error.message || '設定の自動保存に失敗しました';
       pushToast(message, 'error');
     } finally {
       restartSaveLoading = false;
@@ -2325,9 +2343,18 @@
 
   // 再起動設定をリセット
   const handleResetRestartConfig = async () => {
-    if (!confirm('設定をリセットしますか？\n保存されていない変更は失われます。')) {
+    if (!confirm('設定をリセットしますか？')) {
       return;
     }
+    
+    // デバウンスタイマーをクリア
+    if (restartConfigDebounceTimer) {
+      clearTimeout(restartConfigDebounceTimer);
+      restartConfigDebounceTimer = null;
+    }
+    
+    // 初期化フラグをリセット
+    restartConfigInitialized = false;
     
     await loadRestartData();
     pushToast('設定をリセットしました', 'info');
@@ -4178,6 +4205,21 @@
                     {manualRestartLoading ? '実行中...' : '手動再起動トリガー'}
                   </button>
                 </div>
+                <div class="config-create-button">
+                  <button 
+                    type="button" 
+                    class="config-create-btn"
+                    on:click={handleResetRestartConfig}
+                  >
+                    リセット
+                  </button>
+                </div>
+                {#if restartSaveLoading}
+                  <div style="display: flex; align-items: center; gap: 0.5rem; color: #61d1fa; font-size: 0.9rem;">
+                    <div class="loader" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                    <span>保存中...</span>
+                  </div>
+                {/if}
               </div>
             </div>
 
@@ -4254,7 +4296,7 @@
                                   <button
                                     type="button"
                                     class="status-action-button"
-                                    style="font-size: 0.8rem; padding: 0.25rem 0.5rem; background: rgba(255, 107, 107, 0.1); border-color: #ff6b6b;"
+                                    style="font-size: 0.8rem; padding: 0.25rem 0.5rem; background: #ff6b6b; border-color: #ff6b6b; color: #ffffff;"
                                     on:click={() => deleteSchedule(schedule.id)}
                                   >
                                     削除
@@ -4732,31 +4774,6 @@
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 保存・リセットボタン -->
-            <div class="config-create-section">
-              <div class="config-controls">
-                <div class="config-create-button">
-                  <button 
-                    type="button" 
-                    class="config-create-btn"
-                    on:click={handleSaveRestartConfig}
-                    disabled={restartSaveLoading || !restartConfig}
-                  >
-                    {restartSaveLoading ? '保存中...' : '設定を保存'}
-                  </button>
-                </div>
-                <div class="config-create-button">
-                  <button 
-                    type="button" 
-                    class="config-create-btn"
-                    on:click={handleResetRestartConfig}
-                  >
-                    リセット
-                  </button>
                 </div>
               </div>
             </div>
@@ -5991,7 +6008,7 @@
     transition: background 0.15s ease, transform 0.15s ease;
   }
 
-  .field-row button:hover:enabled {
+  .field-row button:not(.status-action-button):not(.schedule-type-button):hover:enabled {
     background: rgba(97, 209, 250, 0.2);
   }
 
@@ -6585,7 +6602,7 @@
     transition: background 0.15s ease, transform 0.15s ease;
   }
 
-  .field-row button:hover:enabled {
+  .field-row button:not(.status-action-button):not(.schedule-type-button):hover:enabled {
     background: rgba(97, 209, 250, 0.2);
   }
 
@@ -6602,11 +6619,12 @@
     font-weight: 600;
     font-size: 0.92rem;
     padding: 0;
-    transition: background 0.15s ease;
+    transition: none;
   }
 
   .status-action-button:hover:enabled {
-    background: rgba(97, 209, 250, 0.22);
+    background: rgba(24, 34, 43, 0.85);
+    color: #61d1fa;
   }
 
   .status-action-button:disabled {
@@ -6617,6 +6635,11 @@
     background: #61d1fa;
     color: #11151d;
     border-color: transparent;
+  }
+
+  .status-action-button.active:hover:enabled {
+    background: #61d1fa;
+    color: #11151d;
   }
 
   .toggle-row {
@@ -7346,10 +7369,20 @@
     transition: none;
   }
 
+  .schedule-type-button:hover:enabled {
+    background: #2b2f35;
+    color: #e9f9ff;
+  }
+
   .schedule-type-button.active {
     background: #61d1fa;
     color: #11151d;
     border-color: #61d1fa;
+  }
+
+  .schedule-type-button.active:hover:enabled {
+    background: #61d1fa;
+    color: #11151d;
   }
 
 
