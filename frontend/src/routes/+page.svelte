@@ -609,6 +609,15 @@
   let useridLoading = false;
   let lastFetchedUsername = '';
   let useridCache = new Map<string, string>();
+
+  // アイテムスポーン機能
+  let itemSpawnUrl = '';
+  let itemSpawnLoading = false;
+
+  // ダイナミックインパルスstring機能
+  let dynamicImpulseTag = '';
+  let dynamicImpulseText = '';
+  let dynamicImpulseLoading = false;
   
   // 下書き保存/復元: コンフィグ作成タブの編集中データをLocalStorageに自動保存
   const loadDraft = () => {
@@ -2773,6 +2782,48 @@
     }
   };
 
+  const spawnItem = async () => {
+    if (itemSpawnLoading) return;
+    itemSpawnLoading = true;
+    try {
+      const trimmed = itemSpawnUrl.trim();
+      if (!trimmed) {
+        pushToast('アイテムのURLを入力してください。', 'error');
+      } else {
+        await postCommand(`spawnitem ${JSON.stringify(trimmed)}`);
+        pushToast('アイテムをスポーンしました。', 'success');
+        itemSpawnUrl = ''; // 成功後に入力欄を空にする
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'アイテムのスポーンに失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      itemSpawnLoading = false;
+    }
+  };
+
+  const sendDynamicImpulse = async () => {
+    if (dynamicImpulseLoading) return;
+    dynamicImpulseLoading = true;
+    try {
+      const trimmedTag = dynamicImpulseTag.trim();
+      const trimmedText = dynamicImpulseText.trim();
+      if (!trimmedTag || !trimmedText) {
+        pushToast('タグとテキストを入力してください。', 'error');
+      } else {
+        await postCommand(`dynamicimpulse ${JSON.stringify(trimmedTag)} ${JSON.stringify(trimmedText)}`);
+        pushToast('ダイナミックインパルスを送信しました。', 'success');
+        dynamicImpulseTag = ''; // 成功後に入力欄を空にする
+        dynamicImpulseText = '';
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ダイナミックインパルスの送信に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      dynamicImpulseLoading = false;
+    }
+  };
+
   const focusWorld = async (world: RuntimeWorldEntry) => {
     if (!$status.running) return;
     worldsError = '';
@@ -3205,7 +3256,7 @@
 
         <div class="tab-panels">
           <section class="panel" class:active={activeTab === 'dashboard'}>
-            <div class="panel-grid two">
+            <div class="panel-grid three">
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>セッション設定</h2>
@@ -3446,6 +3497,48 @@
                   {:else}
                     <p class="empty">読み込み中...</p>
                   {/if}
+                </div>
+              </div>
+
+              <div class="panel-column">
+                <div class="panel-heading">
+                  <h2>スポーン・パルス</h2>
+                </div>
+                <div class="card status-card">
+                  <form class="status-form" on:submit|preventDefault={() => {}}>
+                    <label>
+                      <span>アイテムスポーン</span>
+                      <div class="field-row">
+                        <input
+                          type="url"
+                          bind:value={itemSpawnUrl}
+                          placeholder="アイテムのURLを入力"
+                        />
+                        <button type="button" class="status-action-button" on:click={spawnItem} disabled={!$status.running || itemSpawnLoading}>
+                          スポーン
+                        </button>
+                      </div>
+                    </label>
+
+                    <label>
+                      <span>ダイナミックインパルスstring</span>
+                      <div class="field-row">
+                        <input
+                          type="text"
+                          bind:value={dynamicImpulseTag}
+                          placeholder="タグ"
+                        />
+                        <input
+                          type="text"
+                          bind:value={dynamicImpulseText}
+                          placeholder="テキスト"
+                        />
+                        <button type="button" class="status-action-button" on:click={sendDynamicImpulse} disabled={!$status.running || dynamicImpulseLoading}>
+                          送信
+                        </button>
+                      </div>
+                    </label>
+                  </form>
                 </div>
               </div>
             </div>
