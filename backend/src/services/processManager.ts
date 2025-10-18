@@ -57,9 +57,30 @@ export class ProcessManager extends EventEmitter {
         if (state.lastStartedConfigPath) {
           this.status.configPath = state.lastStartedConfigPath;
         }
+      } else {
+        // ファイルが存在しない場合はデフォルト状態を作成
+        console.log('[ProcessManager] Runtime state file not found, creating default runtime-state.json');
+        const defaultState: RuntimeState = {
+          lastUsedConfigPath: null,
+          lastUsedConfigName: null,
+          isRunning: false
+        };
+        this.saveRuntimeState(null, 'stop');
       }
     } catch (error) {
       console.error('[ProcessManager] Failed to load runtime state:', error);
+      // エラー時はデフォルト状態を作成
+      const defaultState: RuntimeState = {
+        lastUsedConfigPath: null,
+        lastUsedConfigName: null,
+        isRunning: false
+      };
+      try {
+        fs.writeFileSync(RUNTIME_STATE_PATH, JSON.stringify(defaultState, null, 2), 'utf-8');
+        console.log('[ProcessManager] Created default runtime state file');
+      } catch (writeError) {
+        console.error('[ProcessManager] Failed to create default runtime state file:', writeError);
+      }
     }
   }
 

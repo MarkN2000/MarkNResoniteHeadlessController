@@ -14,23 +14,42 @@ const loadSecurityConfig = (): SecurityConfig => {
       const configData = fs.readFileSync(configPath, 'utf-8');
       securityConfig = JSON.parse(configData);
       console.log('Security config loaded:', securityConfig);
-    } catch (error) {
-      console.error('Failed to load security config:', error);
-      console.error('Config path:', configPath);
-      console.error('File exists:', fs.existsSync(configPath));
-      
-      // デフォルト設定を使用
-      securityConfig = {
-        allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8']
-      };
-      console.log('Using default security config:', securityConfig);
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // ファイルが存在しない場合はデフォルト設定を作成
+        console.log('[Security] Config file not found, creating default security.json');
+        securityConfig = {
+          allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8', '127.0.0.1/32']
+        };
+        saveSecurityConfig(securityConfig);
+      } else {
+        console.error('Failed to load security config:', error);
+        console.error('Config path:', configPath);
+        console.error('File exists:', fs.existsSync(configPath));
+        
+        // デフォルト設定を使用
+        securityConfig = {
+          allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8', '127.0.0.1/32']
+        };
+        console.log('Using default security config:', securityConfig);
+      }
     }
   }
   // 型ガード: 必ずSecurityConfigを返す
   if (!securityConfig) {
-    securityConfig = { allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8'] };
+    securityConfig = { allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8', '127.0.0.1/32'] };
   }
   return securityConfig;
+};
+
+const saveSecurityConfig = (config: SecurityConfig) => {
+  const configPath = path.join(process.cwd(), '..', 'config', 'security.json');
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    console.log('[Security] Default security config saved:', configPath);
+  } catch (error) {
+    console.error('[Security] Failed to save security config:', error);
+  }
 };
 
 /**

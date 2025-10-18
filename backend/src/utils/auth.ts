@@ -19,16 +19,41 @@ const getConfigPath = (): string => {
 const loadAuthConfig = (): AuthConfig => {
   if (!authConfig) {
     const configPath = getConfigPath();
-    const configData = fs.readFileSync(configPath, 'utf-8');
-    const fileConfig = JSON.parse(configData);
     
-    // 環境変数で上書き可能
-    authConfig = {
-      jwtSecret: process.env.AUTH_SHARED_SECRET || fileConfig.jwtSecret,
-      jwtExpiresIn: process.env.JWT_EXPIRES_IN || fileConfig.jwtExpiresIn,
-      defaultPassword: process.env.DEFAULT_PASSWORD || fileConfig.defaultPassword,
-      password: process.env.DEFAULT_PASSWORD || fileConfig.password,
-    };
+    try {
+      const configData = fs.readFileSync(configPath, 'utf-8');
+      const fileConfig = JSON.parse(configData);
+      
+      // 環境変数で上書き可能
+      authConfig = {
+        jwtSecret: process.env.AUTH_SHARED_SECRET || fileConfig.jwtSecret,
+        jwtExpiresIn: process.env.JWT_EXPIRES_IN || fileConfig.jwtExpiresIn,
+        defaultPassword: process.env.DEFAULT_PASSWORD || fileConfig.defaultPassword,
+        password: process.env.DEFAULT_PASSWORD || fileConfig.password,
+      };
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // ファイルが存在しない場合はデフォルト設定を作成
+        console.log('[Auth] Config file not found, creating default auth.json');
+        const defaultConfig: AuthConfig = {
+          jwtSecret: process.env.AUTH_SHARED_SECRET || 'your-secret-key-change-in-production',
+          jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+          defaultPassword: process.env.DEFAULT_PASSWORD || 'admin123',
+          password: process.env.DEFAULT_PASSWORD || 'admin123',
+        };
+        saveAuthConfig(defaultConfig);
+        authConfig = defaultConfig;
+      } else {
+        console.error('[Auth] Failed to load auth config:', error);
+        // エラー時はデフォルト設定を使用
+        authConfig = {
+          jwtSecret: process.env.AUTH_SHARED_SECRET || 'your-secret-key-change-in-production',
+          jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+          defaultPassword: process.env.DEFAULT_PASSWORD || 'admin123',
+          password: process.env.DEFAULT_PASSWORD || 'admin123',
+        };
+      }
+    }
   }
   return authConfig;
 };

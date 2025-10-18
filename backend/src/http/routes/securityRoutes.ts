@@ -21,9 +21,24 @@ router.get('/config', (req: AuthenticatedRequest, res) => {
     const config = JSON.parse(configData);
     
     res.json(config);
-  } catch (error) {
-    console.error('Failed to load security config:', error);
-    res.status(500).json({ error: 'Failed to load security configuration' });
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      // ファイルが存在しない場合はデフォルト設定を作成
+      console.log('[SecurityRoutes] Config file not found, creating default security.json');
+      const defaultConfig = {
+        allowedCidrs: ['192.168.0.0/16', '10.0.0.0/8', '127.0.0.1/32']
+      };
+      try {
+        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
+        res.json(defaultConfig);
+      } catch (writeError) {
+        console.error('Failed to create default security config:', writeError);
+        res.status(500).json({ error: 'Failed to create security configuration' });
+      }
+    } else {
+      console.error('Failed to load security config:', error);
+      res.status(500).json({ error: 'Failed to load security configuration' });
+    }
   }
 });
 
