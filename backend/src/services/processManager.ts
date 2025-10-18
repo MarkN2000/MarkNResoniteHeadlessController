@@ -20,9 +20,9 @@ export interface HeadlessStatus {
 }
 
 interface RuntimeState {
-  lastStartedConfigPath: string | null;
-  lastStartedAt: string | null;
-  lastStoppedAt: string | null;
+  lastUsedConfigPath: string | null;
+  lastUsedConfigName: string | null;
+  isRunning: boolean;
 }
 
 export interface ExecuteCommandOptions {
@@ -54,8 +54,8 @@ export class ProcessManager extends EventEmitter {
         const state: RuntimeState = JSON.parse(content);
         
         // 最後に起動したコンフィグパスをステータスに反映
-        if (state.lastStartedConfigPath) {
-          this.status.configPath = state.lastStartedConfigPath;
+        if (state.lastUsedConfigPath) {
+          this.status.configPath = state.lastUsedConfigPath;
         }
       } else {
         // ファイルが存在しない場合はデフォルト状態を作成
@@ -90,9 +90,9 @@ export class ProcessManager extends EventEmitter {
   private saveRuntimeState(configPath: string | null, event: 'start' | 'stop'): void {
     try {
       const state: RuntimeState = {
-        lastStartedConfigPath: configPath,
-        lastStartedAt: event === 'start' ? new Date().toISOString() : null,
-        lastStoppedAt: event === 'stop' ? new Date().toISOString() : null
+        lastUsedConfigPath: configPath,
+        lastUsedConfigName: configPath ? path.basename(configPath) : null,
+        isRunning: event === 'start'
       };
 
       // 既存の状態を読み込んで更新
@@ -101,13 +101,13 @@ export class ProcessManager extends EventEmitter {
         const existingState: RuntimeState = JSON.parse(content);
         
         if (event === 'start') {
-          state.lastStartedConfigPath = configPath;
-          state.lastStartedAt = new Date().toISOString();
-          state.lastStoppedAt = existingState.lastStoppedAt;
+          state.lastUsedConfigPath = configPath;
+          state.lastUsedConfigName = configPath ? path.basename(configPath) : null;
+          state.isRunning = true;
         } else {
-          state.lastStartedConfigPath = existingState.lastStartedConfigPath;
-          state.lastStartedAt = existingState.lastStartedAt;
-          state.lastStoppedAt = new Date().toISOString();
+          state.lastUsedConfigPath = existingState.lastUsedConfigPath;
+          state.lastUsedConfigName = existingState.lastUsedConfigName;
+          state.isRunning = false;
         }
       }
 
@@ -125,7 +125,7 @@ export class ProcessManager extends EventEmitter {
       if (fs.existsSync(RUNTIME_STATE_PATH)) {
         const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
         const state: RuntimeState = JSON.parse(content);
-        return state.lastStartedConfigPath;
+        return state.lastUsedConfigPath;
       }
     } catch (error) {
       console.error('[ProcessManager] Failed to get last started config path:', error);

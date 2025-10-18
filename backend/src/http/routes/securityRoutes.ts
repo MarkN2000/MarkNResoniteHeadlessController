@@ -15,8 +15,9 @@ router.use(lenientRateLimit);
 
 // セキュリティ設定の取得
 router.get('/config', (req: AuthenticatedRequest, res) => {
+  const configPath = path.join(process.cwd(), '..', 'config', 'security.json');
+  
   try {
-    const configPath = path.join(process.cwd(), '..', 'config', 'security.json');
     const configData = fs.readFileSync(configPath, 'utf-8');
     const config = JSON.parse(configData);
     

@@ -1,15 +1,17 @@
 {
   "pkg": {
     "targets": [
-      "node20-win-x64",
-      "node20-linux-x64",
-      "node20-macos-x64"
+      "node18-win-x64"
     ],
     "outputPath": "dist",
     "assets": [
       "dist/backend/src/**/*",
       "dist/shared/src/**/*",
-      "frontend/build/**/*"
+      "frontend/build/**/*",
+      "frontend/build/**/*.html",
+      "frontend/build/**/*.css",
+      "frontend/build/**/*.js",
+      "frontend/build/**/*.json"
     ],
     "scripts": [
       "dist/backend/src/**/*.js"

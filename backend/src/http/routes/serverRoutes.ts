@@ -235,7 +235,7 @@ serverRoutes.get('/status', (_req, res) => {
 
 serverRoutes.get('/last-config', (_req, res) => {
   const lastConfigPath = processManager.getLastStartedConfigPath();
-  res.json({ lastStartedConfigPath: lastConfigPath });
+  res.json({ lastUsedConfigPath: lastConfigPath });
 });
 
 serverRoutes.get('/logs', (req, res) => {

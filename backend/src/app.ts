@@ -13,9 +13,29 @@ import { getCorsConfig, dynamicOriginCheck } from './config/cors.js';
 import { systemMetricsCollector } from './services/systemMetrics.js';
 import { processManager } from './services/processManager.js';
 import { RestartManager } from './services/restartManager.js';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// 必要なディレクトリを作成
+const ensureDirectories = () => {
+  const configDir = path.join(__dirname, '../../../config');
+  const backendConfigDir = path.join(__dirname, '../config');
+  
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+    console.log('[App] Created config directory:', configDir);
+  }
+  
+  if (!fs.existsSync(backendConfigDir)) {
+    fs.mkdirSync(backendConfigDir, { recursive: true });
+    console.log('[App] Created backend config directory:', backendConfigDir);
+  }
+};
+
+// ディレクトリの作成を実行
+ensureDirectories();
 
 const app = express();
 

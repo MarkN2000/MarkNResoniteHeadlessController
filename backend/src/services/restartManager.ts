@@ -910,12 +910,12 @@ export class RestartManager extends EventEmitter {
         const runtimeStateData = await fs.readFile(runtimeStatePath, 'utf-8');
         const runtimeState = JSON.parse(runtimeStateData);
         
-        if (runtimeState.lastStartedConfigPath) {
-          const fileName = path.basename(runtimeState.lastStartedConfigPath);
+        if (runtimeState.lastUsedConfigPath) {
+          const fileName = path.basename(runtimeState.lastUsedConfigPath);
           console.log(`[RestartManager] Resolved "__previous__" to: ${fileName}`);
           return {
             fileName,
-            fullPath: runtimeState.lastStartedConfigPath
+            fullPath: runtimeState.lastUsedConfigPath
           };
         } else {
           console.error('[RestartManager] No previous config found in runtime-state.json');
@@ -1002,9 +1002,9 @@ export class RestartManager extends EventEmitter {
       
       // runtime-state.jsonを更新
       const runtimeState = {
-        lastStartedConfigPath: resolved.fullPath,
-        lastStartedAt: new Date().toISOString(),
-        lastStoppedAt: null
+        lastUsedConfigPath: resolved.fullPath,
+        lastUsedConfigName: resolved.fileName,
+        isRunning: true
       };
       
       await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');
@@ -1078,9 +1078,9 @@ export class RestartManager extends EventEmitter {
       
       // runtime-state.jsonを更新
       const runtimeState = {
-        lastStartedConfigPath: resolved.fullPath,
-        lastStartedAt: new Date().toISOString(),
-        lastStoppedAt: null
+        lastUsedConfigPath: resolved.fullPath,
+        lastUsedConfigName: resolved.fileName,
+        isRunning: true
       };
       
       await fs.writeFile(runtimeStatePath, JSON.stringify(runtimeState, null, 2), 'utf-8');

@@ -38,8 +38,8 @@ copy "sample\*" "dist\distribution\config\"
 
 REM READMEファイルをコピー
 echo Copying documentation...
-copy "README.md" "dist\distribution\"
-copy "DEPLOYMENT.md" "dist\distribution\"
+copy "DISTRIBUTION_README.md" "dist\distribution\README.md"
+copy "DISTRIBUTION_REQUIREMENTS.md" "dist\distribution\"
 
 echo.
 echo Distribution build completed!
