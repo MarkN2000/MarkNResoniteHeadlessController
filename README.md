@@ -194,6 +194,14 @@ npm start
 - WebUI & API: `http://localhost:8080`
 - パスワード: `.env` または `config/auth.json` で設定したもの
 
+#### 配布用Zipの作成（Windows）
+
+```bash
+npm run package:zip
+```
+
+`dist/MarkNResoniteHeadlessController.zip` が生成され、`.env` や実運用の `config/*.json` を除外した配布物が作成されます。ビルド済みの場合は `powershell -File scripts/package-distribution.ps1 -SkipBuild` で再ビルドを省略できます。
+
 ⚠️ **本番環境の注意点**:
 - 必ず `.env` で `NODE_ENV=production` を設定
 - セキュリティ設定を厳密に確認

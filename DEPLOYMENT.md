@@ -102,6 +102,14 @@ scripts\start-production.bat
 npm start
 ```
 
+### 5.1 配布パッケージの作成（任意）
+
+```bash
+npm run package:zip
+```
+
+`dist/MarkNResoniteHeadlessController.zip` が生成され、機密情報を除いた配布用アーカイブを自動で作成します。既にビルド済みの場合は `powershell -File scripts/package-distribution.ps1 -SkipBuild` のように `-SkipBuild` を付けてビルド工程を省略できます。
+
 ### 6. アクセス
 
 ブラウザで `http://localhost:8080` にアクセスし、設定したパスワードでログインしてください。

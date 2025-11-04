@@ -15,7 +15,8 @@
     "format": "npm run format --workspace=backend && npm run format --workspace=frontend",
     "dev": "npm run dev --workspace=backend & npm run dev --workspace=frontend",
     "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend",
-    "start": "npm run start --workspace backend"
+    "start": "npm run start --workspace backend",
+    "package:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-distribution.ps1"
   },
   "engines": {
     "node": ">=20.0.0"

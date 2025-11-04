@@ -56,6 +56,13 @@ npm run build --workspace=frontend
 4. `node_modules` や一時ファイルは含めず、ルートディレクトリをZip圧縮して配布用アーカイブを作成
 5. 配布アーカイブに README / ドキュメントを同梱し、初回セットアップ手順を明記
 
+#### 3.3 Zipパッケージの自動生成
+
+Windows環境では `npm run package:zip` または `scripts\package-distribution.bat` を使用すると、上記手順を自動化して `dist/MarkNResoniteHeadlessController.zip` を生成できます。
+- デフォルトで `npm run build` を実行したうえでステージング → Zip 化 → クリーンアップを行います
+- `scripts/package-distribution.ps1 -SkipBuild` を使えばビルド済み成果物をそのまま打包できます
+- `.env` や `config/*.json` など機密情報は自動的に除外されます（`.example` と `sample` のみ同梱）
+
 ## 設定ファイルの自動生成
 
 ### 1. 自動生成される設定ファイル
