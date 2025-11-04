@@ -1,57 +1,63 @@
 @echo off
-REM Windows用セットアップスクリプト
+REM Windows setup script
 
 echo ======================================
 echo  MarkN Resonite Headless Controller
-echo  初回セットアップ
+echo  Initial Setup
 echo ======================================
 echo.
 
-REM Node.jsがインストールされているか確認
+REM Verify Node.js installation
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [エラー] Node.jsがインストールされていません。
-    echo Node.js 20.x以上をインストールしてください。
+    echo [ERROR] Node.js is not installed.
+    echo Please install Node.js 20.x or newer.
     echo https://nodejs.org/
     pause
     exit /b 1
 )
 
-echo [1/3] セットアップスクリプトを実行中...
-node scripts/setup.js
+echo [1/3] Running setup script...
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%.."
+node "%SCRIPT_DIR%setup.js"
 if %errorlevel% neq 0 (
-    echo [エラー] セットアップスクリプトの実行に失敗しました。
+    echo [ERROR] Failed to execute setup script.
     pause
+    popd
     exit /b 1
 )
 
 echo.
-echo [2/3] 依存関係をインストール中...
+echo [2/3] Installing dependencies...
 call npm install
 if %errorlevel% neq 0 (
-    echo [エラー] 依存関係のインストールに失敗しました。
+    echo [ERROR] Failed to install dependencies.
     pause
+    popd
     exit /b 1
 )
 
 echo.
-echo [3/3] ビルド中...
+echo [3/3] Building shared workspace...
 call npm run build --workspace shared
 if %errorlevel% neq 0 (
-    echo [エラー] ビルドに失敗しました。
+    echo [ERROR] Build failed.
     pause
+    popd
     exit /b 1
 )
 
 echo.
 echo ======================================
-echo  セットアップ完了！
+echo  Setup Complete!
 echo ======================================
 echo.
-echo 次のステップ:
-echo   1. .env ファイルを編集して設定を変更
-echo   2. config\auth.json を編集してパスワードを変更
-echo   3. npm run dev で開発サーバーを起動
+echo Next steps:
+echo   1. Update the .env file for your environment
+echo   2. Update config\auth.json to set a secure password
+echo   3. Start development servers with npm run dev
 echo.
 pause
+popd
 
