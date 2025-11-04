@@ -186,7 +186,7 @@ npm run build
 # Windowsの場合
 scripts\start-production.bat
 
-# または
+# または（リポジトリから直接起動する場合）
 npm start
 ```
 
@@ -201,6 +201,15 @@ npm run package:zip
 ```
 
 コマンド実行時に `npm run build` も自動で走り、最新ビルド成果物を含む `dist/MarkNResoniteHeadlessController.zip` が生成されます。`.env` や実運用の `config/*.json` は Zip に含まれません。既にビルド済みの場合は `powershell -File scripts/package-distribution.ps1 -SkipBuild` を使うと再ビルドを省略できます。
+
+#### 配布Zipからのセットアップ（エンドユーザー向け）
+
+1. 配布された `MarkNResoniteHeadlessController.zip` を任意のディレクトリに展開します。
+2. Node.js 20 以上がインストールされていることを確認します。
+3. 展開先で `scripts/setup.bat` を実行します（バックエンド依存のみインストールされ、ビルドは不要です）。
+4. 必要に応じて `env.example` を `.env` として複製し、各種シークレットやパスを調整します。
+5. `scripts/start-production.bat` を実行するとバックエンドが起動し、初回起動時に `config/*.json` が自動生成されます。
+6. ブラウザで `http://localhost:8080` にアクセスし、初期パスワード `admin123` でログイン後、設定を更新してください。
 
 ⚠️ **本番環境の注意点**:
 - 必ず `.env` で `NODE_ENV=production` を設定
@@ -711,63 +720,7 @@ npm run test
   - ✅ **パフォーマンス最適化**: worldsコマンドの重複実行を削減（1回の取得で全アクションに共有）
 
 #### 🐛 修正済みの重大なバグ
-- **待機制御が未実装だった問題**（2024-10-12修正）
-  - 症状: 再起動トリガー発動時にユーザー数をチェックせず、即座に再起動が実行されていた
-  - 原因: `executePreRestartActions`でユーザー数チェックのロジックが完全に欠けていた
-  - 修正: 完全な待機制御システムを実装
-    - ユーザー0人になるまで待機 → 0人になったら指定時間待機 → 再起動
-    - 強制再起動タイムアウト（最大待機時間）の実装
-    - 強制再起動の何分前にアクション実行する制御
-    - 1分ごとのユーザー数チェックインターバル
-- **worldsコマンドの3重実行問題**（2024-10-12修正）
-  - 症状: アクション実行時にworldsコマンドが3回連続で実行されていた
-  - 原因: `sendChatMessage`、`spawnWarningItem`、`applySessionChanges`がそれぞれ独立してworldsを取得
-  - 修正: `executeActions`で1回だけworldsを取得し、各メソッドに渡すように変更
-- **強制再起動ボタンが待機制御を実行していた問題**（2024-10-12修正）
-  - 症状: 「強制再起動」ボタンを押してもユーザーがいる場合は最大120分待機していた
-  - 原因: `trigger === 'forced'`の場合でも`executePreRestartActions()`を実行していた
-  - 修正: `trigger === 'forced'`の場合は待機制御とアクションをスキップして即座に再起動
-    - **強制再起動（forced）**: 待機制御・アクションをスキップ → 即座に再起動
-    - **手動再起動トリガー（manual）**: 待機制御・アクションを実行 → 再起動
-- **🔴 ユーザー数カウントの重大なバグ**（2024-10-12修正）
-  - 症状: ユーザーがいるのに0人と判定され、アクションが実行されずに即座に再起動されていた
-  - 原因: `parseWorldsOutput()`が`Present`人数を取得しておらず、`getTotalUserCount()`のロジックが複雑で誤動作していた
-  - 修正: 
-    - `parseWorldsOutput()`を修正して`present`フィールドも取得するように変更
-    - `getTotalUserCount()`をシンプルな`reduce`に変更し、`present`人数を正しく合計
-    - **詳細なデバッグログを追加**（原因特定のため）:
-      - worlds コマンドの raw output を出力
-      - パース結果（各セッションの Users / Present 人数）
-      - 総ユーザー数（Present の合計）
-      - 初回チェックと定期チェックの結果
-      - ゼロユーザー待機の経過時間
-      - アクション実行の詳細（どのアクションが実行されたか）
-  - **この修正により、待機制御が正しく動作するようになりました**
-- **🔴🔴🔴 最重大バグ: sendCommand() vs executeCommand() の使用ミス**（2024-10-12修正）
-  - **症状**: `worlds` と `users` コマンドが `undefined` を返し、全てのアクションが実行できなかった
-  - **原因**: `ProcessManager.sendCommand()` は **void を返す**メソッドで、コマンドを送信するだけで出力を取得しない
-    - `sendCommand()`: コマンドを stdin に書き込むだけ（戻り値なし）
-    - `executeCommand()`: コマンドを実行して LogEntry[] を返す（出力を取得）
-  - **修正**: 出力を必要とするコマンドを `executeCommand()` に変更
-    - `getTotalUserCount()`: `executeCommand('worlds')` に変更
-    - `executeActions()`: `executeCommand('worlds')` に変更
-    - `sendChatMessage()`: `executeCommand('users')` に変更
-  - **この修正により、コマンド出力が正しく取得でき、アクションが実行されるようになりました**
-- **🔴 チャットメッセージのコマンド構文エラー**（2024-10-12修正）
-  - **症状**: `message "MarkN" 🔄 サーバーが間もなく再起動します。` → `Invalid number of arguments.`
-  - **原因**: 絵文字を含むメッセージが正しくエスケープされていない。メッセージ部分も引用符で囲む必要がある
-  - **修正**: `message "${username}" "${message}"` に変更
-- **🔴 worlds の重複パース問題**（2024-10-12修正）
-  - **症状**: 2つのセッションなのに4つとしてパースされ、各アクションが2回実行されていた
-  - **原因**: `executeCommand('worlds')` の出力に同じ内容が複数回含まれていた
-  - **修正**: `parseWorldsOutput()` で `Map` を使用して index をキーに重複を除去
-- **🔴 dynamicImpulseString のタグ修正**（2024-10-12修正）
-  - **症状**: `Triggered 0 receivers` - インパルスを受信するオブジェクトがない
-  - **原因**: タグが "MRHC" だったが、アイテム側は "MRHC.play" を期待していた
-  - **修正**: タグを `MRHC.play` に変更
-    ```typescript
-    dynamicimpulsestring MRHC.play "${message}"
-    ```
+
 
 #### ⚠️ 残りタスク（優先度低）
 1. **予定再起動のカード機能** - UI/UX向上（後回し可）
