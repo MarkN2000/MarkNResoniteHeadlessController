@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { PROJECT_ROOT } from '../config/index.js';
 
 interface SecurityConfig {
   allowedCidrs: string[];
@@ -9,7 +10,7 @@ let securityConfig: SecurityConfig | null = null;
 
 const loadSecurityConfig = (): SecurityConfig => {
   if (!securityConfig) {
-    const configPath = path.join(process.cwd(), '..', 'config', 'security.json');
+    const configPath = path.join(PROJECT_ROOT, 'config', 'security.json');
     try {
       const configData = fs.readFileSync(configPath, 'utf-8');
       securityConfig = JSON.parse(configData);
@@ -43,8 +44,9 @@ const loadSecurityConfig = (): SecurityConfig => {
 };
 
 const saveSecurityConfig = (config: SecurityConfig) => {
-  const configPath = path.join(process.cwd(), '..', 'config', 'security.json');
+  const configPath = path.join(PROJECT_ROOT, 'config', 'security.json');
   try {
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
     console.log('[Security] Default security config saved:', configPath);
   } catch (error) {

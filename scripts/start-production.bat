@@ -3,16 +3,22 @@ REM 本番環境用起動スクリプト
 
 echo ======================================
 echo  MarkN Resonite Headless Controller
-echo  本番環境モード
+echo  Production Mode
 echo ======================================
 echo.
 
-echo [起動] バックエンドサーバーを起動中...
-echo ポート: 8080
+echo [INFO] Starting backend server...
+echo Port: 8080
 echo.
 
-REM バックエンドを起動（cross-envで環境変数設定）
-call npm start
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%.."
+
+set NODE_ENV=production
+set APP_ROOT=%CD%
+node backend\dist\backend\src\app.js
+
+popd
 
 pause
 

@@ -29,8 +29,8 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/3] Installing dependencies...
-call npm install
+echo [2/3] Installing backend dependencies...
+call npm install --omit=dev --prefix backend
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
     pause
@@ -39,14 +39,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [3/3] Building shared workspace...
-call npm run build --workspace shared
-if %errorlevel% neq 0 (
-    echo [ERROR] Build failed.
-    pause
-    popd
-    exit /b 1
-)
+echo [3/3] Prebuilt assets detected. No build required.
 
 echo.
 echo ======================================

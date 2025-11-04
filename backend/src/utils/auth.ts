@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
+import { PROJECT_ROOT } from '../config/index.js';
 
 interface AuthConfig {
   jwtSecret: string;
@@ -12,9 +13,7 @@ interface AuthConfig {
 
 let authConfig: AuthConfig | null = null;
 
-const getConfigPath = (): string => {
-  return path.join(process.cwd(), '..', 'config', 'auth.json');
-};
+const getConfigPath = (): string => path.join(PROJECT_ROOT, 'config', 'auth.json');
 
 const loadAuthConfig = (): AuthConfig => {
   if (!authConfig) {
@@ -61,6 +60,7 @@ const loadAuthConfig = (): AuthConfig => {
 const saveAuthConfig = (config: AuthConfig) => {
   const configPath = getConfigPath();
   // インデントと整形を一定にする
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
   authConfig = null; // 次回読み込みでリロード
 };

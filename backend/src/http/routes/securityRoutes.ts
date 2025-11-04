@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { PROJECT_ROOT } from '../../config/index.js';
 import { authenticateToken } from '../../middleware/auth.js';
 import { optionalCidrRestriction } from '../../middleware/cidr.js';
 import { lenientRateLimit } from '../../middleware/rateLimit.js';
@@ -15,7 +16,7 @@ router.use(lenientRateLimit);
 
 // セキュリティ設定の取得
 router.get('/config', (req: AuthenticatedRequest, res) => {
-  const configPath = path.join(process.cwd(), '..', 'config', 'security.json');
+  const configPath = path.join(PROJECT_ROOT, 'config', 'security.json');
   
   try {
     const configData = fs.readFileSync(configPath, 'utf-8');

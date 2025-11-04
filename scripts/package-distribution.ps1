@@ -119,6 +119,7 @@ Copy-RequiredDirectoryContents -SourceRelative 'sample' -DestinationRelative 'co
 $filesToCopy = @(
     @{ Source = 'package.json'; Destination = 'package.json' },
     @{ Source = 'package-lock.json'; Destination = 'package-lock.json' },
+    @{ Source = 'backend\package.json'; Destination = 'backend\package.json' },
     @{ Source = 'README.md'; Destination = 'README.md' },
     @{ Source = 'env.example'; Destination = 'env.example' },
     @{ Source = 'scripts\setup.bat'; Destination = 'scripts\setup.bat' },
