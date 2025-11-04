@@ -8,9 +8,7 @@
     "start": "cross-env NODE_ENV=production node dist/backend/src/app.js",
     "dev": "nodemon --watch src --ext ts --exec tsx src/app.ts",
     "lint": "eslint \"src/**/*.ts\"",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "build:exe": "npm run build && pkg dist/backend/src/app.js --target node18-win-x64 --output dist/MarkNResoniteHeadlessController.exe",
-    "build:exe:all": "npm run build && pkg dist/backend/src/app.js --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --output dist/MarkNResoniteHeadlessController"
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
     "@types/node-fetch": "^2.6.13",
@@ -36,7 +34,6 @@
     "cross-env": "^10.1.0",
     "eslint": "^8.57.0",
     "nodemon": "^3.0.3",
-    "pkg": "^5.8.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"

@@ -178,10 +178,6 @@ npm run dev --workspace frontend
 
 1. **ビルド**
 ```bash
-# Windowsの場合
-scripts\build-all.bat
-
-# または
 npm run build
 ```
 

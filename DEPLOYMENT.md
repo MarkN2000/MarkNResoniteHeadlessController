@@ -89,10 +89,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 4. ビルド
 
 ```bash
-# Windowsの場合
-scripts\build-all.bat
-
-# または
 npm run build
 ```
 

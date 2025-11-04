@@ -8,47 +8,53 @@ MarkNResoniteHeadlessControllerは、Resoniteヘッドレスサーバーをブ�
 
 ### 1. 配布形式
 
-- **実行ファイル**: Windows用の単一exeファイル（MarkNResoniteHeadlessController.exe）
-- **フロントエンド**: 静的ファイル（HTML、CSS、JavaScript）をexeファイルに埋め込み
-- **設定ファイル**: 初回実行時に自動生成されるデフォルト設定ファイル
+- **Zipアーカイブ**: Windows環境向けに必要なファイルとスクリプトをまとめたZipパッケージ
+- **起動スクリプト**: `scripts/start-production.bat` を利用してNode.jsプロセスとして起動
+- **設定ファイル**: 初回実行時に自動生成されるデフォルト設定ファイルと、同梱するサンプル設定
 
 ### 2. 配布パッケージ構成
 
 ```
 MarkNResoniteHeadlessController/
-├── MarkNResoniteHeadlessController.exe  # メイン実行ファイル
-├── config/                              # 設定ファイルディレクトリ（初回実行時に自動作成）
-│   ├── auth.json                        # 認証設定（自動生成）
-│   ├── security.json                    # セキュリティ設定（自動生成）
-│   ├── runtime-state.json               # ランタイム状態（自動生成）
-│   ├── restart.json                     # 再起動設定（自動生成）
-│   └── restart-status.json              # 再起動ステータス（自動生成）
-├── frontend/                            # フロントエンドファイル（exeに埋め込み）
-└── README.md                            # 使用方法
+├── backend/
+│   └── dist/backend/src/...             # コンパイル済みNode.jsアプリ
+├── frontend/
+│   └── build/...                        # 静的フロントエンドファイル
+├── shared/
+│   └── dist/...                         # 共有ライブラリのビルド成果物
+├── scripts/
+│   ├── setup.bat                        # 初回セットアップ用スクリプト
+│   └── start-production.bat             # 起動スクリプト
+├── config/
+│   ├── *.json.example                   # サンプル設定ファイル
+│   └── headless/                        # Resoniteヘッドレス向け補助ファイル（任意）
+├── package.json                         # ルートパッケージ設定
+├── package-lock.json                    # 依存関係ロックファイル
+├── README.md                            # 使用方法
+└── その他必要なドキュメント/スクリプト
 ```
 
-### 3. ビルドプロセス
+### 3. パッケージ作成プロセス
 
-#### 3.1 開発者向けビルドコマンド
+#### 3.1 開発者向け準備コマンド
 
 ```bash
-# Windows用exeファイルの作成
-npm run build:exe
+# 依存関係のインストール
+npm install
 
-# 全プラットフォーム用exeファイルの作成
-npm run build:exe:all
-
-# 配布用パッケージの作成
-scripts/build-distribution.bat
+# 共有ライブラリ・バックエンド・フロントエンドのビルド
+npm run build --workspace=shared
+npm run build --workspace=backend
+npm run build --workspace=frontend
 ```
 
-#### 3.2 ビルド手順
+#### 3.2 パッケージング手順
 
-1. 依存関係のインストール: `npm install`
-2. フロントエンドのビルド: `npm run build --workspace=frontend`
-3. バックエンドのビルド: `npm run build --workspace=backend`
-4. exeファイルの作成: `npm run build:exe`
-5. 配布用ディレクトリの作成: `scripts/build-distribution.bat`
+1. `backend/dist`・`shared/dist`・`frontend/build` が最新のビルド結果であることを確認
+2. `config/*.example` や `config/headless` など、配布時に同梱したいファイルを整理
+3. `scripts/start-production.bat` と `scripts/setup.bat` を含めてWindowsユーザーが起動しやすい構成にする
+4. `node_modules` や一時ファイルは含めず、ルートディレクトリをZip圧縮して配布用アーカイブを作成
+5. 配布アーカイブに README / ドキュメントを同梱し、初回セットアップ手順を明記
 
 ## 設定ファイルの自動生成
 
@@ -79,9 +85,9 @@ scripts/build-distribution.bat
 ### 1. アップデートの種類
 
 #### 1.1 手動アップデート
-- 新しいexeファイルをダウンロード
-- 既存のexeファイルを置き換え
-- 設定ファイルは保持される
+- 新しいZipアーカイブをダウンロード
+- 稼働中のアプリケーションを停止
+- 既存ディレクトリに上書き展開するか、新しい場所へ展開して設定ファイルのみコピー
 
 #### 1.2 自動アップデート（将来実装予定）
 - アプリケーション内でのアップデート通知
@@ -97,29 +103,31 @@ scripts/build-distribution.bat
 ### 3. アップデート手順
 
 1. 現在のアプリケーションを停止
-2. 新しいexeファイルをダウンロード
-3. 既存のexeファイルを置き換え
-4. アプリケーションを再起動
-5. 設定の確認（必要に応じて調整）
+2. 新しいZipアーカイブを取得
+3. 配布物を展開し、`config/` や `.env` などユーザー固有ファイルを除いて上書き
+4. 必要に応じて依存関係を再インストール（`npm install --omit=dev` など）
+5. `scripts/start-production.bat` で再起動し、設定を確認
 
 ## 実行方式
 
 ### 1. 初回実行
 
-1. **exeファイルの実行**: `MarkNResoniteHeadlessController.exe`をダブルクリック
-2. **設定ファイルの自動作成**: `config/`ディレクトリに必要な設定ファイルが自動生成
-3. **Web UIの起動**: ブラウザで`http://localhost:8080`にアクセス
-4. **初期設定**: デフォルトパスワード（`admin123`）でログイン
+1. 配布Zipを任意の場所に展開
+2. `scripts/setup.bat` を実行して依存関係のインストールと設定ファイル生成を行う
+3. `scripts/start-production.bat` を実行してバックエンドサービスを起動
+4. ブラウザで `http://localhost:8080` にアクセス
+5. デフォルトパスワード（`admin123`）でログインし、必要に応じて設定を更新
 
 ### 2. 通常実行
 
-1. **exeファイルの実行**: `MarkNResoniteHeadlessController.exe`をダブルクリック
-2. **Web UIのアクセス**: ブラウザで`http://localhost:8080`にアクセス
-3. **認証**: 設定したパスワードでログイン
+1. `scripts/start-production.bat` を実行
+2. ブラウザで `http://localhost:8080` にアクセス
+3. 設定したパスワードでログイン
 
 ### 3. 実行環境要件
 
 - **OS**: Windows 10/11 (64bit)
+- **ランタイム**: Node.js 20.x 以上（配布物には含まれないため各自でインストール）
 - **メモリ**: 最低512MB、推奨1GB以上
 - **ディスク**: 最低100MBの空き容量
 - **ネットワーク**: ローカルネットワークアクセス（オプション）
@@ -168,7 +176,7 @@ scripts/build-distribution.bat
 
 ### 2. ログの確認
 
-- **コンソールログ**: exeファイル実行時のコンソール出力
+- **コンソールログ**: `scripts/start-production.bat` 実行時のコンソール出力
 - **アプリケーションログ**: Web UI内のログ表示機能
 - **システムログ**: Windowsイベントログ
 
