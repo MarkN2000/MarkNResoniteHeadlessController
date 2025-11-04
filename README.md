@@ -200,7 +200,7 @@ npm start
 npm run package:zip
 ```
 
-`dist/MarkNResoniteHeadlessController.zip` が生成され、`.env` や実運用の `config/*.json` を除外した配布物が作成されます。ビルド済みの場合は `powershell -File scripts/package-distribution.ps1 -SkipBuild` で再ビルドを省略できます。
+コマンド実行時に `npm run build` も自動で走り、最新ビルド成果物を含む `dist/MarkNResoniteHeadlessController.zip` が生成されます。`.env` や実運用の `config/*.json` は Zip に含まれません。既にビルド済みの場合は `powershell -File scripts/package-distribution.ps1 -SkipBuild` を使うと再ビルドを省略できます。
 
 ⚠️ **本番環境の注意点**:
 - 必ず `.env` で `NODE_ENV=production` を設定

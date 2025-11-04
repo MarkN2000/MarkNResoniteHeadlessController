@@ -23,7 +23,7 @@ function Copy-RequiredDirectory {
 
     $source = Join-Path $root $SourceRelative
     if (-not (Test-Path -LiteralPath $source)) {
-        throw "コピー対象が存在しません: $SourceRelative。先に npm run build を実行してください。"
+        throw "Required source not found: $SourceRelative. Run npm run build first."
     }
 
     $destination = Join-Path $packageRoot $DestinationRelative
@@ -41,7 +41,7 @@ function Copy-RequiredDirectoryContents {
 
     $source = Join-Path $root $SourceRelative
     if (-not (Test-Path -LiteralPath $source)) {
-        throw "コピー対象が存在しません: $SourceRelative"
+        throw "Required source not found: $SourceRelative"
     }
 
     $destination = Join-Path $packageRoot $DestinationRelative
@@ -61,7 +61,7 @@ function Copy-RequiredFile {
 
     $source = Join-Path $root $SourceRelative
     if (-not (Test-Path -LiteralPath $source)) {
-        throw "コピー対象のファイルが存在しません: $SourceRelative"
+        throw "Required file not found: $SourceRelative"
     }
 
     $destination = Join-Path $packageRoot $DestinationRelative
@@ -71,17 +71,23 @@ function Copy-RequiredFile {
     Copy-Item -LiteralPath $source -Destination $destination -Force
 }
 
-Write-Host "📦 MarkN Resonite Headless Controller - 配布Zipパッケージ作成" -ForegroundColor Cyan
+Write-Host "Packaging MarkN Resonite Headless Controller" -ForegroundColor Cyan
 
 if (-not $SkipBuild) {
-    Write-Host "[1/5] npm run build を実行中..." -ForegroundColor Yellow
-    & npm run build
-    if ($LASTEXITCODE -ne 0) {
-        throw "npm run build に失敗しました (exit code: $LASTEXITCODE)"
+    Write-Host "[1/5] Running npm run build..." -ForegroundColor Yellow
+
+    $npmInfo = Get-Command npm -ErrorAction SilentlyContinue
+    if (-not $npmInfo) {
+        throw "npm command not found in PATH. Install Node.js or adjust PATH."
+    }
+
+    $process = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm run build' -NoNewWindow -Wait -PassThru
+    if ($process.ExitCode -ne 0) {
+        throw "npm run build failed (exit code: $($process.ExitCode))"
     }
 }
 else {
-    Write-Host "[1/5] npm run build をスキップしました (--SkipBuild)" -ForegroundColor Yellow
+    Write-Host "[1/5] Skipped npm run build (--SkipBuild)" -ForegroundColor Yellow
 }
 
 $distDir = Join-Path $root 'dist'
@@ -89,13 +95,13 @@ $stagingDir = Join-Path $distDir 'package-staging'
 $packageRoot = Join-Path $stagingDir 'MarkNResoniteHeadlessController'
 $zipPath = Join-Path $distDir 'MarkNResoniteHeadlessController.zip'
 
-Write-Host "[2/5] ステージングディレクトリを初期化中..." -ForegroundColor Yellow
+Write-Host "[2/5] Preparing staging directory..." -ForegroundColor Yellow
 if (Test-Path -LiteralPath $stagingDir) {
     Remove-Item -LiteralPath $stagingDir -Recurse -Force
 }
 Ensure-Directory -Path $packageRoot
 
-Write-Host "[3/5] 必要なファイル/ディレクトリをコピー中..." -ForegroundColor Yellow
+Write-Host "[3/5] Copying required files..." -ForegroundColor Yellow
 
 $directoriesToCopy = @(
     @{ Source = 'backend\dist'; Destination = 'backend\dist' },
@@ -107,7 +113,7 @@ foreach ($entry in $directoriesToCopy) {
     Copy-RequiredDirectory -SourceRelative $entry.Source -DestinationRelative $entry.Destination
 }
 
-# サンプルヘッドレス設定（機密情報を含まない）
+# Copy sample headless configuration (no secrets)
 Copy-RequiredDirectoryContents -SourceRelative 'sample' -DestinationRelative 'config\headless'
 
 $filesToCopy = @(
@@ -139,16 +145,16 @@ foreach ($path in $configExamples) {
     Copy-RequiredFile -SourceRelative $path -DestinationRelative $path
 }
 
-Write-Host "[4/5] Zipファイルを生成中..." -ForegroundColor Yellow
+Write-Host "[4/5] Creating zip file..." -ForegroundColor Yellow
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
 
 Compress-Archive -Path $packageRoot -DestinationPath $zipPath -CompressionLevel Optimal -Force
 
-Write-Host "[5/5] ステージングディレクトリをクリーンアップ中..." -ForegroundColor Yellow
+Write-Host "[5/5] Cleaning up staging directory..." -ForegroundColor Yellow
 Remove-Item -LiteralPath $stagingDir -Recurse -Force
 
-Write-Host "✅ Zipパッケージを作成しました: $zipPath" -ForegroundColor Green
-Write-Host "   ※ 機密情報 (.env や config/*.json 等) は含まれていません。" -ForegroundColor Green
+Write-Host "Package created: $zipPath" -ForegroundColor Green
+Write-Host "Secrets (.env, config/*.json, etc.) are NOT included." -ForegroundColor Green
 
