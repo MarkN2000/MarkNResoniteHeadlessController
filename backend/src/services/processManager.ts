@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE, RUNTIME_STATE_PATH } from '../config/index.js';
+import { getHeadlessCredentials } from '../config/headlessCredentials.js';
 import { LogBuffer } from './logBuffer.js';
 import type { LogEntry } from './logBuffer.js';
 import iconv from 'iconv-lite';
@@ -187,6 +188,27 @@ export class ProcessManager extends EventEmitter {
       }
     }
 
+    let resolvedUsername = typeof username === 'string' ? username.trim() : '';
+    let resolvedPassword = typeof password === 'string' ? password : '';
+
+    if (!resolvedUsername || !resolvedPassword) {
+      const defaults = getHeadlessCredentials();
+      if (defaults) {
+        if (!resolvedUsername && defaults.username) {
+          resolvedUsername = defaults.username;
+        }
+        if (!resolvedPassword && defaults.password) {
+          resolvedPassword = defaults.password;
+        }
+      }
+    }
+
+    if (!resolvedUsername || !resolvedPassword) {
+      console.warn(
+        `[ProcessManager] ユーザー名またはパスワードが空です。config/headless/credentials.json を設定するか、明示的に指定してください。`
+      );
+    }
+
     // 設定ファイルを生成
     const config = {
       "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
@@ -198,8 +220,8 @@ export class ProcessManager extends EventEmitter {
       "usernameOverride": typeof configData.usernameOverride === 'string' && configData.usernameOverride.trim() !== ''
         ? configData.usernameOverride
         : null,
-      "loginCredential": username ?? '',
-      "loginPassword": password ?? '',
+      "loginCredential": resolvedUsername ?? '',
+      "loginPassword": resolvedPassword ?? '',
       "startWorlds": configData.startWorlds || [],
       "dataFolder": configData.dataFolder || null,
       "cacheFolder": configData.cacheFolder || null,

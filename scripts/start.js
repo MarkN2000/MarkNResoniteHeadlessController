@@ -11,9 +11,9 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
 const CONFIG_DIR = path.join(ROOT_DIR, 'config');
 const HEADLESS_CONFIG_DIR = path.join(CONFIG_DIR, 'headless');
+const HEADLESS_CREDENTIALS_PATH = path.join(HEADLESS_CONFIG_DIR, 'credentials.json');
 const AUTH_CONFIG_PATH = path.join(CONFIG_DIR, 'auth.json');
 const AUTH_CONFIG_TEMPLATE = path.join(CONFIG_DIR, 'auth.json.example');
-const HEADLESS_CONFIG_TARGET = path.join(HEADLESS_CONFIG_DIR, 'default.json');
 const HEADLESS_CONFIG_TEMPLATE_CANDIDATES = [
   path.join(HEADLESS_CONFIG_DIR, 'default.template.json'),
   path.join(ROOT_DIR, 'sample', 'default.json'),
@@ -141,30 +141,84 @@ const loadHeadlessTemplate = () => {
   };
 };
 
-const updateHeadlessCredentials = (username, password) => {
+const saveHeadlessCredentials = (username, password) => {
+  const payload = {
+    username,
+    password,
+    updatedAt: new Date().toISOString(),
+  };
+  fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(HEADLESS_CREDENTIALS_PATH, JSON.stringify(payload, null, 2), 'utf-8');
+  console.log(`[INFO] Headless資格情報を保存しました: ${path.relative(ROOT_DIR, HEADLESS_CREDENTIALS_PATH)}`);
+};
+
+const ensureDefaultHeadlessConfig = () => {
   fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
 
+  const defaultPath = path.join(HEADLESS_CONFIG_DIR, 'default.json');
+  if (fs.existsSync(defaultPath)) {
+    return defaultPath;
+  }
+
   let config;
-  if (fs.existsSync(HEADLESS_CONFIG_TARGET)) {
-    try {
-      config = JSON.parse(fs.readFileSync(HEADLESS_CONFIG_TARGET, 'utf-8'));
-    } catch (error) {
-      console.warn(`[WARN] 既存の headless 設定を読み込めませんでした。テンプレートから再生成します: ${HEADLESS_CONFIG_TARGET}`);
-      config = loadHeadlessTemplate();
+  for (const candidate of HEADLESS_CONFIG_TEMPLATE_CANDIDATES) {
+    if (candidate && fs.existsSync(candidate)) {
+      try {
+        config = JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+        break;
+      } catch (error) {
+        console.warn(`[WARN] テンプレートの読み込みに失敗しました: ${candidate}`, error);
+      }
     }
-  } else {
+  }
+
+  if (!config) {
     config = loadHeadlessTemplate();
   }
 
-  config.loginCredential = username;
-  config.loginPassword = password;
+  fs.writeFileSync(defaultPath, JSON.stringify(config, null, 2), 'utf-8');
+  console.log(`[INFO] Headlessデフォルト設定を作成しました: ${path.relative(ROOT_DIR, defaultPath)}`);
+  return defaultPath;
+};
 
-  if (!Array.isArray(config.startWorlds)) {
-    config.startWorlds = [];
+const updateHeadlessConfigFile = (configPath, username, password) => {
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    config.loginCredential = username;
+    config.loginPassword = password;
+
+    if (!Array.isArray(config.startWorlds)) {
+      config.startWorlds = [];
+    }
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    console.log(`[INFO] Headless設定を更新しました: ${path.relative(ROOT_DIR, configPath)}`);
+  } catch (error) {
+    console.warn(`[WARN] Headless設定の更新に失敗しました (${configPath}):`, error);
+  }
+};
+
+const applyHeadlessCredentialsToConfigs = (username, password) => {
+  const defaultPath = ensureDefaultHeadlessConfig();
+
+  const entries = fs.readdirSync(HEADLESS_CONFIG_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.toLowerCase().endsWith('.json')) continue;
+    if (entry.name === 'credentials.json') continue;
+
+    const targetPath = path.join(HEADLESS_CONFIG_DIR, entry.name);
+    try {
+      updateHeadlessConfigFile(targetPath, username, password);
+    } catch (error) {
+      console.warn(`[WARN] Headless設定ファイルにアクセスできません (${targetPath}):`, error);
+    }
   }
 
-  fs.writeFileSync(HEADLESS_CONFIG_TARGET, JSON.stringify(config, null, 2), 'utf-8');
-  console.log(`[INFO] Headless設定を更新しました: ${path.relative(ROOT_DIR, HEADLESS_CONFIG_TARGET)}`);
+  // 確実に default.json が最新化されるよう明示呼び出し
+  if (fs.existsSync(defaultPath)) {
+    updateHeadlessConfigFile(defaultPath, username, password);
+  }
 };
 
 const runInitialSetup = async () => {
@@ -194,7 +248,8 @@ const runInitialSetup = async () => {
   const credentials = await promptForInitialCredentials();
   if (credentials) {
     updateAuthPassword(credentials.appPassword);
-    updateHeadlessCredentials(credentials.headlessUsername, credentials.headlessPassword);
+    saveHeadlessCredentials(credentials.headlessUsername, credentials.headlessPassword);
+    applyHeadlessCredentialsToConfigs(credentials.headlessUsername, credentials.headlessPassword);
   }
 
   divider();

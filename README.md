@@ -95,6 +95,7 @@ npm run setup
 - バックエンド依存関係のインストール
 - プリビルド済み資産の確認
 - 管理画面ログイン用パスワードと Headless 資格情報の入力・保存
+- 入力された Headless 資格情報は `config/headless/credentials.json` に保存され、既存のプリセット設定（`config/headless/*.json`）へ自動反映されます。
 
 4. **設定ファイルの編集**
 
