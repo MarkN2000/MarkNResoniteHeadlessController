@@ -122,8 +122,10 @@ $filesToCopy = @(
     @{ Source = 'backend\package.json'; Destination = 'backend\package.json' },
     @{ Source = 'README.md'; Destination = 'README.md' },
     @{ Source = 'env.example'; Destination = 'env.example' },
+    @{ Source = 'start.bat'; Destination = 'start.bat' },
     @{ Source = 'scripts\setup.bat'; Destination = 'scripts\setup.bat' },
     @{ Source = 'scripts\setup.js'; Destination = 'scripts\setup.js' },
+    @{ Source = 'scripts\start.js'; Destination = 'scripts\start.js' },
     @{ Source = 'scripts\start-production.bat'; Destination = 'scripts\start-production.bat' }
 )
 
