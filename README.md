@@ -81,18 +81,20 @@ npm install
 npm install --save-dev @sveltejs/adapter-static --workspace frontend
 ```
 
-3. **自動セットアップの実行**
+3. **初期セットアップの実行**
 ```bash
-# Windowsの場合
-scripts\setup.bat
+# Windowsの場合（初回セットアップと本番起動を兼ねる）
+start.bat
 
-# または手動で
+# または手動でセットアップのみ実施
 npm run setup
 ```
 
-このスクリプトが以下を自動的に行います：
+`start.bat` は初回実行時に以下を自動的に行い、そのまま本番モードでバックエンドを起動します：
 - 設定ファイルのサンプルから実際のファイルを生成
-- 共通型定義のビルド
+- バックエンド依存関係のインストール
+- プリビルド済み資産の確認
+- 管理画面ログイン用パスワードと Headless 資格情報の入力・保存
 
 4. **設定ファイルの編集**
 
@@ -184,9 +186,12 @@ npm run build
 2. **起動**
 ```bash
 # Windowsの場合
-scripts\start-production.bat
+start.bat
 
-# または（リポジトリから直接起動する場合）
+# または（Node.jsから直接実行）
+node scripts/start.js
+
+# 既存のバックエンドワークスペーススクリプトを使う場合
 npm start
 ```
 
@@ -206,9 +211,9 @@ npm run package:zip
 
 1. 配布された `MarkNResoniteHeadlessController.zip` を任意のディレクトリに展開します。
 2. Node.js 20 以上がインストールされていることを確認します。
-3. 展開先で `scripts/setup.bat` を実行します（バックエンド依存のみインストールされ、ビルドは不要です）。
-4. 必要に応じて `env.example` を `.env` として複製し、各種シークレットやパスを調整します。
-5. `scripts/start-production.bat` を実行するとバックエンドが起動し、初回起動時に `config/*.json` が自動生成されます。
+3. Windowsでは `start.bat` を実行（ダブルクリック可）します。初回はセットアップが自動で実施され、そのままバックエンドが起動します。その他の環境では `node scripts/start.js` または `npm run setup` と既存手順を利用してください。
+4. `.env` や `config/*.json` が未生成の場合は自動的に作成されます。必要に応じて `env.example` を `.env` に複製し、シークレットやパスを調整してください。
+5. 2回目以降も `start.bat` を実行するだけでバックエンドを起動できます（セットアップはスキップされます）。
 6. ブラウザで `http://localhost:8080` にアクセスし、初期パスワード `admin123` でログイン後、設定を更新してください。
 
 ⚠️ **本番環境の注意点**:

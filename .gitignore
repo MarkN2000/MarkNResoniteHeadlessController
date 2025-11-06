@@ -14,6 +14,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Setup marker
+.setup_completed
+
 # Resonite headless configs (keep templates only)
 config/headless/*.json
 !config/headless/*.template.json
@@ -26,3 +29,4 @@ backend/config/*.json
 
 # Sample files
 sample/バニラで起動したときのコンソール画面.txt
+sample/scripts/
