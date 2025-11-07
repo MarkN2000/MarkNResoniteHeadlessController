@@ -322,9 +322,6 @@
 
   // Config generation state
   let configName = '';
-  let configUsername = '';
-  let configPassword = '';
-  let showPassword = false;
   let configGenerationLoading = false;
   let isFormClearing = false; // フォームクリア中フラグ
   
@@ -340,12 +337,9 @@
   let configLogsFolder = '';
   let configAllowedUrlHosts = 'https://ttsapi.markn2000.com/';
   let configAutoSpawnItems = '';
-
   // リセット用デフォルト値（default.json 準拠）
   const DEFAULT_CONFIG = {
     name: 'default',
-    username: '',
-    password: '',
     comment: '',
     universeId: '',
     tickRate: 60.0,
@@ -402,8 +396,6 @@
   // リセットヘルパー
   const resetBasicField = (key: keyof typeof DEFAULT_CONFIG) => {
     if (key === 'name') configName = DEFAULT_CONFIG.name;
-    if (key === 'username') configUsername = DEFAULT_CONFIG.username;
-    if (key === 'password') configPassword = DEFAULT_CONFIG.password;
     if (key === 'comment') configComment = DEFAULT_CONFIG.comment;
     if (key === 'universeId') configUniverseId = DEFAULT_CONFIG.universeId;
     if (key === 'tickRate') configTickRate = DEFAULT_CONFIG.tickRate;
@@ -431,113 +423,13 @@
     sessions = sessions.map(s => (s.id === cur.id ? cur : s));
   };
 
-  // usernameからuseridを取得するAPI関数（デバウンス・キャッシュ機能付き）
-  const fetchUseridFromUsername = async (username: string): Promise<string | null> => {
-    const trimmedUsername = username.trim();
-    if (!trimmedUsername) return null;
-    
-    // キャッシュをチェック
-    if (useridCache.has(trimmedUsername)) {
-      return useridCache.get(trimmedUsername)!;
-    }
-    
-    // 同じユーザー名の場合は重複リクエストを避ける
-    if (lastFetchedUsername === trimmedUsername && useridLoading) {
-      return null;
-    }
-    
-    try {
-      useridLoading = true;
-      lastFetchedUsername = trimmedUsername;
-      
-      // バックエンド経由でAPIを呼び出し（CORS問題を回避）
-      const response = await fetch(`/api/server/resonite-user/${encodeURIComponent(trimmedUsername)}`);
-      
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-          if (errorData.details) {
-            errorMessage += ` (詳細: ${errorData.details})`;
-          }
-        } catch {
-          errorMessage += ' (レスポンスの解析に失敗)';
-        }
-        throw new Error(errorMessage);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.userid) {
-        throw new Error('ユーザーIDが取得できませんでした（APIレスポンスにuseridが含まれていません）');
-      }
-      
-      // キャッシュに保存
-      useridCache.set(trimmedUsername, data.userid);
-      
-      return data.userid;
-      
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'ユーザーIDの取得に失敗しました';
-      pushToast(`ユーザーID取得に失敗: ${message}`, 'error');
-      return null;
-    } finally {
-      useridLoading = false;
-    }
-  };
-
-  // 手動でUserIDを取得してプレフィックスに設定
-  const autoFillUserid = async () => {
-    const username = configUsername.trim();
-    
-    if (!username) {
-      pushToast('ユーザー名を入力してください', 'error');
-      return;
-    }
-    
-    if (useridLoading) {
-      return; // 既に実行中の場合は何もしない
-    }
-    
-    try {
-      // キャッシュをチェック
-      if (useridCache.has(username)) {
-        const userid = useridCache.get(username)!;
-        const cur = getCurrentSession();
-        (cur as any).customSessionIdPrefix = userid;
-        sessions = sessions.map(s => (s.id === cur.id ? cur : s));
-        pushToast('キャッシュから自動入力しました', 'success');
-        return;
-      }
-      
-      // lastFetchedUsernameをリセットして常に実行できるようにする
-      lastFetchedUsername = '';
-      
-      const userid = await fetchUseridFromUsername(username);
-      
-      if (userid) {
-        // 現在のセッションのプレフィックスに設定
-        const cur = getCurrentSession();
-        (cur as any).customSessionIdPrefix = userid;
-        sessions = sessions.map(s => (s.id === cur.id ? cur : s));
-        
-        pushToast('ユーザーIDを自動入力しました', 'success');
-      }
-    } catch (error) {
-      // 予期しないエラーが発生した場合
-      const message = error instanceof Error ? error.message : '不明なエラーが発生しました';
-      pushToast(`予期しないエラー: ${message}`, 'error');
-    }
-  };
-
   // カスタムセッションIDの接頭辞
   const getCustomIdPrefix = () => {
     // カスタムプレフィックスが設定されている場合はそれを使用、そうでなければデフォルト
     if (customSessionIdPrefix.trim()) {
       return customSessionIdPrefix.trim();
     }
-    return headlessUserId ? `S-${headlessUserId}:` : 'S-<UserID>:';
+    return 'S-<UserID>:';
   };
   
   // Session management (default.json と同値になるよう初期値設定)
@@ -595,7 +487,6 @@
   let selectedConfigToLoad = '';
   let configLoadLoading = false;
   let configDeleteLoading = false;
-  
   // プレビュー編集用の変数
   let isPreviewEditing = false;
   let editedPreviewText = '';
@@ -603,10 +494,6 @@
   let previewTextarea: HTMLTextAreaElement | null = null;
   // カスタムセッションIDプレフィックス用の変数
   let customSessionIdPrefix = '';
-  // ユーザーID取得用の変数
-  let useridLoading = false;
-  let lastFetchedUsername = '';
-  let useridCache = new Map<string, string>();
   // アイテムスポーン機能
   let itemSpawnUrl = '';
   let itemSpawnLoading = false;
@@ -628,9 +515,6 @@
       }
       
       configName = draft.configName ?? '';
-      configUsername = draft.configUsername ?? '';
-      // パスワードは一時保存から除外（セキュリティ対策）
-      configPassword = '';
       configComment = draft.configComment ?? '';
       configUniverseId = draft.configUniverseId ?? '';
       configTickRate = typeof draft.configTickRate === 'number' ? draft.configTickRate : 60.0;
@@ -651,7 +535,6 @@
       return false;
     }
   };
-
   const saveDraft = () => {
     try {
       // 検索用の一時フィールドは保存しないようにセッションを整形
@@ -665,9 +548,6 @@
 
       const draft = {
         configName,
-        configUsername,
-        // パスワードは一時保存から除外（セキュリティ対策）
-        // configPassword を削除
         configComment,
         configUniverseId,
         configTickRate,
@@ -690,7 +570,6 @@
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_STORAGE_KEY);
   };
-
   // コンフィグファイル読み込み機能
   const loadConfigFile = async () => {
     if (!selectedConfigToLoad || configLoadLoading) return;
@@ -720,8 +599,6 @@
       
       // 基本設定に反映（ヘルパー関数を使用）
       configName = nameWithoutExt || 'default';
-      configUsername = configData.loginCredential || '';
-      configPassword = ''; // セキュリティのため、読み込み時はパスワードを空にする
       configComment = configData.comment || '';
       configUniverseId = configData.universeId || '';
       configTickRate = configData.tickRate ?? 60.0;
@@ -799,7 +676,6 @@
       }, 0);
     }
   };
-
   // コンフィグファイル削除機能
   const deleteConfigFile = async () => {
     if (!selectedConfigToLoad || configDeleteLoading) return;
@@ -951,15 +827,6 @@
       // JSON構文チェック
       const parsed = JSON.parse(editedPreviewText);
       
-      // 必須フィールドの検証
-      const username = parsed.loginCredential;
-      const password = parsed.loginPassword;
-      
-      if (!username || !password) {
-        previewEditError = 'エラー: loginCredentialとloginPasswordは必須です';
-        return;
-      }
-
       // データ型の検証
       if (parsed.tickRate !== undefined && (typeof parsed.tickRate !== 'number' || parsed.tickRate <= 0)) {
         previewEditError = 'エラー: tickRateは正の数値である必要があります';
@@ -1024,10 +891,6 @@
       configComment = parsed.comment;
     }
     
-    // ログイン情報の取得
-    if (parsed.loginCredential) configUsername = parsed.loginCredential;
-    if (parsed.loginPassword) configPassword = parsed.loginPassword;
-    
     // 詳細設定の反映
     if (parsed.universeId !== undefined) configUniverseId = parsed.universeId || '';
     if (parsed.tickRate !== undefined) configTickRate = parsed.tickRate;
@@ -1039,7 +902,7 @@
     
     // 配列フィールドの変換
     if (parsed.allowedUrlHosts !== undefined) {
-      configAllowedUrlHosts = arrayToString(parsed.allowedUrlHosts);
+      configAllowedUrls = arrayToString(parsed.allowedUrlHosts);
     }
     if (parsed.autoSpawnItems !== undefined) {
       configAutoSpawnItems = arrayToString(parsed.autoSpawnItems);
@@ -1153,7 +1016,6 @@
   const setStatusLoading = (key: string, value: boolean) => {
     statusActionLoading = { ...statusActionLoading, [key]: value };
   };
-
   afterUpdate(() => {
     if (logContainer) {
       logContainer.scrollTop = logContainer.scrollHeight;
@@ -1301,7 +1163,6 @@
     ]);
     return userCount;
   };
-
   const refreshConfigsOnly = async () => {
     const configList = await getConfigs();
     setConfigs(configList);
@@ -1312,7 +1173,6 @@
       localStorage.setItem(STORAGE_KEY, selectedConfig);
     }
   };
-
   const addSession = () => {
     const newSession = {
       id: nextSessionId++,
@@ -1360,7 +1220,6 @@
     sessions = [...sessions, newSession];
     activeSessionTab = newSession.id;
   };
-
   const removeSession = (sessionId: number) => {
     if (sessions.length <= 1) {
       pushToast('最低1つのセッションが必要です', 'error');
@@ -1381,25 +1240,13 @@
     configGenerationLoading = true;
     try {
       const trimmedName = configName.trim();
-      const trimmedUsername = configUsername.trim();
-      const trimmedPassword = configPassword.trim();
       
-      // バリデーション: 設定名、ユーザー名、パスワードは必須
+      // バリデーション: 設定名は必須
       if (!trimmedName) {
         pushToast('設定名を入力してください', 'error');
         return;
       }
       
-      if (!trimmedUsername) {
-        pushToast('ユーザー名を入力してください', 'error');
-        return;
-      }
-      
-      if (!trimmedPassword) {
-        pushToast('パスワードを入力してください', 'error');
-        return;
-      }
-
       // セッションデータを処理（ヘルパー関数を使用）
       const processedSessions = sessions.map(session => {
         const processedSession: any = {
@@ -1484,17 +1331,14 @@
       }
 
       // ここで初めてバックエンドへ送信（"作成"ボタン押下時）
-      await generateConfig(trimmedName, trimmedUsername, trimmedPassword, configData, overwrite);
+      await generateConfig(trimmedName, configData, overwrite);
       pushToast('コンフィグファイルを作成しました', 'success');
       
       // 設定ファイル一覧を更新
       await refreshConfigsOnly();
-      
       // フォームをクリア（リアクティブステートメントをスキップ）
       isFormClearing = true;
       configName = '';
-      configUsername = '';
-      configPassword = '';
       configComment = '';
       configUniverseId = '';
       configTickRate = 60.0;
@@ -1563,8 +1407,6 @@
   $: {
     if (activeTab === 'settings') {
       const trimmedName = configName.trim() || 'Config';
-      const trimmedUsername = configUsername.trim();
-      const trimmedPassword = configPassword.trim();
 
       // sessionsを確実に配列として扱う
       const sessionsList = [...sessions];
@@ -1633,8 +1475,8 @@
         "tickRate": configTickRate,
         "maxConcurrentAssetTransfers": configMaxConcurrentAssetTransfers,
         "usernameOverride": configUsernameOverride.trim() || null,
-        "loginCredential": trimmedUsername || null,
-        "loginPassword": trimmedPassword || null,
+        "loginCredential": PREVIEW_LOGIN_USERNAME_PLACEHOLDER,
+        "loginPassword": PREVIEW_LOGIN_PASSWORD_PLACEHOLDER,
         "startWorlds": JSON.parse(JSON.stringify(processedSessions)),
         "dataFolder": configDataFolder.trim() || null,
         "cacheFolder": configCacheFolder.trim() || null,
@@ -1830,13 +1672,12 @@
   // 設定タブの関連変数が変化したときのみトリガー（ログ等の外部更新では発火しない）
   $: if (activeTab === 'settings' && !isFormClearing) {
     // 依存として触れておくことで、これらの値が変わった時だけ反応
-    configName; configUsername; configPassword; configComment; configUniverseId;
+    configName; configComment; configUniverseId;
     configTickRate; configMaxConcurrentAssetTransfers; configUsernameOverride;
     configDataFolder; configCacheFolder; configLogsFolder; configAllowedUrlHosts;
     configAutoSpawnItems; sessions;
     triggerSaveDraft();
   }
-
   const sendUserAction = async (username: string, action: UserActionDefinition['key']) => {
     if (!username) {
       pushToast('ユーザー名が取得できませんでした', 'error');
@@ -1964,7 +1805,6 @@
     }
     await sendStatusCommand('awayKickMinutes', `awaykickinterval ${Math.floor(awayKickMinutesInput)}`, '最大AFK時間を更新しました');
   };
-
   const applyAccessLevel = async (value?: string) => {
     const nextLevel = value ?? accessLevelInput;
     if (!nextLevel) {
@@ -1974,7 +1814,6 @@
     accessLevelInput = nextLevel;
     await sendStatusCommand('accessLevel', `accesslevel ${nextLevel}`, `アクセスレベルを${nextLevel}に設定しました`);
   };
-
   const handleHiddenFromListingChange = async (checked: boolean) => {
     hiddenFromListingInput = checked;
     await sendStatusCommand(
@@ -1983,11 +1822,9 @@
       checked ? 'リスト非表示に設定しました' : 'リスト表示に設定しました'
     );
   };
-
   const applyDescription = async () => {
     await sendStatusCommand('description', `description ${JSON.stringify(sessionDescriptionInput)}`, '説明を更新しました');
   };
-
   const executeSessionCommand = async (command: 'save' | 'close' | 'restart') => {
     let successMessage = '';
     switch (command) {
@@ -2026,7 +1863,6 @@
       actionInProgress = false;
     }
   };
-
   const handleStop = async () => {
     actionInProgress = true;
     try {
@@ -2179,7 +2015,6 @@
       friendRemoveLoading = false;
     }
   };
-
   const submitFriendMessage = async () => {
     if (friendMessageLoading) return;
     friendMessageLoading = true;
@@ -2598,7 +2433,6 @@
     selectedBanEntry = entry;
     selectedFriendUser = null; // フレンドユーザー選択を解除
   };
-  
   const unbanSelectedUser = async () => {
     if (!selectedBanEntry) {
       pushToast('BANエントリを選択してください', 'error');
@@ -2621,7 +2455,6 @@
       pushToast(message, 'error');
     }
   };
-
   const sendFriendRequestToSelected = async () => {
     if (!selectedFriendUser) {
       pushToast('ユーザーを選択してください', 'error');
@@ -2642,7 +2475,6 @@
       friendSendLoading = false;
     }
   };
-
   const acceptFriendRequestFromSelected = async () => {
     if (!selectedFriendUser) {
       pushToast('ユーザーを選択してください', 'error');
@@ -2682,7 +2514,6 @@
       friendAcceptLoading = false;
     }
   };
-
   const removeFriendFromSelected = async () => {
     if (!selectedFriendUser) {
       pushToast('ユーザーを選択してください', 'error');
@@ -3167,7 +2998,6 @@
           {/if}
         </div>
       </section>
-
       <section class="logs-card compact">
         <div class="section-header">
           <h2>ログ</h2>
@@ -3487,7 +3317,6 @@
                   {/if}
                 </div>
               </div>
-
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>スポーン・パルス</h2>
@@ -3811,7 +3640,6 @@
                   </form>
                 </div>
               </div>
-
               <!-- 右側: 選択したユーザーへの操作 -->
               <div class="panel-column">
                 <div class="panel-heading">
@@ -3990,29 +3818,6 @@
                     </label>
 
                     <label>
-                      <span><span class="required">*</span>ユーザー名</span>
-                      <div class="field-row">
-                        <input type="text" bind:value={configUsername} placeholder="Headlessのユーザー名" />
-                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('username')} title="リセット" aria-label="リセット">
-                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
-                        </button>
-                      </div>
-                    </label>
-
-                    <label>
-                      <span><span class="required">*</span>パスワード</span>
-                      <div class="field-row">
-                        <input type={showPassword ? 'text' : 'password'} bind:value={configPassword} placeholder="あなたのResoniteパスワード" />
-                        <button type="button" class="refresh-config-button eye" class:active={showPassword} aria-pressed={showPassword} on:click={() => (showPassword = !showPassword)} title={showPassword ? '非表示' : '表示'} aria-label="表示切替">
-                          <svg viewBox="0 0 24 24" class="refresh-icon" aria-hidden="true"><path d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 .002 6.002A3 3 0 0 0 12 9z"/></svg>
-                        </button>
-                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('password')} title="リセット" aria-label="リセット">
-                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
-                        </button>
-                      </div>
-                    </label>
-
-                    <label>
                       <span>コメント <small class="note">特に効果はありません</small></span>
                       <div class="field-row">
                         <input type="text" bind:value={configComment} placeholder="設定ファイルの説明" />
@@ -4139,7 +3944,6 @@
                       +
                     </button>
                   </div>
-
                   <!-- Session content -->
                   {#each sessions as session}
                     {#if activeSessionTab === session.id}
@@ -4159,16 +3963,6 @@
                           <div class="field-row">
                             <div class="field-row" style="gap:0.4rem; align-items:center;">
                               <input type="text" bind:value={session.customSessionIdPrefix} placeholder="U-userID" class="prefix" />
-                              <button 
-                                type="button" 
-                                class="status-action-button" 
-                                style="padding: 0.35rem 0.75rem; font-size: 0.85rem;"
-                                on:click={autoFillUserid}
-                                disabled={useridLoading}
-                                title="ユーザー名からUserIDを自動取得"
-                              >
-                                {useridLoading ? '取得中...' : '自動入力'}
-                              </button>
                               <span class="separator">:</span>
                               <input type="text" bind:value={session.customSessionIdSuffix} placeholder="空欄で無効" />
                             </div>
@@ -4791,7 +4585,6 @@
                   </div>
                 </div>
               </div>
-
               <!-- 右カラム -->
               <div class="panel-column">
                 <!-- 2️⃣ 再起動前アクション設定 -->
@@ -4879,7 +4672,7 @@
                             class={restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.chatMessage.enabled = !restartConfig.preRestartActions.chatMessage.enabled; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'オン' : 'オフ'}
+                            {restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'オン' : 'オff'}
                           </button>
                         </div>
                       </label>
@@ -4909,7 +4702,7 @@
                             class={restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.itemSpawn.enabled = !restartConfig.preRestartActions.itemSpawn.enabled; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'オン' : 'オフ'}
+                            {restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'オン' : 'オff'}
                           </button>
                         </div>
                       </label>
@@ -4971,7 +4764,7 @@
                             class={restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.setPrivate = !restartConfig.preRestartActions.sessionChanges.setPrivate; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'オン' : 'オフ'}
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'オン' : 'オff'}
                           </button>
                         </div>
                       </label>
@@ -5482,7 +5275,6 @@
     min-height: auto;
     color: #cceaff;
   }
-
   .status-info .backend-status .dot,
   .status-info .online .dot,
   .status-info .offline .dot {
@@ -5833,7 +5625,6 @@
     display: grid;
     gap: 1.5rem;
   }
-
   .panel-grid.two {
     display: grid;
     gap: 1.5rem;
@@ -6184,7 +5975,6 @@
     color: #86888b;
     font-size: 0.85rem;
   }
-
   .empty {
     text-align: center;
     color: #86888b;
@@ -6371,7 +6161,6 @@
     cursor: not-allowed;
     opacity: 0.5;
   }
-
   .config-create-button {
     flex-shrink: 0;
   }
@@ -6532,7 +6321,6 @@
     transform: translateY(-1px);
     filter: brightness(1.15);
   }
-
   .action-buttons button.save:hover:enabled {
     background: #2f6d3b;
   }
@@ -6881,7 +6669,6 @@
   .description-header button:hover:enabled {
     background: rgba(97, 209, 250, 0.2);
   }
-
   .description-block textarea {
     width: 100%;
     min-height: 6rem;
@@ -7018,14 +6805,12 @@
     position: relative;
     overflow: hidden;
   }
-
   .world-card .thumb img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
   }
-
   .thumb-placeholder {
     color: #9aa3b3;
     font-size: 0.85rem;
@@ -7232,7 +7017,6 @@
     align-items: center;
     z-index: 1000;
   }
-
   .loader {
     border: 4px solid #f3f3f3;
     border-top: 4px solid #3498db;
@@ -7579,7 +7363,6 @@
     padding: 1.25rem 1.5rem;
     border-bottom: 1px solid #2b2f35;
   }
-
   .modal-header h2 {
     margin: 0;
     font-size: 1.25rem;
@@ -7667,7 +7450,6 @@
   .modal-save-btn:hover {
     background: #7dd9fc;
   }
-
   /* 予定タイプ選択ボタン（ホバー無効） */
   .schedule-type-button {
     padding: 0.5rem 1rem;
@@ -7679,7 +7461,6 @@
     cursor: pointer;
     transition: none;
   }
-
   .schedule-type-button:hover:enabled {
     background: #2b2f35;
     color: #e9f9ff;

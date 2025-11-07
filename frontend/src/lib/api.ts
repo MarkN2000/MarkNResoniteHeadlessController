@@ -108,10 +108,10 @@ async function request(path: string, init?: RequestInit) {
 export const getStatus = () => request('/server/status') as Promise<HeadlessStatus>;
 export const getLogs = (limit?: number) => request(`/server/logs${limit ? `?limit=${limit}` : ''}`) as Promise<LogEntry[]>;
 export const getConfigs = () => request('/server/configs') as Promise<ConfigEntry[]>;
-export const generateConfig = (name: string, username: string, password: string, configData?: any, overwrite?: boolean) =>
+export const generateConfig = (name: string, configData?: any, overwrite?: boolean) =>
   request('/server/configs/generate', {
     method: 'POST',
-    body: JSON.stringify({ name, username, password, configData, overwrite: Boolean(overwrite) })
+    body: JSON.stringify({ name, configData, overwrite: Boolean(overwrite) })
   }) as Promise<{ ok: boolean; path: string; name: string }>;
 export const startServer = (configPath?: string) =>
   request('/server/start', {
