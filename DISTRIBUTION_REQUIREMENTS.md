@@ -123,7 +123,7 @@ Windows環境では `npm run package:zip` または `scripts\package-distributio
 2. `scripts/setup.bat` を実行して依存関係のインストールと設定ファイル生成を行う
 3. `scripts/start-production.bat` を実行してバックエンドサービスを起動
 4. ブラウザで `http://localhost:8080` にアクセス
-5. デフォルトパスワード（`admin123`）でログインし、必要に応じて設定を更新
+5. 初回セットアップ時に設定したパスワードでログインし、必要に応じて設定を更新
 
 ### 2. 通常実行
 
@@ -149,8 +149,8 @@ Windows環境では `npm run package:zip` または `scripts\package-distributio
 
 ### 1. 認証
 
-- **デフォルトパスワード**: 初回実行時は`admin123`
-- **パスワード変更**: Web UIから変更可能
+- **初回設定**: セットアップ時に必ずパスワードを入力
+- **パスワード変更**: Web UIから再設定可能
 - **JWT認証**: セッション管理にJWTを使用
 
 ### 2. ネットワークセキュリティ

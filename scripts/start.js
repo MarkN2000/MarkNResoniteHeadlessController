@@ -99,17 +99,33 @@ const updateAuthPassword = (password) => {
     authConfig = {
       jwtSecret: 'your-secret-key-change-in-production',
       jwtExpiresIn: '24h',
-      defaultPassword: 'admin123',
-      password: 'admin123',
+      password: '',
     };
   }
 
   authConfig.password = password;
-  authConfig.defaultPassword = password;
+  if ('defaultPassword' in authConfig) {
+    delete authConfig.defaultPassword;
+  }
 
   fs.mkdirSync(path.dirname(AUTH_CONFIG_PATH), { recursive: true });
   fs.writeFileSync(AUTH_CONFIG_PATH, JSON.stringify(authConfig, null, 2), 'utf-8');
   console.log(`[INFO] config/auth.json を更新しました。`);
+};
+
+const loadAuthPassword = () => {
+  try {
+    if (!fs.existsSync(AUTH_CONFIG_PATH)) {
+      return null;
+    }
+
+    const data = JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf-8'));
+    const password = typeof data.password === 'string' ? data.password : null;
+    return password;
+  } catch (error) {
+    console.warn('[WARN] config/auth.json の読み込みに失敗しました:', error);
+    return null;
+  }
 };
 
 const loadHeadlessTemplate = () => {
@@ -150,6 +166,28 @@ const saveHeadlessCredentials = (username, password) => {
   fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
   fs.writeFileSync(HEADLESS_CREDENTIALS_PATH, JSON.stringify(payload, null, 2), 'utf-8');
   console.log(`[INFO] Headless資格情報を保存しました: ${path.relative(ROOT_DIR, HEADLESS_CREDENTIALS_PATH)}`);
+};
+
+const loadSavedHeadlessCredentials = () => {
+  try {
+    if (!fs.existsSync(HEADLESS_CREDENTIALS_PATH)) {
+      return null;
+    }
+
+    const raw = fs.readFileSync(HEADLESS_CREDENTIALS_PATH, 'utf-8');
+    const json = JSON.parse(raw);
+    const username = typeof json.username === 'string' ? json.username.trim() : '';
+    const password = typeof json.password === 'string' ? json.password : '';
+
+    if (!username || !password) {
+      return null;
+    }
+
+    return { username, password };
+  } catch (error) {
+    console.warn('[WARN] Headless資格情報の読み込みに失敗しました:', error);
+    return null;
+  }
 };
 
 const ensureDefaultHeadlessConfig = () => {
@@ -268,6 +306,31 @@ const runInitialSetup = async () => {
   );
 };
 
+const ensureCredentialsConfigured = async () => {
+  const savedAuthPassword = loadAuthPassword();
+  const savedHeadlessCredentials = loadSavedHeadlessCredentials();
+
+  const needsAuthPassword = !savedAuthPassword; // パスワードが設定されていない場合
+  const needsHeadlessCredentials = !savedHeadlessCredentials;
+
+  if (needsAuthPassword || needsHeadlessCredentials) {
+    console.log('');
+    console.log('--- 初期パスワード／Headless資格情報が未設定です。 ---');
+    const credentials = await promptForInitialCredentials();
+    if (credentials) {
+      updateAuthPassword(credentials.appPassword);
+      saveHeadlessCredentials(credentials.headlessUsername, credentials.headlessPassword);
+      applyHeadlessCredentialsToConfigs(credentials.headlessUsername, credentials.headlessPassword);
+      return;
+    }
+    console.warn('[WARN] 資格情報が設定されていません。必要に応じて config/auth.json と config/headless/*.json を手動で更新してください。');
+    return;
+  }
+
+  // 既存の資格情報でプリセットを整備
+  applyHeadlessCredentialsToConfigs(savedHeadlessCredentials.username, savedHeadlessCredentials.password);
+};
+
 const startApplication = () => {
   divider();
   console.log(' MarkN Resonite Headless Controller');
@@ -306,6 +369,8 @@ const main = async () => {
   try {
     if (!fs.existsSync(SETUP_MARKER)) {
       await runInitialSetup();
+    } else {
+      await ensureCredentialsConfigured();
     }
 
     startApplication();

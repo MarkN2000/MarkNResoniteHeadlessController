@@ -96,6 +96,7 @@ npm run setup
 - プリビルド済み資産の確認
 - 管理画面ログイン用パスワードと Headless 資格情報の入力・保存
 - 入力された Headless 資格情報は `config/headless/credentials.json` に保存され、既存のプリセット設定（`config/headless/*.json`）へ自動反映されます。
+- `.setup_completed` が存在する環境でも、パスワードや Headless 資格情報が未設定／初期値の場合には再度入力を促し、設定を反映します。
 
 4. **設定ファイルの編集**
 
@@ -109,7 +110,6 @@ npm run setup
 - `.env` の `AUTH_SHARED_SECRET`（JWTシークレット）
 - `.env` の `MOD_API_KEY`（Mod APIキー）
 - `.env` の `RESONITE_HEADLESS_PATH`（Resonite実行ファイルパス）
-- `config/auth.json` の `password`（管理者パスワード）
 
 #### 方法2: 手動セットアップ
 
@@ -149,7 +149,6 @@ NODE_ENV=development
 SERVER_PORT=8080
 AUTH_SHARED_SECRET=your-secret-key-change-in-production
 MOD_API_KEY=mod-secret-key
-DEFAULT_PASSWORD=admin123
 RESONITE_HEADLESS_PATH=C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe
 ```
 
@@ -175,7 +174,6 @@ npm run dev --workspace frontend
 2. **アクセス**
 - WebUI: `http://localhost:5173`
 - API: `http://localhost:8080/api`
-- デフォルトパスワード: `admin123`（変更推奨）
 
 #### 本番環境
 
@@ -215,7 +213,7 @@ npm run package:zip
 3. Windowsでは `start.bat` を実行（ダブルクリック可）します。初回はセットアップが自動で実施され、そのままバックエンドが起動します。その他の環境では `node scripts/start.js` または `npm run setup` と既存手順を利用してください。
 4. `.env` や `config/*.json` が未生成の場合は自動的に作成されます。必要に応じて `env.example` を `.env` に複製し、シークレットやパスを調整してください。
 5. 2回目以降も `start.bat` を実行するだけでバックエンドを起動できます（セットアップはスキップされます）。
-6. ブラウザで `http://localhost:8080` にアクセスし、初期パスワード `admin123` でログイン後、設定を更新してください。
+6. ブラウザで `http://localhost:8080` にアクセスし、初回セットアップで設定したパスワードでログインしてください。
 
 ⚠️ **本番環境の注意点**:
 - 必ず `.env` で `NODE_ENV=production` を設定
@@ -531,7 +529,7 @@ APIはエラー時に適切なHTTPステータスコードとエラーメッセ�
 {
   "jwtSecret": "your-secret-key-change-in-production",
   "jwtExpiresIn": "24h",
-  "defaultPassword": "admin123"
+  "password": ""
 }
 ```
 
@@ -579,8 +577,9 @@ MOD_API_KEY=your-production-mod-key
 ### よくある問題
 
 1. **ログインできない**
-   - デフォルトパスワード: `admin123`
-   - 設定ファイル: `config/auth.json`を確認
+   - 初回セットアップで設定したパスワードを再確認
+   - `start.bat` を再実行してパスワードを再設定
+   - 設定ファイル: `config/auth.json` を確認
 
 2. **Mod APIにアクセスできない**
    - API Key: `mod-secret-key`を確認

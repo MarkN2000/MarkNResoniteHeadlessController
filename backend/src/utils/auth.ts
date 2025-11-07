@@ -7,7 +7,6 @@ import { PROJECT_ROOT } from '../config/index.js';
 interface AuthConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
-  defaultPassword?: string; // 互換のため残す
   password?: string; // プレーンパスワード（ユーザー設定）
 }
 
@@ -27,7 +26,6 @@ const loadAuthConfig = (): AuthConfig => {
       authConfig = {
         jwtSecret: process.env.AUTH_SHARED_SECRET || fileConfig.jwtSecret,
         jwtExpiresIn: process.env.JWT_EXPIRES_IN || fileConfig.jwtExpiresIn,
-        defaultPassword: process.env.DEFAULT_PASSWORD || fileConfig.defaultPassword,
         password: process.env.DEFAULT_PASSWORD || fileConfig.password,
       };
     } catch (error: any) {
@@ -37,8 +35,7 @@ const loadAuthConfig = (): AuthConfig => {
         const defaultConfig: AuthConfig = {
           jwtSecret: process.env.AUTH_SHARED_SECRET || 'your-secret-key-change-in-production',
           jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
-          defaultPassword: process.env.DEFAULT_PASSWORD || 'admin123',
-          password: process.env.DEFAULT_PASSWORD || 'admin123',
+          password: process.env.DEFAULT_PASSWORD || '', // パスワードは空で作成
         };
         saveAuthConfig(defaultConfig);
         authConfig = defaultConfig;
@@ -48,8 +45,7 @@ const loadAuthConfig = (): AuthConfig => {
         authConfig = {
           jwtSecret: process.env.AUTH_SHARED_SECRET || 'your-secret-key-change-in-production',
           jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
-          defaultPassword: process.env.DEFAULT_PASSWORD || 'admin123',
-          password: process.env.DEFAULT_PASSWORD || 'admin123',
+          password: process.env.DEFAULT_PASSWORD || '', // パスワードは空で作成
         };
       }
     }
@@ -83,16 +79,9 @@ export const comparePassword = async (password: string, hashedPassword: string):
   return bcrypt.compare(password, hashedPassword);
 };
 
-export const getDefaultPassword = (): string => {
-  const config = loadAuthConfig();
-  // 後方互換: defaultPassword が残っている場合に参照
-  return config.defaultPassword || '';
-};
-
 export const getPlainPassword = (): string => {
   const config = loadAuthConfig();
-  // 優先: password（ユーザー設定）。未設定時はdefaultPasswordへフォールバック
-  return (config.password && String(config.password)) || getDefaultPassword();
+  return (config.password && String(config.password)) || '';
 };
 
 export const updatePlainPassword = (newPassword: string) => {

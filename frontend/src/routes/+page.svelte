@@ -601,24 +601,19 @@
   let editedPreviewText = '';
   let previewEditError = '';
   let previewTextarea: HTMLTextAreaElement | null = null;
-  
   // カスタムセッションIDプレフィックス用の変数
   let customSessionIdPrefix = '';
-  
   // ユーザーID取得用の変数
   let useridLoading = false;
   let lastFetchedUsername = '';
   let useridCache = new Map<string, string>();
-
   // アイテムスポーン機能
   let itemSpawnUrl = '';
   let itemSpawnLoading = false;
-
   // ダイナミックインパルスstring機能
   let dynamicImpulseTag = '';
   let dynamicImpulseText = '';
   let dynamicImpulseLoading = false;
-  
   // 下書き保存/復元: コンフィグ作成タブの編集中データをLocalStorageに自動保存
   const loadDraft = () => {
     try {
@@ -1237,7 +1232,6 @@
     }
     return count;
   };
-
   const refreshRuntimeStatus = async (suppressError = false) => {
     statusLoading = true;
     try {
@@ -1886,7 +1880,6 @@
       userActionLoading = { ...userActionLoading, [`${username}-role`]: false };
     }
   };
-
   const sendStatusCommand = async (key: string, command: string, successMessage: string) => {
     if (!$status.running) {
       pushToast('サーバーが起動していません', 'error');
@@ -2523,7 +2516,6 @@
       friendRequestsLoading = false;
     }
   };
-
   const loadBannedUsersList = async () => {
     if (bansLoading) return;
     bansLoading = true;
@@ -3049,10 +3041,6 @@
           {/if}
         </button>
       </form>
-      <div class="login-info">
-        <p>デフォルトパスワード: <code>admin123</code></p>
-        <p><small>本番環境では必ずパスワードを変更してください</small></p>
-      </div>
     </div>
   </div>
 {:else}
@@ -3693,7 +3681,6 @@
               </div>
             </section>
           {/if}
-
           <section class="panel" class:active={activeTab === 'friends'}>
             <div class="panel-grid two">
               <!-- 左側: ユーザー検索とリスト -->
@@ -4119,7 +4106,6 @@
                   </form>
                 </div>
               </div>
-
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>セッション設定</h2>
@@ -4313,7 +4299,7 @@
                           <div class="field-row">
                             <input type="text" bind:value={session.tags} placeholder="tag1,tag2,tag3" />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('tags')} title="リセット" aria-label="リセット">
-                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l-64-64 56 56-160 160Z" /></svg>
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
                           </div>
                         </label>
@@ -4482,7 +4468,6 @@
               {/if}
             </div>
           </section>
-
           <!-- 自動再起動設定タブ -->
           <section class="panel" class:active={activeTab === 'restart'}>
             <!-- 再起動ボタンセクション -->
@@ -4638,7 +4623,7 @@
                             class={restartConfig && restartConfig.triggers.highLoad.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.triggers.highLoad.enabled = !restartConfig.triggers.highLoad.enabled; }}
                           >
-                            {restartConfig && restartConfig.triggers.highLoad.enabled ? 'オン' : 'オフ'}
+                            {restartConfig && restartConfig.triggers.highLoad.enabled ? 'オン' : 'オff'}
                           </button>
                         </div>
                       </label>
@@ -4999,7 +4984,7 @@
                             class={restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.setMaxUserToOne = !restartConfig.preRestartActions.sessionChanges.setMaxUserToOne; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'オン' : 'オフ'}
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'オン' : 'オff'}
                           </button>
                         </div>
                       </label>
@@ -5012,7 +4997,7 @@
                             class={restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled = !restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'オン' : 'オフ'}
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'オン' : 'オff'}
                           </button>
                         </div>
                       </label>
@@ -5085,7 +5070,6 @@
                         </div>
     {/each}
                     </div>
-                    
   <!-- 予定再起動編集モーダル -->
   {#if scheduledRestartModalOpen && editingSchedule}
     <div class="modal-overlay" on:click={closeScheduleModal}>
@@ -5734,7 +5718,6 @@
     font-weight: 600;
     transition: background 0.15s ease, transform 0.15s ease;
   }
-
   .resource-metrics {
     list-style: none;
     padding: 0;
@@ -6383,7 +6366,6 @@
   .config-load-section .delete-button:hover:not(:disabled) {
     background: #c82333;
   }
-
   .config-load-section .delete-button:disabled {
     background: #6c757d;
     cursor: not-allowed;
@@ -7026,7 +7008,6 @@
     border-color: #ba64f2;
     box-shadow: 0 0 0 3px rgba(186, 100, 242, 0.35);
   }
-
   .world-card .thumb {
     width: 100%;
     height: 140px;
@@ -7533,19 +7514,6 @@
     cursor: not-allowed;
   }
 
-  .login-info {
-    text-align: center;
-    color: #a0a0a0;
-    font-size: 0.85rem;
-  }
-
-  .login-info code {
-    background: #404040;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.25rem;
-    font-family: monospace;
-  }
-
   .logout-button {
     background: #61d1fa;
     color: #000000;
@@ -7674,7 +7642,6 @@
     margin-top: 1.5rem;
     justify-content: flex-end;
   }
-
   .modal-cancel-btn,
   .modal-save-btn {
     padding: 0.625rem 1.25rem;
@@ -7689,11 +7656,9 @@
     background: #2b2f35;
     color: #e9f9ff;
   }
-
   .modal-cancel-btn:hover {
     background: #34404c;
   }
-
   .modal-save-btn {
     background: #61d1fa;
     color: #11151d;
