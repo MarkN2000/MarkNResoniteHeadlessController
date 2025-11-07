@@ -48,6 +48,8 @@
   } from '$lib';
 
   const { status, logs, configs, metrics, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
+  const PREVIEW_LOGIN_USERNAME_PLACEHOLDER = '<保存済みのユーザー名が使用されます>';
+  const PREVIEW_LOGIN_PASSWORD_PLACEHOLDER = '<保存済みのパスワードが使用されます>';
 
   // Resonite画像URLを変換する関数
   const convertResoniteImageUrl = (url: string | null): string | null => {
@@ -902,7 +904,7 @@
     
     // 配列フィールドの変換
     if (parsed.allowedUrlHosts !== undefined) {
-      configAllowedUrls = arrayToString(parsed.allowedUrlHosts);
+      configAllowedUrlHosts = arrayToString(parsed.allowedUrlHosts);
     }
     if (parsed.autoSpawnItems !== undefined) {
       configAutoSpawnItems = arrayToString(parsed.autoSpawnItems);
