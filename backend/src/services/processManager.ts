@@ -427,9 +427,13 @@ export class ProcessManager extends EventEmitter {
 
   private decodeBuffer(data: Buffer): string {
     try {
-      return iconv.decode(data, 'shift_jis');
-    } catch (error) {
-      return data.toString('utf8');
+      return iconv.decode(data, 'utf8');
+    } catch (utfError) {
+      try {
+        return iconv.decode(data, 'shift_jis');
+      } catch (sjisError) {
+        return data.toString('utf8');
+      }
     }
   }
 

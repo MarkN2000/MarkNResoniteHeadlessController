@@ -824,7 +824,7 @@
         session?.requiredUserJoinCloudVariableDenyMessage
       ),
       awayKickMinutes:
-        session?.awayKickMinutes === undefined ? null : session.awayKickMinutes,
+        session?.awayKickMinutes ?? 5,
       parentSessionIds:
         typeof session?.parentSessionIds === 'string'
           ? session.parentSessionIds
@@ -1315,7 +1315,7 @@
           useCustomJoinVerifier: session.useCustomJoinVerifier,
           mobileFriendly: session.mobileFriendly,
           keepOriginalRoles: session.keepOriginalRoles,
-          awayKickMinutes: session.awayKickMinutes,
+          awayKickMinutes: session.awayKickMinutes ?? 5,
           autoRecover: session.autoRecover,
           idleRestartInterval: session.idleRestartInterval,
           forcedRestartInterval: session.forcedRestartInterval,
@@ -1447,7 +1447,7 @@
           useCustomJoinVerifier: session.useCustomJoinVerifier,
           mobileFriendly: session.mobileFriendly,
           keepOriginalRoles: session.keepOriginalRoles,
-          awayKickMinutes: session.awayKickMinutes,
+          awayKickMinutes: session.awayKickMinutes ?? 5,
           autoRecover: session.autoRecover,
           idleRestartInterval: session.idleRestartInterval,
           forcedRestartInterval: session.forcedRestartInterval,
@@ -3107,7 +3107,7 @@
 
         <div class="tab-panels">
           <section class="panel" class:active={activeTab === 'dashboard'}>
-            <div class="panel-grid three">
+            <div class="panel-grid two">
               <div class="panel-column">
                 <div class="panel-heading">
                   <h2>セッション設定</h2>
@@ -3349,8 +3349,7 @@
                     <p class="empty">読み込み中...</p>
                   {/if}
                 </div>
-              </div>
-              <div class="panel-column">
+
                 <div class="panel-heading">
                   <h2>スポーン・パルス</h2>
                 </div>
@@ -4283,7 +4282,19 @@
                         <label>
                           <span>AFKキック時間（分） <small class="note">-1で無効</small></span>
                           <div class="field-row">
-                            <input type="number" bind:value={session.awayKickMinutes} min="-1" placeholder="5" required />
+                            <input 
+                              type="number" 
+                              bind:value={session.awayKickMinutes} 
+                              min="-1" 
+                              placeholder="5" 
+                              required
+                              on:blur={(e) => {
+                                const value = (e.target as HTMLInputElement).value;
+                                if (value === '' || value === null || value === undefined) {
+                                  session.awayKickMinutes = 5;
+                                }
+                              }}
+                            />
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('awayKickMinutes')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
