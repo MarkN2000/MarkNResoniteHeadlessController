@@ -205,7 +205,7 @@ export class ProcessManager extends EventEmitter {
 
     if (!resolvedUsername || !resolvedPassword) {
       console.warn(
-        `[ProcessManager] ユーザー名またはパスワードが空です。config/headless/credentials.json を設定するか、明示的に指定してください。`
+        `[ProcessManager] ユーザー名またはパスワードが空です。config/auth.json の headlessCredentials を設定するか、明示的に指定してください。`
       );
     }
 

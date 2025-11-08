@@ -1,30 +1,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { HEADLESS_CONFIG_DIR } from './index.js';
+import { PROJECT_ROOT } from './index.js';
 
 export interface HeadlessCredentials {
   username: string;
   password: string;
 }
 
-const CREDENTIALS_FILE = path.join(HEADLESS_CONFIG_DIR, 'credentials.json');
+const AUTH_CONFIG_PATH = path.join(PROJECT_ROOT, 'config', 'auth.json');
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
 export const getHeadlessCredentials = (): HeadlessCredentials | null => {
   try {
-    if (!fs.existsSync(CREDENTIALS_FILE)) {
+    if (!fs.existsSync(AUTH_CONFIG_PATH)) {
       return null;
     }
 
-    const raw = fs.readFileSync(CREDENTIALS_FILE, 'utf-8');
+    const raw = fs.readFileSync(AUTH_CONFIG_PATH, 'utf-8');
     const json = JSON.parse(raw);
-    const username = isNonEmptyString(json.username) ? json.username.trim() : '';
-    const password = isNonEmptyString(json.password) ? json.password : '';
+    const credentials = json?.headlessCredentials;
+    const username = isNonEmptyString(credentials?.username) ? credentials.username.trim() : '';
+    const password = isNonEmptyString(credentials?.password) ? credentials.password : '';
 
-    if (!username && !password) {
+    if (!username || !password) {
       return null;
     }
 
@@ -33,7 +34,7 @@ export const getHeadlessCredentials = (): HeadlessCredentials | null => {
       password,
     };
   } catch (error) {
-    console.warn('[HeadlessCredentials] Failed to read credentials:', error);
+    console.warn('[HeadlessCredentials] Failed to read headless credentials from auth.json:', error);
     return null;
   }
 };

@@ -7514,10 +7514,12 @@
   }
 
 .allowed-hosts-list {
-  margin-top: 1rem;
+  margin-top: 0.4rem;
   padding: 0.4rem 0.6rem;
   background: #284c5d;
   border-radius: 0.5rem;
+  width: 50%;
+  margin-left: auto;
 }
 
 .allowed-host-item {
@@ -7561,5 +7563,10 @@
     .panel-grid.two {
       grid-template-columns: 1fr;
     }
+
+  .allowed-hosts-list {
+    width: 100%;
+    margin-left: 0;
+  }
   }
 </style>

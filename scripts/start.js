@@ -11,7 +11,6 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
 const CONFIG_DIR = path.join(ROOT_DIR, 'config');
 const HEADLESS_CONFIG_DIR = path.join(CONFIG_DIR, 'headless');
-const HEADLESS_CREDENTIALS_PATH = path.join(HEADLESS_CONFIG_DIR, 'credentials.json');
 const AUTH_CONFIG_PATH = path.join(CONFIG_DIR, 'auth.json');
 const AUTH_CONFIG_TEMPLATE = path.join(CONFIG_DIR, 'auth.json.example');
 const HEADLESS_CONFIG_TEMPLATE_CANDIDATES = [
@@ -89,13 +88,26 @@ const promptForInitialCredentials = async () => {
   };
 };
 
-const updateAuthPassword = (password) => {
+const loadOrCreateAuthConfig = () => {
   let authConfig;
+
   if (fs.existsSync(AUTH_CONFIG_PATH)) {
-    authConfig = JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf-8'));
-  } else if (fs.existsSync(AUTH_CONFIG_TEMPLATE)) {
-    authConfig = JSON.parse(fs.readFileSync(AUTH_CONFIG_TEMPLATE, 'utf-8'));
-  } else {
+    try {
+      authConfig = JSON.parse(fs.readFileSync(AUTH_CONFIG_PATH, 'utf-8'));
+    } catch (error) {
+      console.warn('[WARN] config/auth.json の読み込みに失敗しました。テンプレートまたはデフォルトを使用します:', error);
+    }
+  }
+
+  if (!authConfig && fs.existsSync(AUTH_CONFIG_TEMPLATE)) {
+    try {
+      authConfig = JSON.parse(fs.readFileSync(AUTH_CONFIG_TEMPLATE, 'utf-8'));
+    } catch (error) {
+      console.warn('[WARN] auth.json.example の読み込みに失敗しました。デフォルトを使用します:', error);
+    }
+  }
+
+  if (!authConfig) {
     authConfig = {
       jwtSecret: 'your-secret-key-change-in-production',
       jwtExpiresIn: '24h',
@@ -103,13 +115,22 @@ const updateAuthPassword = (password) => {
     };
   }
 
-  authConfig.password = password;
   if ('defaultPassword' in authConfig) {
     delete authConfig.defaultPassword;
   }
 
+  return authConfig;
+};
+
+const saveAuthConfig = (config) => {
   fs.mkdirSync(path.dirname(AUTH_CONFIG_PATH), { recursive: true });
-  fs.writeFileSync(AUTH_CONFIG_PATH, JSON.stringify(authConfig, null, 2), 'utf-8');
+  fs.writeFileSync(AUTH_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+};
+
+const updateAuthPassword = (password) => {
+  const authConfig = loadOrCreateAuthConfig();
+  authConfig.password = password;
+  saveAuthConfig(authConfig);
   console.log(`[INFO] config/auth.json を更新しました。`);
 };
 
@@ -158,26 +179,34 @@ const loadHeadlessTemplate = () => {
 };
 
 const saveHeadlessCredentials = (username, password) => {
-  const payload = {
+  const authConfig = loadOrCreateAuthConfig();
+  authConfig.headlessCredentials = {
     username,
     password,
     updatedAt: new Date().toISOString(),
   };
-  fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(HEADLESS_CREDENTIALS_PATH, JSON.stringify(payload, null, 2), 'utf-8');
-  console.log(`[INFO] Headless資格情報を保存しました: ${path.relative(ROOT_DIR, HEADLESS_CREDENTIALS_PATH)}`);
+  saveAuthConfig(authConfig);
+  console.log(
+    `[INFO] Headless資格情報を保存しました: ${path.relative(
+      ROOT_DIR,
+      AUTH_CONFIG_PATH,
+    )} (headlessCredentials)`,
+  );
 };
 
 const loadSavedHeadlessCredentials = () => {
   try {
-    if (!fs.existsSync(HEADLESS_CREDENTIALS_PATH)) {
+    if (!fs.existsSync(AUTH_CONFIG_PATH)) {
       return null;
     }
 
-    const raw = fs.readFileSync(HEADLESS_CREDENTIALS_PATH, 'utf-8');
+    const raw = fs.readFileSync(AUTH_CONFIG_PATH, 'utf-8');
     const json = JSON.parse(raw);
-    const username = typeof json.username === 'string' ? json.username.trim() : '';
-    const password = typeof json.password === 'string' ? json.password : '';
+    const credentials = json?.headlessCredentials;
+    const username =
+      typeof credentials?.username === 'string' ? credentials.username.trim() : '';
+    const password =
+      typeof credentials?.password === 'string' ? credentials.password : '';
 
     if (!username || !password) {
       return null;

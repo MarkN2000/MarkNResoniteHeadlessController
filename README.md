@@ -95,7 +95,7 @@ npm run setup
 - バックエンド依存関係のインストール
 - プリビルド済み資産の確認
 - 管理画面ログイン用パスワードと Headless 資格情報の入力・保存
-- 入力された Headless 資格情報は `config/headless/credentials.json` に保存され、既存のプリセット設定（`config/headless/*.json`）へ自動反映されます。
+- 入力された Headless 資格情報は `config/auth.json` の `headlessCredentials` として保存され、既存のプリセット設定（`config/headless/*.json`）へ自動反映されます。
 - `.setup_completed` が存在する環境でも、パスワードや Headless 資格情報が未設定／初期値の場合には再度入力を促し、設定を反映します。
 
 4. **設定ファイルの編集**
@@ -664,6 +664,135 @@ npm run test
   ```
 - 使用例: `import type { Type } from '@shared/index.js'`
 - これにより開発環境と本番環境で同じコードが動作
+
+## UIデザイン仕様
+
+### リスト表示コンポーネント（右寄せ・幅50%デザイン）
+
+入力欄とリストボックスを組み合わせたコンポーネントのデザイン仕様です。許可されたURLホストなど、配列データを追加・削除するUIに適用します。
+
+#### HTML構造
+
+```svelte
+<label>
+  <span>項目名</span>
+  <div class="field-row">
+    <input type="text" bind:value={newItem} placeholder="例: example.com" />
+    <button type="button" class="status-action-button" on:click={addItem} disabled={!newItem}>
+      追加
+    </button>
+  </div>
+</label>
+
+{#if items.length > 0}
+  <div class="allowed-hosts-list">
+    {#each items as item, index (item)}
+      <div class="allowed-host-item">
+        <span>{item}</span>
+        <button type="button" class="delete-button" on:click={() => removeItem(index)} title="削除">
+          <svg viewBox="0 -960 960 960" class="delete-icon" aria-hidden="true">
+            <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+          </svg>
+        </button>
+      </div>
+    {/each}
+  </div>
+{/if}
+```
+
+#### CSSスタイル
+
+```css
+/* リストコンテナ */
+.allowed-hosts-list {
+  margin-top: 0.4rem;              /* 入力欄との間隔（詰め気味） */
+  padding: 0.4rem 0.6rem;           /* 内側の余白 */
+  background: #284c5d;              /* 背景色（青緑系） */
+  border-radius: 0.5rem;             /* 角丸 */
+  width: 50%;                       /* 幅を50%に制限 */
+  margin-left: auto;                /* 右寄せ */
+}
+
+/* リスト項目 */
+.allowed-host-item {
+  display: flex;
+  justify-content: space-between;   /* 項目名と削除ボタンを両端に配置 */
+  align-items: center;              /* 縦方向中央揃え */
+  gap: 0.4rem;                      /* 項目名とボタンの間隔 */
+  padding: 0.25rem 0;               /* 上下の余白（小さめ） */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);  /* 区切り線 */
+  font-size: 0.8rem;                /* フォントサイズ（小さめ） */
+}
+
+.allowed-host-item:last-child {
+  border-bottom: none;              /* 最後の項目は区切り線なし */
+}
+
+.allowed-host-item span {
+  word-break: break-all;            /* 長いテキストは折り返し */
+}
+
+/* 削除ボタン */
+.allowed-host-item .delete-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.15rem;
+  margin-left: 0.75rem;
+}
+
+.allowed-host-item .delete-icon {
+  width: 20px;
+  height: 20px;
+  fill: #aeb4bd;                    /* 通常時の色（グレー） */
+  transition: fill 0.2s ease;
+}
+
+.allowed-host-item .delete-button:hover .delete-icon {
+  fill: #ff6b6b;                    /* ホバー時の色（赤） */
+}
+
+/* レスポンシブ対応（モバイル） */
+@media (max-width: 768px) {
+  .allowed-hosts-list {
+    width: 100%;                    /* モバイルでは全幅 */
+    margin-left: 0;                 /* 左寄せに戻す */
+  }
+}
+```
+
+#### デザインの特徴
+
+1. **レイアウト**
+   - 入力欄と追加ボタンは通常のフォームレイアウト
+   - リストボックスは右寄せで幅50%
+   - 入力欄とリストの間隔は`0.4rem`（詰め気味）
+
+2. **視覚的特徴**
+   - 背景色: `#284c5d`（青緑系）
+   - 角丸: `0.5rem`
+   - フォントサイズ: `0.8rem`（コンパクト）
+   - 項目間の区切り線: 半透明の白線
+
+3. **インタラクション**
+   - 削除ボタンはホバーで赤色（`#ff6b6b`）に変化
+   - 長いテキストは自動折り返し
+
+4. **レスポンシブ**
+   - モバイル（768px以下）では全幅表示
+
+#### 使用例
+
+このデザインパターンは以下のような項目に適用できます：
+- 許可されたURLホスト
+- 自動スポーンアイテム
+- その他の配列形式の設定項目
+
+#### 実装時の注意点
+
+- クラス名は`allowed-hosts-list`と`allowed-host-item`を使用（他の項目に適用する場合は適宜変更）
+- 削除ボタンには`title="削除"`属性を追加してアクセシビリティを確保
+- SVGアイコンは`aria-hidden="true"`を設定
 
 ## ライセンス
 
