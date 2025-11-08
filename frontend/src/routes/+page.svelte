@@ -337,7 +337,8 @@
   let configDataFolder = '';
   let configCacheFolder = '';
   let configLogsFolder = '';
-  let configAllowedUrlHosts = 'https://ttsapi.markn2000.com/';
+  let configAllowedUrlHosts: string[] = ['https://ttsapi.markn2000.com/'];
+  let newAllowedHost = '';
   let configAutoSpawnItems = '';
   // リセット用デフォルト値（default.json 準拠）
   const DEFAULT_CONFIG = {
@@ -350,7 +351,7 @@
     dataFolder: '',
     cacheFolder: '',
     logsFolder: '',
-    allowedUrlHosts: 'https://ttsapi.markn2000.com/',
+    allowedUrlHosts: ['https://ttsapi.markn2000.com/'],
     autoSpawnItems: ''
   } as const;
 
@@ -525,7 +526,7 @@
       configDataFolder = draft.configDataFolder ?? '';
       configCacheFolder = draft.configCacheFolder ?? '';
       configLogsFolder = draft.configLogsFolder ?? '';
-      configAllowedUrlHosts = Array.isArray(draft.configAllowedUrlHosts) ? draft.configAllowedUrlHosts.join(',') : (draft.configAllowedUrlHosts ?? '');
+      configAllowedUrlHosts = Array.isArray(draft.configAllowedUrlHosts) ? draft.configAllowedUrlHosts : ['https://ttsapi.markn2000.com/'];
       configAutoSpawnItems = Array.isArray(draft.configAutoSpawnItems) ? draft.configAutoSpawnItems.join(',') : (draft.configAutoSpawnItems ?? '');
       if (Array.isArray(draft.sessions) && draft.sessions.length) {
         sessions = draft.sessions;
@@ -558,7 +559,7 @@
         configDataFolder,
         configCacheFolder,
         configLogsFolder,
-        configAllowedUrlHosts: configAllowedUrlHosts.split(',').map(h => h.trim()).filter(Boolean),
+        configAllowedUrlHosts,
         configAutoSpawnItems: configAutoSpawnItems.split(',').map(i => i.trim()).filter(Boolean),
         sessions: draftSessions,
         _expires: Date.now() + (30 * 60 * 1000) // 30分で期限切れ
@@ -609,7 +610,7 @@
       configDataFolder = configData.dataFolder || '';
       configCacheFolder = configData.cacheFolder || '';
       configLogsFolder = configData.logsFolder || '';
-      configAllowedUrlHosts = arrayToString(configData.allowedUrlHosts);
+      configAllowedUrlHosts = Array.isArray(configData.allowedUrlHosts) ? configData.allowedUrlHosts : ['https://ttsapi.markn2000.com/'];
       configAutoSpawnItems = arrayToString(configData.autoSpawnItems);
       
       // セッション設定に反映（ヘルパー関数を使用）
@@ -808,6 +809,20 @@
     }
   };
 
+  const addAllowedHost = () => {
+    const host = newAllowedHost.trim();
+    if (host && !configAllowedUrlHosts.includes(host)) {
+      configAllowedUrlHosts = [...configAllowedUrlHosts, host];
+      newAllowedHost = '';
+    } else if (configAllowedUrlHosts.includes(host)) {
+      pushToast('このホストは既に追加されています', 'info');
+    }
+  };
+
+  const removeAllowedHost = (index: number) => {
+    configAllowedUrlHosts = configAllowedUrlHosts.filter((_, i) => i !== index);
+  };
+
   // プレビュー編集機能
   const startPreviewEdit = () => {
     isPreviewEditing = true;
@@ -904,7 +919,7 @@
     
     // 配列フィールドの変換
     if (parsed.allowedUrlHosts !== undefined) {
-      configAllowedUrlHosts = arrayToString(parsed.allowedUrlHosts);
+      configAllowedUrlHosts = Array.isArray(parsed.allowedUrlHosts) ? parsed.allowedUrlHosts : ['https://ttsapi.markn2000.com/'];
     }
     if (parsed.autoSpawnItems !== undefined) {
       configAutoSpawnItems = arrayToString(parsed.autoSpawnItems);
@@ -1314,7 +1329,7 @@
         dataFolder: configDataFolder.trim() || null,
         cacheFolder: configCacheFolder.trim() || null,
         logsFolder: configLogsFolder.trim() || null,
-        allowedUrlHosts: stringToArray(configAllowedUrlHosts),
+        allowedUrlHosts: configAllowedUrlHosts,
         autoSpawnItems: stringToArray(configAutoSpawnItems),
         startWorlds: processedSessions
       };
@@ -1349,7 +1364,7 @@
       configDataFolder = '';
       configCacheFolder = '';
       configLogsFolder = '';
-      configAllowedUrlHosts = 'https://ttsapi.markn2000.com/';
+      configAllowedUrlHosts = ['https://ttsapi.markn2000.com/'];
       configAutoSpawnItems = '';
       sessions = [{
         id: 1,
@@ -1483,7 +1498,7 @@
         "dataFolder": configDataFolder.trim() || null,
         "cacheFolder": configCacheFolder.trim() || null,
         "logsFolder": configLogsFolder.trim() || null,
-        "allowedUrlHosts": stringToArray(configAllowedUrlHosts),
+        "allowedUrlHosts": configAllowedUrlHosts,
         "autoSpawnItems": stringToArray(configAutoSpawnItems)
       };
 
@@ -3894,12 +3909,27 @@
                     <label>
                       <span>許可されたURLホスト</span>
                       <div class="field-row">
-                        <input type="text" bind:value={configAllowedUrlHosts} placeholder="例: example.com,api.example.com" />
-                        <button type="button" class="refresh-config-button" on:click={() => resetBasicField('allowedUrlHosts')} title="リセット" aria-label="リセット">
-                          <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                        <input type="text" bind:value={newAllowedHost} placeholder="例: example.com,api.example.com" />
+                        <button type="button" class="status-action-button" on:click={addAllowedHost} disabled={!newAllowedHost}>
+                          追加
                         </button>
                       </div>
                     </label>
+
+                    {#if configAllowedUrlHosts.length > 0}
+                      <div class="allowed-hosts-list">
+                        {#each configAllowedUrlHosts as host, index (host)}
+                          <div class="allowed-host-item">
+                            <span>{host}</span>
+                            <button type="button" class="delete-button" on:click={() => removeAllowedHost(index)} title="削除">
+                              <svg viewBox="0 -960 960 960" class="delete-icon" aria-hidden="true">
+                                <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+                              </svg>
+                            </button>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
 
                     <label>
                       <span>自動スポーンアイテム</span>
@@ -7479,5 +7509,57 @@
     color: #11151d;
   }
 
+  .config-preview-actions button.edit {
+    background: #007bff;
+  }
 
+.allowed-hosts-list {
+  margin-top: 1rem;
+  padding: 0.4rem 0.6rem;
+  background: #284c5d;
+  border-radius: 0.5rem;
+}
+
+.allowed-host-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 0.8rem;
+}
+  
+  .allowed-host-item:last-child {
+    border-bottom: none;
+  }
+
+  .allowed-host-item span {
+    word-break: break-all;
+  }
+  
+.allowed-host-item .delete-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+  padding: 0.15rem;
+  margin-left: 0.75rem;
+  }
+
+.allowed-host-item .delete-icon {
+  width: 20px;
+  height: 20px;
+    fill: #aeb4bd;
+    transition: fill 0.2s ease;
+  }
+
+  .allowed-host-item .delete-button:hover .delete-icon {
+    fill: #ff6b6b;
+  }
+
+  @media (max-width: 768px) {
+    .panel-grid.two {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>

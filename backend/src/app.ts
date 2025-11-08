@@ -65,11 +65,14 @@ restartManager.initialize().catch((error) => {
 const apiRouter = createApiRouter(restartManager);
 app.use('/api', apiRouter);
 
-// 本番環境: フロントエンドの静的ファイルを配信
-if (process.env.NODE_ENV === 'production') {
-  // dist/backend/src/app.js から見て ../../../../frontend/build
-  const frontendBuildPath = path.join(__dirname, '../../../../frontend/build');
-  
+// フロントエンドの静的ファイルを配信（本番環境、または開発環境でビルド済みの場合）
+// 開発環境: backend/src/app.ts から見て ../../frontend/build
+// 本番環境: dist/backend/src/app.js から見て ../../../../frontend/build
+// 両方に対応するため、プロジェクトルートを取得
+const projectRoot = path.resolve(__dirname, process.env.NODE_ENV === 'production' ? '../../../../' : '../../');
+const frontendBuildPath = path.join(projectRoot, 'frontend/build');
+
+if (fs.existsSync(frontendBuildPath)) {
   // 静的ファイル配信
   app.use(express.static(frontendBuildPath));
   
@@ -83,6 +86,9 @@ if (process.env.NODE_ENV === 'production') {
   });
   
   console.log('[Static] Serving frontend from:', frontendBuildPath);
+} else if (process.env.NODE_ENV === 'production') {
+  console.warn('[Static] Frontend build directory not found:', frontendBuildPath);
+  console.warn('[Static] Please run "npm run build" to build the frontend.');
 }
 
 const httpServer = createServer(app);
