@@ -4620,7 +4620,7 @@
                             class={restartConfig && restartConfig.triggers.highLoad.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.triggers.highLoad.enabled = !restartConfig.triggers.highLoad.enabled; }}
                           >
-                            {restartConfig && restartConfig.triggers.highLoad.enabled ? 'オン' : 'オff'}
+                            {restartConfig && restartConfig.triggers.highLoad.enabled ? 'オン' : 'オフ'}
                           </button>
                         </div>
                       </label>
@@ -4875,7 +4875,7 @@
                             class={restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.chatMessage.enabled = !restartConfig.preRestartActions.chatMessage.enabled; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'オン' : 'オff'}
+                            {restartConfig && restartConfig.preRestartActions.chatMessage.enabled ? 'オン' : 'オフ'}
                           </button>
                         </div>
                       </label>
@@ -4905,7 +4905,7 @@
                             class={restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.itemSpawn.enabled = !restartConfig.preRestartActions.itemSpawn.enabled; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'オン' : 'オff'}
+                            {restartConfig && restartConfig.preRestartActions.itemSpawn.enabled ? 'オン' : 'オフ'}
                           </button>
                         </div>
                       </label>
@@ -4967,7 +4967,7 @@
                             class={restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.setPrivate = !restartConfig.preRestartActions.sessionChanges.setPrivate; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'オン' : 'オff'}
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setPrivate ? 'オン' : 'オフ'}
                           </button>
                         </div>
                       </label>
@@ -4980,7 +4980,7 @@
                             class={restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.setMaxUserToOne = !restartConfig.preRestartActions.sessionChanges.setMaxUserToOne; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'オン' : 'オff'}
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.setMaxUserToOne ? 'オン' : 'オフ'}
                           </button>
                         </div>
                       </label>
@@ -4993,7 +4993,7 @@
                             class={restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'status-action-button active' : 'status-action-button'}
                             on:click={() => { if (restartConfig) restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled = !restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled; }}
                           >
-                            {restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'オン' : 'オff'}
+                            {restartConfig && restartConfig.preRestartActions.sessionChanges.changeSessionName.enabled ? 'オン' : 'オフ'}
                           </button>
                         </div>
                       </label>
