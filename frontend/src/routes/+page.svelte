@@ -355,6 +355,9 @@
     autoSpawnItems: ''
   } as const;
 
+  const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'] as const;
+  type RoleOption = (typeof ROLE_OPTIONS)[number];
+
   const DEFAULT_SESSION_FIELDS = {
     sessionName: '',
     customSessionId: '',
@@ -367,7 +370,9 @@
     overrideCorrespondingWorldId: '',
     forcePort: null as number | null,
     keepOriginalRoles: false,
-    defaultUserRoles: '',
+    defaultUserRolesEntries: [] as { username: string; role: RoleOption }[],
+    newRoleUsername: '',
+    newRoleRole: 'Admin' as RoleOption,
     roleCloudVariable: '',
     allowUserCloudVariable: '',
     denyUserCloudVariable: '',
@@ -407,11 +412,13 @@
     if (key === 'dataFolder') configDataFolder = DEFAULT_CONFIG.dataFolder;
     if (key === 'cacheFolder') configCacheFolder = DEFAULT_CONFIG.cacheFolder;
     if (key === 'logsFolder') configLogsFolder = DEFAULT_CONFIG.logsFolder;
-    if (key === 'allowedUrlHosts') configAllowedUrlHosts = DEFAULT_CONFIG.allowedUrlHosts;
+    if (key === 'allowedUrlHosts') configAllowedUrlHosts = [...DEFAULT_CONFIG.allowedUrlHosts];
     if (key === 'autoSpawnItems') configAutoSpawnItems = DEFAULT_CONFIG.autoSpawnItems;
   };
 
-  const resetCurrentSessionField = (field: keyof typeof DEFAULT_SESSION_FIELDS | 'customSessionIdSuffix') => {
+  const resetCurrentSessionField = (
+    field: keyof typeof DEFAULT_SESSION_FIELDS | 'customSessionIdSuffix' | 'defaultUserRoles'
+  ) => {
     const cur = getCurrentSession();
     if (field === 'customSessionIdSuffix') {
       (cur as any).customSessionIdSuffix = '';
@@ -419,6 +426,10 @@
       // カスタムセッションIDのリセット時はプレフィックスとサフィックス両方をリセット
       (cur as any).customSessionIdPrefix = '';
       (cur as any).customSessionIdSuffix = '';
+    } else if (field === 'defaultUserRoles') {
+      (cur as any).defaultUserRolesEntries = [];
+      (cur as any).newRoleUsername = '';
+      (cur as any).newRoleRole = DEFAULT_SESSION_FIELDS.newRoleRole;
     } else {
       (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
     }
@@ -434,57 +445,6 @@
     }
     return 'S-<UserID>:';
   };
-  
-  // Session management (default.json と同値になるよう初期値設定)
-  let sessions: any[] = [
-    {
-      id: 1,
-      isEnabled: true,
-      sessionName: '',
-      customSessionId: '',
-      customSessionIdPrefix: '',
-      customSessionIdSuffix: '',
-      description: '',
-      maxUsers: 16,
-      accessLevel: 'Anyone',
-      useCustomJoinVerifier: false,
-      hideFromPublicListing: null,
-      tags: '',
-      mobileFriendly: false,
-      loadWorldURL: '',
-      loadWorldPresetName: 'Grid',
-      overrideCorrespondingWorldId: '',
-      forcePort: null,
-      keepOriginalRoles: false,
-      defaultUserRoles: '',
-      roleCloudVariable: '',
-      allowUserCloudVariable: '',
-      denyUserCloudVariable: '',
-      requiredUserJoinCloudVariable: '',
-      requiredUserJoinCloudVariableDenyMessage: '',
-      awayKickMinutes: null,
-      parentSessionIds: '',
-      autoInviteUsernames: '',
-      autoInviteMessage: '',
-      saveAsOwner: '',
-      autoRecover: true,
-      idleRestartInterval: 1800,
-      forcedRestartInterval: -1.0,
-      saveOnExit: false,
-      autosaveInterval: -1.0,
-      autoSleep: true,
-      // ワールド検索関連のプロパティを追加
-      showWorldSearch: false,
-      worldSearchTerm: '',
-      worldSearchLoading: false,
-      worldSearchError: '',
-      worldSearchResults: []
-    }
-  ];
-  let activeSessionTab = 1;
-  let nextSessionId = 2;
-  let showConfigPreview = false;
-  let configPreviewText = '';
   
   // コンフィグ読み込み用の変数
   let selectedConfigToLoad = '';
@@ -529,7 +489,7 @@
       configAllowedUrlHosts = Array.isArray(draft.configAllowedUrlHosts) ? draft.configAllowedUrlHosts : ['https://ttsapi.markn2000.com/'];
       configAutoSpawnItems = Array.isArray(draft.configAutoSpawnItems) ? draft.configAutoSpawnItems.join(',') : (draft.configAutoSpawnItems ?? '');
       if (Array.isArray(draft.sessions) && draft.sessions.length) {
-        sessions = draft.sessions;
+        sessions = draft.sessions.map((session: any, index: number) => normalizeSession(session, index));
         activeSessionTab = sessions[0]?.id ?? 1;
         nextSessionId = Math.max(...sessions.map(s => s.id)) + 1;
       }
@@ -615,52 +575,9 @@
       
       // セッション設定に反映（ヘルパー関数を使用）
       if (configData.startWorlds && Array.isArray(configData.startWorlds)) {
-        sessions = configData.startWorlds.map((world: any, index: number) => {
-          const { prefix, suffix } = splitCustomSessionId(world.customSessionId);
-          
-          return {
-            id: index + 1,
-            isEnabled: world.isEnabled !== false,
-            sessionName: world.sessionName || '',
-            customSessionId: world.customSessionId || '',
-            customSessionIdPrefix: prefix,
-            customSessionIdSuffix: suffix,
-            description: world.description || '',
-            maxUsers: world.maxUsers ?? 16,
-            accessLevel: world.accessLevel || 'Anyone',
-            useCustomJoinVerifier: world.useCustomJoinVerifier || false,
-            hideFromPublicListing: world.hideFromPublicListing ?? null,
-            tags: arrayToString(world.tags),
-            mobileFriendly: world.mobileFriendly || false,
-            loadWorldURL: world.loadWorldURL || '',
-            loadWorldPresetName: world.loadWorldPresetName || 'Grid',
-            overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
-            forcePort: world.forcePort ?? null,
-            keepOriginalRoles: world.keepOriginalRoles || false,
-            defaultUserRoles: objectToJsonString(world.defaultUserRoles),
-            roleCloudVariable: world.roleCloudVariable || '',
-            allowUserCloudVariable: world.allowUserCloudVariable || '',
-            denyUserCloudVariable: world.denyUserCloudVariable || '',
-            requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
-            requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
-            awayKickMinutes: world.awayKickMinutes ?? null,
-            parentSessionIds: arrayToString(world.parentSessionIds),
-            autoInviteUsernames: arrayToString(world.autoInviteUsernames),
-            autoInviteMessage: world.autoInviteMessage || '',
-            saveAsOwner: world.saveAsOwner || '',
-            autoRecover: world.autoRecover !== false,
-            idleRestartInterval: world.idleRestartInterval ?? 1800,
-            forcedRestartInterval: world.forcedRestartInterval ?? -1.0,
-            saveOnExit: world.saveOnExit || false,
-            autosaveInterval: world.autosaveInterval ?? -1.0,
-            autoSleep: world.autoSleep !== false,
-            showWorldSearch: false,
-            worldSearchTerm: '',
-            worldSearchLoading: false,
-            worldSearchError: '',
-            worldSearchResults: []
-          };
-        });
+        sessions = configData.startWorlds.map((world: any, index: number) =>
+          normalizeSession({ ...world, id: index + 1 }, index)
+        );
         
         activeSessionTab = 1;
         nextSessionId = sessions.length + 1;
@@ -786,28 +703,126 @@
     return null;
   };
 
-  // ヘルパー関数: defaultUserRolesの型変換
-  const objectToJsonString = (value: any): string => {
-    if (!value) return '';
-    if (typeof value === 'string') return value;
-    if (typeof value === 'object') {
-      try {
-        return JSON.stringify(value);
-      } catch {
-        return '';
-      }
-    }
-    return '';
+  const normalizeRoleEntries = (entries: any): { username: string; role: RoleOption }[] => {
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .map((entry) => {
+        const username =
+          typeof entry?.username === 'string' ? entry.username.trim() : '';
+        if (!username) return null;
+        const roleValue = typeof entry?.role === 'string' ? entry.role : '';
+        const normalizedRole: RoleOption = ROLE_OPTIONS.includes(roleValue as RoleOption)
+          ? (roleValue as RoleOption)
+          : 'Guest';
+        return { username, role: normalizedRole };
+      })
+      .filter(Boolean) as { username: string; role: RoleOption }[];
   };
 
-  const jsonStringToObject = (value: string): any => {
-    if (!value || !value.trim()) return null;
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
+  const rolesObjectToEntries = (value: any): { username: string; role: RoleOption }[] => {
+    if (!value || typeof value !== 'object') return [];
+    const entries = Object.entries(value).map(([username, role]) => ({
+      username,
+      role
+    }));
+    return normalizeRoleEntries(entries);
   };
+
+  const rolesEntriesToObject = (entries: { username: string; role: RoleOption }[]): Record<string, RoleOption> | null => {
+    if (!entries?.length) return null;
+    const result: Record<string, RoleOption> = {};
+    entries.forEach(({ username, role }) => {
+      if (username) {
+        result[username] = role;
+      }
+    });
+    return Object.keys(result).length ? result : null;
+  };
+
+  const normalizeSession = (session: any, index = 0): any => {
+    const { prefix, suffix } = splitCustomSessionId(session?.customSessionId ?? '');
+    const roleEntries = Array.isArray(session?.defaultUserRolesEntries)
+      ? normalizeRoleEntries(session.defaultUserRolesEntries)
+      : rolesObjectToEntries(session?.defaultUserRoles);
+
+    const ensureString = (value: any) => (typeof value === 'string' ? value : '');
+
+    const candidateRole = session?.newRoleRole;
+
+    return {
+      id: session?.id ?? index + 1,
+      isEnabled: session?.isEnabled !== false,
+      sessionName: ensureString(session?.sessionName),
+      customSessionId: ensureString(session?.customSessionId),
+      customSessionIdPrefix: ensureString(session?.customSessionIdPrefix ?? prefix),
+      customSessionIdSuffix: ensureString(session?.customSessionIdSuffix ?? suffix),
+      description: ensureString(session?.description),
+      maxUsers: typeof session?.maxUsers === 'number' ? session.maxUsers : 16,
+      accessLevel: ensureString(session?.accessLevel) || 'Anyone',
+      useCustomJoinVerifier: session?.useCustomJoinVerifier ?? false,
+      hideFromPublicListing:
+        session?.hideFromPublicListing === null || session?.hideFromPublicListing === undefined
+          ? null
+          : !!session.hideFromPublicListing,
+      tags: typeof session?.tags === 'string' ? session.tags : arrayToString(session?.tags),
+      mobileFriendly: session?.mobileFriendly ?? false,
+      loadWorldURL: ensureString(session?.loadWorldURL),
+      loadWorldPresetName: ensureString(session?.loadWorldPresetName) || 'Grid',
+      overrideCorrespondingWorldId: ensureString(session?.overrideCorrespondingWorldId),
+      forcePort:
+        session?.forcePort === null || session?.forcePort === undefined || session?.forcePort === ''
+          ? null
+          : session.forcePort,
+      keepOriginalRoles: session?.keepOriginalRoles ?? false,
+      defaultUserRolesEntries: roleEntries,
+      newRoleUsername: ensureString(session?.newRoleUsername),
+      newRoleRole: ROLE_OPTIONS.includes((candidateRole ?? '') as RoleOption)
+        ? (candidateRole as RoleOption)
+        : 'Admin',
+      roleCloudVariable: ensureString(session?.roleCloudVariable),
+      allowUserCloudVariable: ensureString(session?.allowUserCloudVariable),
+      denyUserCloudVariable: ensureString(session?.denyUserCloudVariable),
+      requiredUserJoinCloudVariable: ensureString(session?.requiredUserJoinCloudVariable),
+      requiredUserJoinCloudVariableDenyMessage: ensureString(
+        session?.requiredUserJoinCloudVariableDenyMessage
+      ),
+      awayKickMinutes:
+        session?.awayKickMinutes === undefined ? null : session.awayKickMinutes,
+      parentSessionIds:
+        typeof session?.parentSessionIds === 'string'
+          ? session.parentSessionIds
+          : arrayToString(session?.parentSessionIds),
+      autoInviteUsernames:
+        typeof session?.autoInviteUsernames === 'string'
+          ? session.autoInviteUsernames
+          : arrayToString(session?.autoInviteUsernames),
+      autoInviteMessage: ensureString(session?.autoInviteMessage),
+      saveAsOwner: ensureString(session?.saveAsOwner),
+      autoRecover: session?.autoRecover !== false,
+      idleRestartInterval:
+        typeof session?.idleRestartInterval === 'number' ? session.idleRestartInterval : 1800,
+      forcedRestartInterval:
+        typeof session?.forcedRestartInterval === 'number' ? session.forcedRestartInterval : -1.0,
+      saveOnExit: session?.saveOnExit ?? false,
+      autosaveInterval:
+        typeof session?.autosaveInterval === 'number' ? session.autosaveInterval : -1.0,
+      autoSleep: session?.autoSleep !== false,
+      showWorldSearch: session?.showWorldSearch ?? false,
+      worldSearchTerm: ensureString(session?.worldSearchTerm),
+      worldSearchLoading: session?.worldSearchLoading ?? false,
+      worldSearchError: ensureString(session?.worldSearchError),
+      worldSearchResults: Array.isArray(session?.worldSearchResults)
+        ? session.worldSearchResults
+        : []
+    };
+  };
+
+  // Session management (default.json と同値になるよう初期値調整)
+  let sessions: any[] = [normalizeSession({ id: 1 })];
+  let activeSessionTab = 1;
+  let nextSessionId = 2;
+  let showConfigPreview = false;
+  let configPreviewText = '';
 
   const addAllowedHost = () => {
     const host = newAllowedHost.trim();
@@ -821,6 +836,50 @@
 
   const removeAllowedHost = (index: number) => {
     configAllowedUrlHosts = configAllowedUrlHosts.filter((_, i) => i !== index);
+  };
+
+  const addDefaultUserRole = (sessionId: number) => {
+    const targetIndex = sessions.findIndex((session) => session.id === sessionId);
+    if (targetIndex === -1) return;
+
+    const session = sessions[targetIndex];
+    const username = (session.newRoleUsername ?? '').trim();
+    if (!username) return;
+
+    const selectedRole = session.newRoleRole ?? 'Admin';
+    const normalizedRole: RoleOption = ROLE_OPTIONS.includes(selectedRole as RoleOption)
+      ? (selectedRole as RoleOption)
+      : 'Guest';
+
+    const normalizedEntries = normalizeRoleEntries(session.defaultUserRolesEntries);
+    const existingIndex = normalizedEntries.findIndex(
+      (entry) => entry.username.toLowerCase() === username.toLowerCase()
+    );
+
+    if (existingIndex !== -1) {
+      normalizedEntries[existingIndex] = { username, role: normalizedRole };
+      pushToast('既存ユーザーの権限を更新しました', 'info');
+    } else {
+      normalizedEntries.push({ username, role: normalizedRole });
+      pushToast('ユーザー権限を追加しました', 'success');
+    }
+
+    session.defaultUserRolesEntries = normalizedEntries;
+    session.newRoleUsername = '';
+    session.newRoleRole = normalizedRole;
+    sessions = [...sessions];
+  };
+
+  const removeDefaultUserRole = (sessionId: number, index: number) => {
+    const targetIndex = sessions.findIndex((session) => session.id === sessionId);
+    if (targetIndex === -1) return;
+
+    const session = sessions[targetIndex];
+    session.defaultUserRolesEntries = [
+      ...session.defaultUserRolesEntries.slice(0, index),
+      ...session.defaultUserRolesEntries.slice(index + 1)
+    ];
+    sessions = [...sessions];
   };
 
   // プレビュー編集機能
@@ -927,59 +986,14 @@
     
     // セッション設定の反映
     if (parsed.startWorlds && Array.isArray(parsed.startWorlds)) {
-      sessions = parsed.startWorlds.map((world: any, index: number) => {
-        // customSessionIdの分割処理
-        const { prefix, suffix } = splitCustomSessionId(world.customSessionId);
-        
-        return {
-          id: index + 1,
-          isEnabled: world.isEnabled !== false,
-          sessionName: world.sessionName || '',
-          customSessionId: world.customSessionId || '',
-          customSessionIdPrefix: prefix,
-          customSessionIdSuffix: suffix,
-          description: world.description || '',
-          maxUsers: world.maxUsers ?? 16,
-          accessLevel: world.accessLevel || 'Anyone',
-          useCustomJoinVerifier: world.useCustomJoinVerifier || false,
-          hideFromPublicListing: world.hideFromPublicListing ?? null,
-          tags: arrayToString(world.tags),
-          mobileFriendly: world.mobileFriendly || false,
-          loadWorldURL: world.loadWorldURL || '',
-          loadWorldPresetName: world.loadWorldPresetName || 'Grid',
-          overrideCorrespondingWorldId: world.overrideCorrespondingWorldId || '',
-          forcePort: world.forcePort ?? null,
-          keepOriginalRoles: world.keepOriginalRoles || false,
-          defaultUserRoles: objectToJsonString(world.defaultUserRoles),
-          roleCloudVariable: world.roleCloudVariable || '',
-          allowUserCloudVariable: world.allowUserCloudVariable || '',
-          denyUserCloudVariable: world.denyUserCloudVariable || '',
-          requiredUserJoinCloudVariable: world.requiredUserJoinCloudVariable || '',
-          requiredUserJoinCloudVariableDenyMessage: world.requiredUserJoinCloudVariableDenyMessage || '',
-          awayKickMinutes: world.awayKickMinutes ?? null,
-          parentSessionIds: arrayToString(world.parentSessionIds),
-          autoInviteUsernames: arrayToString(world.autoInviteUsernames),
-          autoInviteMessage: world.autoInviteMessage || '',
-          saveAsOwner: world.saveAsOwner || '',
-          autoRecover: world.autoRecover !== false,
-          idleRestartInterval: world.idleRestartInterval ?? 1800,
-          forcedRestartInterval: world.forcedRestartInterval ?? -1.0,
-          saveOnExit: world.saveOnExit || false,
-          autosaveInterval: world.autosaveInterval ?? -1.0,
-          autoSleep: world.autoSleep !== false,
-          showWorldSearch: false,
-          worldSearchTerm: '',
-          worldSearchLoading: false,
-          worldSearchError: '',
-          worldSearchResults: []
-        };
-      });
+      sessions = parsed.startWorlds.map((world: any, index: number) =>
+        normalizeSession({ ...world, id: index + 1 }, index)
+      );
       activeSessionTab = 1;
       nextSessionId = sessions.length + 1;
     }
   };
 
-  const ROLE_OPTIONS = ['Admin', 'Builder', 'Moderator', 'Guest', 'Spectator'];
   const USER_ACTIONS = [
     { key: 'silence', label: 'ミュート' },
     { key: 'unsilence', label: 'ボイス許可' },
@@ -1191,49 +1205,7 @@
     }
   };
   const addSession = () => {
-    const newSession = {
-      id: nextSessionId++,
-      isEnabled: true,
-      sessionName: '',
-      customSessionId: '',
-      customSessionIdPrefix: '',
-      customSessionIdSuffix: '',
-      description: '',
-      maxUsers: 16,
-      accessLevel: 'Anyone',
-      useCustomJoinVerifier: false,
-      hideFromPublicListing: null,
-      tags: '',
-      mobileFriendly: false,
-      loadWorldURL: '',
-      loadWorldPresetName: 'Grid',
-      overrideCorrespondingWorldId: '',
-      forcePort: null,
-      keepOriginalRoles: false,
-      defaultUserRoles: '',
-      roleCloudVariable: '',
-      allowUserCloudVariable: '',
-      denyUserCloudVariable: '',
-      requiredUserJoinCloudVariable: '',
-      requiredUserJoinCloudVariableDenyMessage: '',
-      awayKickMinutes: null,
-      parentSessionIds: '',
-      autoInviteUsernames: '',
-      autoInviteMessage: '',
-      saveAsOwner: '',
-      autoRecover: true,
-      idleRestartInterval: 1800,
-      forcedRestartInterval: -1.0,
-      saveOnExit: false,
-      autosaveInterval: -1.0,
-      autoSleep: true,
-      // ワールド検索関連のプロパティを追加
-      showWorldSearch: false,
-      worldSearchTerm: '',
-      worldSearchLoading: false,
-      worldSearchError: '',
-      worldSearchResults: []
-    };
+    const newSession = normalizeSession({ id: nextSessionId++ });
     sessions = [...sessions, newSession];
     activeSessionTab = newSession.id;
   };
@@ -1298,8 +1270,10 @@
         processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() || null;
         processedSession.forcePort = (session.forcePort !== null && session.forcePort !== '') ? Number(session.forcePort) : null;
         
-        // defaultUserRoles: ヘルパー関数を使用
-        processedSession.defaultUserRoles = jsonStringToObject(session.defaultUserRoles);
+        // defaultUserRoles: 配列データをオブジェクトに変換
+        const normalizedRoleEntries = normalizeRoleEntries(session.defaultUserRolesEntries);
+        session.defaultUserRolesEntries = normalizedRoleEntries;
+        processedSession.defaultUserRoles = rolesEntriesToObject(normalizedRoleEntries);
         
         processedSession.roleCloudVariable = session.roleCloudVariable.trim() || null;
         processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim() || null;
@@ -1366,43 +1340,7 @@
       configLogsFolder = '';
       configAllowedUrlHosts = ['https://ttsapi.markn2000.com/'];
       configAutoSpawnItems = '';
-      sessions = [{
-        id: 1,
-        isEnabled: true,
-        sessionName: '',
-        customSessionId: '',
-        customSessionIdPrefix: '',
-        customSessionIdSuffix: '',
-        description: '',
-        maxUsers: 16,
-        accessLevel: 'Anyone',
-        useCustomJoinVerifier: false,
-        hideFromPublicListing: null,
-        tags: '',
-        mobileFriendly: false,
-        loadWorldURL: '',
-        loadWorldPresetName: 'Grid',
-        overrideCorrespondingWorldId: '',
-        forcePort: null,
-        keepOriginalRoles: false,
-        defaultUserRoles: '',
-        roleCloudVariable: '',
-        allowUserCloudVariable: '',
-        denyUserCloudVariable: '',
-        requiredUserJoinCloudVariable: '',
-        requiredUserJoinCloudVariableDenyMessage: '',
-        awayKickMinutes: null,
-        parentSessionIds: '',
-        autoInviteUsernames: '',
-        autoInviteMessage: '',
-        saveAsOwner: '',
-        autoRecover: true,
-        idleRestartInterval: 1800,
-        forcedRestartInterval: -1.0,
-        saveOnExit: false,
-        autosaveInterval: -1.0,
-        autoSleep: true
-      }];
+      sessions = [normalizeSession({ id: 1 })];
       activeSessionTab = 1;
       nextSessionId = 2;
       clearDraft();
@@ -1461,8 +1399,9 @@
         processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() || null;
         processedSession.forcePort = (session.forcePort !== null && session.forcePort !== '') ? Number(session.forcePort) : null;
         
-        // defaultUserRoles: ヘルパー関数を使用
-        processedSession.defaultUserRoles = jsonStringToObject(session.defaultUserRoles);
+        // defaultUserRoles: 配列データをオブジェクトに変換
+        const normalizedRoleEntries = normalizeRoleEntries(session.defaultUserRolesEntries);
+        processedSession.defaultUserRoles = rolesEntriesToObject(normalizedRoleEntries);
         
         processedSession.roleCloudVariable = session.roleCloudVariable.trim() || null;
         processedSession.allowUserCloudVariable = session.allowUserCloudVariable.trim() || null;
@@ -4132,13 +4071,63 @@
 
                         <label>
                           <span>個別ユーザー権限設定</span>
-                          <div class="field-row">
-                            <input type="text" bind:value={session.defaultUserRoles} placeholder="JSON形式で入力してください" />
-                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('defaultUserRoles')} title="リセット" aria-label="リセット">
-                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                          <div class="field-row role-entry-row">
+                            <input
+                              type="text"
+                              bind:value={session.newRoleUsername}
+                              placeholder="ユーザー名を入力"
+                              aria-label="ユーザー名"
+                            />
+                            <div class="select-wrapper narrow">
+                              <select bind:value={session.newRoleRole} aria-label="権限を選択">
+                                {#each ROLE_OPTIONS as roleOption}
+                                  <option value={roleOption}>{roleOption}</option>
+                                {/each}
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              class="status-action-button"
+                              on:click={() => addDefaultUserRole(session.id)}
+                              disabled={!session.newRoleUsername?.trim()}
+                            >
+                              追加
+                            </button>
+                            <button
+                              type="button"
+                              class="refresh-config-button"
+                              on:click={() => resetCurrentSessionField('defaultUserRoles')}
+                              title="リセット"
+                              aria-label="リセット"
+                            >
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                                <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+                              </svg>
                             </button>
                           </div>
                         </label>
+
+                        {#if session.defaultUserRolesEntries.length}
+                          <div class="user-roles-list">
+                            {#each session.defaultUserRolesEntries as entry, index}
+                              <div class="user-role-item">
+                                <span class="user-role-username">{entry.username}</span>
+                                <span class="user-role-role">{entry.role}</span>
+                                <button
+                                  type="button"
+                                  class="delete-button"
+                                  on:click={() => removeDefaultUserRole(session.id, index)}
+                                  title="削除"
+                                  aria-label={`${entry.username}を削除`}
+                                >
+                                  <svg viewBox="0 -960 960 960" class="delete-icon" aria-hidden="true">
+                                    <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
 
                         <label>
                           <span>AFKキック時間（分） <small class="note">-1で無効</small></span>
@@ -7513,7 +7502,8 @@
     background: #007bff;
   }
 
-.allowed-hosts-list {
+.allowed-hosts-list,
+.user-roles-list {
   margin-top: 0.4rem;
   padding: 0.4rem 0.6rem;
   background: #284c5d;
@@ -7522,49 +7512,79 @@
   margin-left: auto;
 }
 
-.allowed-host-item {
+.allowed-host-item,
+.user-role-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 0.4rem;
   padding: 0.25rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   font-size: 0.8rem;
 }
-  
-  .allowed-host-item:last-child {
-    border-bottom: none;
-  }
 
-  .allowed-host-item span {
-    word-break: break-all;
-  }
-  
-.allowed-host-item .delete-button {
-    background: none;
-    border: none;
-    cursor: pointer;
+.allowed-host-item {
+  justify-content: space-between;
+}
+
+.allowed-host-item:last-child,
+.user-role-item:last-child {
+  border-bottom: none;
+}
+
+.allowed-host-item span,
+.user-role-username {
+  word-break: break-all;
+}
+
+.user-role-item {
+  justify-content: flex-start;
+}
+
+.user-role-username {
+  flex: 1;
+  color: #e9f9ff;
+}
+
+.user-role-role {
+  min-width: 5.5rem;
+  text-align: right;
+  color: #c7cad3;
+  font-weight: 600;
+}
+
+.allowed-host-item .delete-button,
+.user-role-item .delete-button {
+  background: none;
+  border: none;
+  cursor: pointer;
   padding: 0.15rem;
   margin-left: 0.75rem;
-  }
+}
 
-.allowed-host-item .delete-icon {
+.allowed-host-item .delete-icon,
+.user-role-item .delete-icon {
   width: 20px;
   height: 20px;
-    fill: #aeb4bd;
-    transition: fill 0.2s ease;
-  }
+  fill: #aeb4bd;
+  transition: fill 0.2s ease;
+}
 
-  .allowed-host-item .delete-button:hover .delete-icon {
-    fill: #ff6b6b;
-  }
+.allowed-host-item .delete-button:hover .delete-icon,
+.user-role-item .delete-button:hover .delete-icon {
+  fill: #ff6b6b;
+}
+
+.role-entry-row {
+  gap: 0.5rem;
+}
 
   @media (max-width: 768px) {
     .panel-grid.two {
       grid-template-columns: 1fr;
     }
 
-  .allowed-hosts-list {
+  .allowed-hosts-list,
+  .user-roles-list {
     width: 100%;
     margin-left: 0;
   }
