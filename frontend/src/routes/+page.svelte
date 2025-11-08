@@ -1790,7 +1790,16 @@
         await navigator.clipboard.writeText(sessionId);
         pushToast('SessionIDをコピーしました', 'success');
       } else {
-        pushToast('クリップボードに対応していません', 'error');
+        // フォールバック: document.execCommandを使用
+        const ta = document.createElement('textarea');
+        ta.value = sessionId;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        pushToast('SessionIDをコピーしました', 'success');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'コピーに失敗しました';
@@ -1807,7 +1816,16 @@
         await navigator.clipboard.writeText(pasteUrl);
         pushToast('貼付け用URLをコピーしました', 'success');
       } else {
-        pushToast('クリップボードに対応していません', 'error');
+        // フォールバック: document.execCommandを使用
+        const ta = document.createElement('textarea');
+        ta.value = pasteUrl;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        pushToast('貼付け用URLをコピーしました', 'success');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'コピーに失敗しました';
