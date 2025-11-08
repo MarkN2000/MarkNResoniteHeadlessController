@@ -152,6 +152,8 @@ MOD_API_KEY=mod-secret-key
 RESONITE_HEADLESS_PATH=C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe
 ```
 
+初回セットアップではポート番号の入力を求められ、回答が `.env` の `PORT` / `SERVER_PORT` に自動反映されます。手動で変更する場合も `.env` を編集してください。
+
 ### 起動
 
 #### 開発環境
@@ -195,7 +197,7 @@ npm start
 ```
 
 3. **アクセス**
-- WebUI & API: `http://localhost:8080`
+- WebUI & API: `http://localhost:<設定したポート>`
 - パスワード: `.env` または `config/auth.json` で設定したもの
 
 #### 配布用Zipの作成（Windows）
@@ -210,10 +212,10 @@ npm run package:zip
 
 1. 配布された `MarkNResoniteHeadlessController.zip` を任意のディレクトリに展開します。
 2. Node.js 20 以上がインストールされていることを確認します。
-3. Windowsでは `start.bat` を実行（ダブルクリック可）します。初回はセットアップが自動で実施され、そのままバックエンドが起動します。その他の環境では `node scripts/start.js` または `npm run setup` と既存手順を利用してください。
+3. Windowsでは `start.bat` を実行（ダブルクリック可）します。初回はセットアップが自動で実施され、アプリ用パスワード・Headless資格情報・使用ポート（デフォルト8080）の入力を求められます。その他の環境では `node scripts/start.js` または `npm run setup` と既存手順を利用してください。
 4. `.env` や `config/*.json` が未生成の場合は自動的に作成されます。必要に応じて `env.example` を `.env` に複製し、シークレットやパスを調整してください。
 5. 2回目以降も `start.bat` を実行するだけでバックエンドを起動できます（セットアップはスキップされます）。
-6. ブラウザで `http://localhost:8080` にアクセスし、初回セットアップで設定したパスワードでログインしてください。
+6. ブラウザで `http://localhost:<設定したポート>` にアクセスし、初回セットアップで設定したパスワードでログインしてください。
 
 ⚠️ **本番環境の注意点**:
 - 必ず `.env` で `NODE_ENV=production` を設定

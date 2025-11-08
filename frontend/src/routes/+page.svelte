@@ -380,7 +380,8 @@
     requiredUserJoinCloudVariableDenyMessage: '',
     awayKickMinutes: 5,
     parentSessionIds: '',
-    autoInviteUsernames: '',
+    autoInviteUsernamesEntries: [] as string[],
+    newAutoInviteUsername: '',
     autoInviteMessage: '',
     saveAsOwner: '',
     autoRecover: true,
@@ -430,6 +431,9 @@
       (cur as any).defaultUserRolesEntries = [];
       (cur as any).newRoleUsername = '';
       (cur as any).newRoleRole = DEFAULT_SESSION_FIELDS.newRoleRole;
+    } else if (field === 'autoInviteUsernames') {
+      (cur as any).autoInviteUsernamesEntries = [];
+      (cur as any).newAutoInviteUsername = '';
     } else {
       (cur as any)[field] = (DEFAULT_SESSION_FIELDS as any)[field];
     }
@@ -739,6 +743,30 @@
     return Object.keys(result).length ? result : null;
   };
 
+  const normalizeAutoInviteEntries = (value: any): string[] => {
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+      return stringToArray(value) ?? [];
+    }
+    if (value && typeof value === 'object') {
+      // 予期せぬオブジェクトの場合は値を抽出
+      return Object.values(value)
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean);
+    }
+    return [];
+  };
+
+  const autoInviteEntriesToArray = (entries: string[]): string[] | null => {
+    if (!entries?.length) return null;
+    const unique = Array.from(new Set(entries.map((entry) => entry.trim()).filter(Boolean)));
+    return unique.length ? unique : null;
+  };
+
   const normalizeSession = (session: any, index = 0): any => {
     const { prefix, suffix } = splitCustomSessionId(session?.customSessionId ?? '');
     const roleEntries = Array.isArray(session?.defaultUserRolesEntries)
@@ -792,10 +820,10 @@
         typeof session?.parentSessionIds === 'string'
           ? session.parentSessionIds
           : arrayToString(session?.parentSessionIds),
-      autoInviteUsernames:
-        typeof session?.autoInviteUsernames === 'string'
-          ? session.autoInviteUsernames
-          : arrayToString(session?.autoInviteUsernames),
+      autoInviteUsernamesEntries: normalizeAutoInviteEntries(
+        session?.autoInviteUsernamesEntries ?? session?.autoInviteUsernames
+      ),
+      newAutoInviteUsername: ensureString(session?.newAutoInviteUsername),
       autoInviteMessage: ensureString(session?.autoInviteMessage),
       saveAsOwner: ensureString(session?.saveAsOwner),
       autoRecover: session?.autoRecover !== false,
@@ -878,6 +906,39 @@
     session.defaultUserRolesEntries = [
       ...session.defaultUserRolesEntries.slice(0, index),
       ...session.defaultUserRolesEntries.slice(index + 1)
+    ];
+    sessions = [...sessions];
+  };
+
+  const addAutoInviteUsername = (sessionId: number) => {
+    const targetIndex = sessions.findIndex((session) => session.id === sessionId);
+    if (targetIndex === -1) return;
+
+    const session = sessions[targetIndex];
+    const username = (session.newAutoInviteUsername ?? '').trim();
+    if (!username) return;
+
+    const normalizedEntries = normalizeAutoInviteEntries(session.autoInviteUsernamesEntries);
+    if (!normalizedEntries.includes(username)) {
+      normalizedEntries.push(username);
+      pushToast('自動招待ユーザーを追加しました', 'success');
+    } else {
+      pushToast('このユーザーは既に追加されています', 'info');
+    }
+
+    session.autoInviteUsernamesEntries = normalizedEntries;
+    session.newAutoInviteUsername = '';
+    sessions = [...sessions];
+  };
+
+  const removeAutoInviteUsername = (sessionId: number, index: number) => {
+    const targetIndex = sessions.findIndex((session) => session.id === sessionId);
+    if (targetIndex === -1) return;
+
+    const session = sessions[targetIndex];
+    session.autoInviteUsernamesEntries = [
+      ...session.autoInviteUsernamesEntries.slice(0, index),
+      ...session.autoInviteUsernamesEntries.slice(index + 1)
     ];
     sessions = [...sessions];
   };
@@ -1283,7 +1344,10 @@
         
         // 配列フィールド: ヘルパー関数を使用
         processedSession.parentSessionIds = stringToArray(session.parentSessionIds);
-        processedSession.autoInviteUsernames = stringToArray(session.autoInviteUsernames);
+
+        const autoInviteEntries = normalizeAutoInviteEntries(session.autoInviteUsernamesEntries);
+        session.autoInviteUsernamesEntries = autoInviteEntries;
+        processedSession.autoInviteUsernames = autoInviteEntriesToArray(autoInviteEntries);
         
         processedSession.autoInviteMessage = session.autoInviteMessage.trim() || null;
         processedSession.saveAsOwner = session.saveAsOwner.trim() || null;
@@ -1411,7 +1475,11 @@
         
         // 配列フィールド: ヘルパー関数を使用
         processedSession.parentSessionIds = stringToArray(session.parentSessionIds);
-        processedSession.autoInviteUsernames = stringToArray(session.autoInviteUsernames);
+
+        const previewAutoInviteEntries = normalizeAutoInviteEntries(
+          session.autoInviteUsernamesEntries
+        );
+        processedSession.autoInviteUsernames = autoInviteEntriesToArray(previewAutoInviteEntries);
         
         processedSession.autoInviteMessage = session.autoInviteMessage.trim() || null;
         processedSession.saveAsOwner = session.saveAsOwner.trim() || null;
@@ -4128,6 +4196,80 @@
                             {/each}
                           </div>
                         {/if}
+
+                        <label>
+                          <span>ユーザー自動招待</span>
+                          <div class="field-row auto-invite-row">
+                            <input
+                              type="text"
+                              bind:value={session.newAutoInviteUsername}
+                              placeholder="ユーザー名を入力"
+                              aria-label="自動招待ユーザー名"
+                            />
+                            <button
+                              type="button"
+                              class="status-action-button"
+                              on:click={() => addAutoInviteUsername(session.id)}
+                              disabled={!session.newAutoInviteUsername?.trim()}
+                            >
+                              追加
+                            </button>
+                            <button
+                              type="button"
+                              class="refresh-config-button"
+                              on:click={() => resetCurrentSessionField('autoInviteUsernames')}
+                              title="リセット"
+                              aria-label="リセット"
+                            >
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                                <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </label>
+
+                        {#if session.autoInviteUsernamesEntries.length}
+                          <div class="auto-invite-list">
+                            {#each session.autoInviteUsernamesEntries as username, index}
+                              <div class="auto-invite-item">
+                                <span class="auto-invite-username">{username}</span>
+                                <button
+                                  type="button"
+                                  class="delete-button"
+                                  on:click={() => removeAutoInviteUsername(session.id, index)}
+                                  title="削除"
+                                  aria-label={`${username}を削除`}
+                                >
+                                  <svg viewBox="0 -960 960 960" class="delete-icon" aria-hidden="true">
+                                    <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
+
+                        <label>
+                          <span>招待メッセージ</span>
+                          <div class="field-row">
+                            <textarea
+                              bind:value={session.autoInviteMessage}
+                              placeholder="自動招待時に送信するメッセージ"
+                              rows="2"
+                            ></textarea>
+                            <button
+                              type="button"
+                              class="refresh-config-button"
+                              on:click={() => resetCurrentSessionField('autoInviteMessage')}
+                              title="リセット"
+                              aria-label="リセット"
+                            >
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                                <path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </label>
 
                         <label>
                           <span>AFKキック時間（分） <small class="note">-1で無効</small></span>
@@ -7503,7 +7645,8 @@
   }
 
 .allowed-hosts-list,
-.user-roles-list {
+.user-roles-list,
+.auto-invite-list {
   margin-top: 0.4rem;
   padding: 0.4rem 0.6rem;
   background: #284c5d;
@@ -7513,7 +7656,8 @@
 }
 
 .allowed-host-item,
-.user-role-item {
+.user-role-item,
+.auto-invite-item {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -7527,12 +7671,14 @@
 }
 
 .allowed-host-item:last-child,
-.user-role-item:last-child {
+.user-role-item:last-child,
+.auto-invite-item:last-child {
   border-bottom: none;
 }
 
 .allowed-host-item span,
-.user-role-username {
+.user-role-username,
+.auto-invite-username {
   word-break: break-all;
 }
 
@@ -7552,8 +7698,18 @@
   font-weight: 600;
 }
 
+.auto-invite-item {
+  justify-content: space-between;
+}
+
+.auto-invite-username {
+  flex: 1;
+  color: #e9f9ff;
+}
+
 .allowed-host-item .delete-button,
-.user-role-item .delete-button {
+.user-role-item .delete-button,
+.auto-invite-item .delete-button {
   background: none;
   border: none;
   cursor: pointer;
@@ -7562,7 +7718,8 @@
 }
 
 .allowed-host-item .delete-icon,
-.user-role-item .delete-icon {
+.user-role-item .delete-icon,
+.auto-invite-item .delete-icon {
   width: 20px;
   height: 20px;
   fill: #aeb4bd;
@@ -7570,11 +7727,16 @@
 }
 
 .allowed-host-item .delete-button:hover .delete-icon,
-.user-role-item .delete-button:hover .delete-icon {
+.user-role-item .delete-button:hover .delete-icon,
+.auto-invite-item .delete-button:hover .delete-icon {
   fill: #ff6b6b;
 }
 
 .role-entry-row {
+  gap: 0.5rem;
+}
+
+.auto-invite-row {
   gap: 0.5rem;
 }
 
@@ -7584,7 +7746,8 @@
     }
 
   .allowed-hosts-list,
-  .user-roles-list {
+  .user-roles-list,
+  .auto-invite-list {
     width: 100%;
     margin-left: 0;
   }
