@@ -126,7 +126,8 @@ $filesToCopy = @(
     @{ Source = 'scripts\setup.bat'; Destination = 'scripts\setup.bat' },
     @{ Source = 'scripts\setup.js'; Destination = 'scripts\setup.js' },
     @{ Source = 'scripts\start.js'; Destination = 'scripts\start.js' },
-    @{ Source = 'scripts\start-production.bat'; Destination = 'scripts\start-production.bat' }
+    @{ Source = 'scripts\start-production.bat'; Destination = 'scripts\start-production.bat' },
+    @{ Source = 'scripts\start-bootstrap.ps1'; Destination = 'scripts\start-bootstrap.ps1' }
 )
 
 foreach ($entry in $filesToCopy) {
