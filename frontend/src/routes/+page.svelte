@@ -2152,6 +2152,7 @@
       ];
     }
 
+    restartConfig = { ...restartConfig };
     closeScheduleModal();
     pushToast('予定を保存しました（5秒後に自動保存されます）', 'info');
   };
@@ -2164,6 +2165,7 @@
       restartConfig.triggers.scheduled.schedules = restartConfig.triggers.scheduled.schedules.filter(
         (s: any) => s.id !== scheduleId
       );
+      restartConfig = { ...restartConfig };
       pushToast('予定を削除しました（5秒後に自動保存されます）', 'info');
     }
   };
@@ -2175,7 +2177,7 @@
     const schedule = restartConfig.triggers.scheduled.schedules.find((s: any) => s.id === scheduleId);
     if (schedule) {
       schedule.enabled = !schedule.enabled;
-      restartConfig = restartConfig; // Trigger reactivity
+      restartConfig = { ...restartConfig }; // Trigger reactivity
     }
   };
 
@@ -4505,7 +4507,7 @@
                           <button
                             type="button"
                             class={restartConfig && restartConfig.triggers.scheduled.enabled ? 'status-action-button active' : 'status-action-button'}
-                            on:click={() => { if (restartConfig) restartConfig.triggers.scheduled.enabled = !restartConfig.triggers.scheduled.enabled; }}
+                            on:click={() => { if (restartConfig) { restartConfig.triggers.scheduled.enabled = !restartConfig.triggers.scheduled.enabled; restartConfig = { ...restartConfig }; } }}
                           >
                             {restartConfig && restartConfig.triggers.scheduled.enabled ? 'オン' : 'オフ'}
                           </button>
