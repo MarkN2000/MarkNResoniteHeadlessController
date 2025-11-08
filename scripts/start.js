@@ -565,14 +565,19 @@ const ensureCredentialsConfigured = async () => {
       updateAuthPassword(credentials.appPassword);
       saveHeadlessCredentials(credentials.headlessUsername, credentials.headlessPassword);
       applyHeadlessCredentialsToConfigs(credentials.headlessUsername, credentials.headlessPassword);
-      return;
+      
+      // 資格情報入力後にポート設定を促す
+      console.log('');
+      await ensureServerPortConfigured();
+      return true; // 資格情報を設定したことを示す
     }
     console.warn('[WARN] 資格情報が設定されていません。必要に応じて config/auth.json と config/headless/*.json を手動で更新してください。');
-    return;
+    return false;
   }
 
   // 既存の資格情報でプリセットを整備
   applyHeadlessCredentialsToConfigs(savedHeadlessCredentials.username, savedHeadlessCredentials.password);
+  return false; // 既存の資格情報を使用したことを示す
 };
 
 const startApplication = () => {
@@ -623,17 +628,15 @@ const startApplication = () => {
 
 const main = async () => {
   try {
-    let serverPortConfigured = false;
-
     if (!fs.existsSync(SETUP_MARKER)) {
       await runInitialSetup();
-      serverPortConfigured = true;
     } else {
-      await ensureCredentialsConfigured();
-    }
-
-    if (!serverPortConfigured) {
-      await ensureServerPortConfigured();
+      const credentialsWereSet = await ensureCredentialsConfigured();
+      // 資格情報を設定した場合は、その時点でポート設定も完了している
+      // 資格情報が既に設定済みの場合は、ここでポート設定を確認
+      if (!credentialsWereSet) {
+        await ensureServerPortConfigured();
+      }
     }
 
     startApplication();

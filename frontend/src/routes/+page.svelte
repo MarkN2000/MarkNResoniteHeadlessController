@@ -80,10 +80,19 @@
     { id: 'newWorld', label: '新規セッション' },
     { id: 'friends', label: 'フレンド管理' },
     { id: 'settings', label: 'コンフィグ作成' },
-    { id: 'restart', label: '自動再起動設定' }
+    { id: 'restart', label: '自動再起動設定' },
+    { id: 'links', label: 'リンク一覧' }
   ];
 
   let activeTab: (typeof tabs)[number]['id'] = 'dashboard';
+
+  // 固定リンク一覧
+  const links = [
+    { title: 'ヘッドレスコマンド', url: 'https://wiki.resonite.com/Headless_server_software/Commands' },
+    { title: 'ヘッドレスコンフィグファイル', url: 'https://wiki.resonite.com/Headless_server_software/Configuration_file' },
+    { title: 'GitHub', url: 'https://github.com/MarkN2000/MarkNResoniteHeadlessController' },
+    { title: '作者ホームページ', url: 'http://markn2000.com' }
+  ];
 
   // 認証状態
   let isAuthenticated = false;
@@ -5006,6 +5015,35 @@
                 </div>
                 </div>
                         </div>
+          </section>
+
+          <!-- リンク一覧タブ -->
+          <section class="panel" class:active={activeTab === 'links'}>
+            <div class="panel-column">
+              <div class="panel-heading">
+                <h2>リンク一覧</h2>
+              </div>
+              <div class="card status-card">
+                <div class="status-display-list">
+                  {#each links as link}
+                    <div class="status-display-item">
+                      <span class="status-display-label">{link.title}</span>
+                      <div class="field-row">
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="status-action-button"
+                          style="text-decoration: none;"
+                        >
+                          開く
+                        </a>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            </div>
           </section>
                       </div>
                           {/if}
