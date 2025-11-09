@@ -1966,25 +1966,45 @@
     }
   };
 
+  // 共通のワールド検索処理関数
+  // 状態管理をコールバックで抽象化し、異なるコンテキストで再利用可能にする
+  const performWorldSearch = async (
+    searchTerm: string,
+    callbacks: {
+      setLoading: (loading: boolean) => void;
+      setError: (error: string) => void;
+      setResults: (results: WorldSearchItem[]) => void;
+    }
+  ): Promise<void> => {
+    const term = searchTerm.trim();
+    if (!term) {
+      callbacks.setResults([]);
+      callbacks.setError('');
+      return;
+    }
+
+    callbacks.setLoading(true);
+    callbacks.setError('');
+    try {
+      const resp = await getWorldSearch(term);
+      callbacks.setResults(resp.items ?? []);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '検索に失敗しました';
+      callbacks.setError(errorMessage);
+      callbacks.setResults([]);
+    } finally {
+      callbacks.setLoading(false);
+    }
+  };
+
   const submitWorldSearch = async () => {
     if (worldSearchLoading) return;
-    worldSearchLoading = true;
-    worldSearchError = '';
     selectedResoniteUrl = null;
-    try {
-      const term = worldSearchTerm.trim();
-      if (!term) {
-        worldSearchResults = [];
-      } else {
-        const resp = await getWorldSearch(term);
-        worldSearchResults = resp.items ?? [];
-      }
-    } catch (error) {
-      worldSearchError = error instanceof Error ? error.message : '検索に失敗しました';
-      worldSearchResults = [];
-    } finally {
-      worldSearchLoading = false;
-    }
+    await performWorldSearch(worldSearchTerm, {
+      setLoading: (loading) => (worldSearchLoading = loading),
+      setError: (error) => (worldSearchError = error),
+      setResults: (results) => (worldSearchResults = results)
+    });
   };
 
   const launchSelectedWorld = async () => {
@@ -4095,16 +4115,20 @@
                             <div class="field-row" style="margin-top:0.5rem;">
                               <input type="text" bind:value={session.worldSearchTerm} placeholder="ワールド名で検索" />
                               <button type="button" on:click={async () => {
-                                (session as any).worldSearchLoading = true; sessions = [...sessions];
-                                try {
-                                  const res = await getWorldSearch(session.worldSearchTerm.trim());
-                                  (session as any).worldSearchResults = res.items;
-                                  (session as any).worldSearchError = '';
-                                } catch (e) {
-                                  (session as any).worldSearchError = e instanceof Error ? e.message : '検索に失敗しました';
-                                } finally {
-                                  (session as any).worldSearchLoading = false; sessions = [...sessions];
-                                }
+                                await performWorldSearch(session.worldSearchTerm, {
+                                  setLoading: (loading) => {
+                                    (session as any).worldSearchLoading = loading;
+                                    sessions = [...sessions];
+                                  },
+                                  setError: (error) => {
+                                    (session as any).worldSearchError = error;
+                                    sessions = [...sessions];
+                                  },
+                                  setResults: (results) => {
+                                    (session as any).worldSearchResults = results;
+                                    sessions = [...sessions];
+                                  }
+                                });
                               }}>検索</button>
                             </div>
                             {#if session.worldSearchLoading}
