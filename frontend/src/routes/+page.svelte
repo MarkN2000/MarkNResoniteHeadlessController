@@ -5038,9 +5038,9 @@
                                     if (!restartConfig) return;
                                     const target = e.target as HTMLSelectElement;
                                     if (target.value === 'とらぞセッション閉店アナウンス') {
-                                      restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8';
+                                      restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4';
                                     } else if (target.value === 'テキスト読み上げ') {
-                                      restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-5eacacd2-3163-42bd-95ee-bb6810c993e1';
+                                      restartConfig.preRestartActions.itemSpawn.itemUrl = 'resrec:///U-MarkN/R-47c7c916-1e47-470d-abae-9e7c22315743';
                                     }
                                   }}
                                 >

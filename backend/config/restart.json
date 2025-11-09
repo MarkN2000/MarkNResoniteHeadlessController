@@ -51,7 +51,7 @@
     "itemSpawn": {
       "enabled": true,
       "itemType": "とらぞセッション閉店アナウンス",
-      "itemUrl": "resrec:///U-MarkN/R-d347f78c-d30a-4664-9b6f-2984078880a8",
+      "itemUrl": "resrec:///U-MarkN/R-566fb326-06aa-4333-9c2f-5a9490145d1b",
       "message": "まもなくこのセッションは再起動されます"
     },
     "sessionChanges": {
