@@ -286,6 +286,13 @@ export interface ResoniteUsersSearchResponse {
 export const searchResoniteUsers = (username: string) =>
   request(`/server/resonite-users-search?name=${encodeURIComponent(username)}`) as Promise<ResoniteUsersSearchResponse>;
 
+export interface ResoniteUserIdResponse {
+  userid: string;
+}
+
+export const getResoniteUserId = (username: string) =>
+  request(`/server/resonite-user/${encodeURIComponent(username)}`) as Promise<ResoniteUserIdResponse>;
+
 // ============================================================
 // 自動再起動機能のAPI
 // ============================================================
@@ -421,3 +428,11 @@ export const resetRestartConfig = () =>
   request('/restart/config/reset', {
     method: 'POST'
   }) as Promise<{ success: boolean; message: string; config: RestartConfig }>;
+
+// HeadlessCredentials取得API
+export interface HeadlessCredentialsResponse {
+  username: string;
+}
+
+export const getHeadlessCredentials = () =>
+  request('/server/headless-credentials') as Promise<HeadlessCredentialsResponse>;

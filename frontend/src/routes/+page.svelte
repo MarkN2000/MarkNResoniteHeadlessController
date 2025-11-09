@@ -27,6 +27,8 @@
     getClientInfo,
     getResoniteUserFull,
     searchResoniteUsers,
+    getResoniteUserId,
+    getHeadlessCredentials,
     getRestartConfig,
     saveRestartConfig,
     getRestartStatus,
@@ -266,6 +268,7 @@
   let startupUsersReady = false;
   let headlessUserName: string | null = null;
   let headlessUserId: string | null = null;
+  let savedHeadlessUserName: string | null = null; // auth.jsonから取得したユーザー名
   let startupRetryCount = 0;
   const STARTUP_RETRY_INTERVAL = 3800;
   const STARTUP_MAX_RETRIES = 4;
@@ -477,6 +480,8 @@
   let dynamicImpulseTag = '';
   let dynamicImpulseText = '';
   let dynamicImpulseLoading = false;
+  // カスタムセッションID自動入力機能
+  let customSessionIdAutoFillLoading: Record<number, boolean> = {};
   // 下書き保存/復元: コンフィグ作成タブの編集中データをLocalStorageに自動保存
   const loadDraft = () => {
     try {
@@ -1533,6 +1538,17 @@
     }
   };
 
+  // headlessCredentialsからユーザー名を取得
+  const loadHeadlessCredentials = async () => {
+    try {
+      const response = await getHeadlessCredentials();
+      savedHeadlessUserName = response.username || null;
+    } catch (error) {
+      // エラーは無視（credentialsが存在しない場合もある）
+      savedHeadlessUserName = null;
+    }
+  };
+
   const loadInitialData = async () => {
     initialLoading = true;
     try {
@@ -1544,6 +1560,9 @@
       }
       setConfigs(configList);
       applyConfigList(configList);
+
+      // headlessCredentialsを読み込む（サーバー起動前でも取得可能）
+      await loadHeadlessCredentials();
 
       const statusValue = await getStatus();
       setStatus(statusValue);
@@ -2381,6 +2400,60 @@
     }
   };
 
+  // カスタムセッションIDの自動入力関数
+  const autoFillCustomSessionId = async (sessionId: number) => {
+    // 保存済みユーザー名を確認（auth.jsonから取得したもののみ使用）
+    if (!savedHeadlessUserName || !savedHeadlessUserName.trim()) {
+      pushToast('ユーザー名が保存されていません。auth.jsonにheadlessCredentialsを設定してください。', 'error');
+      return;
+    }
+
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) {
+      pushToast('セッションが見つかりません', 'error');
+      return;
+    }
+
+    // 既に入力がある場合は確認
+    const currentPrefix = (session as any).customSessionIdPrefix?.trim() || '';
+    if (currentPrefix) {
+      const confirmed = window.confirm(
+        `既に入力されている値 "${currentPrefix}" を上書きしますか？`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    // ローディング状態を設定
+    if (customSessionIdAutoFillLoading[sessionId]) return;
+    customSessionIdAutoFillLoading[sessionId] = true;
+    customSessionIdAutoFillLoading = { ...customSessionIdAutoFillLoading }; // リアクティブ更新
+
+    try {
+      // APIを呼び出してユーザーIDを取得
+      const response = await getResoniteUserId(savedHeadlessUserName.trim());
+      const userId = response.userid;
+
+      if (!userId) {
+        pushToast('ユーザーIDの取得に失敗しました', 'error');
+        return;
+      }
+
+      // ユーザーIDをプレフィックス欄に設定（U-プレフィックスは既に含まれている想定）
+      (session as any).customSessionIdPrefix = userId;
+      sessions = sessions.map(s => (s.id === sessionId ? session : s));
+      
+      pushToast(`ユーザーID "${userId}" を自動入力しました`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ユーザーIDの取得に失敗しました';
+      pushToast(`自動入力失敗: ${message}`, 'error');
+    } finally {
+      customSessionIdAutoFillLoading[sessionId] = false;
+      customSessionIdAutoFillLoading = { ...customSessionIdAutoFillLoading }; // リアクティブ更新
+    }
+  };
+
   const loadFriendRequestsList = async () => {
     if (friendRequestsLoading) return;
     friendRequestsLoading = true;
@@ -2870,7 +2943,8 @@
     }, delay);
   };
 
-  $: headlessUserName = $status.userName ?? headlessUserName;
+  // headlessUserNameは表示用（自動入力機能ではsavedHeadlessUserNameを直接使用）
+  $: headlessUserName = $status.userName ?? savedHeadlessUserName ?? headlessUserName;
   $: headlessUserId = $status.userId ?? headlessUserId;
 
   const isHeadlessAccount = (user: any) => {
@@ -4053,6 +4127,24 @@
                               <span class="separator">:</span>
                               <input type="text" bind:value={session.customSessionIdSuffix} placeholder="空欄で無効" />
                             </div>
+                            <button 
+                              type="button" 
+                              class="refresh-config-button" 
+                              on:click={() => autoFillCustomSessionId(session.id)} 
+                              title="保存済みユーザー名から自動入力" 
+                              aria-label="自動入力"
+                              disabled={customSessionIdAutoFillLoading[session.id] || !savedHeadlessUserName}
+                            >
+                              {#if customSessionIdAutoFillLoading[session.id]}
+                                <svg viewBox="0 -960 960 960" class="refresh-icon spinning" aria-hidden="true">
+                                  <path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-156t86-127Q252-817 325-848.5T480-880q17 0 28.5 11.5T520-840q0 17-11.5 28.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160q133 0 226.5-93.5T800-480q0-17 11.5-28.5T840-520q17 0 28.5 11.5T880-480q0 82-31.5 155t-86 127.5q-54.5 54.5-127 86T480-80Z"/>
+                                </svg>
+                              {:else}
+                                <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true">
+                                  <path d="M480-120 200-400l56-56 184 184 184-184 56 56-200 200Zm0-400L200-800l56-56 184 184 184-184 56 56-200 200Z"/>
+                                </svg>
+                              {/if}
+                            </button>
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('customSessionId')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
@@ -5398,6 +5490,10 @@
     width: 16px;
     height: 16px;
     fill: currentColor;
+  }
+
+  .refresh-config-button .refresh-icon.spinning {
+    animation: spin 1s linear infinite;
   }
 
   .refresh-config-button.eye.active {

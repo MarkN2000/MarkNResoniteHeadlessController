@@ -186,6 +186,28 @@ serverRoutes.get('/resonite-users-search', normalRateLimit, async (req, res, nex
   }
 });
 
+// headlessCredentials取得（認証不要）
+serverRoutes.get('/headless-credentials', normalRateLimit, async (_req, res, next) => {
+  try {
+    const { getHeadlessCredentials } = await import('../../config/headlessCredentials.js');
+    const credentials = getHeadlessCredentials();
+    
+    if (!credentials) {
+      return res.status(404).json({ error: 'Headless credentials not found' });
+    }
+    
+    // パスワードは返さない（セキュリティのため）
+    res.json({ username: credentials.username });
+  } catch (error) {
+    console.error('[HeadlessCredentials] エラー:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ 
+      error: 'Headless credentials取得中にエラーが発生しました',
+      details: errorMessage
+    });
+  }
+});
+
 // コンフィグファイル一覧取得（認証不要）
 serverRoutes.get('/configs', normalRateLimit, (_req, res) => {
   const configs = processManager.listConfigs().map(filePath => ({
@@ -843,6 +865,7 @@ serverRoutes.get('/world-search', async (req, res, next) => {
       const anchor = $(el);
       const name = anchor.find('h2.listing-item__heading span').first().text().trim();
       const href = anchor.attr('href') || '';
+      
       // Try to find image in common places (img/src, img/srcset, data-src, background-image)
       let imageUrl: string | null = null;
       const img = anchor.find('img').first();
@@ -862,17 +885,22 @@ serverRoutes.get('/world-search', async (req, res, next) => {
       imageUrl = absolutize(imageUrl);
 
       const recMatch = href.match(/\/R-([A-Za-z0-9_-]+)/);
-      const ownerMatch = href.match(/\/U-([A-Za-z0-9_-]+)/);
+      // ユーザーID（U-）またはグループID（G-）の両方を検出
+      const ownerMatch = href.match(/\/(U|G)-([A-Za-z0-9_-]+)/);
       if (!name || !recMatch || !ownerMatch) return;
+      
       const recordId = `R-${recMatch[1]}`;
-      const ownerId = `U-${ownerMatch[1]}`;
-      // Expected final: resrec:///U-<owner>/R-<record>
+      // グループ（G-）またはユーザー（U-）の両方に対応
+      const ownerType = ownerMatch[1]; // 'U' または 'G'
+      const ownerId = `${ownerType}-${ownerMatch[2]}`;
+      // Expected final: resrec:///U-<owner>/R-<record> または resrec:///G-<group>/R-<record>
       const resoniteUrl = `resrec:///${ownerId}/${recordId}`;
       items.push({ name, imageUrl, recordId, resoniteUrl });
     });
 
     res.json({ items });
   } catch (error) {
+    console.error('[WorldSearch] エラー:', error);
     next(error);
   }
 });
