@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import cors from 'cors';
-import { processManager } from '../../services/processManager.js';
 import { cidrRestriction } from '../../middleware/cidr.js';
 import { modCors } from '../../config/cors.js';
 import { getPlainPassword } from '../../utils/auth.js';
 import { checkRateLimit, generateRateLimitKey } from '../../utils/rateLimit.js';
+import { actionHandlers } from './modHandlers.js';
 
 const router = Router();
 
@@ -130,31 +130,31 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { action, requestId } = req.body;
+  const { action, params, requestId } = req.body;
+
+  // アクションハンドラーの取得
+  const handler = actionHandlers[action];
+  if (!handler) {
+    return respond(res, 404, {
+      ok: false,
+      action,
+      requestId,
+      error: {
+        code: 'UNKNOWN_ACTION',
+        message: `Unknown action: ${action}`
+      }
+    });
+  }
 
   try {
-    switch (action) {
-      case 'sessionlist': {
-        const result = await processManager.executeCommand('worlds');
-        return respond(res, 200, {
-          ok: true,
-          action,
-          requestId,
-          data: result
-        });
-      }
-
-      default:
-        return respond(res, 404, {
-          ok: false,
-          action,
-          requestId,
-          error: {
-            code: 'UNKNOWN_ACTION',
-            message: `Unknown action: ${action}`
-          }
-        });
-    }
+    // ハンドラーを実行
+    const data = await handler(params || {});
+    return respond(res, 200, {
+      ok: true,
+      action,
+      requestId,
+      data
+    });
   } catch (error) {
     console.error('[ModAPI] Action execution error:', {
       action,
