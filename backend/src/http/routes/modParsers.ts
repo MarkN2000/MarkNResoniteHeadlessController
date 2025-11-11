@@ -125,3 +125,65 @@ export const parseStatusOutput = (output: string): ParsedStatus => {
   };
 };
 
+/**
+ * inviteコマンドの出力をパース
+ * 成功時: "Invite sent!"
+ */
+export const parseInviteOutput = (output: string): { success: boolean; message: string } => {
+  const lowerOutput = output.toLowerCase();
+  if (lowerOutput.includes('invite sent!')) {
+    return { success: true, message: 'Invite sent!' };
+  }
+  return { success: false, message: output.trim() || 'Failed to send invite' };
+};
+
+/**
+ * accesslevelコマンドの出力をパース
+ * 成功時: "World セッション１ now has access level Private"
+ */
+export const parseAccessLevelOutput = (output: string): { success: boolean; message: string; accessLevel?: string } => {
+  const match = output.match(/now has access level\s+(\S+)/i);
+  if (match) {
+    return {
+      success: true,
+      message: output.trim(),
+      accessLevel: match[1]
+    };
+  }
+  return { success: false, message: output.trim() || 'Failed to change access level' };
+};
+
+/**
+ * roleコマンドの出力をパース
+ * 成功時: "MarkN now has role Admin!"
+ */
+export const parseRoleOutput = (output: string): { success: boolean; message: string; username?: string; role?: string } => {
+  const match = output.match(/(\S+)\s+now has role\s+(\S+)/i);
+  if (match) {
+    return {
+      success: true,
+      message: output.trim(),
+      username: match[1],
+      role: match[2].replace(/[!.]/g, '') // "Admin!" -> "Admin"
+    };
+  }
+  return { success: false, message: output.trim() || 'Failed to change role' };
+};
+
+/**
+ * sessionURLコマンドの出力をパース
+ * 例: res-steam://76561198384468054/0/S-aac647b6-241c-47ae-b5d7-29365df96c24
+ */
+export const parseSessionUrlOutput = (output: string): { sessionUrl?: string; sessionId?: string } => {
+  // res-steam://, resrec://, ressession:// などのURLを検出
+  const urlMatch = output.match(/(res[-\w]*:\/\/[^\s]+)/i);
+  if (urlMatch) {
+    const sessionUrl = urlMatch[1];
+    // SessionIDを抽出 (S-で始まるID)
+    const sessionIdMatch = sessionUrl.match(/S-([a-f0-9-]+)/i);
+    const sessionId = sessionIdMatch ? `S-${sessionIdMatch[1]}` : undefined;
+    return { sessionUrl, sessionId };
+  }
+  return {};
+};
+

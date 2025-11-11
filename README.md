@@ -249,7 +249,7 @@ Content-Type: application/json; charset=utf-8
 - `version`: number（必須、現行は 1 固定）
 - `timestamp`: string（必須、ISO8601）
 - `apiKey`: string（必須）
-- `action`: string（必須、実装済み: `sessionlist`, `focus`）
+- `action`: string（必須、実装済み: `sessionlist`, `focus`, `invite`, `setaccesslevel`, `setrole`, `startworld`）
 - `params`: object（任意、アクション固有の引数。詳細は各アクションの説明を参照）
 - `requestId`: string（任意、相関ID）
 
@@ -380,6 +380,160 @@ HTTPステータス例：
 **注意事項:**
 - `params.index` は必須で、0以上の整数を指定してください
 - 存在しないインデックスを指定した場合、エラーが返される可能性があります
+
+#### 3. `invite` - ユーザーを招待
+
+現在フォーカス中のセッションにフレンドを招待します。
+
+**リクエスト例:**
+```json
+{
+  "version": 1,
+  "timestamp": "2025-11-11T17:46:00.000Z",
+  "apiKey": "your-login-password",
+  "action": "invite",
+  "params": {
+    "username": "MarkN"
+  },
+  "requestId": "req-003"
+}
+```
+
+**レスポンス例（成功時）:**
+```json
+{
+  "ok": true,
+  "action": "invite",
+  "timestamp": "2025-11-11T17:46:01.234Z",
+  "requestId": "req-003",
+  "data": {
+    "success": true,
+    "message": "Invite sent!"
+  }
+}
+```
+
+**注意事項:**
+- `params.username` は必須で、招待するユーザー名を指定してください
+- ユーザーはフレンドリストに登録されている必要があります
+- フォーカス中のセッションがない場合、エラーが返される可能性があります
+
+#### 4. `setaccesslevel` - セッションのアクセスレベル変更
+
+現在フォーカス中のセッションのアクセスレベルを変更します。
+
+**リクエスト例:**
+```json
+{
+  "version": 1,
+  "timestamp": "2025-11-11T17:47:00.000Z",
+  "apiKey": "your-login-password",
+  "action": "setaccesslevel",
+  "params": {
+    "accessLevel": "Private"
+  },
+  "requestId": "req-004"
+}
+```
+
+**レスポンス例（成功時）:**
+```json
+{
+  "ok": true,
+  "action": "setaccesslevel",
+  "timestamp": "2025-11-11T17:47:01.234Z",
+  "requestId": "req-004",
+  "data": {
+    "success": true,
+    "message": "World セッション１ now has access level Private",
+    "accessLevel": "Private"
+  }
+}
+```
+
+**注意事項:**
+- `params.accessLevel` は必須で、以下のいずれかを指定してください: `Private`, `LAN`, `Friends`, `Anyone`
+- フォーカス中のセッションがない場合、エラーが返される可能性があります
+
+#### 5. `setrole` - ユーザーの権限変更
+
+現在フォーカス中のセッションのユーザーの権限（ロール）を変更します。
+
+**リクエスト例:**
+```json
+{
+  "version": 1,
+  "timestamp": "2025-11-11T17:48:00.000Z",
+  "apiKey": "your-login-password",
+  "action": "setrole",
+  "params": {
+    "username": "MarkN",
+    "role": "Admin"
+  },
+  "requestId": "req-005"
+}
+```
+
+**レスポンス例（成功時）:**
+```json
+{
+  "ok": true,
+  "action": "setrole",
+  "timestamp": "2025-11-11T17:48:01.234Z",
+  "requestId": "req-005",
+  "data": {
+    "success": true,
+    "message": "MarkN now has role Admin!",
+    "username": "MarkN",
+    "role": "Admin"
+  }
+}
+```
+
+**注意事項:**
+- `params.username` は必須で、権限を変更するユーザー名を指定してください
+- `params.role` は必須で、以下のいずれかを指定してください: `Admin`, `Builder`, `Moderator`, `Guest`, `Spectator`
+- フォーカス中のセッションに該当ユーザーが存在しない場合、エラーが返される可能性があります
+
+#### 6. `startworld` - セッションの開始
+
+指定されたURLから新しいセッションを開始し、開始されたセッションのURLを返します。
+
+**リクエスト例:**
+```json
+{
+  "version": 1,
+  "timestamp": "2025-11-11T17:59:00.000Z",
+  "apiKey": "your-login-password",
+  "action": "startworld",
+  "params": {
+    "url": "resrec:///U-MarkN/R-a8166d98-ef9f-4efb-8a86-dbed9d8be48d"
+  },
+  "requestId": "req-006"
+}
+```
+
+**レスポンス例（成功時）:**
+```json
+{
+  "ok": true,
+  "action": "startworld",
+  "timestamp": "2025-11-11T17:59:15.234Z",
+  "requestId": "req-006",
+  "data": {
+    "success": true,
+    "sessionUrl": "res-steam://76561198384468054/0/S-aac647b6-241c-47ae-b5d7-29365df96c24",
+    "sessionId": "S-aac647b6-241c-47ae-b5d7-29365df96c24",
+    "worldName": "地下貯水施設"
+  }
+}
+```
+
+**注意事項:**
+- `params.url` は必須で、セッションURL（`resrec://`, `res-steam://` など）を指定してください
+- ワールドの読み込みには時間がかかる場合があります（最大30秒まで待機）
+- 無効なURLや読み込めないワールドの場合、エラーが返される可能性があります
+- ワールド名はプロンプトから自動抽出されますが、取得できない場合もあります
 
 ### エラーハンドリング
 
