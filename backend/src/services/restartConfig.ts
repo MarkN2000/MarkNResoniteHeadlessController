@@ -180,10 +180,3 @@ function validateConfig(config: RestartConfig): void {
   }
 }
 
-/**
- * デフォルト設定を取得
- */
-export function getDefaultRestartConfig(): RestartConfig {
-  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-}
-

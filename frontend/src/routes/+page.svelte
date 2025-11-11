@@ -33,7 +33,6 @@
     saveRestartConfig,
     getRestartStatus,
     triggerRestart,
-    resetRestartConfig,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -2399,40 +2398,6 @@
     }
   };
 
-  // 再起動設定をリセット
-  const handleResetRestartConfig = async () => {
-    if (!confirm('設定をデフォルトにリセットしますか？\n\n現在の設定は失われます。')) {
-      return;
-    }
-    
-    try {
-      // デバウンスタイマーをクリア
-      if (restartConfigDebounceTimer) {
-        clearTimeout(restartConfigDebounceTimer);
-        restartConfigDebounceTimer = null;
-      }
-      
-      // 初期化フラグをリセット
-      restartConfigInitialized = false;
-      
-      // リセットAPIを呼び出し
-      const result = await resetRestartConfig();
-      
-      // 返されたデフォルト設定を適用
-      restartConfig = result.config;
-      
-      // ステータスも再取得
-      restartStatus = await getRestartStatus();
-      
-      // 初期化フラグをセット
-      restartConfigInitialized = true;
-      
-      pushToast('設定をデフォルトにリセットしました', 'success');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '設定のリセットに失敗しました';
-      pushToast(message, 'error');
-    }
-  };
 
   // フレンド管理タブ - 新機能の関数
   const searchFriendByUsername = async () => {
@@ -4705,15 +4670,6 @@
                     disabled={manualRestartLoading}
                   >
                     {manualRestartLoading ? '実行中...' : '手動再起動トリガー'}
-                  </button>
-                </div>
-                <div class="config-create-button">
-                  <button 
-                    type="button" 
-                    class="config-create-btn"
-                    on:click={handleResetRestartConfig}
-                  >
-                    リセット
                   </button>
                 </div>
                 {#if restartSaveLoading}
