@@ -1,138 +1,110 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import cors from 'cors';
 import { processManager } from '../../services/processManager.js';
 import { cidrRestriction } from '../../middleware/cidr.js';
 import { lenientRateLimit } from '../../middleware/rateLimit.js';
 import { modCors } from '../../config/cors.js';
 import { getPlainPassword } from '../../utils/auth.js';
-import type { ExecuteCommandOptions } from '../../services/processManager.js';
 
 const router = Router();
 
-// Mod専用の軽量認証（APIキーベース）
-// 既定ではアプリのログインパスワードと同一キーを使用
 const modApiKey = process.env.MOD_API_KEY || getPlainPassword();
 
-const authenticateMod = (req: any, res: any, next: any) => {
-  const apiKey = req.headers['x-mod-api-key'] || req.query.apiKey;
-  
-  if (!apiKey || apiKey !== modApiKey) {
-    return res.status(401).json({ error: 'Invalid API key' });
+interface ModRequestBody {
+  version: number;
+  timestamp: string;
+  apiKey: string;
+  action: string;
+  params?: unknown;
+  requestId?: string;
+}
+
+type ErrorCode = 'UNKNOWN_ACTION' | 'GENERAL_ERROR';
+
+const sendSuccess = (res: Response, action: string, requestId: string | undefined, data: unknown) => {
+  const response: Record<string, unknown> = {
+    ok: true,
+    action,
+    timestamp: new Date().toISOString(),
+    data
+  };
+
+  if (requestId) {
+    response.requestId = requestId;
   }
-  
-  next();
+
+  res.status(200).json(response);
 };
 
-// Mod専用ルート（認証は軽量、CORSは制限的）
-router.use(cors(modCors)); // Mod専用CORS設定
-router.use(authenticateMod);
-router.use(cidrRestriction); // ローカルネットワークのみ
-router.use(lenientRateLimit); // 緩いレート制限
+const sendError = (
+  res: Response,
+  status: number,
+  action: string,
+  requestId: string | undefined,
+  code: ErrorCode,
+  message: string
+) => {
+  const response: Record<string, unknown> = {
+    ok: false,
+    action,
+    timestamp: new Date().toISOString(),
+    error: { code, message }
+  };
 
-// コマンド実行
-router.post('/command', async (req, res) => {
-  try {
-    const { command, options } = req.body;
-    
-    if (!command) {
-      return res.status(400).json({ error: 'Command is required' });
+  if (requestId) {
+    response.requestId = requestId;
+  }
+
+  res.status(status).json(response);
+};
+
+router.use(cors(modCors));
+router.use(cidrRestriction);
+router.use(lenientRateLimit);
+
+router.post('/', async (req: Request, res: Response) => {
+  if (!req.is('application/json')) {
+    return sendError(res, 415, 'unknown', undefined, 'GENERAL_ERROR', 'Content-Type must be application/json');
+  }
+
+  const body = req.body as Partial<ModRequestBody> | undefined;
+  const action = typeof body?.action === 'string' && body.action.trim() !== '' ? body.action : 'unknown';
+  const requestId = typeof body?.requestId === 'string' ? body.requestId : undefined;
+
+  if (body?.version !== 1) {
+    return sendError(res, 400, action, requestId, 'GENERAL_ERROR', 'Invalid or missing version');
+  }
+
+  if (typeof body?.timestamp !== 'string' || Number.isNaN(Date.parse(body.timestamp))) {
+    return sendError(res, 400, action, requestId, 'GENERAL_ERROR', 'Invalid or missing timestamp');
+  }
+
+  if (typeof body?.apiKey !== 'string' || body.apiKey.trim() === '') {
+    return sendError(res, 401, action, requestId, 'GENERAL_ERROR', 'Invalid or missing API key');
+  }
+
+  if (!body?.action || typeof body.action !== 'string' || body.action.trim() === '') {
+    return sendError(res, 400, 'unknown', requestId, 'GENERAL_ERROR', 'Invalid or missing action');
+  }
+
+  if (body.apiKey !== modApiKey) {
+    return sendError(res, 401, action, requestId, 'GENERAL_ERROR', 'Invalid API key');
+  }
+
+  switch (body.action) {
+    case 'sessionlist': {
+      try {
+        const result = await processManager.executeCommand('worlds');
+        return sendSuccess(res, body.action, requestId, { result });
+      } catch (error) {
+        console.error('Mod sessionlist error:', error);
+        return sendError(res, 500, body.action, requestId, 'GENERAL_ERROR', 'Failed to execute sessionlist');
+      }
     }
 
-    const result = await processManager.executeCommand(command, options);
-    
-    res.json({ 
-      success: true, 
-      result,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Mod command error:', error);
-    res.status(500).json({ 
-      error: 'Command execution failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// サーバー状態取得
-router.get('/status', (req, res) => {
-  res.json(processManager.getStatus());
-});
-
-// ログ取得（最新100件）
-router.get('/logs', (req, res) => {
-  const logs = processManager.getLogs(100);
-  res.json(logs);
-});
-
-// ワールド一覧取得
-router.get('/worlds', async (req, res) => {
-  try {
-    const output = await processManager.executeCommand('worlds');
-    res.json({ 
-      success: true, 
-      result: output,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Mod worlds error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get worlds',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// ユーザー一覧取得
-router.get('/users', async (req, res) => {
-  try {
-    const output = await processManager.executeCommand('users');
-    res.json({ 
-      success: true, 
-      result: output,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Mod users error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get users',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// サーバー起動
-router.post('/start', async (req, res) => {
-  try {
-    const { configPath } = req.body;
-    processManager.start(configPath);
-    res.json({ 
-      success: true,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Mod start error:', error);
-    res.status(500).json({ 
-      error: 'Failed to start server',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// サーバー停止
-router.post('/stop', async (req, res) => {
-  try {
-    await processManager.stop();
-    res.json({ 
-      success: true,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Mod stop error:', error);
-    res.status(500).json({ 
-      error: 'Failed to stop server',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    default:
+      return sendError(res, 404, body.action, requestId, 'UNKNOWN_ACTION', 'Action is not supported');
   }
 });
 
