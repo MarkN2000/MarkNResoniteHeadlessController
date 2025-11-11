@@ -8,7 +8,8 @@ import { checkRateLimit, generateRateLimitKey } from '../../utils/rateLimit.js';
 
 const router = Router();
 
-const modApiKey = process.env.MOD_API_KEY || getPlainPassword();
+// Mod APIキーはアプリのログインパスワードと同じものを使用
+const modApiKey = getPlainPassword();
 
 const RATE_LIMIT_CONFIG = {
   windowMs: 15 * 60 * 1000,

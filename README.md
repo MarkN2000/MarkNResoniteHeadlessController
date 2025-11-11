@@ -101,8 +101,8 @@ npm run setup
 
 ⚠️ **重要**: 本番環境では必ず以下を変更してください：
 - `.env` の `AUTH_SHARED_SECRET`（JWTシークレット）
-- `.env` の `MOD_API_KEY`（Mod APIキー）
 - `.env` の `RESONITE_HEADLESS_PATH`（Resonite実行ファイルパス）
+- `config/auth.json` の `password`（Mod APIキーも同じ値を使用）
 
 #### 方法2: 手動セットアップ
 
@@ -141,7 +141,6 @@ cp backend/config/restart-status.json.example backend/config/restart-status.json
 NODE_ENV=development
 SERVER_PORT=8080
 AUTH_SHARED_SECRET=your-secret-key-change-in-production
-MOD_API_KEY=mod-secret-key
 RESONITE_HEADLESS_PATH=C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe
 ```
 
@@ -228,7 +227,7 @@ Content-Type: application/json; charset=utf-8
 
 ### 認証
 - API Key はリクエストボディに含めます（ヘッダー/クエリは使用しません）。
-- 環境変数 `MOD_API_KEY` で設定。未設定時は `config/auth.json` の `password` を使用。
+- API Key はアプリのログインパスワード（`config/auth.json` の `password` または環境変数 `DEFAULT_PASSWORD`）と同じものを使用します。
 
 ### セキュリティ制限（維持）
 - **CIDR制限**: ローカルネットワーク内からのアクセスのみ許可（デフォルト: `192.168.0.0/16`, `10.0.0.0/8`, `127.0.0.1`）
@@ -390,7 +389,8 @@ APIはエラー時に適切なHTTPステータスコードとエラーメッセ�
 
 1. **401エラーが返される**
    - API Keyが正しいか確認
-   - `config/auth.json` または環境変数 `MOD_API_KEY` を確認
+   - `config/auth.json` の `password`（または環境変数 `DEFAULT_PASSWORD`）を確認
+   - API Keyはアプリのログインパスワードと同じ値を使用します
 
 2. **403エラーが返される**
    - アクセス元IPアドレスがCIDR範囲内か確認
@@ -425,13 +425,13 @@ APIはエラー時に適切なHTTPステータスコードとエラーメッセ�
 NODE_ENV=development
 AUTH_SHARED_SECRET=your-secret-key
 SERVER_PORT=8080
-MOD_API_KEY=mod-secret-key
+DEFAULT_PASSWORD=your-login-password
 
 # 本番環境
 NODE_ENV=production
 AUTH_SHARED_SECRET=your-production-secret
 SERVER_PORT=8080
-MOD_API_KEY=your-production-mod-key
+DEFAULT_PASSWORD=your-production-login-password
 ```
 
 ## セキュリティ設定
