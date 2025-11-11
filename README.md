@@ -218,175 +218,114 @@ npm run package:zip
 
 ## Mod連携API
 
-Resonite MODから本アプリケーションのAPIを呼び出して、ヘッドレスサーバーを操作することができます。
+Resonite MODから本アプリケーションのAPIを呼び出して、ヘッドレスサーバーを操作できます。新仕様では、単一エンドポイント・単一メソッド（POST）でアクションを指定します。
+
+### エンドポイント（単一）
+```http
+POST /api/mod
+Content-Type: application/json; charset=utf-8
+```
 
 ### 認証
+- API Key はリクエストボディに含めます（ヘッダー/クエリは使用しません）。
+- 環境変数 `MOD_API_KEY` で設定。未設定時は `config/auth.json` の `password` を使用。
 
-ModからのAPIアクセスには、API Key認証が必要です。API Keyは以下のいずれかの方法で指定できます：
-
-#### 方法1: リクエストヘッダー（推奨）
-```csharp
-// C# Example
-var request = new HttpRequestMessage(HttpMethod.Post, "http://192.168.1.100:8080/api/mod/command");
-request.Headers.Add("X-Mod-Api-Key", "mod-secret-key");
-request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-```
-
-#### 方法2: クエリパラメータ
-```
-http://192.168.1.100:8080/api/mod/command?apiKey=mod-secret-key
-```
-
-### セキュリティ制限
-
+### セキュリティ制限（維持）
 - **CIDR制限**: ローカルネットワーク内からのアクセスのみ許可（デフォルト: `192.168.0.0/16`, `10.0.0.0/8`, `127.0.0.1`）
-- **レート制限**: 15分間に1000リクエストまで
-- **API Key**: `config/auth.json` または環境変数 `MOD_API_KEY` で設定
+- **レート制限**: 15分間に1000リクエストまで（`X-RateLimit-*` ヘッダ付与）
+- **CORS**: ローカル/プライベートIPのオリジンのみ許可
+- **リクエストサイズ**: 10MBまで
 
-### エンドポイント一覧
-
-#### 1. コマンド実行（任意のヘッドレスコマンド）
-
-```http
-POST /api/mod/command
-Content-Type: application/json
-X-Mod-Api-Key: mod-secret-key
-
-{
-  "command": "say Hello from Mod!",
-  "options": {}
-}
-```
-
-**レスポンス:**
+### リクエストボディ（共通）
 ```json
 {
-  "success": true,
-  "result": [
-    {
-      "message": "Command executed successfully",
-      "timestamp": "2025-10-12T12:00:00.000Z"
-    }
-  ],
-  "timestamp": "2025-10-12T12:00:00.000Z"
+  "version": 1,
+  "timestamp": "2025-11-11T03:00:00.000Z",
+  "apiKey": "your-mod-key",
+  "action": "sessionlist",
+  "params": {},
+  "requestId": "abc-123"
+}
+```
+- `version`: number（必須、現行は 1 固定）
+- `timestamp`: string（必須、ISO8601）
+- `apiKey`: string（必須）
+- `action`: string（必須、現在は `sessionlist` のみ）
+- `params`: object（任意、アクション固有の引数。`sessionlist` は不要）
+- `requestId`: string（任意、相関ID）
+
+### レスポンス（共通）
+成功時（200 OK）
+```json
+{
+  "ok": true,
+  "action": "sessionlist",
+  "timestamp": "2025-11-11T03:00:01.234Z",
+  "requestId": "abc-123",
+  "data": [
+    { "stream": "stdout", "message": "...", "timestamp": "..." },
+    { "stream": "stdout", "message": "...", "timestamp": "..." }
+  ]
 }
 ```
 
-**使用例:**
+失敗時の例
+```json
+{
+  "ok": false,
+  "action": "sessionlist",
+  "timestamp": "2025-11-11T03:00:01.234Z",
+  "requestId": "abc-123",
+  "error": { "code": "INVALID_API_KEY", "message": "Invalid API key" }
+}
+```
+HTTPステータス例：
+- `401 Unauthorized`（APIキー不正/未指定）
+- `400 Bad Request`（必須項目/型不正, `version` 不正 等）
+- `403 Forbidden`（CIDR制限）
+- `404 Not Found`（未知の `action`）
+- `415 Unsupported Media Type`（JSON以外のContent-Type）
+- `429 Too Many Requests`（レート制限超過）
+- `500 Internal Server Error`（実行時例外）
+
+### 実装済みアクション
+- `sessionlist`: ヘッドレスの `worlds` コマンドを実行し、その出力（ログエントリ配列）を `data` に返却します。
+
+#### 例（curl）
+```bash
+curl -X POST http://192.168.1.100:8080/api/mod \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": 1,
+    "timestamp": "2025-11-11T03:00:00.000Z",
+    "apiKey": "your-mod-key",
+    "action": "sessionlist",
+    "params": {},
+    "requestId": "abc-123"
+  }'
+```
+
+#### 例（C#）
 ```csharp
-// C# Example - チャットメッセージ送信
-var command = new {
-    command = "say Hello from Mod!"
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+
+var http = new HttpClient();
+var payload = new {
+    version = 1,
+    timestamp = DateTime.UtcNow.ToString("o"),
+    apiKey = "your-mod-key",
+    action = "sessionlist",
+    @params = new { },
+    requestId = Guid.NewGuid().ToString()
 };
-var json = JsonSerializer.Serialize(command);
-var response = await httpClient.PostAsync(
-    "http://192.168.1.100:8080/api/mod/command",
+var json = JsonSerializer.Serialize(payload);
+var res = await http.PostAsync(
+    "http://192.168.1.100:8080/api/mod",
     new StringContent(json, Encoding.UTF8, "application/json")
 );
-
-// ダイナミックインパルス送信
-var impulseCommand = new {
-    command = "dynamicimpulsestring MessageBoard \"New message from MOD\""
-};
-```
-
-#### 2. サーバー状態取得
-
-```http
-GET /api/mod/status
-X-Mod-Api-Key: mod-secret-key
-```
-
-**レスポンス:**
-```json
-{
-  "isRunning": true,
-  "startedAt": "2025-10-12T08:00:00.000Z",
-  "uptime": 14400000,
-  "focusedWorldId": "0",
-  "lastUsedConfig": "default.json"
-}
-```
-
-#### 3. ログ取得（最新100件）
-
-```http
-GET /api/mod/logs
-X-Mod-Api-Key: mod-secret-key
-```
-
-**レスポンス:**
-```json
-[
-  {
-    "message": "World started",
-    "timestamp": "2025-10-12T08:00:00.000Z"
-  },
-  ...
-]
-```
-
-#### 4. ワールド一覧取得
-
-```http
-GET /api/mod/worlds
-X-Mod-Api-Key: mod-secret-key
-```
-
-**レスポンス:**
-```json
-[
-  {
-    "index": 0,
-    "name": "My World",
-    "sessionId": "S-abc123...",
-    "activeUsers": 3,
-    "totalUsers": 5,
-    "maxUsers": 16,
-    "accessLevel": "Anyone"
-  },
-  ...
-]
-```
-
-#### 5. フォーカス中ワールドのユーザー一覧取得
-
-```http
-GET /api/mod/users
-X-Mod-Api-Key: mod-secret-key
-```
-
-**レスポンス:**
-```json
-[
-  {
-    "username": "User1",
-    "userId": "U-abc123...",
-    "role": "Admin",
-    "isPresent": true,
-    "ping": 45
-  },
-  ...
-]
-```
-
-#### 6. サーバー起動
-
-```http
-POST /api/mod/start
-Content-Type: application/json
-X-Mod-Api-Key: mod-secret-key
-
-{
-  "config": "default.json"
-}
-```
-
-#### 7. サーバー停止
-
-```http
-POST /api/mod/stop
-X-Mod-Api-Key: mod-secret-key
+var body = await res.Content.ReadAsStringAsync();
 ```
 
 ### 実装例
@@ -394,95 +333,35 @@ X-Mod-Api-Key: mod-secret-key
 #### C# (Resonite MOD)
 
 ```csharp
-using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
-public class HeadlessControllerClient
+public static class ModApi
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _baseUrl;
-    private readonly string _apiKey;
-
-    public HeadlessControllerClient(string baseUrl, string apiKey)
+    public static async Task<string> SessionListAsync(string baseUrl, string apiKey)
     {
-        _baseUrl = baseUrl;
-        _apiKey = apiKey;
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("X-Mod-Api-Key", apiKey);
-    }
-
-    // 任意のコマンドを実行
-    public async Task<bool> ExecuteCommandAsync(string command)
-    {
-        try
-        {
-            var payload = new { command };
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            
-            var response = await _httpClient.PostAsync(
-                $"{_baseUrl}/api/mod/command",
-                content
-            );
-            
-            return response.IsSuccessStatusCode;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Command execution failed: {ex.Message}");
-            return false;
-        }
-    }
-
-    // チャットメッセージを送信
-    public async Task SendChatMessageAsync(string message)
-    {
-        await ExecuteCommandAsync($"say {message}");
-    }
-
-    // ダイナミックインパルスを送信
-    public async Task SendDynamicImpulseAsync(string tag, string value)
-    {
-        await ExecuteCommandAsync($"dynamicimpulsestring {tag} \"{value}\"");
-    }
-
-    // サーバー状態を取得
-    public async Task<ServerStatus> GetStatusAsync()
-    {
-        try
-        {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/mod/status");
-            var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ServerStatus>(json);
-        }
-        catch
-        {
-            return null;
-        }
+        using var http = new HttpClient();
+        var payload = new {
+            version = 1,
+            timestamp = DateTime.UtcNow.ToString("o"),
+            apiKey = apiKey,
+            action = "sessionlist",
+            @params = new { },
+            requestId = Guid.NewGuid().ToString()
+        };
+        var json = JsonSerializer.Serialize(payload);
+        var res = await http.PostAsync(
+            $"{baseUrl}/api/mod",
+            new StringContent(json, Encoding.UTF8, "application/json")
+        );
+        return await res.Content.ReadAsStringAsync();
     }
 }
 
 // 使用例
-var client = new HeadlessControllerClient("http://192.168.1.100:8080", "mod-secret-key");
-
-// コマンド実行
-await client.ExecuteCommandAsync("save");
-
-// チャットメッセージ送信
-await client.SendChatMessageAsync("Hello from MOD!");
-
-// ダイナミックインパルス送信
-await client.SendDynamicImpulseAsync("MRHC.play", "Announcement message");
-
-// サーバー状態確認
-var status = await client.GetStatusAsync();
-if (status?.isRunning == true)
-{
-    Console.WriteLine($"Server is running for {status.uptime}ms");
-}
+var json = await ModApi.SessionListAsync("http://192.168.1.100:8080", "your-mod-key");
+Console.WriteLine(json);
 ```
 
 ### エラーハンドリング
@@ -492,13 +371,18 @@ APIはエラー時に適切なHTTPステータスコードとエラーメッセ�
 - **401 Unauthorized**: API Keyが無効または未指定
 - **403 Forbidden**: CIDR制限により拒否
 - **429 Too Many Requests**: レート制限超過
-- **400 Bad Request**: リクエストが不正
+- **400 Bad Request**: リクエストが不正（`version`/`timestamp`/`action` 不備等）
+- **404 Not Found**: 未知の `action`
+- **415 Unsupported Media Type**: JSON以外のContent-Type
 - **500 Internal Server Error**: サーバー内部エラー
 
 ```json
 {
-  "error": "Command execution failed",
-  "message": "Process is not running"
+  "ok": false,
+  "action": "sessionlist",
+  "timestamp": "2025-11-11T03:00:01.234Z",
+  "requestId": "abc-123",
+  "error": { "code": "INTERNAL_ERROR", "message": "Failed to execute action" }
 }
 ```
 

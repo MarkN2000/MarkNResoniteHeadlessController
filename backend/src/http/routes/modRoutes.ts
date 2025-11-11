@@ -1,110 +1,174 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
 import cors from 'cors';
 import { processManager } from '../../services/processManager.js';
 import { cidrRestriction } from '../../middleware/cidr.js';
-import { lenientRateLimit } from '../../middleware/rateLimit.js';
 import { modCors } from '../../config/cors.js';
 import { getPlainPassword } from '../../utils/auth.js';
+import { checkRateLimit, generateRateLimitKey } from '../../utils/rateLimit.js';
 
 const router = Router();
 
 const modApiKey = process.env.MOD_API_KEY || getPlainPassword();
 
-interface ModRequestBody {
-  version: number;
-  timestamp: string;
-  apiKey: string;
-  action: string;
-  params?: unknown;
-  requestId?: string;
-}
+const RATE_LIMIT_CONFIG = {
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 1000,
+  skipSuccessfulRequests: false
+} as const;
 
-type ErrorCode = 'UNKNOWN_ACTION' | 'GENERAL_ERROR';
-
-const sendSuccess = (res: Response, action: string, requestId: string | undefined, data: unknown) => {
-  const response: Record<string, unknown> = {
-    ok: true,
-    action,
-    timestamp: new Date().toISOString(),
-    data
-  };
-
-  if (requestId) {
-    response.requestId = requestId;
-  }
-
-  res.status(200).json(response);
+const isJsonRequest = (req: any): boolean => {
+  return typeof req.is === 'function' && req.is('application/json');
 };
 
-const sendError = (
-  res: Response,
-  status: number,
-  action: string,
-  requestId: string | undefined,
-  code: ErrorCode,
-  message: string
-) => {
-  const response: Record<string, unknown> = {
-    ok: false,
-    action,
-    timestamp: new Date().toISOString(),
-    error: { code, message }
+const respond = (res: any, status: number, payload: any) => {
+  const body = {
+    ...payload,
+    timestamp: new Date().toISOString()
   };
+  return res.status(status).json(body);
+};
 
-  if (requestId) {
-    response.requestId = requestId;
+const validateRequest = (req: any) => {
+  if (!isJsonRequest(req)) {
+    return {
+      status: 415,
+      error: {
+        code: 'UNSUPPORTED_MEDIA_TYPE',
+        message: 'Content-Type must be application/json'
+      }
+    };
   }
 
-  res.status(status).json(response);
+  const { version, timestamp, apiKey, action } = req.body ?? {};
+
+  if (version !== 1) {
+    return {
+      status: 400,
+      error: {
+        code: 'INVALID_VERSION',
+        message: 'version must be 1'
+      }
+    };
+  }
+
+  if (typeof timestamp !== 'string' || timestamp.length === 0) {
+    return {
+      status: 400,
+      error: {
+        code: 'INVALID_TIMESTAMP',
+        message: 'timestamp is required'
+      }
+    };
+  }
+
+  if (typeof apiKey !== 'string' || apiKey.length === 0) {
+    return {
+      status: 401,
+      error: {
+        code: 'INVALID_API_KEY',
+        message: 'Invalid API key'
+      }
+    };
+  }
+
+  if (typeof action !== 'string' || action.length === 0) {
+    return {
+      status: 400,
+      error: {
+        code: 'INVALID_ACTION',
+        message: 'action is required'
+      }
+    };
+  }
+
+  if (apiKey !== modApiKey) {
+    return {
+      status: 401,
+      error: {
+        code: 'INVALID_API_KEY',
+        message: 'Invalid API key'
+      }
+    };
+  }
+
+  return null;
 };
 
 router.use(cors(modCors));
 router.use(cidrRestriction);
-router.use(lenientRateLimit);
 
-router.post('/', async (req: Request, res: Response) => {
-  if (!req.is('application/json')) {
-    return sendError(res, 415, 'unknown', undefined, 'GENERAL_ERROR', 'Content-Type must be application/json');
-  }
+router.post('/', async (req, res) => {
+  const rateLimitKey = generateRateLimitKey(req);
+  const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMIT_CONFIG);
 
-  const body = req.body as Partial<ModRequestBody> | undefined;
-  const action = typeof body?.action === 'string' && body.action.trim() !== '' ? body.action : 'unknown';
-  const requestId = typeof body?.requestId === 'string' ? body.requestId : undefined;
+  res.set({
+    'X-RateLimit-Limit': RATE_LIMIT_CONFIG.maxRequests.toString(),
+    'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+    'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString()
+  });
 
-  if (body?.version !== 1) {
-    return sendError(res, 400, action, requestId, 'GENERAL_ERROR', 'Invalid or missing version');
-  }
-
-  if (typeof body?.timestamp !== 'string' || Number.isNaN(Date.parse(body.timestamp))) {
-    return sendError(res, 400, action, requestId, 'GENERAL_ERROR', 'Invalid or missing timestamp');
-  }
-
-  if (typeof body?.apiKey !== 'string' || body.apiKey.trim() === '') {
-    return sendError(res, 401, action, requestId, 'GENERAL_ERROR', 'Invalid or missing API key');
-  }
-
-  if (!body?.action || typeof body.action !== 'string' || body.action.trim() === '') {
-    return sendError(res, 400, 'unknown', requestId, 'GENERAL_ERROR', 'Invalid or missing action');
-  }
-
-  if (body.apiKey !== modApiKey) {
-    return sendError(res, 401, action, requestId, 'GENERAL_ERROR', 'Invalid API key');
-  }
-
-  switch (body.action) {
-    case 'sessionlist': {
-      try {
-        const result = await processManager.executeCommand('worlds');
-        return sendSuccess(res, body.action, requestId, { result });
-      } catch (error) {
-        console.error('Mod sessionlist error:', error);
-        return sendError(res, 500, body.action, requestId, 'GENERAL_ERROR', 'Failed to execute sessionlist');
+  if (!rateLimitResult.allowed) {
+    return respond(res, 429, {
+      ok: false,
+      action: req.body?.action ?? null,
+      requestId: req.body?.requestId,
+      error: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Rate limit exceeded. Please try again later.'
       }
-    }
+    });
+  }
 
-    default:
-      return sendError(res, 404, body.action, requestId, 'UNKNOWN_ACTION', 'Action is not supported');
+  const validation = validateRequest(req);
+  if (validation) {
+    return respond(res, validation.status, {
+      ok: false,
+      action: req.body?.action ?? null,
+      requestId: req.body?.requestId,
+      error: validation.error
+    });
+  }
+
+  const { action, requestId } = req.body;
+
+  try {
+    switch (action) {
+      case 'sessionlist': {
+        const result = await processManager.executeCommand('worlds');
+        return respond(res, 200, {
+          ok: true,
+          action,
+          requestId,
+          data: result
+        });
+      }
+
+      default:
+        return respond(res, 404, {
+          ok: false,
+          action,
+          requestId,
+          error: {
+            code: 'UNKNOWN_ACTION',
+            message: `Unknown action: ${action}`
+          }
+        });
+    }
+  } catch (error) {
+    console.error('[ModAPI] Action execution error:', {
+      action,
+      message: error instanceof Error ? error.message : String(error)
+    });
+
+    return respond(res, 500, {
+      ok: false,
+      action,
+      requestId,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to execute action'
+      }
+    });
   }
 });
 
