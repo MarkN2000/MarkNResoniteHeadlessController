@@ -339,7 +339,6 @@ export interface RestartConfig {
   };
   preRestartActions: {
     waitControl: {
-      waitForZeroUsers: number;
       forceRestartTimeout: number;
       actionTiming: number;
     };

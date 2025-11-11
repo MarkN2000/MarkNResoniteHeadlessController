@@ -17,7 +17,6 @@
   },
   "preRestartActions": {
     "waitControl": {
-      "waitForZeroUsers": 5,
       "forceRestartTimeout": 120,
       "actionTiming": 2
     },

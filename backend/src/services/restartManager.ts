@@ -14,6 +14,9 @@ const STATUS_FILE = path.join(PROJECT_ROOT, 'config', 'restart-status.json');
 // 高負荷トリガーの無効化期間（ミリ秒）
 const HIGH_LOAD_COOLDOWN_MS = 30 * 60 * 1000; // 30分
 
+// ユーザー0人待機時間（固定値5秒）
+const ZERO_USER_WAIT_TIME_MS = 5000; // 5秒
+
 /**
  * 再起動マネージャー
  * 自動再起動機能の中核を担うサービス
@@ -342,7 +345,7 @@ export class RestartManager extends EventEmitter {
     const { waitControl } = preRestartActions;
     
     console.log('[RestartManager] Starting pre-restart wait control...');
-    console.log(`[RestartManager] - Wait for zero users: ${waitControl.waitForZeroUsers} minutes`);
+    console.log(`[RestartManager] - Wait for zero users: 5 seconds (fixed)`);
     console.log(`[RestartManager] - Force restart timeout: ${waitControl.forceRestartTimeout} minutes`);
     console.log(`[RestartManager] - Action timing: ${waitControl.actionTiming} minutes before restart`);
     
@@ -355,7 +358,6 @@ export class RestartManager extends EventEmitter {
     const forceRestartTime = waitControl.forceRestartTimeout * 60 * 1000; // 分→ミリ秒
     const actionTime = waitControl.actionTiming * 60 * 1000; // 分→ミリ秒
     const actionDelay = forceRestartTime - actionTime; // アクション実行までの待機時間
-    const zeroUserWaitTime = waitControl.waitForZeroUsers * 60 * 1000; // ユーザー0人待機時間
     
     const startTime = Date.now();
     
@@ -407,18 +409,17 @@ export class RestartManager extends EventEmitter {
           if (this.zeroUserWaitStartTime === null) {
             // 0人待機を開始
             this.zeroUserWaitStartTime = Date.now();
-            console.log(`[RestartManager] ⚠️ Users reached zero. Waiting ${waitControl.waitForZeroUsers} minutes...`);
-            console.log(`[RestartManager] Zero user wait will complete at: ${new Date(this.zeroUserWaitStartTime + zeroUserWaitTime).toLocaleString()}`);
+            console.log(`[RestartManager] ⚠️ Users reached zero. Waiting 5 seconds...`);
+            console.log(`[RestartManager] Zero user wait will complete at: ${new Date(this.zeroUserWaitStartTime + ZERO_USER_WAIT_TIME_MS).toLocaleString()}`);
           } else {
             // 0人待機中
             const zeroWaitElapsed = Date.now() - this.zeroUserWaitStartTime;
-            const zeroWaitRemaining = zeroUserWaitTime - zeroWaitElapsed;
-            const minutesRemaining = Math.floor(zeroWaitRemaining / 60000);
-            const secondsRemaining = Math.floor((zeroWaitRemaining % 60000) / 1000);
+            const zeroWaitRemaining = ZERO_USER_WAIT_TIME_MS - zeroWaitElapsed;
+            const secondsRemaining = Math.floor(zeroWaitRemaining / 1000);
             
-            console.log(`[RestartManager] Zero user wait: ${minutesRemaining}m ${secondsRemaining}s remaining (elapsed: ${Math.floor(zeroWaitElapsed / 60000)}m)`);
+            console.log(`[RestartManager] Zero user wait: ${secondsRemaining}s remaining (elapsed: ${Math.floor(zeroWaitElapsed / 1000)}s)`);
             
-            if (zeroWaitElapsed >= zeroUserWaitTime) {
+            if (zeroWaitElapsed >= ZERO_USER_WAIT_TIME_MS) {
               // 待機時間が経過したので再起動
               console.log('[RestartManager] ✓ Zero user wait completed. Proceeding to restart.');
               
@@ -461,7 +462,7 @@ export class RestartManager extends EventEmitter {
         
         if (userCount === 0) {
           this.zeroUserWaitStartTime = Date.now();
-          console.log(`[RestartManager] ⚠️ Users already zero at start. Waiting ${waitControl.waitForZeroUsers} minutes...`);
+          console.log(`[RestartManager] ⚠️ Users already zero at start. Waiting 5 seconds...`);
         } else {
           console.log(`[RestartManager] ✓ Users present (${userCount}). Will wait for them to leave.`);
         }

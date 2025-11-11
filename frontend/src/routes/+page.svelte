@@ -4915,20 +4915,6 @@
                     <form class="status-form" on:submit|preventDefault={() => {}}>
                       <!-- 待機制御 -->
                       <label>
-                        <span>再起動待機</span>
-                        <div class="field-row">
-                          <input 
-                            type="number" 
-                            min="0" 
-                            max="120"
-                            bind:value={restartConfig.preRestartActions.waitControl.waitForZeroUsers}
-                            placeholder="5"
-                          />
-                          <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
-                        </div>
-                      </label>
-                      
-                      <label>
                         <span>強制実行タイムアウト</span>
                         <div class="field-row">
                           <input 

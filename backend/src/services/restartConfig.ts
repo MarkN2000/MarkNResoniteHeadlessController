@@ -25,7 +25,6 @@ const DEFAULT_CONFIG: RestartConfig = {
   },
   preRestartActions: {
     waitControl: {
-      waitForZeroUsers: 5,
       forceRestartTimeout: 180,
       actionTiming: 2
     },

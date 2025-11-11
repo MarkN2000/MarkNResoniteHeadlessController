@@ -63,7 +63,6 @@ export interface RestartConfig {
   preRestartActions: {
     // 待機制御
     waitControl: {
-      waitForZeroUsers: number; // ユーザー0になってから待機する時間（分）
       forceRestartTimeout: number; // 強制実行までのタイムアウト（分）
       actionTiming: number; // アクション実行タイミング（強制再起動の何分前）
     };
