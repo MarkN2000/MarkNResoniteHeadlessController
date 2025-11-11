@@ -58,3 +58,70 @@ export const parseWorldsOutput = (output: string): ParsedSession[] => {
   return sessions;
 };
 
+export interface ParsedStatus {
+  name?: string;
+  sessionId?: string;
+  currentUsers?: number;
+  presentUsers?: number;
+  maxUsers?: number;
+  uptime?: string;
+  accessLevel?: string;
+  hiddenFromListing?: boolean;
+  mobileFriendly?: boolean;
+  description?: string;
+  tags: string[];
+  users: string[];
+}
+
+export const parseStatusOutput = (output: string): ParsedStatus => {
+  const lines = output
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const map: Record<string, string> = {};
+  for (const line of lines) {
+    const match = line.match(/^([^:]+):\s*(.*)$/);
+    if (!match) continue;
+    const [, rawKey, rawValue] = match;
+    if (!rawKey || !rawValue) continue;
+    map[rawKey.trim()] = rawValue.trim();
+  }
+
+  const parseNumber = (value?: string) => {
+    if (!value) return undefined;
+    const num = Number(value.replace(/[^0-9.-]/g, ''));
+    return Number.isNaN(num) ? undefined : num;
+  };
+
+  const parseBoolean = (value?: string) => {
+    if (!value) return undefined;
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+    return undefined;
+  };
+
+  const tags = map['Tags']
+    ? map['Tags'].split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  const users = map['Users']
+    ? map['Users'].split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  return {
+    name: map['Name'],
+    sessionId: map['SessionID'],
+    currentUsers: parseNumber(map['Current Users']),
+    presentUsers: parseNumber(map['Present Users']),
+    maxUsers: parseNumber(map['Max Users']),
+    uptime: map['Uptime'],
+    accessLevel: map['Access Level'],
+    hiddenFromListing: parseBoolean(map['Hidden from listing']),
+    mobileFriendly: parseBoolean(map['Mobile Friendly']),
+    description: map['Description'] ?? '',
+    tags,
+    users
+  };
+};
+

@@ -249,8 +249,8 @@ Content-Type: application/json; charset=utf-8
 - `version`: number（必須、現行は 1 固定）
 - `timestamp`: string（必須、ISO8601）
 - `apiKey`: string（必須）
-- `action`: string（必須、現在は `sessionlist` のみ）
-- `params`: object（任意、アクション固有の引数。`sessionlist` は不要）
+- `action`: string（必須、実装済み: `sessionlist`, `focus`）
+- `params`: object（任意、アクション固有の引数。詳細は各アクションの説明を参照）
 - `requestId`: string（任意、相関ID）
 
 ### レスポンス（共通）
@@ -261,12 +261,14 @@ Content-Type: application/json; charset=utf-8
   "action": "sessionlist",
   "timestamp": "2025-11-11T03:00:01.234Z",
   "requestId": "abc-123",
-  "data": [
-    { "stream": "stdout", "message": "...", "timestamp": "..." },
-    { "stream": "stdout", "message": "...", "timestamp": "..." }
-  ]
+  "data": { /* アクション固有の構造化データ */ }
 }
 ```
+- `ok`: boolean（常に `true`）
+- `action`: string（リクエストの `action` を反映）
+- `timestamp`: string（サーバー処理時刻、ISO8601）
+- `requestId`: string（任意、リクエストに含まれていた場合のみ）
+- `data`: any（アクション固有の結果データ）
 
 失敗時の例
 ```json
@@ -288,80 +290,96 @@ HTTPステータス例：
 - `500 Internal Server Error`（実行時例外）
 
 ### 実装済みアクション
-- `sessionlist`: ヘッドレスの `worlds` コマンドを実行し、その出力（ログエントリ配列）を `data` に返却します。
 
-#### 例（curl）
-```bash
-curl -X POST http://192.168.1.100:8080/api/mod \
-  -H "Content-Type: application/json" \
-  -d '{
-    "version": 1,
-    "timestamp": "2025-11-11T03:00:00.000Z",
-    "apiKey": "your-mod-key",
-    "action": "sessionlist",
-    "params": {},
-    "requestId": "abc-123"
-  }'
-```
+#### 1. `sessionlist` - セッション一覧取得
 
-#### 例（C#）
-```csharp
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
+ヘッドレスの `worlds` コマンドを実行し、アクティブなセッション一覧を構造化データで返します。
 
-var http = new HttpClient();
-var payload = new {
-    version = 1,
-    timestamp = DateTime.UtcNow.ToString("o"),
-    apiKey = "your-mod-key",
-    action = "sessionlist",
-    @params = new { },
-    requestId = Guid.NewGuid().ToString()
-};
-var json = JsonSerializer.Serialize(payload);
-var res = await http.PostAsync(
-    "http://192.168.1.100:8080/api/mod",
-    new StringContent(json, Encoding.UTF8, "application/json")
-);
-var body = await res.Content.ReadAsStringAsync();
-```
-
-### 実装例
-
-#### C# (Resonite MOD)
-
-```csharp
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-
-public static class ModApi
+**リクエスト例:**
+```json
 {
-    public static async Task<string> SessionListAsync(string baseUrl, string apiKey)
-    {
-        using var http = new HttpClient();
-        var payload = new {
-            version = 1,
-            timestamp = DateTime.UtcNow.ToString("o"),
-            apiKey = apiKey,
-            action = "sessionlist",
-            @params = new { },
-            requestId = Guid.NewGuid().ToString()
-        };
-        var json = JsonSerializer.Serialize(payload);
-        var res = await http.PostAsync(
-            $"{baseUrl}/api/mod",
-            new StringContent(json, Encoding.UTF8, "application/json")
-        );
-        return await res.Content.ReadAsStringAsync();
-    }
+  "version": 1,
+  "timestamp": "2025-11-11T03:00:00.000Z",
+  "apiKey": "your-login-password",
+  "action": "sessionlist",
+  "params": {},
+  "requestId": "req-001"
 }
-
-// 使用例
-var json = await ModApi.SessionListAsync("http://192.168.1.100:8080", "your-mod-key");
-Console.WriteLine(json);
 ```
+
+**レスポンス例（成功時）:**
+```json
+{
+  "ok": true,
+  "action": "sessionlist",
+  "timestamp": "2025-11-11T03:00:01.234Z",
+  "requestId": "req-001",
+  "data": [
+    {
+      "index": 0,
+      "name": "セッション１",
+      "users": 2,
+      "present": 1,
+      "accessLevel": "LAN",
+      "maxUsers": 16
+    },
+    {
+      "index": 1,
+      "name": "MarkN_headless World 1",
+      "users": 1,
+      "present": 0,
+      "accessLevel": "Private",
+      "maxUsers": 32
+    }
+  ]
+}
+```
+
+#### 2. `focus` - セッションにフォーカスしてステータス取得
+
+指定されたインデックスのセッションにフォーカスし、そのセッションのステータス情報を構造化データで返します。
+
+**リクエスト例:**
+```json
+{
+  "version": 1,
+  "timestamp": "2025-11-11T03:30:00.000Z",
+  "apiKey": "your-login-password",
+  "action": "focus",
+  "params": {
+    "index": 0
+  },
+  "requestId": "req-002"
+}
+```
+
+**レスポンス例（成功時）:**
+```json
+{
+  "ok": true,
+  "action": "focus",
+  "timestamp": "2025-11-11T03:30:01.234Z",
+  "requestId": "req-002",
+  "data": {
+    "name": "セッション１",
+    "sessionId": "S-170a0f5e-bbc8-427c-8b50-7a494ee89b62",
+    "currentUsers": 2,
+    "presentUsers": 0,
+    "maxUsers": 16,
+    "uptime": "00:23:35.0453801",
+    "accessLevel": "LAN",
+    "hiddenFromListing": false,
+    "mobileFriendly": false,
+    "description": "",
+    "tags": [],
+    "users": ["MarkN_headless", "MarkN"]
+  }
+}
+```
+
+**注意事項:**
+- `params.index` は必須で、0以上の整数を指定してください
+- 存在しないインデックスを指定した場合、エラーが返される可能性があります
 
 ### エラーハンドリング
 
