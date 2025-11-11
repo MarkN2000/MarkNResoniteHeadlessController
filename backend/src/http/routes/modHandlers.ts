@@ -157,7 +157,7 @@ export const handleStartWorld: ModActionHandler = async (params) => {
 
   // ワールド名を抽出（プロンプトから取得、例: "地下貯水施設>"）
   const worldNameMatch = startOutput.match(/([^>]+)>$/);
-  const worldName = worldNameMatch ? worldNameMatch[1].trim() : undefined;
+  const worldName = worldNameMatch && worldNameMatch[1] ? worldNameMatch[1].trim() : undefined;
 
   // "World running..." が含まれているか確認
   if (!startOutput.toLowerCase().includes('world running')) {

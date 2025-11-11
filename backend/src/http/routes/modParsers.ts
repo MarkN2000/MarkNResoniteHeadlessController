@@ -43,7 +43,7 @@ export const parseWorldsOutput = (output: string): ParsedSession[] => {
     if (!trimmed) continue;
 
     const match = trimmed.match(regex);
-    if (match?.groups) {
+    if (match?.groups?.index && match.groups.name && match.groups.users && match.groups.present && match.groups.access && match.groups.max) {
       sessions.push({
         index: Number(match.groups.index),
         name: match.groups.name.trim(),
@@ -159,7 +159,7 @@ export const parseAccessLevelOutput = (output: string): { success: boolean; mess
  */
 export const parseRoleOutput = (output: string): { success: boolean; message: string; username?: string; role?: string } => {
   const match = output.match(/(\S+)\s+now has role\s+(\S+)/i);
-  if (match) {
+  if (match && match[1] && match[2]) {
     return {
       success: true,
       message: output.trim(),
@@ -177,11 +177,11 @@ export const parseRoleOutput = (output: string): { success: boolean; message: st
 export const parseSessionUrlOutput = (output: string): { sessionUrl?: string; sessionId?: string } => {
   // res-steam://, resrec://, ressession:// などのURLを検出
   const urlMatch = output.match(/(res[-\w]*:\/\/[^\s]+)/i);
-  if (urlMatch) {
+  if (urlMatch && urlMatch[1]) {
     const sessionUrl = urlMatch[1];
     // SessionIDを抽出 (S-で始まるID)
     const sessionIdMatch = sessionUrl.match(/S-([a-f0-9-]+)/i);
-    const sessionId = sessionIdMatch ? `S-${sessionIdMatch[1]}` : undefined;
+    const sessionId = sessionIdMatch && sessionIdMatch[1] ? `S-${sessionIdMatch[1]}` : undefined;
     return { sessionUrl, sessionId };
   }
   return {};
