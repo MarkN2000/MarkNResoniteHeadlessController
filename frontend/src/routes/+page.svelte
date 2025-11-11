@@ -333,6 +333,56 @@
   let editingScheduleId: string | null = null;
   let editingSchedule: any = null;
   let scheduledRestartModalOpen = false;
+  let editingScheduleUseGlobalWaitControl = true;
+  let editingScheduleCustomForceTimeout = 0;
+  let editingScheduleCustomActionTiming = 0;
+
+  const getGlobalWaitControlDefaults = () => {
+    const waitControl = restartConfig?.preRestartActions.waitControl;
+    const forceRestartTimeout = waitControl?.forceRestartTimeout ?? 120;
+    const actionTiming = waitControl?.actionTiming ?? 2;
+    return {
+      forceRestartTimeout,
+      actionTiming: Math.min(actionTiming, forceRestartTimeout)
+    };
+  };
+
+  const resetCustomWaitControlToDefaults = () => {
+    const defaults = getGlobalWaitControlDefaults();
+    editingScheduleCustomForceTimeout = defaults.forceRestartTimeout;
+    editingScheduleCustomActionTiming = defaults.actionTiming;
+  };
+
+  const ensureCustomWaitControlWithinBounds = () => {
+    if (!Number.isFinite(editingScheduleCustomForceTimeout)) {
+      editingScheduleCustomForceTimeout = 1;
+    }
+    if (!Number.isFinite(editingScheduleCustomActionTiming)) {
+      editingScheduleCustomActionTiming = 1;
+    }
+    
+    editingScheduleCustomForceTimeout = Math.min(
+      1440,
+      Math.max(1, Math.round(editingScheduleCustomForceTimeout))
+    );
+    editingScheduleCustomActionTiming = Math.min(
+      editingScheduleCustomForceTimeout,
+      Math.max(1, Math.round(editingScheduleCustomActionTiming))
+    );
+  };
+
+  const useGlobalScheduleWaitControl = () => {
+    editingScheduleUseGlobalWaitControl = true;
+  };
+
+  const useCustomScheduleWaitControl = () => {
+    if (editingScheduleCustomForceTimeout <= 0 || editingScheduleCustomActionTiming <= 0) {
+      resetCustomWaitControlToDefaults();
+    } else {
+      ensureCustomWaitControlWithinBounds();
+    }
+    editingScheduleUseGlobalWaitControl = false;
+  };
 
   // Config generation state
   let configName = '';
@@ -2171,6 +2221,8 @@
       dailyTime: { hour: 3, minute: 0 },
       configFile: '__previous__'
     };
+    editingScheduleUseGlobalWaitControl = true;
+    resetCustomWaitControlToDefaults();
     scheduledRestartModalOpen = true;
   };
 
@@ -2178,6 +2230,25 @@
   const openEditScheduleModal = (schedule: any) => {
     editingScheduleId = schedule.id;
     editingSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
+    
+    if (schedule.waitControl) {
+      editingScheduleUseGlobalWaitControl = false;
+      const { forceRestartTimeout, actionTiming } = schedule.waitControl;
+      editingScheduleCustomForceTimeout = Math.min(
+        1440,
+        Math.max(1, Math.round(forceRestartTimeout ?? getGlobalWaitControlDefaults().forceRestartTimeout))
+      );
+      const fallbackAction = getGlobalWaitControlDefaults().actionTiming;
+      editingScheduleCustomActionTiming = Math.min(
+        editingScheduleCustomForceTimeout,
+        Math.max(1, Math.round(actionTiming ?? fallbackAction))
+      );
+      ensureCustomWaitControlWithinBounds();
+    } else {
+      editingScheduleUseGlobalWaitControl = true;
+      resetCustomWaitControlToDefaults();
+    }
+    
     scheduledRestartModalOpen = true;
   };
 
@@ -2186,11 +2257,41 @@
     scheduledRestartModalOpen = false;
     editingScheduleId = null;
     editingSchedule = null;
+    editingScheduleUseGlobalWaitControl = true;
+    resetCustomWaitControlToDefaults();
   };
 
   // 予定再起動 - 保存
   const saveSchedule = () => {
     if (!restartConfig || !editingSchedule) return;
+    
+    if (editingScheduleUseGlobalWaitControl) {
+      if (editingSchedule.waitControl) {
+        delete editingSchedule.waitControl;
+      }
+    } else {
+      ensureCustomWaitControlWithinBounds();
+      const forceRestartTimeout = editingScheduleCustomForceTimeout;
+      const actionTiming = editingScheduleCustomActionTiming;
+      
+      if (forceRestartTimeout < 1 || forceRestartTimeout > 1440) {
+        pushToast('強制実行タイムアウトは1〜1440分の範囲で設定してください', 'error');
+        return;
+      }
+      if (actionTiming < 1) {
+        pushToast('アクション実行タイミングは1分以上で設定してください', 'error');
+        return;
+      }
+      if (actionTiming > forceRestartTimeout) {
+        pushToast('アクション実行タイミングは強制実行タイムアウト以下に設定してください', 'error');
+        return;
+      }
+      
+      editingSchedule.waitControl = {
+        forceRestartTimeout,
+        actionTiming
+      };
+    }
 
     if (editingScheduleId) {
       // 編集
@@ -4721,6 +4822,14 @@
                                   <span style="color: #a0a0a0;">起動コンフィグ:</span>
                                   {schedule.configFile === '__previous__' ? '直前のコンフィグを使用' : schedule.configFile}
                                 </div>
+                                <div>
+                                  <span style="color: #a0a0a0;">待機制御:</span>
+                                  {#if schedule.waitControl}
+                                    カスタム設定（強制実行タイムアウト {schedule.waitControl.forceRestartTimeout}分 / アクション {schedule.waitControl.actionTiming}分前）
+                                  {:else}
+                                    グローバル設定を使用
+                                  {/if}
+                                </div>
                               </div>
                             </div>
                           {/each}
@@ -5316,6 +5425,79 @@
                 {/if}
               </select>
             </label>
+
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #2b2f35; display: flex; flex-direction: column; gap: 0.75rem;">
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <span style="font-weight: 600;">⚙️ 待機制御設定</span>
+                <p style="margin: 0; color: #a0a0a0; font-size: 0.85rem;">
+                  予定ごとに強制実行タイムアウトとアクション実行タイミングを個別設定できます。
+                </p>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                  <button
+                    type="button"
+                    class={editingScheduleUseGlobalWaitControl ? 'status-action-button active' : 'status-action-button'}
+                    on:click={useGlobalScheduleWaitControl}
+                  >
+                    グローバル設定を使用
+                  </button>
+                  <button
+                    type="button"
+                    class={!editingScheduleUseGlobalWaitControl ? 'status-action-button active' : 'status-action-button'}
+                    on:click={useCustomScheduleWaitControl}
+                  >
+                    個別に設定
+                  </button>
+                </div>
+              </div>
+
+              {#if editingScheduleUseGlobalWaitControl}
+                <p style="margin: 0; color: #a0a0a0; font-size: 0.85rem;">
+                  現在のグローバル設定（強制実行タイムアウト {getGlobalWaitControlDefaults().forceRestartTimeout}分 / アクション実行タイミング {getGlobalWaitControlDefaults().actionTiming}分前）が適用されます。
+                </p>
+              {:else}
+                <div style="display: grid; gap: 0.75rem;">
+                  <label class="modal-label">
+                    <span>強制実行タイムアウト</span>
+                    <div class="field-row">
+                      <input
+                        type="number"
+                        min="1"
+                        max="1440"
+                        bind:value={editingScheduleCustomForceTimeout}
+                        on:input={(e) => {
+                          const target = e.target as HTMLInputElement;
+                          editingScheduleCustomForceTimeout = Number(target.value);
+                          ensureCustomWaitControlWithinBounds();
+                        }}
+                        required
+                      />
+                      <span style="color: #a0a0a0; font-size: 0.9rem;">分</span>
+                    </div>
+                  </label>
+                  <label class="modal-label">
+                    <span>アクション実行タイミング</span>
+                    <div class="field-row">
+                      <input
+                        type="number"
+                        min="1"
+                        max={editingScheduleCustomForceTimeout}
+                        bind:value={editingScheduleCustomActionTiming}
+                        on:input={(e) => {
+                          const target = e.target as HTMLInputElement;
+                          editingScheduleCustomActionTiming = Number(target.value);
+                          ensureCustomWaitControlWithinBounds();
+                        }}
+                        required
+                      />
+                      <span style="color: #a0a0a0; font-size: 0.9rem;">分前</span>
+                    </div>
+                    <small style="color: #86888b; font-size: 0.85rem;">
+                      最大: {editingScheduleCustomForceTimeout}分（強制実行タイムアウト）
+                    </small>
+                  </label>
+                </div>
+              {/if}
+            </div>
 
             <div class="modal-actions">
               <button type="button" class="modal-cancel-btn" on:click={closeScheduleModal}>

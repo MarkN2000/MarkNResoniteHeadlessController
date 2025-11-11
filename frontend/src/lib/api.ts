@@ -318,6 +318,10 @@ export interface ScheduledRestartEntry {
     minute: number;
   };
   configFile: string;
+  waitControl?: {
+    forceRestartTimeout: number;
+    actionTiming: number;
+  };
 }
 
 export interface RestartConfig {

@@ -35,6 +35,11 @@ export interface ScheduledRestartEntry {
     minute: number;
   };
   configFile: string; // 起動するコンフィグファイル名
+  // 予定ごとの待機制御設定（指定時のみ適用）
+  waitControl?: {
+    forceRestartTimeout: number; // 分
+    actionTiming: number; // 分前
+  };
 }
 
 export interface RestartConfig {

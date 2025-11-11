@@ -147,6 +147,27 @@ function validateConfig(config: RestartConfig): void {
     if (schedule.type === 'daily' && !schedule.dailyTime) {
       throw new Error('毎日の設定が不正です');
     }
+    
+    if (schedule.waitControl) {
+      const { forceRestartTimeout, actionTiming } = schedule.waitControl;
+      
+      if (typeof forceRestartTimeout !== 'number' || Number.isNaN(forceRestartTimeout)) {
+        throw new Error('予定ごとの強制実行タイムアウトが数値ではありません');
+      }
+      if (forceRestartTimeout < 1 || forceRestartTimeout > 1440) {
+        throw new Error('予定ごとの強制実行タイムアウトは1〜1440分の範囲で指定してください');
+      }
+      
+      if (typeof actionTiming !== 'number' || Number.isNaN(actionTiming)) {
+        throw new Error('予定ごとのアクション実行タイミングが数値ではありません');
+      }
+      if (actionTiming < 1) {
+        throw new Error('予定ごとのアクション実行タイミングは1分以上で指定してください');
+      }
+      if (actionTiming > forceRestartTimeout) {
+        throw new Error('予定ごとのアクション実行タイミングは強制実行タイムアウト以下に設定してください');
+      }
+    }
   }
   
   // フェールセーフのバリデーション

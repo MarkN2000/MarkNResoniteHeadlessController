@@ -321,7 +321,7 @@ export class RestartManager extends EventEmitter {
         await this.executeRestart(trigger, scheduleId);
       } else {
         // その他のトリガーは待機制御とアクションを実行
-        await this.executePreRestartActions();
+        await this.executePreRestartActions(scheduleId);
         await this.executeRestart(trigger, scheduleId);
       }
       
@@ -338,16 +338,38 @@ export class RestartManager extends EventEmitter {
   /**
    * 再起動前アクションを実行（待機制御付き）
    */
-  private async executePreRestartActions(): Promise<void> {
+  private async executePreRestartActions(scheduleId?: string): Promise<void> {
     if (!this.config) return;
     
     const { preRestartActions } = this.config;
-    const { waitControl } = preRestartActions;
+    const globalWaitControl = preRestartActions.waitControl;
+    
+    let waitControl = { ...globalWaitControl };
+    let usingScheduleOverride = false;
+    
+    if (scheduleId) {
+      const schedule = this.config.triggers.scheduled.schedules.find((s) => s.id === scheduleId);
+      if (schedule?.waitControl) {
+        waitControl = {
+          forceRestartTimeout: schedule.waitControl.forceRestartTimeout,
+          actionTiming: schedule.waitControl.actionTiming
+        };
+        usingScheduleOverride = true;
+      }
+    }
     
     console.log('[RestartManager] Starting pre-restart wait control...');
     console.log(`[RestartManager] - Wait for zero users: 5 seconds (fixed)`);
-    console.log(`[RestartManager] - Force restart timeout: ${waitControl.forceRestartTimeout} minutes`);
-    console.log(`[RestartManager] - Action timing: ${waitControl.actionTiming} minutes before restart`);
+    console.log(
+      `[RestartManager] - Force restart timeout: ${waitControl.forceRestartTimeout} minutes${
+        usingScheduleOverride ? ` (schedule override${scheduleId ? `: ${scheduleId}` : ''})` : ''
+      }`
+    );
+    console.log(
+      `[RestartManager] - Action timing: ${waitControl.actionTiming} minutes before restart${
+        usingScheduleOverride ? ` (schedule override${scheduleId ? `: ${scheduleId}` : ''})` : ''
+      }`
+    );
     
     // フラグをリセット
     this.actionsExecuted = false;
@@ -381,7 +403,9 @@ export class RestartManager extends EventEmitter {
       if (actionDelay > 0) {
         this.actionTimer = setTimeout(async () => {
           if (!this.actionsExecuted) {
-            console.log(`[RestartManager] Action timing reached (${waitControl.actionTiming} minutes before forced restart)`);
+            console.log(
+              `[RestartManager] Action timing reached (${waitControl.actionTiming} minutes before forced restart)`
+            );
             await this.executeActions();
             this.actionsExecuted = true;
           }
@@ -410,7 +434,11 @@ export class RestartManager extends EventEmitter {
             // 0人待機を開始
             this.zeroUserWaitStartTime = Date.now();
             console.log(`[RestartManager] ⚠️ Users reached zero. Waiting 5 seconds...`);
-            console.log(`[RestartManager] Zero user wait will complete at: ${new Date(this.zeroUserWaitStartTime + ZERO_USER_WAIT_TIME_MS).toLocaleString()}`);
+            console.log(
+              `[RestartManager] Zero user wait will complete at: ${new Date(
+                this.zeroUserWaitStartTime + ZERO_USER_WAIT_TIME_MS
+              ).toLocaleString()}`
+            );
           } else {
             // 0人待機中
             const zeroWaitElapsed = Date.now() - this.zeroUserWaitStartTime;
