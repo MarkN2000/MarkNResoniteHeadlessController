@@ -370,17 +370,19 @@
     );
   };
 
-  const useGlobalScheduleWaitControl = () => {
-    editingScheduleUseGlobalWaitControl = true;
-  };
-
-  const useCustomScheduleWaitControl = () => {
-    if (editingScheduleCustomForceTimeout <= 0 || editingScheduleCustomActionTiming <= 0) {
-      resetCustomWaitControlToDefaults();
+  const toggleScheduleWaitControl = () => {
+    if (editingScheduleUseGlobalWaitControl) {
+      // グローバル設定 → 個別設定
+      if (editingScheduleCustomForceTimeout <= 0 || editingScheduleCustomActionTiming <= 0) {
+        resetCustomWaitControlToDefaults();
+      } else {
+        ensureCustomWaitControlWithinBounds();
+      }
+      editingScheduleUseGlobalWaitControl = false;
     } else {
-      ensureCustomWaitControlWithinBounds();
+      // 個別設定 → グローバル設定
+      editingScheduleUseGlobalWaitControl = true;
     }
-    editingScheduleUseGlobalWaitControl = false;
   };
 
   // Config generation state
@@ -4991,6 +4993,22 @@
                               const target = e.target as HTMLInputElement;
                               const value = Number(target.value);
                               
+                              // 1未満の場合は1に補正
+                              if (value < 1 || !Number.isFinite(value) || isNaN(value)) {
+                                restartConfig.preRestartActions.waitControl.forceRestartTimeout = 1;
+                                target.value = '1';
+                                return;
+                              }
+                              
+                              // 1440を超える場合は1440に補正
+                              if (value > 1440) {
+                                restartConfig.preRestartActions.waitControl.forceRestartTimeout = 1440;
+                                target.value = '1440';
+                                return;
+                              }
+                              
+                              restartConfig.preRestartActions.waitControl.forceRestartTimeout = value;
+                              
                               // アクション実行タイミングが強制実行タイムアウトより大きい場合は自動調整
                               if (restartConfig.preRestartActions.waitControl.actionTiming > value) {
                                 restartConfig.preRestartActions.waitControl.actionTiming = value;
@@ -5391,15 +5409,11 @@
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                   <button
                     type="button"
-                    class={editingScheduleUseGlobalWaitControl ? 'status-action-button active' : 'status-action-button'}
-                    on:click={useGlobalScheduleWaitControl}
-                  >
-                    グローバル設定を使用
-                  </button>
-                  <button
-                    type="button"
                     class={!editingScheduleUseGlobalWaitControl ? 'status-action-button active' : 'status-action-button'}
-                    on:click={useCustomScheduleWaitControl}
+                    style={editingScheduleUseGlobalWaitControl 
+                      ? 'width: 144px; background: #2b2f35; color: #e9f9ff; border: 1px solid #2b2f35;'
+                      : 'width: 144px;'}
+                    on:click={toggleScheduleWaitControl}
                   >
                     個別に設定
                   </button>
@@ -5422,7 +5436,25 @@
                         bind:value={editingScheduleCustomForceTimeout}
                         on:input={(e) => {
                           const target = e.target as HTMLInputElement;
-                          editingScheduleCustomForceTimeout = Number(target.value);
+                          const value = Number(target.value);
+                          
+                          // 1未満の場合は1に補正
+                          if (value < 1 || !Number.isFinite(value) || isNaN(value)) {
+                            editingScheduleCustomForceTimeout = 1;
+                            target.value = '1';
+                            ensureCustomWaitControlWithinBounds();
+                            return;
+                          }
+                          
+                          // 1440を超える場合は1440に補正
+                          if (value > 1440) {
+                            editingScheduleCustomForceTimeout = 1440;
+                            target.value = '1440';
+                            ensureCustomWaitControlWithinBounds();
+                            return;
+                          }
+                          
+                          editingScheduleCustomForceTimeout = value;
                           ensureCustomWaitControlWithinBounds();
                         }}
                         required
