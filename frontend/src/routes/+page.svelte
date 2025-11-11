@@ -2795,7 +2795,7 @@
 
     try {
       const username = selectedFriendUser.username || selectedFriendUser.id;
-      await postCommand(`invite ${JSON.stringify(username)}`);
+      await postCommand(`invite "${username}"`);
       pushToast(`${username} をフォーカス中のセッション (${runtimeWorlds.focusedSessionName || runtimeWorlds.focusedSessionId}) に招待しました`, 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : '招待に失敗しました';
