@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "ResoniteヘッドレスサーバーをブラウザUIから管理するためのツール",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "backend",

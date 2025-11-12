@@ -432,7 +432,7 @@ DEFAULT_PASSWORD=your-login-password
 
 # 本番環境
 NODE_ENV=production
-AUTH_SHARED_SECRET=your-production-secret  # ⚠️ 強力なランダム文字列に変更（推奨: 32文字以上）
+AUTH_SHARED_SECRET=your-production-secret
 SERVER_PORT=8080
 DEFAULT_PASSWORD=your-production-login-password
 ```
@@ -474,116 +474,10 @@ DEFAULT_PASSWORD=your-production-login-password
    - CIDR制限の設定を確認
 
 3. **CORSエラー**
-   - 開発環境: `http://localhost:5173`からのアクセスか確認
    - 本番環境: 許可されたドメインからのアクセスか確認
 
-### ログの確認
+### ログ
 バックエンドのターミナルで以下のログを確認：
 - `[SECURITY]`: セキュリティイベント
 - `[DEBUG]`: デバッグ情報
 - `[RATE_LIMIT]`: レート制限イベント
-
-## 📋 Resoniteヘッドレスコマンドリファレンス
-
-### アカウント管理
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `login` | Resoniteアカウントにログイン | `login <username/email> <password>` |
-| `logout` | 現在のResoniteアカウントからログアウト | `logout` |
-
-### フレンド管理
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `message` | フレンドリストのユーザーにメッセージを送信 | `message <friend name> <message>` |
-| `invite` | 現在フォーカス中のワールドにフレンドを招待 | `invite <friend name>` |
-| `friendRequests` | すべての受信したフレンドリクエストを一覧表示 | `friendRequests` |
-| `acceptFriendRequest` | フレンドリクエストを承認 | `acceptfriendrequest <friend name>` |
-| `sendFriendRequest` | フレンドリクエストを送信 | `sendFriendRequest <friend name>` |
-| `removeFriend` | ヘッドレスからフレンドを削除 | `removeFriend <friend name>` |
-
-### ワールド管理
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `worlds` | すべてのアクティブなワールドを一覧表示 | `worlds` |
-| `focus` | 特定のワールドにフォーカス | `focus <world id>` |
-| `startWorldURL` | Resonite URLから新しいワールドを開始 | `startworldurl <record URL>` |
-| `startWorldTemplate` | テンプレートから新しいワールドを開始 | `startworldtemplate <template name>` |
-| `status` | 現在のワールドのステータスを表示 | `status` |
-| `close` | 現在フォーカス中のワールドを閉じる | `close` |
-| `save` | 現在フォーカス中のワールドを保存 | `save` |
-| `restart` | 現在フォーカス中のワールドを再起動 | `restart` |
-
-### セッション情報
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `sessionURL` | 現在のセッションのResonite URLをコンソールに出力 | `sessionurl` |
-| `sessionID` | 現在のセッションのIDをコンソールに出力 | `sessionid` |
-| `copySessionURL` | 現在のセッションのResonite URLをクリップボードにコピー | `copysessionurl` |
-| `copySessionID` | 現在のセッションのIDをクリップボードにコピー | `copysessionid` |
-
-### セッション設定
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `name` | 現在フォーカス中のワールドの名前を設定 | `name <new name>` |
-| `accessLevel` | 現在フォーカス中のワールドのアクセスレベルを設定 | `accesslevel <access level name>` |
-| `hideFromListing` | セッションをリストから非表示にするかどうかを設定 | `hidefromlisting <true/false>` |
-| `description` | 現在フォーカス中のワールドの説明を設定 | `description <new description>` |
-| `maxUsers` | 現在フォーカス中のワールドのユーザー制限を設定 | `maxusers <number of users>` |
-| `awayKickInterval` | 現在フォーカス中のワールドの離席キック間隔を設定 | `awaykickinterval <interval in minutes>` |
-
-### ユーザー管理
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `users` | 現在フォーカス中のワールドのすべてのユーザーを一覧表示 | `users` |
-| `kick` | セッションから指定されたユーザーをキック | `kick <username>` |
-| `silence` | セッション内で指定されたユーザーをサイレンス | `silence <username>` |
-| `unsilence` | 指定されたユーザーからサイレンスを解除 | `unsilence <username>` |
-| `respawn` | 指定されたユーザーをリスポーン | `respawn <username>` |
-| `role` | 指定されたユーザーにロールを割り当て（Admin, Builder, Moderator, Guest, Spectator） | `role <username> <role>` |
-
-### BANシステム
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `ban` | このサーバーがホストするすべてのセッションから指定されたユーザーをBAN | `ban <username>` |
-| `unban` | 指定されたユーザーのBANを解除 | `unban <username>` |
-| `listbans` | すべてのアクティブなBANを一覧表示 | `listbans` |
-| `banByName` | Resoniteユーザー名でユーザーをBANする | `banbyname <Resonite username>` |
-| `unbanByName` | Resoniteユーザー名でユーザーのBANを解除 | `unbanbyname <Resonite username>` |
-| `banByID` | ResoniteユーザーIDでユーザーをBAN | `banbyid <user ID>` |
-| `unbanByID` | ResoniteユーザーIDでユーザーのBANを解除 | `unbanbyid <user ID>` |
-
-### アイテム・アセット
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `import` | 現在フォーカス中のワールドにアセットをインポート | `import <file path or Resonite URL>` |
-| `importMinecraft` | Minecraftワールドをインポート（Minewaysのインストールが必要） | `importminecraft <folder containing Minecraft world with the level.dat file>` |
-| `spawn` | インベントリから保存されたアイテムをルートにスポーン | `spawn <Resonite url> <active state>` |
-
-### ダイナミックインパルス
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `dynamicImpulse` | 指定されたタグでシーンルートにダイナミックインパルスを送信 | `dynamicimpulse <tag>` |
-| `dynamicImpulseString` | 指定されたタグと文字列値で非同期ダイナミックインパルスを送信 | `dynamicimpulsestring <tag> <value>` |
-| `dynamicImpulseInt` | 指定されたタグと整数値で非同期ダイナミックインパルスを送信 | `dynamicimpulseint <tag> <value>` |
-| `dynamicImpulseFloat` | 指定されたタグと浮動小数点値で非同期ダイナミックインパルスを送信 | `dynamicimpulsefloat <tag> <value>` |
-
-### システム管理
-
-| コマンド | 説明 | 使用方法 |
-|---------|------|---------|
-| `saveConfig` | 現在の設定を元のconfigファイルに保存 | `saveconfig <filename>` (オプション、未指定の場合は上書き保存) |
-| `gc` | 完全なガベージコレクションを強制実行 | `gc` |
-| `shutdown` | ヘッドレスをシャットダウン（ワールド状態は保存されません） | `shutdown` |
-| `tickRate` | サーバーの最大シミュレーションレートを設定 | `tickrate <ticks per second>` |
-| `log` | 対話型シェルをログ出力モードに切り替え（Enterキーで復帰） | `log` |
-| `debugWorldState` | ワールドの状態に関するデバッグ情報を出力 | `debugWorldState` |
-| `version` | ヘッドレスが実行中のバージョン番号を出力 | `version` |
