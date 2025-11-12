@@ -1,5 +1,7 @@
 # MarkN Resonite Headless Controller
 
+![MarkN Resonite Headless Controller](images/thumnail.webp)
+
 Resoniteのヘッドレスサーバーを、ローカルネットワーク内のブラウザから簡単に操作・管理するためのWebアプリケーションです。
 
 ## 使い方（配布Zipからのセットアップ）
