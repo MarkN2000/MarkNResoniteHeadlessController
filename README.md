@@ -476,3 +476,8 @@ DEFAULT_PASSWORD=your-production-login-password
 - `[SECURITY]`: セキュリティイベント
 - `[DEBUG]`: デバッグ情報
 - `[RATE_LIMIT]`: レート制限イベント
+
+### GitHub Actions
+
+   git tag v1.0.0
+   git push origin v1.0.0
