@@ -82,10 +82,9 @@ console.log(`\n📊 結果: ${copiedCount}個のファイルをコピー, ${skip
 if (copiedCount > 0) {
   console.log('⚠️  重要: 本番環境で使用する前に、以下の設定を必ず変更してください：');
   console.log('  1. .env ファイルの AUTH_SHARED_SECRET');
-  console.log('  2. .env ファイルの MOD_API_KEY');
-  console.log('  3. .env ファイルの RESONITE_HEADLESS_PATH');
-  console.log('  4. config/auth.json の jwtSecret と password');
-  console.log('  5. config/security.json の allowedCidrs（必要に応じて）\n');
+  console.log('  2. .env ファイルの RESONITE_HEADLESS_PATH');
+  console.log('  3. config/auth.json の jwtSecret と password');
+  console.log('  4. config/security.json の allowedCidrs（必要に応じて）\n');
 }
 
 console.log('✨ セットアップが完了しました！\n');
