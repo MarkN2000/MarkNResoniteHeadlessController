@@ -5,6 +5,7 @@ import { execFileSync, execSync, spawn } from 'child_process';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import net from 'node:net';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,9 +24,14 @@ const SETUP_MARKER = path.join(ROOT_DIR, '.setup_completed');
 const SETUP_SCRIPT = path.join(__dirname, 'setup.js');
 const APP_ENTRY = path.join(BACKEND_DIR, 'dist', 'backend', 'src', 'app.js');
 const DEFAULT_SERVER_PORT = 8080;
+const DEFAULT_HEADLESS_PATH = 'C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe';
 
 const divider = () => {
   console.log('======================================');
+};
+
+const generateSecureSecret = () => {
+  return crypto.randomBytes(32).toString('base64');
 };
 
 const parseKeyValueLine = (line) => {
@@ -238,6 +244,136 @@ const ensureServerPortConfigured = async () => {
   return port;
 };
 
+const validateHeadlessPath = (filePath) => {
+  if (!filePath || typeof filePath !== 'string') {
+    return { valid: false, reason: 'パスが指定されていません。' };
+  }
+
+  const trimmed = filePath.trim();
+  if (!trimmed) {
+    return { valid: false, reason: 'パスが空です。' };
+  }
+
+  // パスが Headless/Resonite.exe または Headless\Resonite.exe で終わっているか確認
+  const normalizedPath = trimmed.replace(/\\/g, '/');
+  if (!normalizedPath.toLowerCase().endsWith('headless/resonite.exe')) {
+    return {
+      valid: false,
+      reason: 'パスは Headless/Resonite.exe で終わる必要があります。',
+    };
+  }
+
+  // ファイルが存在するか確認
+  if (!fs.existsSync(trimmed)) {
+    return { valid: false, reason: '指定されたファイルが存在しません。' };
+  }
+
+  return { valid: true };
+};
+
+const loadSavedHeadlessPath = () => {
+  // 環境変数から確認
+  if (process.env.RESONITE_HEADLESS_PATH) {
+    const validation = validateHeadlessPath(process.env.RESONITE_HEADLESS_PATH);
+    if (validation.valid) {
+      return process.env.RESONITE_HEADLESS_PATH;
+    }
+  }
+
+  // .env ファイルから読み込み
+  const lines = readEnvLines();
+  for (const line of lines) {
+    const kv = parseKeyValueLine(line);
+    if (kv && kv.key.toUpperCase() === 'RESONITE_HEADLESS_PATH') {
+      const validation = validateHeadlessPath(kv.value);
+      if (validation.valid) {
+        return kv.value;
+      }
+    }
+  }
+
+  return null;
+};
+
+const saveHeadlessPath = (headlessPath) => {
+  const pathValue = String(headlessPath);
+  let lines = readEnvLines();
+  lines = replaceEnvValue(lines, 'RESONITE_HEADLESS_PATH', pathValue);
+  writeEnvLines(lines);
+  console.log(`[INFO] .env の RESONITE_HEADLESS_PATH を更新しました。`);
+};
+
+const promptForHeadlessPath = async (defaultPath = DEFAULT_HEADLESS_PATH) => {
+  if (!process.stdin.isTTY) {
+    return defaultPath;
+  }
+
+  const rl = readline.createInterface({ input, output });
+  let resolvedPath = defaultPath;
+
+  while (true) {
+    const answer = await rl.question(
+      `Resonite.exeのパスを入力（未入力の場合 ${defaultPath} となります): `,
+    );
+    const trimmed = answer.trim();
+    const candidate = trimmed || defaultPath;
+
+    const validation = validateHeadlessPath(candidate);
+    if (!validation.valid) {
+      console.log(`エラー: ${validation.reason}`);
+      continue;
+    }
+
+    resolvedPath = candidate;
+    break;
+  }
+
+  rl.close();
+  console.log('');
+  return resolvedPath;
+};
+
+const ensureHeadlessPathConfigured = async () => {
+  let headlessPath = loadSavedHeadlessPath();
+
+  if (headlessPath) {
+    const validation = validateHeadlessPath(headlessPath);
+    if (!validation.valid) {
+      if (process.stdin.isTTY) {
+        console.log('');
+        console.log(`--- 保存されているパスが無効です: ${validation.reason} ---`);
+        console.log('--- Headlessの実行ファイルパスを変更する場合は入力してください ---');
+        headlessPath = await promptForHeadlessPath(DEFAULT_HEADLESS_PATH);
+        saveHeadlessPath(headlessPath);
+      } else {
+        console.warn(
+          `[WARN] 保存されているパスが無効です: ${validation.reason}。必要に応じて .env を更新してください。`,
+        );
+        headlessPath = DEFAULT_HEADLESS_PATH;
+        saveHeadlessPath(headlessPath);
+      }
+    }
+  } else if (process.stdin.isTTY) {
+    console.log('');
+    console.log('--- Headlessの実行ファイルパスを変更する場合は入力してください ---');
+    headlessPath = await promptForHeadlessPath(DEFAULT_HEADLESS_PATH);
+    saveHeadlessPath(headlessPath);
+  } else {
+    headlessPath = DEFAULT_HEADLESS_PATH;
+    console.warn(
+      `[WARN] 対話的な入力が利用できません。デフォルトパス ${headlessPath} を使用します。必要に応じて .env を手動で更新してください。`,
+    );
+    saveHeadlessPath(headlessPath);
+  }
+
+  if (!headlessPath) {
+    headlessPath = DEFAULT_HEADLESS_PATH;
+    saveHeadlessPath(headlessPath);
+  }
+
+  return headlessPath;
+};
+
 const waitForExit = (code = 0) => {
   if (!process.stdin.isTTY) {
     process.exit(code);
@@ -432,6 +568,108 @@ const loadSavedHeadlessCredentials = () => {
   }
 };
 
+const isDefaultSecret = (secret) => {
+  if (!secret || typeof secret !== 'string') {
+    return true;
+  }
+  const trimmed = secret.trim();
+  return (
+    !trimmed ||
+    trimmed === 'your-secret-key' ||
+    trimmed === 'your-secret-key-change-in-production' ||
+    trimmed.length < 16
+  );
+};
+
+const ensureAuthSecretConfigured = () => {
+  let secret = null;
+  let needsEnvUpdate = false;
+  let needsAuthJsonUpdate = false;
+
+  // .env ファイルが存在しない場合は作成（setup.js で作成されるはずだが念のため）
+  if (!fs.existsSync(ENV_PATH)) {
+    console.log('[INFO] .env ファイルが存在しないため、作成します。');
+    writeEnvLines([]);
+  }
+
+  // .env ファイルから AUTH_SHARED_SECRET を読み込む
+  const envLines = readEnvLines();
+  let envSecret = null;
+  for (const line of envLines) {
+    const kv = parseKeyValueLine(line);
+    if (kv && kv.key.toUpperCase() === 'AUTH_SHARED_SECRET') {
+      envSecret = kv.value;
+      break;
+    }
+  }
+
+  // 環境変数からも確認
+  if (!envSecret && process.env.AUTH_SHARED_SECRET) {
+    envSecret = process.env.AUTH_SHARED_SECRET;
+  }
+
+  // デフォルト値の場合は生成が必要
+  if (isDefaultSecret(envSecret)) {
+    secret = generateSecureSecret();
+    needsEnvUpdate = true;
+    console.log('[INFO] AUTH_SHARED_SECRET を自動生成しました。');
+  } else {
+    secret = envSecret;
+  }
+
+  // auth.json の jwtSecret を確認
+  let authConfig = loadOrCreateAuthConfig();
+  if (isDefaultSecret(authConfig.jwtSecret)) {
+    // 環境変数または生成したシークレットを使用
+    authConfig.jwtSecret = secret;
+    needsAuthJsonUpdate = true;
+    console.log('[INFO] auth.json の jwtSecret を自動設定しました。');
+  }
+
+  // .env ファイルを更新
+  if (needsEnvUpdate) {
+    let updatedLines = replaceEnvValue(envLines, 'AUTH_SHARED_SECRET', secret);
+    writeEnvLines(updatedLines);
+    console.log('[INFO] .env の AUTH_SHARED_SECRET を更新しました。');
+    // 更新後の行を再読み込み（NODE_ENV のチェック用）
+    envLines.length = 0;
+    envLines.push(...readEnvLines());
+  }
+
+  // NODE_ENV=production を設定（本番環境）
+  const hasNodeEnv = envLines.some((line) => {
+    const kv = parseKeyValueLine(line);
+    return kv && kv.key.toUpperCase() === 'NODE_ENV';
+  });
+  if (!hasNodeEnv) {
+    const updatedLines = replaceEnvValue(envLines, 'NODE_ENV', 'production');
+    writeEnvLines(updatedLines);
+    console.log('[INFO] .env の NODE_ENV を production に設定しました。');
+  } else {
+    // 既存の NODE_ENV を確認し、development の場合は production に変更
+    const nodeEnvLine = envLines.find((line) => {
+      const kv = parseKeyValueLine(line);
+      return kv && kv.key.toUpperCase() === 'NODE_ENV';
+    });
+    if (nodeEnvLine) {
+      const kv = parseKeyValueLine(nodeEnvLine);
+      if (kv && kv.value.toLowerCase() === 'development') {
+        const updatedLines = replaceEnvValue(envLines, 'NODE_ENV', 'production');
+        writeEnvLines(updatedLines);
+        console.log('[INFO] .env の NODE_ENV を production に更新しました。');
+      }
+    }
+  }
+
+  // auth.json を更新
+  if (needsAuthJsonUpdate) {
+    saveAuthConfig(authConfig);
+    console.log('[INFO] config/auth.json の jwtSecret を更新しました。');
+  }
+
+  return secret;
+};
+
 const ensureDefaultHeadlessConfig = () => {
   fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
 
@@ -525,6 +763,9 @@ const runInitialSetup = async () => {
   console.log('[3/3] 追加のビルドは不要です。プリビルド資産を使用します。');
   console.log('');
 
+  // シークレットの自動生成・設定
+  ensureAuthSecretConfigured();
+
   const credentials = await promptForInitialCredentials();
   if (credentials) {
     updateAuthPassword(credentials.appPassword);
@@ -532,6 +773,7 @@ const runInitialSetup = async () => {
     applyHeadlessCredentialsToConfigs(credentials.headlessUsername, credentials.headlessPassword);
   }
 
+  await ensureHeadlessPathConfigured();
   await ensureServerPortConfigured();
 
   divider();
@@ -551,6 +793,9 @@ const runInitialSetup = async () => {
 };
 
 const ensureCredentialsConfigured = async () => {
+  // シークレットの自動生成・設定（初回起動時にも実行）
+  ensureAuthSecretConfigured();
+
   const savedAuthPassword = loadAuthPassword();
   const savedHeadlessCredentials = loadSavedHeadlessCredentials();
 
@@ -566,8 +811,9 @@ const ensureCredentialsConfigured = async () => {
       saveHeadlessCredentials(credentials.headlessUsername, credentials.headlessPassword);
       applyHeadlessCredentialsToConfigs(credentials.headlessUsername, credentials.headlessPassword);
       
-      // 資格情報入力後にポート設定を促す
+      // 資格情報入力後にHeadlessパスとポート設定を促す
       console.log('');
+      await ensureHeadlessPathConfigured();
       await ensureServerPortConfigured();
       return true; // 資格情報を設定したことを示す
     }
@@ -632,9 +878,10 @@ const main = async () => {
       await runInitialSetup();
     } else {
       const credentialsWereSet = await ensureCredentialsConfigured();
-      // 資格情報を設定した場合は、その時点でポート設定も完了している
-      // 資格情報が既に設定済みの場合は、ここでポート設定を確認
+      // 資格情報を設定した場合は、その時点でHeadlessパスとポート設定も完了している
+      // 資格情報が既に設定済みの場合は、ここでHeadlessパスとポート設定を確認
       if (!credentialsWereSet) {
+        await ensureHeadlessPathConfigured();
         await ensureServerPortConfigured();
       }
     }

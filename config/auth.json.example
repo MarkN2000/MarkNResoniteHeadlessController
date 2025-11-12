@@ -1,4 +1,5 @@
 {
+  "_comment": "⚠️ セキュリティ警告: このリポジトリは公開されています。本番環境では必ず jwtSecret を変更してください。環境変数 AUTH_SHARED_SECRET の使用を強く推奨します（環境変数が優先されます）。",
   "jwtSecret": "your-secret-key-change-in-production",
   "jwtExpiresIn": "24h",
   "password": "",

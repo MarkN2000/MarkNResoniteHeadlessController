@@ -2,45 +2,6 @@
 
 Resoniteのヘッドレスサーバーを、ローカルネットワーク内のPCやスマートフォンのブラウザから簡単に操作・管理するためのWebアプリケーションです。
 
-## 概要
-
-- **WebUI**: ブラウザから直感的にヘッドレスサーバーを操作
-- **Mod連携**: Resonite ModからのAPI連携機能
-- **セキュリティ**: JWT認証、CIDR制限、レート制限による多層防御
-- **リアルタイム**: WebSocketによるリアルタイムログ・ステータス表示
-
-## 主要機能
-
-### WebUI機能
-- **ダッシュボード**: サーバー状態監視、ユーザー管理、ワールド操作
-- **新規ワールド**: テンプレート/URLからのワールド起動、ワールド検索機能
-- **フレンド管理**: フレンドリクエスト、メッセージ送信
-- **設定管理**: 設定ファイルの作成・編集
-- **コマンド実行**: 任意のヘッドレスコマンドの実行
-
-### Mod連携機能
-- **REST API**: Modからのコマンド送信
-- **軽量認証**: API Key認証による高速アクセス
-- **ローカル制限**: ローカルネットワーク内からのアクセスのみ許可
-
-## セキュリティ機能
-
-### 認証・認可
-- **JWT認証**: WebUI用のトークンベース認証
-- **API Key認証**: Mod用の軽量認証
-- **CIDR制限**: ローカルネットワーク内からのアクセスのみ許可
-
-### レート制限
-- **ログイン試行**: 15分間に5回まで
-- **API呼び出し**: 15分間に1000回まで
-- **セキュリティ情報**: 15分間に1000回まで
-- **リクエストサイズ**: 10MBまで
-
-### CORS設定
-- **開発環境**: localhost系のみ許可
-- **本番環境**: 指定されたドメインのみ許可
-- **Mod用**: ローカルネットワーク内のIPのみ許可
-
 ## 技術スタック
 
 - **バックエンド**: Node.js + Express + Socket.io
@@ -56,141 +17,6 @@ Resoniteのヘッドレスサーバーを、ローカルネットワーク内の
 - Resonite Headless Server
 - Windows 10/11
 
-### インストール
-
-#### 方法1: 自動セットアップ（推奨・Windows）
-
-1. **リポジトリのクローン**
-```bash
-git clone <repository-url>
-cd MarkNResoniteHeadlessController
-```
-
-2. **依存関係のインストール**
-```bash
-npm install
-
-# フロントエンド用のadapter-staticをインストール（重要）
-npm install --save-dev @sveltejs/adapter-static --workspace frontend
-```
-
-3. **初期セットアップの実行**
-```bash
-# Windowsの場合（初回セットアップと本番起動を兼ねる）
-start.bat
-
-# または手動でセットアップのみ実施
-npm run setup
-```
-
-`start.bat` は初回実行時に以下を自動的に行い、そのまま本番モードでバックエンドを起動します：
-- 設定ファイルのサンプルから実際のファイルを生成
-- バックエンド依存関係のインストール
-- プリビルド済み資産の確認
-- 管理画面ログイン用パスワードと Headless 資格情報の入力・保存
-- 入力された Headless 資格情報は `config/auth.json` の `headlessCredentials` として保存され、既存のプリセット設定（`config/headless/*.json`）へ自動反映されます。
-- `.setup_completed` が存在する環境でも、パスワードや Headless 資格情報が未設定／初期値の場合には再度入力を促し、設定を反映します。
-
-4. **設定ファイルの編集**
-
-生成された設定ファイルを環境に合わせて編集してください：
-
-- `.env` - 環境変数（シークレットキー、パス等）
-- `config/auth.json` - 認証設定（パスワード等）
-- `config/security.json` - セキュリティ設定（CIDR範囲等）
-
-⚠️ **重要**: 本番環境では必ず以下を変更してください：
-- `.env` の `AUTH_SHARED_SECRET`（JWTシークレット）
-- `.env` の `RESONITE_HEADLESS_PATH`（Resonite実行ファイルパス）
-- `config/auth.json` の `password`（Mod APIキーも同じ値を使用）
-
-#### 方法2: 手動セットアップ
-
-1. **リポジトリのクローン**
-```bash
-git clone <repository-url>
-cd MarkNResoniteHeadlessController
-```
-
-2. **依存関係のインストール**
-```bash
-npm install
-```
-
-3. **設定ファイルの準備**
-```bash
-# 環境変数
-cp env.example .env
-
-# 認証設定
-cp config/auth.json.example config/auth.json
-
-# セキュリティ設定
-cp config/security.json.example config/security.json
-
-# ランタイム状態
-cp config/runtime-state.json.example config/runtime-state.json
-
-# 再起動設定
-cp backend/config/restart.json.example backend/config/restart.json
-cp backend/config/restart-status.json.example backend/config/restart-status.json
-```
-
-4. **環境変数の編集（.env）**
-```bash
-NODE_ENV=development
-SERVER_PORT=8080
-AUTH_SHARED_SECRET=your-secret-key-change-in-production
-RESONITE_HEADLESS_PATH=C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe
-```
-
-初回セットアップではポート番号の入力を求められ、回答が `.env` の `PORT` / `SERVER_PORT` に自動反映されます。手動で変更する場合も `.env` を編集してください。
-
-### 起動
-
-#### 開発環境
-
-1. **開発サーバーの起動（バックエンド + フロントエンド）**
-```bash
-npm run dev
-```
-
-または個別に起動：
-
-```bash
-# バックエンドのみ
-npm run dev --workspace backend
-
-# フロントエンドのみ
-npm run dev --workspace frontend
-```
-
-2. **アクセス**
-- WebUI: `http://localhost:5173`
-- API: `http://localhost:8080/api`
-
-#### 本番環境
-
-1. **ビルド**
-```bash
-npm run build
-```
-
-2. **起動**
-```bash
-# Windowsの場合
-start.bat
-
-# または（Node.jsから直接実行）
-node scripts/start.js
-
-# 既存のバックエンドワークスペーススクリプトを使う場合
-npm start
-```
-
-3. **アクセス**
-- WebUI & API: `http://localhost:<設定したポート>`
-- パスワード: `.env` または `config/auth.json` で設定したもの
 
 #### 配布用Zipの作成（Windows）
 
@@ -204,20 +30,26 @@ npm run package:zip
 
 1. 配布された `MarkNResoniteHeadlessController.zip` を任意のディレクトリに展開します。
 2. Node.js 20 以上がインストールされていることを確認します。
-3. Windowsでは `start.bat` を実行（ダブルクリック可）します。初回はセットアップが自動で実施され、アプリ用パスワード・Headless資格情報・使用ポート（デフォルト8080）の入力を求められます。その他の環境では `node scripts/start.js` または `npm run setup` と既存手順を利用してください。
-4. `.env` や `config/*.json` が未生成の場合は自動的に作成されます。必要に応じて `env.example` を `.env` に複製し、シークレットやパスを調整してください。
+3. Windowsでは `start.bat` を実行（ダブルクリック可）します。初回はセットアップが自動で実施され、以下が自動的に設定されます：
+   - ✅ `AUTH_SHARED_SECRET`（JWTシークレット）の自動生成
+   - ✅ `NODE_ENV=production` の自動設定
+   - ✅ `config/auth.json` の `jwtSecret` の自動設定
+   - アプリ用パスワード・Headless資格情報・使用ポート（デフォルト8080）の入力が求められます
+   その他の環境では `node scripts/start.js` または `npm run setup` と既存手順を利用してください。
+4. `.env` や `config/*.json` が未生成の場合は自動的に作成されます。シークレットは自動生成されるため、手動での変更は不要です。
 5. 2回目以降も `start.bat` を実行するだけでバックエンドを起動できます（セットアップはスキップされます）。
 6. ブラウザで `http://localhost:<設定したポート>` にアクセスし、初回セットアップで設定したパスワードでログインしてください。
 
 ⚠️ **本番環境の注意点**:
-- 必ず `.env` で `NODE_ENV=production` を設定
-- セキュリティ設定を厳密に確認
+- ✅ `NODE_ENV=production` と `AUTH_SHARED_SECRET` は**初回セットアップ時に自動設定**されます（ユーザー操作不要）
+- セキュリティ設定を厳密に確認（`config/security.json` の `allowedCidrs` など）
 - ファイアウォールでポート8080を適切に設定
 - 可能であればリバースプロキシ（nginx等）の使用を推奨
+- **シークレットの手動変更**: 必要に応じて `.env` の `AUTH_SHARED_SECRET` を手動で変更することも可能です（環境変数が設定ファイルより優先されます）
 
-## Mod連携API
+## API
 
-Resonite MODから本アプリケーションのAPIを呼び出して、ヘッドレスサーバーを操作できます。新仕様では、単一エンドポイント・単一メソッド（POST）でアクションを指定します。
+Resoniteから本アプリケーションのAPIを呼び出して、ヘッドレスサーバーを操作できます。新仕様では、単一エンドポイント・単一メソッド（POST）でアクションを指定します。
 
 ### エンドポイント（単一）
 ```http
@@ -584,6 +416,12 @@ APIはエラー時に適切なHTTPステータスコードとエラーメッセ�
 }
 ```
 
+**⚠️ セキュリティ注意事項:**
+- ✅ `jwtSecret` は**初回セットアップ時に自動生成・設定**されます（ユーザー操作不要）
+- `jwtSecret` は環境変数 `AUTH_SHARED_SECRET` で上書き可能です（環境変数が優先されます）
+- `password` はインストール時に必ず設定されるため、ここでの設定は不要です
+- 必要に応じて手動で変更することも可能です
+
 ### セキュリティ設定 (`config/security.json`)
 ```json
 {
@@ -601,10 +439,15 @@ DEFAULT_PASSWORD=your-login-password
 
 # 本番環境
 NODE_ENV=production
-AUTH_SHARED_SECRET=your-production-secret
+AUTH_SHARED_SECRET=your-production-secret  # ⚠️ 強力なランダム文字列に変更（推奨: 32文字以上）
 SERVER_PORT=8080
 DEFAULT_PASSWORD=your-production-login-password
 ```
+
+**環境変数の優先順位:**
+- 環境変数（`process.env.*`）が設定ファイルより優先されます
+- ✅ 初回セットアップ時に `AUTH_SHARED_SECRET` が自動生成され、`.env` ファイルに自動設定されます
+- 必要に応じて手動で変更することも可能です（例: `openssl rand -base64 32` で生成した値を設定）
 
 ## セキュリティ設定
 
@@ -751,28 +594,3 @@ DEFAULT_PASSWORD=your-production-login-password
 | `log` | 対話型シェルをログ出力モードに切り替え（Enterキーで復帰） | `log` |
 | `debugWorldState` | ワールドの状態に関するデバッグ情報を出力 | `debugWorldState` |
 | `version` | ヘッドレスが実行中のバージョン番号を出力 | `version` |
-
-### 使用例
-
-```bash
-# ワールドを開始
-startworldtemplate Grid
-
-# ワールドにフォーカス
-focus 0
-
-# ワールド名を変更
-name My Awesome World
-
-# アクセスレベルを変更
-accesslevel Friends
-
-# 最大ユーザー数を設定
-maxusers 16
-
-# ダイナミックインパルスでメッセージを送信
-dynamicimpulsestring MessageBoard "Hello from Headless!"
-
-# ワールドを保存
-save
-```
