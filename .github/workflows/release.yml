@@ -30,7 +30,20 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/MarkNResoniteHeadlessController.zip
-          generate_release_notes: true
+          body: |
+            ## インストール方法
+
+            1. 配布された `MarkNResoniteHeadlessController.zip` をヘッドレスPCの任意のディレクトリに展開します。
+
+            2. Node.js 20 以上がインストールされていることを確認します。
+
+            3. 初回セットアップは `start.bat` を実行（ダブルクリック）します。指示にしたがってパスワードなどを設定してください。
+
+            4. 2回目以降も `start.bat` を実行するだけでバックエンドを起動できます（セットアップはスキップされます）。
+
+            5. ローカルネットワーク内でブラウザから `<ヘッドレスPCのIPアドレス（例：192.168.1.~）>:8080>` にアクセスし、初回セットアップで設定したパスワードでログインしてください。
+
+            **アップデート方法**: フォルダごと上書きしてください。
           draft: false
           prerelease: false
         env:
