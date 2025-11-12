@@ -31,6 +31,14 @@ export interface ExecuteCommandOptions {
   settleDurationMs?: number;
 }
 
+interface QueuedCommand {
+  command: string;
+  timeoutMs: number;
+  options?: ExecuteCommandOptions;
+  resolve: (value: LogEntry[]) => void;
+  reject: (reason?: any) => void;
+}
+
 export class ProcessManager extends EventEmitter {
   private child?: ChildProcessWithoutNullStreams;
   private status: HeadlessStatus = { running: false };
@@ -38,6 +46,8 @@ export class ProcessManager extends EventEmitter {
   private stopPromise?: Promise<void>;
   private lastUserName?: string;
   private lastUserId?: string;
+  private commandQueue: QueuedCommand[] = [];
+  private isExecutingCommand = false;
 
   constructor() {
     super();
@@ -327,51 +337,102 @@ export class ProcessManager extends EventEmitter {
       throw new Error('Headless process is not running');
     }
 
+    return new Promise((resolve, reject) => {
+      // キューに追加
+      this.commandQueue.push({
+        command,
+        timeoutMs,
+        options,
+        resolve,
+        reject
+      });
+
+      // キューを処理開始（既に実行中でない場合）
+      this.processQueue();
+    });
+  }
+
+  /**
+   * キューから順次コマンドを処理する
+   */
+  private processQueue(): void {
+    // 既に実行中、またはキューが空の場合は何もしない
+    if (this.isExecutingCommand || this.commandQueue.length === 0) {
+      return;
+    }
+
+    // 次のコマンドを取得
+    const queued = this.commandQueue.shift();
+    if (!queued) {
+      return;
+    }
+
+    this.isExecutingCommand = true;
+
+    const { command, timeoutMs, options, resolve, reject } = queued;
     const collectorKey = this.logBuffer.nextId();
     const collector = this.logBuffer.createResponseCollector(collectorKey);
 
     const stopWhen = options?.stopWhen;
     const settleDurationMs = options?.settleDurationMs ?? 80;
 
-    return new Promise((resolve, reject) => {
-      const handleExit = () => {
-        cleanup();
-        reject(new Error('Headless process exited during command execution'));
-      };
+    const handleExit = () => {
+      cleanup();
+      this.isExecutingCommand = false;
+      reject(new Error('Headless process exited during command execution'));
+      // キューに残っているコマンドをすべて拒否
+      this.rejectAllQueuedCommands(new Error('Headless process exited'));
+      // 次のコマンドを処理
+      this.processQueue();
+    };
 
-      const cleanup = () => {
-        clearTimeout(timer);
-        if (settleTimer) clearTimeout(settleTimer);
-        this.off('status', handleExit);
-        this.off('log', handleLog);
-        collector.dispose();
-      };
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (settleTimer) clearTimeout(settleTimer);
+      this.off('status', handleExit);
+      this.off('log', handleLog);
+      collector.dispose();
+    };
 
-      const finalize = () => {
-        cleanup();
-        resolve(collector.collect());
-      };
+    const finalize = () => {
+      cleanup();
+      this.isExecutingCommand = false;
+      resolve(collector.collect());
+      // 次のコマンドを処理
+      this.processQueue();
+    };
 
-      const timer = setTimeout(() => {
-        finalize();
-      }, timeoutMs);
+    const timer = setTimeout(() => {
+      finalize();
+    }, timeoutMs);
 
-      let settleTimer: NodeJS.Timeout | null = null;
+    let settleTimer: NodeJS.Timeout | null = null;
 
-      const handleLog = (entry: LogEntry) => {
-        if (entry.id < collectorKey) return;
-        if (!stopWhen) return;
-        if (!stopWhen(entry)) return;
-        if (settleTimer) return;
-        settleTimer = setTimeout(finalize, settleDurationMs);
-      };
+    const handleLog = (entry: LogEntry) => {
+      if (entry.id < collectorKey) return;
+      if (!stopWhen) return;
+      if (!stopWhen(entry)) return;
+      if (settleTimer) return;
+      settleTimer = setTimeout(finalize, settleDurationMs);
+    };
 
-      this.on('status', handleExit);
-      if (stopWhen) {
-        this.on('log', handleLog);
+    this.on('status', handleExit);
+    if (stopWhen) {
+      this.on('log', handleLog);
+    }
+    this.sendCommand(command);
+  }
+
+  /**
+   * キューに残っているすべてのコマンドを拒否する
+   */
+  private rejectAllQueuedCommands(reason: Error): void {
+    while (this.commandQueue.length > 0) {
+      const queued = this.commandQueue.shift();
+      if (queued) {
+        queued.reject(reason);
       }
-      this.sendCommand(command);
-    });
+    }
   }
 
   stop(gracePeriodMs = 60000, killTimeoutMs = 70000): Promise<void> {
@@ -379,6 +440,10 @@ export class ProcessManager extends EventEmitter {
     if (!child) {
       return Promise.reject(new Error('Headless process is not running'));
     }
+
+    // キューに残っているコマンドをすべて拒否
+    this.rejectAllQueuedCommands(new Error('Headless process is stopping'));
+    this.isExecutingCommand = false;
 
     if (this.stopPromise) {
       return this.stopPromise;

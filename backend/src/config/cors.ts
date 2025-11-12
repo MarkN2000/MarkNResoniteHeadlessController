@@ -27,9 +27,9 @@ const developmentCors: CorsConfig = {
 };
 
 /**
- * Mod専用のCORS設定（ローカルネットワークのみ）
+ * Headless API専用のCORS設定（ローカルネットワークのみ）
  */
-export const modCors: CorsConfig = {
+export const headlessCors: CorsConfig = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // ローカルネットワーク内のIPのみ許可
     if (!origin || 
@@ -42,11 +42,11 @@ export const modCors: CorsConfig = {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: false, // Mod用は認証情報不要
+  credentials: false, // Headless API用は認証情報不要
   methods: ['GET', 'POST'],
   allowedHeaders: [
     'Content-Type',
-    'X-Mod-Api-Key'
+    'X-Headless-Api-Key'
   ]
 };
 

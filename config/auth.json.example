@@ -3,6 +3,6 @@
   "jwtSecret": "your-secret-key-change-in-production",
   "jwtExpiresIn": "24h",
   "password": "",
-  "modApiKey": "mod-secret-key"
+  "_comment_modApiKey": "Headless API用のAPIキー（現在は使用されていません。Headless APIのAPIキーはアプリのログインパスワードと同じものを使用します）"
 }
 

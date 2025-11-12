@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import cors from 'cors';
 import { cidrRestriction } from '../../middleware/cidr.js';
-import { modCors } from '../../config/cors.js';
+import { headlessCors } from '../../config/cors.js';
 import { getPlainPassword } from '../../utils/auth.js';
 import { checkRateLimit, generateRateLimitKey } from '../../utils/rateLimit.js';
-import { actionHandlers } from './modHandlers.js';
+import { actionHandlers } from './headlessHandlers.js';
 
 const router = Router();
 
-// Mod APIキーはアプリのログインパスワードと同じものを使用
-const modApiKey = getPlainPassword();
+// Headless APIキーはアプリのログインパスワードと同じものを使用
+const headlessApiKey = getPlainPassword();
 
 const RATE_LIMIT_CONFIG = {
   windowMs: 15 * 60 * 1000,
@@ -82,7 +82,7 @@ const validateRequest = (req: any) => {
     };
   }
 
-  if (apiKey !== modApiKey) {
+  if (apiKey !== headlessApiKey) {
     return {
       status: 401,
       error: {
@@ -95,7 +95,7 @@ const validateRequest = (req: any) => {
   return null;
 };
 
-router.use(cors(modCors));
+router.use(cors(headlessCors));
 router.use(cidrRestriction);
 
 router.post('/', async (req, res) => {
@@ -156,7 +156,7 @@ router.post('/', async (req, res) => {
       data
     });
   } catch (error) {
-    console.error('[ModAPI] Action execution error:', {
+    console.error('[HeadlessAPI] Action execution error:', {
       action,
       message: error instanceof Error ? error.message : String(error)
     });
@@ -173,4 +173,5 @@ router.post('/', async (req, res) => {
   }
 });
 
-export { router as modRoutes };
+export { router as headlessRoutes };
+

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { serverRoutes } from './routes/serverRoutes.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { securityRoutes } from './routes/securityRoutes.js';
-import { modRoutes } from './routes/modRoutes.js';
+import { headlessRoutes } from './routes/headlessRoutes.js';
 import { createRestartRoutes } from './routes/restartRoutes.js';
 import type { RestartManager } from '../services/restartManager.js';
 
@@ -12,7 +12,7 @@ export function createApiRouter(restartManager?: RestartManager): Router {
   apiRouter.use('/auth', authRoutes);
   apiRouter.use('/server', serverRoutes);
   apiRouter.use('/security', securityRoutes);
-  apiRouter.use('/mod', modRoutes);
+  apiRouter.use('/headless', headlessRoutes);
   
   // RestartManagerが提供されている場合のみrestartルートを追加
   if (restartManager) {

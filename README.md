@@ -40,20 +40,13 @@ npm run package:zip
 5. 2回目以降も `start.bat` を実行するだけでバックエンドを起動できます（セットアップはスキップされます）。
 6. ブラウザで `http://localhost:<設定したポート>` にアクセスし、初回セットアップで設定したパスワードでログインしてください。
 
-⚠️ **本番環境の注意点**:
-- ✅ `NODE_ENV=production` と `AUTH_SHARED_SECRET` は**初回セットアップ時に自動設定**されます（ユーザー操作不要）
-- セキュリティ設定を厳密に確認（`config/security.json` の `allowedCidrs` など）
-- ファイアウォールでポート8080を適切に設定
-- 可能であればリバースプロキシ（nginx等）の使用を推奨
-- **シークレットの手動変更**: 必要に応じて `.env` の `AUTH_SHARED_SECRET` を手動で変更することも可能です（環境変数が設定ファイルより優先されます）
-
 ## API
 
 Resoniteから本アプリケーションのAPIを呼び出して、ヘッドレスサーバーを操作できます。新仕様では、単一エンドポイント・単一メソッド（POST）でアクションを指定します。
 
 ### エンドポイント（単一）
 ```http
-POST /api/mod
+POST /api/headless
 Content-Type: application/json; charset=utf-8
 ```
 
@@ -72,7 +65,7 @@ Content-Type: application/json; charset=utf-8
 {
   "version": 1,
   "timestamp": "2025-11-11T03:00:00.000Z",
-  "apiKey": "your-mod-key",
+  "apiKey": "your-api-key",
   "action": "sessionlist",
   "params": {},
   "requestId": "abc-123"
@@ -464,7 +457,7 @@ DEFAULT_PASSWORD=your-production-login-password
 
 ### CORS設定
 - **WebUI**: 開発環境ではlocalhost、本番環境では指定ドメイン
-- **Mod API**: ローカルネットワーク内のIPのみ許可
+- **Headless API**: ローカルネットワーク内のIPのみ許可
 
 ## トラブルシューティング
 
@@ -475,8 +468,8 @@ DEFAULT_PASSWORD=your-production-login-password
    - `start.bat` を再実行してパスワードを再設定
    - 設定ファイル: `config/auth.json` を確認
 
-2. **Mod APIにアクセスできない**
-   - API Key: `mod-secret-key`を確認
+2. **Headless APIにアクセスできない**
+   - API Keyが正しいか確認
    - ローカルネットワーク内からのアクセスか確認
    - CIDR制限の設定を確認
 

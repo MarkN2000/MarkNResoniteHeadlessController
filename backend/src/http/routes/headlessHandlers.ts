@@ -8,17 +8,17 @@ import {
   parseAccessLevelOutput,
   parseRoleOutput,
   parseSessionUrlOutput
-} from './modParsers.js';
+} from './headlessParsers.js';
 
 /**
- * Mod APIアクションハンドラーの型定義
+ * Headless APIアクションハンドラーの型定義
  */
-export type ModActionHandler = (params: any) => Promise<any>;
+export type HeadlessActionHandler = (params: any) => Promise<any>;
 
 /**
  * sessionlistアクション: セッション一覧を取得
  */
-export const handleSessionList: ModActionHandler = async (_params) => {
+export const handleSessionList: HeadlessActionHandler = async (_params) => {
   const logEntries = await processManager.executeCommand('worlds');
   const output = logEntriesToString(logEntries);
   const sessions = parseWorldsOutput(output);
@@ -28,7 +28,7 @@ export const handleSessionList: ModActionHandler = async (_params) => {
 /**
  * focusアクション: 指定インデックスのセッションにフォーカスし、status結果を返す
  */
-export const handleFocus: ModActionHandler = async (params) => {
+export const handleFocus: HeadlessActionHandler = async (params) => {
   const indexRaw = params?.index ?? params?.focus ?? params?.id;
   if (indexRaw === undefined || indexRaw === null || String(indexRaw).trim() === '') {
     throw new Error('index is required');
@@ -51,7 +51,7 @@ export const handleFocus: ModActionHandler = async (params) => {
 /**
  * inviteアクション: ユーザーを招待
  */
-export const handleInvite: ModActionHandler = async (params) => {
+export const handleInvite: HeadlessActionHandler = async (params) => {
   const username = params?.username;
   if (!username || typeof username !== 'string' || username.trim() === '') {
     throw new Error('username is required');
@@ -71,7 +71,7 @@ export const handleInvite: ModActionHandler = async (params) => {
 /**
  * setaccesslevelアクション: セッションのアクセスレベルを変更
  */
-export const handleSetAccessLevel: ModActionHandler = async (params) => {
+export const handleSetAccessLevel: HeadlessActionHandler = async (params) => {
   const accessLevel = params?.accessLevel;
   if (!accessLevel || typeof accessLevel !== 'string' || accessLevel.trim() === '') {
     throw new Error('accessLevel is required');
@@ -98,7 +98,7 @@ export const handleSetAccessLevel: ModActionHandler = async (params) => {
 /**
  * setroleアクション: ユーザーの権限を変更
  */
-export const handleSetRole: ModActionHandler = async (params) => {
+export const handleSetRole: HeadlessActionHandler = async (params) => {
   const username = params?.username;
   const role = params?.role;
 
@@ -130,7 +130,7 @@ export const handleSetRole: ModActionHandler = async (params) => {
 /**
  * startworldアクション: セッションを開始
  */
-export const handleStartWorld: ModActionHandler = async (params) => {
+export const handleStartWorld: HeadlessActionHandler = async (params) => {
   const url = params?.url;
   if (!url || typeof url !== 'string' || url.trim() === '') {
     throw new Error('url is required');
@@ -184,7 +184,7 @@ export const handleStartWorld: ModActionHandler = async (params) => {
 /**
  * アクションハンドラーのマップ
  */
-export const actionHandlers: Record<string, ModActionHandler> = {
+export const actionHandlers: Record<string, HeadlessActionHandler> = {
   sessionlist: handleSessionList,
   focus: handleFocus,
   invite: handleInvite,
