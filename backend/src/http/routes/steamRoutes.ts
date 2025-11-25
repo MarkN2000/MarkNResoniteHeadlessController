@@ -109,9 +109,12 @@ steamRoutes.post('/config/password', async (req: Request, res: Response) => {
 /**
  * POST /api/steam/update
  * SteamCMD を使って Resonite をアップデート
+ * body: { guardCode?: string }
  */
-steamRoutes.post('/update', async (_req: Request, res: Response) => {
+steamRoutes.post('/update', async (req: Request, res: Response) => {
   try {
+    const { guardCode } = (req.body ?? {}) as { guardCode?: string };
+
     const config = await loadSteamConfig();
     const updater = new SteamUpdateManager(config);
 
@@ -120,9 +123,19 @@ steamRoutes.post('/update', async (_req: Request, res: Response) => {
       console.log(message);
     });
 
-    const result = await updater.updateResonite();
+    const result = await updater.updateResonite(guardCode);
 
     if (!result.success) {
+      // Steam Guardコードが必要な場合は、2ステップ目の入力を促すためのフラグを返す
+      if (result.requiresGuardCode) {
+        return res.json({
+          success: false,
+          updated: false,
+          requiresGuardCode: true,
+          message: result.message
+        });
+      }
+
       return res.status(500).json({
         success: false,
         updated: false,

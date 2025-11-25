@@ -456,6 +456,7 @@ export interface SteamUpdateResponse {
   success: boolean;
   updated: boolean;
   message: string;
+  requiresGuardCode?: boolean;
 }
 
 /**
@@ -484,10 +485,12 @@ export const setSteamPassword = (password: string) =>
 
 /**
  * ResoniteをSteamCMDでアップデート
+ * guardCode が指定された場合は、Steam Guardコード付きで再試行する
  */
-export const updateResonite = () =>
+export const updateResonite = (guardCode?: string) =>
   request('/steam/update', {
-    method: 'POST'
+    method: 'POST',
+    body: JSON.stringify(guardCode ? { guardCode } : {})
   }) as Promise<SteamUpdateResponse>;
 
 // HeadlessCredentials取得API

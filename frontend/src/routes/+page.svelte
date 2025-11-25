@@ -2409,14 +2409,53 @@
   const handleResoniteUpdate = async () => {
     if (steamUpdateLoading) return;
 
-    if (!confirm('ResoniteをSteamCMDでアップデートしますか？\nサーバーの再起動などは行われません。')) {
-      return;
-    }
-
     steamUpdateLoading = true;
     try {
+      // 1回目: Guardコードなしで試行
       const result = await updateResonite();
-      pushToast(result.message || (result.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした'), 'success');
+
+      if (result.success) {
+        pushToast(
+          result.message ||
+            (result.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした'),
+          'success'
+        );
+        return;
+      }
+
+      // Steam Guardコードが必要な場合は、ユーザーに入力してもらう
+      if (result.requiresGuardCode) {
+        const guardCode = window.prompt('Steam Guard コードを入力してください（6桁）');
+        if (!guardCode || !guardCode.trim()) {
+          pushToast('Steam Guard コードが入力されませんでした', 'error');
+          return;
+        }
+
+        const trimmedCode = guardCode.trim();
+        const second = await updateResonite(trimmedCode);
+
+        if (!second.success) {
+          pushToast(
+            second.message ||
+              'Steam Guard コードを使用したResoniteアップデートに失敗しました',
+            'error'
+          );
+          return;
+        }
+
+        pushToast(
+          second.message ||
+            (second.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした'),
+          'success'
+        );
+        return;
+      }
+
+      // Guardコード不要だがアップデートに失敗した場合
+      pushToast(
+        result.message || 'Resoniteアップデートの実行に失敗しました',
+        'error'
+      );
     } catch (error: any) {
       const message = error.message || 'Resoniteアップデートの実行に失敗しました';
       pushToast(message, 'error');

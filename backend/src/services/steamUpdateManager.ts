@@ -8,6 +8,11 @@ export interface SteamUpdateResult {
   updated: boolean;
   message: string;
   rawLog?: string;
+  /**
+   * Steam Guardコードが必要と判断された場合に true
+   * （初回ガード無し試行時のみ想定）
+   */
+  requiresGuardCode?: boolean;
 }
 
 /**
@@ -27,7 +32,7 @@ export class SteamUpdateManager extends EventEmitter {
    * 実装を簡潔にするため、現時点では SteamCMD の出力メッセージから
    * 「already up to date」かどうかを判定する。
    */
-  async updateResonite(): Promise<SteamUpdateResult> {
+  async updateResonite(guardCode?: string): Promise<SteamUpdateResult> {
     const steamcmdPath = this.config.steamCmd.path;
     const { username, password, useSteamGuardFile, steamGuardFile } = this.config.account;
     const appId = this.config.resonite.appId || '2519830';
@@ -48,11 +53,13 @@ export class SteamUpdateManager extends EventEmitter {
       };
     }
 
-    const args: string[] = [
-      '+login',
-      username,
-      password
-    ];
+    const args: string[] = ['+login', username, password];
+
+    // 2ステップ方式の2回目: フロントエンドから guardCode が渡された場合
+    // steamcmd の +login ヘルプに従い、第3引数としてガードコードを渡す
+    if (guardCode) {
+      args.push(guardCode);
+    }
 
     // Steam Guardファイルによる2要素認証に対応
     if (useSteamGuardFile && steamGuardFile) {
@@ -98,16 +105,23 @@ export class SteamUpdateManager extends EventEmitter {
         const baseMessage =
           'SteamCMDの実行がタイムアウトしました。ログインやSteam Guardコード待ちで止まっている可能性があります。';
 
-        const guardMessage = steamGuardPrompted
-          ? ' Steam Guardコードが必要と思われます。config/steam.json の useSteamGuardFile と steamGuardFile を設定して、マシン認証ファイル経由でログインしてください。'
-          : '';
-
-        resolve({
-          success: false,
-          updated: false,
-          message: baseMessage + guardMessage,
-          rawLog
-        });
+        // guardCode 未指定でガードプロンプトが見えている場合は、ガードコード要求とみなす
+        if (!guardCode && steamGuardPrompted) {
+          resolve({
+            success: false,
+            updated: false,
+            message: baseMessage,
+            rawLog,
+            requiresGuardCode: true
+          });
+        } else {
+          resolve({
+            success: false,
+            updated: false,
+            message: baseMessage,
+            rawLog
+          });
+        }
       }, TIMEOUT_MS);
 
       child.stdout.on('data', (data: Buffer) => {
@@ -156,14 +170,26 @@ export class SteamUpdateManager extends EventEmitter {
           this.emit('log', `[SteamUpdate] SteamCMD exited with code ${code}`);
 
           const baseMessage = `SteamCMDの実行中にエラーが発生しました（終了コード: ${code}）。ログを確認してください。`;
-          const guardMessage = steamGuardPrompted
-            ? ' Steam Guardコードが必要と思われます。config/steam.json の useSteamGuardFile と steamGuardFile を設定して、マシン認証ファイル経由でログインしてください。'
-            : '';
+
+          // guardCode 未指定で Steam Guard プロンプトが確認された場合のみ、
+          // フロントエンドからの再試行を促すフラグを立てる
+          if (!guardCode && steamGuardPrompted) {
+            resolve({
+              success: false,
+              updated: false,
+              message:
+                baseMessage +
+                ' Steam Guardコードが必要と思われます。ブラウザ側でSteam Guardコードを入力して再試行してください。',
+              rawLog,
+              requiresGuardCode: true
+            });
+            return;
+          }
 
           resolve({
             success: false,
             updated: false,
-            message: baseMessage + guardMessage,
+            message: baseMessage,
             rawLog
           });
           return;
