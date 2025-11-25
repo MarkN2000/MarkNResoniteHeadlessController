@@ -1109,6 +1109,166 @@ const ensureSteamAccountConfigured = async () => {
   );
 };
 
+/**
+ * 毎回起動時に Steam にログインを試行する
+ * - 信頼済み状態であればそのまま成功
+ * - Guard がリセットされている場合は、Guardコード入力を求めて再試行
+ */
+const ensureSteamLoggedIn = async () => {
+  console.log('');
+  console.log('--- Steamへのログインを確認中... ---');
+
+  // 対話入力がない環境では、ここでのログイン確認はスキップ（バックエンドは通常どおり起動）
+  if (!process.stdin.isTTY) {
+    console.log(
+      '[Steam] 対話的な入力が利用できないため、起動時のSteamログイン確認はスキップします。必要に応じて手動で steamcmd を実行してGuardコードを入力してください。',
+    );
+    return;
+  }
+
+  if (!fs.existsSync(STEAM_CONFIG_FILE)) {
+    console.log(
+      '[Steam] config/steam.json が存在しません。Steam資格情報を設定するには start.bat を対話的に実行し直してください。',
+    );
+    return;
+  }
+
+  let steamConfig;
+  try {
+    steamConfig = JSON.parse(fs.readFileSync(STEAM_CONFIG_FILE, 'utf-8'));
+  } catch (error) {
+    console.warn(
+      `[WARN] config/steam.json の読み込みに失敗しました: ${
+        error && error.message ? error.message : String(error)
+      }`,
+    );
+    return;
+  }
+
+  const steamCmdPath = steamConfig?.steamCmd?.path;
+  const username =
+    typeof steamConfig?.account?.username === 'string'
+      ? steamConfig.account.username.trim()
+      : '';
+  const password =
+    typeof steamConfig?.account?.password === 'string'
+      ? steamConfig.account.password
+      : '';
+
+  if (!steamCmdPath || !username || !password) {
+    console.log(
+      '[Steam] SteamCMDパスまたはアカウント資格情報が未設定のため、起動時ログインはスキップします。config/steam.json を確認してください。',
+    );
+    return;
+  }
+
+  const runLogin = (guardCode = '') =>
+    new Promise((resolve) => {
+      const args = ['+login', username, password];
+      if (guardCode) {
+        args.push(guardCode);
+      }
+      args.push('+quit');
+
+      console.log(`[Steam] steamcmd を起動します: ${steamCmdPath}`);
+
+      const child = spawn(steamCmdPath, args, {
+        cwd: path.dirname(steamCmdPath),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      let stdout = '';
+      let stderr = '';
+      let sawGuardPrompt = false;
+
+      const TIMEOUT_MS = 5 * 60 * 1000; // 5分
+      const timeout = setTimeout(() => {
+        console.warn(
+          `[WARN] Steamログインが ${TIMEOUT_MS}ms 以内に完了しませんでした。プロセスを終了します。`,
+        );
+        try {
+          child.kill();
+        } catch {
+          // ignore
+        }
+      }, TIMEOUT_MS);
+
+      child.stdout.on('data', (data) => {
+        const text = data.toString('utf-8');
+        stdout += text;
+        process.stdout.write(text);
+
+        const lower = text.toLowerCase();
+        if (
+          lower.includes('steam guard') ||
+          lower.includes('two-factor') ||
+          lower.includes('two factor')
+        ) {
+          sawGuardPrompt = true;
+        }
+      });
+
+      child.stderr.on('data', (data) => {
+        const text = data.toString('utf-8');
+        stderr += text;
+        process.stderr.write(text);
+      });
+
+      child.on('close', (code) => {
+        clearTimeout(timeout);
+        const rawLog = stdout + stderr;
+
+        if (code === 0) {
+          resolve({ success: true, requiresGuard: false, rawLog });
+        } else if (sawGuardPrompt) {
+          resolve({ success: false, requiresGuard: true, rawLog });
+        } else {
+          resolve({ success: false, requiresGuard: false, rawLog });
+        }
+      });
+
+      child.on('error', (error) => {
+        clearTimeout(timeout);
+        console.error('[Steam] steamcmd の起動に失敗しました:', error);
+        resolve({ success: false, requiresGuard: false, rawLog: String(error) });
+      });
+    });
+
+  // まずはGuardコードなしでログインを試行
+  const first = await runLogin();
+  if (first.success) {
+    console.log('[Steam] Steamへのログインに成功しました（Guardコード不要）。');
+    return;
+  }
+
+  if (!first.requiresGuard) {
+    console.warn(
+      '[WARN] Steamログインに失敗しました。ログを確認し、必要に応じて steamcmd を手動で実行して原因を調査してください。',
+    );
+    return;
+  }
+
+  // Guardコードが必要な場合は、ユーザーに入力してもらう
+  const rl = readline.createInterface({ input, output });
+  const guardCode = await rl.question('Steam Guard コードを入力してください（6桁）: ');
+  rl.close();
+
+  const trimmedCode = guardCode.trim();
+  if (!trimmedCode) {
+    console.warn('[WARN] Steam Guard コードが入力されませんでした。ログインはスキップされます。');
+    return;
+  }
+
+  const second = await runLogin(trimmedCode);
+  if (second.success) {
+    console.log('[Steam] Steam Guard コードを使用してSteamへのログインに成功しました。');
+  } else {
+    console.warn(
+      '[WARN] Steam Guard コードを使用したログインに失敗しました。コードが正しいか、時間切れでないかを確認してください。',
+    );
+  }
+};
+
 const runInitialSetup = async () => {
   divider();
   console.log(' MarkN Resonite Headless Controller');
