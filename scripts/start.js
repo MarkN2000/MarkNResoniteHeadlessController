@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import https from 'https';
 import { fileURLToPath } from 'url';
 import { execFileSync, execSync, spawn } from 'child_process';
 import readline from 'node:readline/promises';
@@ -25,6 +26,10 @@ const SETUP_SCRIPT = path.join(__dirname, 'setup.js');
 const APP_ENTRY = path.join(BACKEND_DIR, 'dist', 'backend', 'src', 'app.js');
 const DEFAULT_SERVER_PORT = 8080;
 const DEFAULT_HEADLESS_PATH = 'C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe';
+const DEFAULT_STEAMCMD_INSTALL_DIR = 'C:/steamcmd';
+const STEAM_CONFIG_FILE = path.join(CONFIG_DIR, 'steam.json');
+const STEAMCMD_DOWNLOAD_URL =
+  'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip';
 
 const divider = () => {
   console.log('======================================');
@@ -739,6 +744,371 @@ const applyHeadlessCredentialsToConfigs = (username, password) => {
   }
 };
 
+/**
+ * SteamCMD がインストールされているか確認
+ */
+const checkSteamCmdInstalled = async (
+  installDir = DEFAULT_STEAMCMD_INSTALL_DIR,
+) => {
+  const steamcmdExePath = path.join(installDir, 'steamcmd.exe');
+  try {
+    await fs.promises.access(steamcmdExePath);
+    return { installed: true, path: steamcmdExePath };
+  } catch {
+    return { installed: false, path: steamcmdExePath };
+  }
+};
+
+/**
+ * URL からファイルをダウンロード
+ */
+const downloadFile = (url, destPath) =>
+  new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+
+    https
+      .get(url, (response) => {
+        if (response.statusCode !== 200) {
+          file.close();
+          if (fs.existsSync(destPath)) {
+            fs.unlinkSync(destPath);
+          }
+          reject(
+            new Error(
+              `HTTP ${response.statusCode}: ${response.statusMessage || ''}`,
+            ),
+          );
+          return;
+        }
+
+        const totalSize = parseInt(
+          response.headers['content-length'] || '0',
+          10,
+        );
+        let downloadedSize = 0;
+
+        response.on('data', (chunk) => {
+          downloadedSize += chunk.length;
+          if (totalSize > 0) {
+            const percent = ((downloadedSize / totalSize) * 100).toFixed(1);
+            process.stdout.write(
+              `\r[SteamCMD] ダウンロード進捗: ${percent}%`,
+            );
+          }
+        });
+
+        response.pipe(file);
+
+        file.on('finish', () => {
+          file.close();
+          console.log(''); // 改行
+          resolve();
+        });
+
+        file.on('error', (err) => {
+          file.close();
+          if (fs.existsSync(destPath)) {
+            fs.unlinkSync(destPath);
+          }
+          reject(err);
+        });
+      })
+      .on('error', (err) => {
+        file.close();
+        if (fs.existsSync(destPath)) {
+          fs.unlinkSync(destPath);
+        }
+        reject(err);
+      });
+  });
+
+/**
+ * SteamCMD を自動インストール
+ */
+const installSteamCmd = async (installDir = DEFAULT_STEAMCMD_INSTALL_DIR) => {
+  const steamcmdExePath = path.join(installDir, 'steamcmd.exe');
+  const zipPath = path.join(installDir, 'steamcmd.zip');
+
+  try {
+    // インストールディレクトリを作成
+    await fs.promises.mkdir(installDir, { recursive: true });
+
+    console.log(`[SteamCMD] SteamCMDをダウンロードしています...`);
+    console.log(`[SteamCMD] URL: ${STEAMCMD_DOWNLOAD_URL}`);
+
+    // ZIP ファイルをダウンロード
+    await downloadFile(STEAMCMD_DOWNLOAD_URL, zipPath);
+
+    console.log(`[SteamCMD] SteamCMDを展開しています...`);
+    console.log(`[SteamCMD] インストール先: ${installDir}`);
+
+    // PowerShell の Expand-Archive で ZIP を展開
+    const escapedZipPath = zipPath.replace(/'/g, "''");
+    const escapedDestDir = installDir.replace(/'/g, "''");
+    const command = `powershell -Command "Expand-Archive -Path '${escapedZipPath}' -DestinationPath '${escapedDestDir}' -Force"`;
+
+    execSync(command, { stdio: 'inherit' });
+
+    // ZIP ファイルを削除
+    if (fs.existsSync(zipPath)) {
+      await fs.promises.unlink(zipPath);
+    }
+
+    // インストール確認
+    try {
+      await fs.promises.access(steamcmdExePath);
+      console.log(`[SteamCMD] インストールが完了しました: ${steamcmdExePath}`);
+      return { success: true, path: steamcmdExePath };
+    } catch (error) {
+      return {
+        success: false,
+        error: `SteamCMDのインストールは完了しましたが、実行ファイルが見つかりません: ${
+          error && error.message ? error.message : String(error)
+        }`,
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `SteamCMDのインストールに失敗しました: ${
+        error && error.message ? error.message : String(error)
+      }`,
+    };
+  }
+};
+
+/**
+ * SteamCMD のインストールを確認し、必要に応じて自動インストール
+ * （初回セットアップ時のみ呼び出される想定）
+ */
+const ensureSteamCmdInstalled = async () => {
+  console.log('');
+  console.log('--- SteamCMDの確認中... ---');
+
+  // まず config/steam.json に設定済みのパスを確認
+  let steamCmdPath = null;
+  if (fs.existsSync(STEAM_CONFIG_FILE)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(STEAM_CONFIG_FILE, 'utf-8'));
+      if (config && config.steamCmd && typeof config.steamCmd.path === 'string') {
+        steamCmdPath = config.steamCmd.path;
+      }
+    } catch {
+      // 壊れている場合は無視して再生成を試みる
+    }
+  }
+
+  if (steamCmdPath) {
+    try {
+      await fs.promises.access(steamCmdPath);
+      console.log(`[SteamCMD] 既にインストールされています: ${steamCmdPath}`);
+      return { installed: true, path: steamCmdPath };
+    } catch {
+      // 設定ファイル上のパスに存在しない場合は続行
+    }
+  }
+
+  // デフォルトのインストール先を確認
+  const defaultCheck = await checkSteamCmdInstalled();
+  if (defaultCheck.installed) {
+    console.log(`[SteamCMD] 既にインストールされています: ${defaultCheck.path}`);
+    return { installed: true, path: defaultCheck.path };
+  }
+
+  // インストールされていない場合は自動インストール
+  console.log(
+    `[SteamCMD] SteamCMDが見つかりません。自動インストールを開始します...`,
+  );
+  console.log(`[SteamCMD] インストール先: ${DEFAULT_STEAMCMD_INSTALL_DIR}`);
+
+  const result = await installSteamCmd();
+
+  if (!result.success) {
+    console.warn(`[WARN] ${result.error}`);
+    console.warn(
+      '[WARN] SteamCMDは手動でインストールする必要があります（Resoniteのアップデート機能は使用できません）。',
+    );
+    return { installed: false, error: result.error };
+  }
+
+  // config/steam.json を作成／更新して、バックエンドからも認識できるようにする
+  try {
+    await fs.promises.mkdir(CONFIG_DIR, { recursive: true });
+
+    let steamConfig = {};
+    if (fs.existsSync(STEAM_CONFIG_FILE)) {
+      try {
+        steamConfig = JSON.parse(fs.readFileSync(STEAM_CONFIG_FILE, 'utf-8'));
+      } catch {
+        // 破損している場合はデフォルトから作り直す
+        steamConfig = {};
+      }
+    }
+
+    if (!steamConfig.steamCmd) {
+      steamConfig.steamCmd = {};
+    }
+    steamConfig.steamCmd.path = result.path;
+    steamConfig.steamCmd.autoDetect = true;
+
+    if (!steamConfig.resonite) {
+      steamConfig.resonite = {
+        appId: '2519830',
+        installDir:
+          'C:/Program Files (x86)/Steam/steamapps/common/Resonite',
+        autoDetectFromExecutable: true,
+      };
+    }
+
+    if (!steamConfig.account) {
+      steamConfig.account = {
+        username: '',
+        password: '',
+        useSteamGuardFile: false,
+        steamGuardFile: '',
+      };
+    }
+
+    fs.writeFileSync(
+      STEAM_CONFIG_FILE,
+      JSON.stringify(steamConfig, null, 2),
+      'utf-8',
+    );
+    console.log(
+      `[SteamCMD] 設定ファイルを更新しました: ${path.relative(
+        ROOT_DIR,
+        STEAM_CONFIG_FILE,
+      )}`,
+    );
+  } catch (error) {
+    console.warn(
+      `[WARN] SteamCMDの設定ファイル更新に失敗しました: ${
+        error && error.message ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return { installed: true, path: result.path };
+};
+
+/**
+ * Steamアカウント資格情報を config/steam.json に保存（未設定の場合のみ）
+ * フロントエンドからは設定せず、バックエンドPCの対話入力でのみ設定する想定
+ */
+const ensureSteamAccountConfigured = async () => {
+  console.log('');
+  console.log('--- Steamアカウント資格情報の確認中... ---');
+
+  // 対話入力不可の場合はスキップ（手動で config/steam.json を編集してもらう）
+  if (!process.stdin.isTTY) {
+    if (!fs.existsSync(STEAM_CONFIG_FILE)) {
+      console.warn(
+        '[WARN] 対話的な入力が利用できません。Steam資格情報を設定するには config/steam.json を手動で作成・編集してください。',
+      );
+    }
+    return;
+  }
+
+  let steamConfig = {};
+  if (fs.existsSync(STEAM_CONFIG_FILE)) {
+    try {
+      steamConfig = JSON.parse(fs.readFileSync(STEAM_CONFIG_FILE, 'utf-8'));
+    } catch {
+      console.warn(
+        '[WARN] config/steam.json の読み込みに失敗しました。デフォルト設定から再生成します。',
+      );
+      steamConfig = {};
+    }
+  }
+
+  if (!steamConfig.account) {
+    steamConfig.account = {
+      username: '',
+      password: '',
+      useSteamGuardFile: false,
+      steamGuardFile: '',
+    };
+  }
+
+  const currentUsername =
+    typeof steamConfig.account.username === 'string'
+      ? steamConfig.account.username.trim()
+      : '';
+  const currentPassword =
+    typeof steamConfig.account.password === 'string'
+      ? steamConfig.account.password
+      : '';
+
+  if (currentUsername && currentPassword) {
+    console.log('[Steam] 既にSteamアカウント資格情報が設定されています。');
+    return;
+  }
+
+  const rl = readline.createInterface({ input, output });
+
+  const askNonEmpty = async (question, { confirm = false, mask = false } = {}) => {
+    while (true) {
+      const value = mask
+        ? await rl.question(question, { signal: undefined })
+        : await rl.question(question);
+      const trimmed = value.trim();
+      if (!trimmed) {
+        console.log('値が空です。もう一度入力してください。');
+        continue;
+      }
+      if (confirm) {
+        const confirmation = mask
+          ? await rl.question('（確認）もう一度入力してください: ', { signal: undefined })
+          : await rl.question('（確認）もう一度入力してください: ');
+        if (trimmed !== confirmation.trim()) {
+          console.log('入力が一致しません。もう一度やり直してください。');
+          continue;
+        }
+      }
+      return trimmed;
+    }
+  };
+
+  console.log('');
+  console.log('--- Steamアカウント資格情報が未設定です。 ---');
+  const username = await askNonEmpty('Steamのユーザー名を入力してください: ');
+  const password = await askNonEmpty('Steamのパスワードを入力してください: ', {
+    confirm: true,
+    mask: true,
+  });
+
+  rl.close();
+  console.log('');
+
+  steamConfig.account.username = username;
+  steamConfig.account.password = password;
+
+  // 既存の構造がなければ最低限のデフォルトを補完
+  if (!steamConfig.steamCmd) {
+    steamConfig.steamCmd = {
+      path: path.join(DEFAULT_STEAMCMD_INSTALL_DIR, 'steamcmd.exe'),
+      autoDetect: true,
+    };
+  }
+  if (!steamConfig.resonite) {
+    steamConfig.resonite = {
+      appId: '2519830',
+      installDir: 'C:/Program Files (x86)/Steam/steamapps/common/Resonite',
+      autoDetectFromExecutable: true,
+    };
+  }
+
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(STEAM_CONFIG_FILE, JSON.stringify(steamConfig, null, 2), 'utf-8');
+
+  console.log(
+    `[Steam] Steamアカウント資格情報を保存しました: ${path.relative(
+      ROOT_DIR,
+      STEAM_CONFIG_FILE,
+    )}`,
+  );
+};
+
 const runInitialSetup = async () => {
   divider();
   console.log(' MarkN Resonite Headless Controller');
@@ -775,6 +1145,12 @@ const runInitialSetup = async () => {
 
   await ensureHeadlessPathConfigured();
   await ensureServerPortConfigured();
+
+  // SteamCMD のインストール確認と自動インストール
+  await ensureSteamCmdInstalled();
+
+  // Steamアカウント資格情報を設定（未設定の場合のみ対話で入力）
+  await ensureSteamAccountConfigured();
 
   divider();
   console.log(' Setup Complete!');
@@ -884,6 +1260,10 @@ const main = async () => {
         await ensureHeadlessPathConfigured();
         await ensureServerPortConfigured();
       }
+
+      // 既存環境でも SteamCMD と Steamアカウント資格情報を確認
+      await ensureSteamCmdInstalled();
+      await ensureSteamAccountConfigured();
     }
 
     startApplication();

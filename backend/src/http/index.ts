@@ -4,6 +4,7 @@ import { authRoutes } from './routes/authRoutes.js';
 import { securityRoutes } from './routes/securityRoutes.js';
 import { headlessRoutes } from './routes/headlessRoutes.js';
 import { createRestartRoutes } from './routes/restartRoutes.js';
+import { steamRoutes } from './routes/steamRoutes.js';
 import type { RestartManager } from '../services/restartManager.js';
 
 export function createApiRouter(restartManager?: RestartManager): Router {
@@ -13,6 +14,7 @@ export function createApiRouter(restartManager?: RestartManager): Router {
   apiRouter.use('/server', serverRoutes);
   apiRouter.use('/security', securityRoutes);
   apiRouter.use('/headless', headlessRoutes);
+  apiRouter.use('/steam', steamRoutes);
   
   // RestartManagerが提供されている場合のみrestartルートを追加
   if (restartManager) {

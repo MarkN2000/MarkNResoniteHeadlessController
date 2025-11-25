@@ -33,6 +33,7 @@
     saveRestartConfig,
     getRestartStatus,
     triggerRestart,
+    updateResonite,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -328,6 +329,9 @@
   let manualActionsOnlyLoading = false;
   let restartConfigDebounceTimer: NodeJS.Timeout | null = null;
   let restartConfigInitialized = false; // 初回読み込み完了フラグ
+
+  // Steam / Resonite アップデート用の状態
+  let steamUpdateLoading = false;
 
   // Scheduled restart edit state
   let editingScheduleId: string | null = null;
@@ -2398,6 +2402,26 @@
       pushToast(message, 'error');
     } finally {
       manualActionsOnlyLoading = false;
+    }
+  };
+
+  // Resoniteアップデートボタン（SteamCMDでアップデートのみ実行）
+  const handleResoniteUpdate = async () => {
+    if (steamUpdateLoading) return;
+
+    if (!confirm('ResoniteをSteamCMDでアップデートしますか？\nサーバーの再起動などは行われません。')) {
+      return;
+    }
+
+    steamUpdateLoading = true;
+    try {
+      const result = await updateResonite();
+      pushToast(result.message || (result.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした'), 'success');
+    } catch (error: any) {
+      const message = error.message || 'Resoniteアップデートの実行に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      steamUpdateLoading = false;
     }
   };
 
@@ -4703,6 +4727,16 @@
                     disabled={manualActionsOnlyLoading}
                   >
                     {manualActionsOnlyLoading ? '実行中...' : 'トリガー後終了'}
+                  </button>
+                </div>
+                <div class="config-create-button">
+                  <button 
+                    type="button" 
+                    class="config-create-btn"
+                    on:click={handleResoniteUpdate}
+                    disabled={steamUpdateLoading}
+                  >
+                    {steamUpdateLoading ? '実行中...' : 'Resoniteアップデート'}
                   </button>
                 </div>
                 {#if restartSaveLoading}

@@ -424,6 +424,72 @@ export const triggerRestart = (type: 'manual' | 'forced' | 'manualActionsOnly') 
     body: JSON.stringify({ type })
   }) as Promise<{ success: boolean; message: string }>;
 
+// ============================================================
+// Steam / Resonite アップデートのAPI
+// ============================================================
+
+export interface SteamCmdConfig {
+  path: string;
+  autoDetect: boolean;
+}
+
+export interface ResoniteSteamConfig {
+  appId: string;
+  installDir: string;
+  autoDetectFromExecutable: boolean;
+}
+
+export interface SteamAccountConfigPublic {
+  username: string;
+  useSteamGuardFile: boolean;
+  steamGuardFile: string;
+  hasPassword: boolean;
+}
+
+export interface SteamConfigPublic {
+  steamCmd: SteamCmdConfig;
+  resonite: ResoniteSteamConfig;
+  account: SteamAccountConfigPublic;
+}
+
+export interface SteamUpdateResponse {
+  success: boolean;
+  updated: boolean;
+  message: string;
+}
+
+/**
+ * Steam設定を取得（パスワードは含まれない）
+ */
+export const getSteamConfig = () =>
+  request('/steam/config') as Promise<SteamConfigPublic>;
+
+/**
+ * Steam設定を保存（パスワード以外）
+ */
+export const saveSteamConfig = (config: SteamConfigPublic) =>
+  request('/steam/config', {
+    method: 'POST',
+    body: JSON.stringify(config)
+  }) as Promise<{ success: boolean; message: string }>;
+
+/**
+ * Steamパスワードを設定
+ */
+export const setSteamPassword = (password: string) =>
+  request('/steam/config/password', {
+    method: 'POST',
+    body: JSON.stringify({ password })
+  }) as Promise<{ success: boolean; message: string }>;
+
+/**
+ * ResoniteをSteamCMDでアップデート
+ */
+export const updateResonite = () =>
+  request('/steam/update', {
+    method: 'POST'
+  }) as Promise<SteamUpdateResponse>;
+
 // HeadlessCredentials取得API
 export interface HeadlessCredentialsResponse {
   username: string;
