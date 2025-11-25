@@ -336,6 +336,40 @@ export class RestartManager extends EventEmitter {
   }
 
   /**
+   * 再起動前アクションのみを実行（再起動は行わない）
+   * 手動トリガーの「トリガー後終了」ボタン用
+   */
+  async triggerPreRestartActionsOnly(scheduleId?: string): Promise<void> {
+    // 既に再起動処理中（または待機制御中）の場合はスキップ
+    if (this.restartInProgress) {
+      console.log('[RestartManager] Restart already in progress, skipping actions-only trigger');
+      return;
+    }
+
+    // サーバーが停止中の場合はスキップ
+    if (!this.processManager.getStatus().running) {
+      console.log('[RestartManager] Server not running, skipping actions-only trigger');
+      return;
+    }
+
+    this.restartInProgress = true;
+    this.status.restartInProgress = true;
+    console.log('[RestartManager] Actions-only trigger started (no restart will be performed)');
+
+    try {
+      await this.executePreRestartActions(scheduleId);
+      console.log('[RestartManager] Actions-only trigger completed (no restart executed)');
+    } catch (error) {
+      console.error('[RestartManager] Actions-only trigger failed:', error);
+      throw error;
+    } finally {
+      this.restartInProgress = false;
+      this.status.restartInProgress = false;
+      this.saveStatus();
+    }
+  }
+
+  /**
    * 再起動前アクションを実行（待機制御付き）
    */
   private async executePreRestartActions(scheduleId?: string): Promise<void> {

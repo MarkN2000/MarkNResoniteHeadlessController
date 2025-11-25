@@ -418,7 +418,7 @@ export const getRestartStatus = () =>
 /**
  * 手動で再起動をトリガー
  */
-export const triggerRestart = (type: 'manual' | 'forced') =>
+export const triggerRestart = (type: 'manual' | 'forced' | 'manualActionsOnly') =>
   request('/restart/trigger', {
     method: 'POST',
     body: JSON.stringify({ type })

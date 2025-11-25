@@ -65,26 +65,39 @@ export function createRestartRoutes(restartManager: RestartManager): Router {
   /**
    * POST /api/restart/trigger
    * 手動で再起動をトリガー
+   * type: 'manual' | 'forced' | 'manualActionsOnly'
    */
   router.post('/trigger', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { type } = req.body;
       
-      if (type !== 'manual' && type !== 'forced') {
+      if (type !== 'manual' && type !== 'forced' && type !== 'manualActionsOnly') {
         return res.status(400).json({ 
           success: false, 
-          error: 'Invalid trigger type. Use "manual" or "forced".' 
+          error: 'Invalid trigger type. Use "manual", "forced", or "manualActionsOnly".' 
         });
       }
       
-      // 非同期で再起動を実行（レスポンスは即座に返す）
-      restartManager.triggerRestart(type).catch((error) => {
-        console.error('[RestartRoutes] Manual restart failed:', error);
-      });
+      // 非同期で処理を実行（レスポンスは即座に返す）
+      if (type === 'manualActionsOnly') {
+        // 再起動前アクションのみ実行（再起動は行わない）
+        restartManager.triggerPreRestartActionsOnly().catch((error) => {
+          console.error('[RestartRoutes] Actions-only trigger failed:', error);
+        });
+      } else {
+        // 通常の再起動処理
+        restartManager.triggerRestart(type).catch((error) => {
+          console.error('[RestartRoutes] Manual restart failed:', error);
+        });
+      }
       
       res.json({ 
         success: true, 
-        message: type === 'manual' ? '手動再起動を開始しました' : '強制再起動を開始しました' 
+        message: type === 'manual'
+          ? '手動再起動を開始しました'
+          : type === 'forced'
+            ? '強制再起動を開始しました'
+            : 'トリガー後終了処理を開始しました（再起動は行われません）'
       });
     } catch (error: any) {
       console.error('[RestartRoutes] Failed to trigger restart:', error);

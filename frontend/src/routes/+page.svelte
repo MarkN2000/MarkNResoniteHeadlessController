@@ -325,6 +325,7 @@
   let restartSaveLoading = false;
   let forceRestartLoading = false;
   let manualRestartLoading = false;
+  let manualActionsOnlyLoading = false;
   let restartConfigDebounceTimer: NodeJS.Timeout | null = null;
   let restartConfigInitialized = false; // 初回読み込み完了フラグ
 
@@ -2377,6 +2378,26 @@
       pushToast(message, 'error');
     } finally {
       manualRestartLoading = false;
+    }
+  };
+
+  // トリガー後終了ボタン（再起動前アクションのみ実行して再起動しない）
+  const handleManualActionsOnly = async () => {
+    if (manualActionsOnlyLoading) return;
+    
+    if (!confirm('トリガー後終了処理を実行しますか？\n再起動前アクションのみ実行され、再起動は行われません。')) {
+      return;
+    }
+    
+    manualActionsOnlyLoading = true;
+    try {
+      await triggerRestart('manualActionsOnly');
+      pushToast('トリガー後終了処理を開始しました（再起動は行われません）', 'success');
+    } catch (error: any) {
+      const message = error.message || 'トリガー後終了処理の開始に失敗しました';
+      pushToast(message, 'error');
+    } finally {
+      manualActionsOnlyLoading = false;
     }
   };
 
@@ -4672,6 +4693,16 @@
                     disabled={manualRestartLoading}
                   >
                     {manualRestartLoading ? '実行中...' : '手動再起動トリガー'}
+                  </button>
+                </div>
+                <div class="config-create-button">
+                  <button 
+                    type="button" 
+                    class="config-create-btn"
+                    on:click={handleManualActionsOnly}
+                    disabled={manualActionsOnlyLoading}
+                  >
+                    {manualActionsOnlyLoading ? '実行中...' : 'トリガー後終了'}
                   </button>
                 </div>
                 {#if restartSaveLoading}
