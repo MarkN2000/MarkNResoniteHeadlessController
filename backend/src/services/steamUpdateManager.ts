@@ -79,7 +79,8 @@ export class SteamUpdateManager extends EventEmitter {
       let steamGuardPrompted = false;
 
       // タイムアウト（Steam Guardコード待ちなどで止まり続けるのを防ぐ）
-      const TIMEOUT_MS = Number(process.env.STEAMCMD_TIMEOUT_MS || 5 * 60 * 1000); // デフォルト5分
+      // デフォルト30秒（環境変数 STEAMCMD_TIMEOUT_MS で上書き可能）
+      const TIMEOUT_MS = Number(process.env.STEAMCMD_TIMEOUT_MS || 30 * 1000);
       let timeout: NodeJS.Timeout | null = null;
 
       // カレントディレクトリを SteamCMD 実行ファイルのディレクトリに設定
@@ -105,8 +106,8 @@ export class SteamUpdateManager extends EventEmitter {
         const baseMessage =
           'SteamCMDの実行がタイムアウトしました。ログインやSteam Guardコード待ちで止まっている可能性があります。';
 
-        // guardCode 未指定でガードプロンプトが見えている場合は、ガードコード要求とみなす
-        if (!guardCode && steamGuardPrompted) {
+        // 1回目（guardCode未指定）のタイムアウトは、Guardコード要求とみなす
+        if (!guardCode) {
           resolve({
             success: false,
             updated: false,
@@ -171,15 +172,14 @@ export class SteamUpdateManager extends EventEmitter {
 
           const baseMessage = `SteamCMDの実行中にエラーが発生しました（終了コード: ${code}）。ログを確認してください。`;
 
-          // guardCode 未指定で Steam Guard プロンプトが確認された場合のみ、
-          // フロントエンドからの再試行を促すフラグを立てる
-          if (!guardCode && steamGuardPrompted) {
+          // 1回目（guardCode未指定）の失敗は、Guardコード入力を試せるように requiresGuardCode を立てる
+          if (!guardCode) {
             resolve({
               success: false,
               updated: false,
               message:
                 baseMessage +
-                ' Steam Guardコードが必要と思われます。ブラウザ側でSteam Guardコードを入力して再試行してください。',
+                ' Steam Guardコードが必要な可能性があります。ブラウザ側でSteam Guardコードを入力して再試行してください。',
               rawLog,
               requiresGuardCode: true
             });

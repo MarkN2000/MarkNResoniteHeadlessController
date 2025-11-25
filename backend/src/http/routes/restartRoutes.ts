@@ -86,9 +86,9 @@ export function createRestartRoutes(restartManager: RestartManager): Router {
         });
       } else {
         // 通常の再起動処理
-        restartManager.triggerRestart(type).catch((error) => {
-          console.error('[RestartRoutes] Manual restart failed:', error);
-        });
+      restartManager.triggerRestart(type).catch((error) => {
+        console.error('[RestartRoutes] Manual restart failed:', error);
+      });
       }
       
       res.json({ 

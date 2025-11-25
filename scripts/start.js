@@ -1181,7 +1181,8 @@ const ensureSteamLoggedIn = async () => {
       let stderr = '';
       let sawGuardPrompt = false;
 
-      const TIMEOUT_MS = 5 * 60 * 1000; // 5分
+      // Guardコード待ちなどで5分も止まらないよう、起動時チェックは短めにする
+      const TIMEOUT_MS = 30 * 1000; // 30秒
       const timeout = setTimeout(() => {
         console.warn(
           `[WARN] Steamログインが ${TIMEOUT_MS}ms 以内に完了しませんでした。プロセスを終了します。`,
