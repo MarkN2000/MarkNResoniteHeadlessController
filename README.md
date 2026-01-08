@@ -456,6 +456,19 @@ DEFAULT_PASSWORD=your-production-login-password
 - **WebUI**: 開発環境ではlocalhost、本番環境では指定ドメイン
 - **Headless API**: ローカルネットワーク内のIPのみ許可
 
+### ResoniteLink設定
+- `startWorlds[].enableResoniteLink`: セッションでResoniteLinkを許可するフラグ（デフォルトfalse）
+- `startWorlds[].forceResoniteLinkPort`: ResoniteLinkを固定ポートで待ち受ける場合に指定（1以上の数値、未指定/空は自動割当）
+
+```jsonc
+"startWorlds": [
+  {
+    "enableResoniteLink": true,
+    "forceResoniteLinkPort": 10200
+  }
+]
+```
+
 ## トラブルシューティング
 
 ### よくある問題
