@@ -437,6 +437,8 @@
     loadWorldPresetName: 'Grid',
     overrideCorrespondingWorldId: '',
     forcePort: null as number | null,
+    enableResoniteLink: false,
+    forceResoniteLinkPort: null as number | null,
     keepOriginalRoles: false,
     defaultUserRolesEntries: [] as { username: string; role: RoleOption }[],
     newRoleUsername: '',
@@ -495,6 +497,10 @@
       // カスタムセッションIDのリセット時はプレフィックスとサフィックス両方をリセット
       (cur as any).customSessionIdPrefix = '';
       (cur as any).customSessionIdSuffix = '';
+    } else if (field === 'enableResoniteLink') {
+      (cur as any).enableResoniteLink = DEFAULT_SESSION_FIELDS.enableResoniteLink;
+    } else if (field === 'forceResoniteLinkPort') {
+      (cur as any).forceResoniteLinkPort = DEFAULT_SESSION_FIELDS.forceResoniteLinkPort;
     } else if (field === 'defaultUserRoles') {
       (cur as any).defaultUserRolesEntries = [];
       (cur as any).newRoleUsername = '';
@@ -752,6 +758,14 @@
     return trimmed.split(',').map(v => v.trim()).filter(Boolean);
   };
 
+  // ヘルパー関数: 正の数値のみ許可し、それ以外はnullに正規化
+  const parseOptionalPositiveNumber = (value: any): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    return num;
+  };
+
   // ヘルパー関数: customSessionIdの分割と結合
   const splitCustomSessionId = (customSessionId: string | null | undefined): { prefix: string; suffix: string } => {
     if (!customSessionId || typeof customSessionId !== 'string') {
@@ -871,6 +885,8 @@
         session?.forcePort === null || session?.forcePort === undefined || session?.forcePort === ''
           ? null
           : session.forcePort,
+      enableResoniteLink: session?.enableResoniteLink ?? false,
+      forceResoniteLinkPort: parseOptionalPositiveNumber(session?.forceResoniteLinkPort),
       keepOriginalRoles: session?.keepOriginalRoles ?? false,
       defaultUserRolesEntries: roleEntries,
       newRoleUsername: ensureString(session?.newRoleUsername),
@@ -1063,6 +1079,20 @@
           
           if (world.maxUsers !== undefined && (typeof world.maxUsers !== 'number' || world.maxUsers < 0)) {
             previewEditError = `エラー: セッション${i + 1}のmaxUsersは0以上の数値である必要があります`;
+            return;
+          }
+
+          if (world.enableResoniteLink !== undefined && typeof world.enableResoniteLink !== 'boolean') {
+            previewEditError = `エラー: セッション${i + 1}のenableResoniteLinkはbooleanである必要があります`;
+            return;
+          }
+
+          if (
+            world.forceResoniteLinkPort !== undefined &&
+            world.forceResoniteLinkPort !== null &&
+            (typeof world.forceResoniteLinkPort !== 'number' || world.forceResoniteLinkPort <= 0)
+          ) {
+            previewEditError = `エラー: セッション${i + 1}のforceResoniteLinkPortは1以上の数値かnullである必要があります`;
             return;
           }
 
@@ -1400,6 +1430,8 @@
         processedSession.loadWorldPresetName = session.loadWorldPresetName.trim() || 'Grid';
         processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() || null;
         processedSession.forcePort = (session.forcePort !== null && session.forcePort !== '') ? Number(session.forcePort) : null;
+        processedSession.enableResoniteLink = !!session.enableResoniteLink;
+        processedSession.forceResoniteLinkPort = parseOptionalPositiveNumber(session.forceResoniteLinkPort);
         
         // defaultUserRoles: 配列データをオブジェクトに変換
         const normalizedRoleEntries = normalizeRoleEntries(session.defaultUserRolesEntries);
@@ -1532,6 +1564,8 @@
         processedSession.loadWorldPresetName = session.loadWorldPresetName.trim() || 'Grid';
         processedSession.overrideCorrespondingWorldId = session.overrideCorrespondingWorldId.trim() || null;
         processedSession.forcePort = (session.forcePort !== null && session.forcePort !== '') ? Number(session.forcePort) : null;
+        processedSession.enableResoniteLink = !!session.enableResoniteLink;
+        processedSession.forceResoniteLinkPort = parseOptionalPositiveNumber(session.forceResoniteLinkPort);
         
         // defaultUserRoles: 配列データをオブジェクトに変換
         const normalizedRoleEntries = normalizeRoleEntries(session.defaultUserRolesEntries);
@@ -4418,6 +4452,41 @@
                               </select>
                             </div>
                             <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('loadWorldPresetName')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>ResoniteLinkを許可</span>
+                          <div class="field-row">
+                            <button
+                              type="button"
+                              class={session.enableResoniteLink ? 'status-action-button active' : 'status-action-button'}
+                              aria-pressed={session.enableResoniteLink}
+                              on:click={() => {
+                                session.enableResoniteLink = !session.enableResoniteLink;
+                                sessions = [...sessions];
+                              }}
+                            >
+                              {session.enableResoniteLink ? 'オン' : 'オフ'}
+                            </button>
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('enableResoniteLink')} title="リセット" aria-label="リセット">
+                              <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
+                            </button>
+                          </div>
+                        </label>
+
+                        <label>
+                          <span>ResoniteLink固定ポート <small class="note">空欄で自動割当。1以上の数値</small></span>
+                          <div class="field-row">
+                            <input
+                              type="number"
+                              min="1"
+                              bind:value={session.forceResoniteLinkPort}
+                              placeholder="例: 10200"
+                            />
+                            <button type="button" class="refresh-config-button" on:click={() => resetCurrentSessionField('forceResoniteLinkPort')} title="リセット" aria-label="リセット">
                               <svg viewBox="0 -960 960 960" class="refresh-icon" aria-hidden="true"><path d="M482-160q-134 0-228-93t-94-227v-7l-64 64-56-56 160-160 160 160-56 56-64-64v7q0 100 70.5 170T482-240q26 0 51-6t49-18l60 60q-38 22-78 33t-82 11Zm278-161L600-481l56-56 64 64v-7q0-100-70.5-170T478-720q-26 0-51 6t-49 18l-60-60q38-22 78-33t82-11q134 0 228 93t94 227v7l64-64 56 56-160 160Z" /></svg>
                             </button>
                           </div>
