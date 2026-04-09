@@ -1,4 +1,5 @@
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import type { HeadlessStatus, LogEntry, SystemMetrics } from './api';
 
 // 開発環境では直接バックエンドに接続、本番環境では現在のオリジンを使用

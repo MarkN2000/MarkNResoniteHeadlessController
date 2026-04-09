@@ -4,18 +4,23 @@ import { authRoutes } from './routes/authRoutes.js';
 import { securityRoutes } from './routes/securityRoutes.js';
 import { headlessRoutes } from './routes/headlessRoutes.js';
 import { createRestartRoutes } from './routes/restartRoutes.js';
-import { steamRoutes } from './routes/steamRoutes.js';
+import { createSteamRoutes } from './routes/steamRoutes.js';
 import type { RestartManager } from '../services/restartManager.js';
+import type { ProcessManager } from '../services/processManager.js';
 
-export function createApiRouter(restartManager?: RestartManager): Router {
+export function createApiRouter(restartManager?: RestartManager, processManager?: ProcessManager): Router {
   const apiRouter = Router();
 
   apiRouter.use('/auth', authRoutes);
   apiRouter.use('/server', serverRoutes);
   apiRouter.use('/security', securityRoutes);
   apiRouter.use('/headless', headlessRoutes);
-  apiRouter.use('/steam', steamRoutes);
-  
+
+  // ProcessManagerが提供されている場合のみsteamルートを追加
+  if (processManager) {
+    apiRouter.use('/steam', createSteamRoutes(processManager));
+  }
+
   // RestartManagerが提供されている場合のみrestartルートを追加
   if (restartManager) {
     apiRouter.use('/restart', createRestartRoutes(restartManager));

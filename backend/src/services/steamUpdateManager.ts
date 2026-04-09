@@ -53,6 +53,15 @@ export class SteamUpdateManager extends EventEmitter {
       };
     }
 
+    const installDir = this.config.resonite.installDir;
+    if (!installDir) {
+      return {
+        success: false,
+        updated: false,
+        message: 'Resoniteのインストールディレクトリが設定されていません（config/steam.json の resonite.installDir を確認してください）'
+      };
+    }
+
     const args: string[] = ['+login', username, password];
 
     // 2ステップ方式の2回目: フロントエンドから guardCode が渡された場合
@@ -65,6 +74,9 @@ export class SteamUpdateManager extends EventEmitter {
     if (useSteamGuardFile && steamGuardFile) {
       args.push('+set_steam_guard_file', steamGuardFile);
     }
+
+    // インストール先ディレクトリを明示的に指定（SteamCMDデフォルトではなく設定されたパスへ）
+    args.push('+force_install_dir', installDir);
 
     args.push(
       '+app_update',
@@ -79,8 +91,8 @@ export class SteamUpdateManager extends EventEmitter {
       let steamGuardPrompted = false;
 
       // タイムアウト（Steam Guardコード待ちなどで止まり続けるのを防ぐ）
-      // デフォルト30秒（環境変数 STEAMCMD_TIMEOUT_MS で上書き可能）
-      const TIMEOUT_MS = Number(process.env.STEAMCMD_TIMEOUT_MS || 30 * 1000);
+      // デフォルト5分（環境変数 STEAMCMD_TIMEOUT_MS で上書き可能）
+      const TIMEOUT_MS = Number(process.env.STEAMCMD_TIMEOUT_MS || 5 * 60 * 1000);
       let timeout: NodeJS.Timeout | null = null;
 
       // カレントディレクトリを SteamCMD 実行ファイルのディレクトリに設定
@@ -104,25 +116,16 @@ export class SteamUpdateManager extends EventEmitter {
 
         const rawLog = stdout + stderr;
         const baseMessage =
-          'SteamCMDの実行がタイムアウトしました。ログインやSteam Guardコード待ちで止まっている可能性があります。';
+          'SteamCMDの実行がタイムアウトしました。ネットワーク接続やSteamサーバーの状態を確認してください。';
 
-        // 1回目（guardCode未指定）のタイムアウトは、Guardコード要求とみなす
-        if (!guardCode) {
-          resolve({
-            success: false,
-            updated: false,
-            message: baseMessage,
-            rawLog,
-            requiresGuardCode: true
-          });
-        } else {
-          resolve({
-            success: false,
-            updated: false,
-            message: baseMessage,
-            rawLog
-          });
-        }
+        // stdout で Steam Guard プロンプトを検知した場合のみ、ガードコード入力を促す
+        resolve({
+          success: false,
+          updated: false,
+          message: baseMessage,
+          rawLog,
+          requiresGuardCode: steamGuardPrompted && !guardCode
+        });
       }, TIMEOUT_MS);
 
       child.stdout.on('data', (data: Buffer) => {
@@ -172,14 +175,14 @@ export class SteamUpdateManager extends EventEmitter {
 
           const baseMessage = `SteamCMDの実行中にエラーが発生しました（終了コード: ${code}）。ログを確認してください。`;
 
-          // 1回目（guardCode未指定）の失敗は、Guardコード入力を試せるように requiresGuardCode を立てる
-          if (!guardCode) {
+          // stdout で Steam Guard プロンプトを検知した場合のみ、ガードコード入力を促す
+          if (steamGuardPrompted && !guardCode) {
             resolve({
               success: false,
               updated: false,
               message:
                 baseMessage +
-                ' Steam Guardコードが必要な可能性があります。ブラウザ側でSteam Guardコードを入力して再試行してください。',
+                ' Steam Guardコードが必要です。ブラウザ側でSteam Guardコードを入力して再試行してください。',
               rawLog,
               requiresGuardCode: true
             });

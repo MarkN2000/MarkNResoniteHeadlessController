@@ -65,8 +65,8 @@ restartManager.initialize().catch((error) => {
   console.error('[App] Failed to initialize RestartManager:', error);
 });
 
-// APIルートを設定（RestartManagerを渡す）
-const apiRouter = createApiRouter(restartManager);
+// APIルートを設定（RestartManager, ProcessManagerを渡す）
+const apiRouter = createApiRouter(restartManager, processManager);
 app.use('/api', apiRouter);
 
 // フロントエンドの静的ファイルを配信（本番環境、または開発環境でビルド済みの場合）

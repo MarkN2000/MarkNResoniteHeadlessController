@@ -4196,7 +4196,7 @@
                         {#each configAllowedUrlHosts as host, index (host)}
                           <div class="allowed-host-item">
                             <span>{host}</span>
-                            <button type="button" class="delete-button" on:click={() => removeAllowedHost(index)} title="削除">
+                            <button type="button" class="delete-button" on:click={() => removeAllowedHost(index)} title="削除" aria-label="削除">
                               <svg viewBox="0 -960 960 960" class="delete-icon" aria-hidden="true">
                                 <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
                               </svg>
@@ -5380,8 +5380,10 @@
                     </div>
   <!-- 予定再起動編集モーダル -->
   {#if scheduledRestartModalOpen && editingSchedule}
-    <div class="modal-overlay" on:click={closeScheduleModal}>
-      <div class="modal-content" on:click|stopPropagation>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal-overlay" on:click={closeScheduleModal} on:keydown={(e) => { if (e.key === 'Escape') closeScheduleModal(); }} role="button" tabindex="-1">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="modal-content" on:click|stopPropagation on:keydown|stopPropagation role="dialog" tabindex="-1">
         <div class="modal-header">
           <h2>{editingScheduleId ? '予定を編集' : '予定を追加'}</h2>
           <button type="button" class="modal-close" on:click={closeScheduleModal}>×</button>
@@ -6092,19 +6094,9 @@
     box-shadow: 0 0 0 3px rgba(186, 100, 242, 0.4);
   }
 
-  .session strong {
-    display: block;
-    margin-bottom: 0.15rem;
-  }
-
   .session span {
     color: #9aa3b3;
     font-size: 0.7rem;
-  }
-
-  .session .counts {
-    color: #61d1fa;
-    font-weight: 600;
   }
 
   .session-list button {
@@ -6124,53 +6116,8 @@
     gap: 0.6rem;
   }
 
-  .resource-metrics li {
-    background: rgba(17, 21, 29, 0.65);
-    border-radius: 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 0.6rem 0.75rem;
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-  }
-
   .resource-metrics span {
     color: #86888b;
-  }
-
-  .resource-metrics strong {
-    font-weight: 600;
-  }
-
-  .nav-links ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .nav-links button {
-    width: 100%;
-    text-align: left;
-    padding: 0.6rem 0.75rem;
-    border-radius: 0.65rem;
-    border: 1px solid transparent;
-    background: rgba(32, 35, 47, 0.85);
-    color: #e1e1e0;
-    font-weight: 600;
-    transition: background 0.15s ease;
-  }
-
-  .nav-links button:hover {
-    background: rgba(97, 209, 250, 0.22);
-    color: #61d1fa;
-  }
-
-  .nav-links button.active {
-    border-color: rgba(186, 100, 242, 0.45);
-    background: rgba(186, 100, 242, 0.45);
-    color: #11151d;
   }
 
   .dashboard {
@@ -6279,35 +6226,6 @@
     font-size: 1.1rem;
   }
 
-  .summary-card .metrics {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    margin: 1.25rem 0;
-  }
-
-  .summary-card .metrics div {
-    background: #2b2f35;
-    padding: 0.85rem;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(17, 21, 29, 0.45);
-    color: #f5f5f6;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-
-  .summary-card .metrics span {
-    color: #c7cad3;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .summary-card .metrics strong {
-    display: block;
-    margin-top: 0.35rem;
-    font-size: 1.05rem;
-    color: #ffffff;
-  }
-
   .options {
     display: flex;
     gap: 1rem;
@@ -6322,35 +6240,6 @@
     background: rgba(17, 21, 29, 0.75);
     color: #61d1fa;
     font-weight: 600;
-  }
-
-  dl {
-    margin: 0;
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  dl div {
-    display: grid;
-    gap: 0.25rem;
-  }
-
-  dl dt {
-    font-size: 0.75rem;
-    color: #86888b;
-  }
-
-  dl dd {
-    margin: 0;
-    font-size: 0.95rem;
-  }
-
-  dl .full pre {
-    margin: 0;
-    background: rgba(17, 21, 29, 0.65);
-    border-radius: 0.6rem;
-    padding: 0.75rem;
-    font-family: 'JetBrains Mono', monospace;
   }
 
   table {
@@ -6475,11 +6364,6 @@
     overflow-y: auto;
   }
 
-  .form-card form {
-    display: grid;
-    gap: 0.75rem;
-  }
-
   .command-input {
     display: flex;
     gap: 0.75rem;
@@ -6495,10 +6379,7 @@
   }
 
   .command-input button,
-  .form-card button,
-  .summary-card button,
-  .runtime-card button,
-  .command-card button {
+  .form-card button {
     padding: 0.55rem 1.1rem;
     border-radius: 0.65rem;
     border: none;
@@ -6510,9 +6391,6 @@
 
   .command-input button:hover,
   .form-card button:hover,
-  .summary-card button:hover,
-  .runtime-card button:hover,
-  .command-card button:hover,
   .session-list button:hover {
     background: #34404c;
     transform: translateY(-1px);
@@ -6594,17 +6472,6 @@
     gap: 0.5rem;
   }
 
-  .friend-requests li {
-    background: #1a1e27;
-    border-radius: 0.6rem;
-    padding: 0.6rem 0.75rem;
-    color: #d7f1ff;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
   .user-actions {
     display: flex;
     flex-wrap: wrap;
@@ -6628,17 +6495,6 @@
 
   .user-actions button:hover:enabled {
     background: #3a404d;
-  }
-
-  td .feedback {
-    display: block;
-    margin-top: 0.35rem;
-    font-size: 0.7rem;
-    color: #ff7676;
-  }
-
-  td .feedback.success {
-    color: #59eb5c;
   }
 
   .field-row {
@@ -6672,12 +6528,6 @@
     gap: 0.5rem;
     font-size: 0.85rem;
     color: #86888b;
-  }
-
-  .checkbox-field input {
-    width: 1.1rem;
-    height: 1.1rem;
-    accent-color: #61d1fa;
   }
 
   .action-buttons {
@@ -6727,10 +6577,6 @@
       transform: none;
       box-shadow: none;
     }
-
-  .config-create-section .action-buttons {
-    margin-top: 0.5rem;
-  }
 
     .config-controls {
       display: flex;
@@ -6949,9 +6795,7 @@
 
   .status-card button:not(.status-action-button),
   .status-card input,
-  .status-card textarea,
-  .runtime-card button,
-  .command-card button {
+  .status-card textarea {
     padding: 0.55rem 1.1rem;
     border-radius: 0.65rem;
   }
@@ -7034,10 +6878,6 @@
     justify-content: flex-end;
   }
 
-  .status-form .field-row.end {
-    justify-content: flex-end;
-  }
-
   /* ステータス表示用のスタイル */
   .status-display-list {
     display: flex;
@@ -7071,24 +6911,6 @@
     text-align: right;
   }
 
-  .status-card .checkbox-field {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    padding: 0.34rem 0.55rem;
-    background: #11151d;
-    border-radius: 0.75rem;
-    font-weight: 600;
-    color: #f5f5f5;
-  }
-
-  .status-card .checkbox-field input {
-    order: 1;
-    width: 1rem;
-    height: 1rem;
-  }
-
   .status-card .action-buttons {
     display: flex;
     gap: 0.75rem;
@@ -7098,10 +6920,6 @@
   .status-card .feedback {
     font-size: 0.75rem;
     color: #ff7676;
-  }
-
-  .status-card .feedback.success {
-    color: #59eb5c;
   }
 
   @media (max-width: 1200px) {
@@ -7135,9 +6953,7 @@
 
     .command-input button,
     .session-list button,
-    .status-indicators button,
-    .resource-metrics button,
-    .summary-card button {
+    .status-indicators button {
       width: 100%;
     }
   }
@@ -7182,10 +6998,6 @@
     display: flex;
     gap: 0.65rem;
     align-items: center;
-  }
-
-  .status-form .field-row .slash {
-    color: rgba(225, 225, 224, 0.35);
   }
 
   select.disabled-control,
@@ -8081,10 +7893,6 @@
   .schedule-type-button.active:hover:enabled {
     background: #61d1fa;
     color: #11151d;
-  }
-
-  .config-preview-actions button.edit {
-    background: #007bff;
   }
 
 .allowed-hosts-list,
