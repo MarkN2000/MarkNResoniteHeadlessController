@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, afterUpdate } from 'svelte';
-  import { derived, writable } from 'svelte/store';
+  import { writable } from 'svelte/store';
   import {
     createServerStores,
     getStatus,
@@ -110,13 +110,12 @@
   let initialLoading = true;
   let selectedConfig: string | undefined;
   let appMessage: { type: 'error' | 'warning' | 'info'; text: string } | null = null;
-  const notificationsStore = writable<Array<{ id: number; message: string; type: 'success' | 'error' | 'info' }>>([]);
-  const notifications = derived(notificationsStore, value => value);
+  const notifications = writable<Array<{ id: number; message: string; type: 'success' | 'error' | 'info' }>>([]);
   const pushToast = (message: string, type: 'success' | 'error' | 'info' = 'info', duration = 4200) => {
     const id = Date.now() + Math.random();
-    notificationsStore.update(items => [...items, { id, message, type }]);
+    notifications.update(items => [...items, { id, message, type }]);
     setTimeout(() => {
-      notificationsStore.update(items => items.filter((item: { id: number }) => item.id !== id));
+      notifications.update(items => items.filter((item: { id: number }) => item.id !== id));
     }, duration);
   };
 
@@ -1612,7 +1611,7 @@
       backendReachable = true;
       appMessage = null;
       if (configList.length === 0) {
-        throw Object.assign(new Error('設定ファイルが見つかりません。設定ファイルを作成してください。'), { retryable: true, configMissing: true });
+        throw Object.assign(new Error('設定ファイルが見つかりません。設定ファイルを作成してください。'), { configMissing: true });
       }
       setConfigs(configList);
       applyConfigList(configList);
@@ -1646,14 +1645,10 @@
         backendReachable = false;
         const message = error instanceof Error ? error.message : 'バックエンドに接続できません。バックエンドが起動しているか確認してください。';
         appMessage = { type: 'error', text: message };
-        if (error instanceof Error && (error as { retryable?: boolean }).retryable) {
-          setTimeout(() => {
-            if (!initialLoading) {
-              initialLoading = true;
-            }
-            loadInitialData();
-          }, INITIAL_RETRY_DELAY);
-        }
+        // バックエンド接続失敗時は自動リトライ
+        setTimeout(() => {
+          loadInitialData();
+        }, INITIAL_RETRY_DELAY);
       }
     } finally {
       initialLoading = false;
@@ -1748,12 +1743,11 @@
         }
 
         if (pendingStartup && WORLD_RUNNING_REGEX.test(message)) {
-        lastWorldRunningAt = Date.now();
-        pendingStartup = true;
-        startupWorldsReady = false;
-        startupUsersReady = false;
-        startupRetryCount = 0;
-        scheduleStartupFinalize();
+          lastWorldRunningAt = Date.now();
+          startupWorldsReady = false;
+          startupUsersReady = false;
+          startupRetryCount = 0;
+          scheduleStartupFinalize();
           continue;
         }
       }
