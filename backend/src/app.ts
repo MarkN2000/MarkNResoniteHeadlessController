@@ -9,7 +9,7 @@ import { SERVER_PORT } from './config/index.js';
 import { createApiRouter } from './http/index.js';
 import { registerSocketHandlers } from './ws/index.js';
 import { cidrRestriction } from './middleware/cidr.js';
-import { getCorsConfig, dynamicOriginCheck } from './config/cors.js';
+import { getCorsConfig } from './config/cors.js';
 import { startRateLimitCleanup } from './utils/rateLimit.js';
 import { systemMetricsCollector } from './services/systemMetrics.js';
 import { processManager } from './services/processManager.js';

@@ -105,8 +105,7 @@ const productionCors: CorsConfig = {
  * 環境に応じたCORS設定を取得
  */
 export const getCorsConfig = (): CorsConfig => {
-  const isDevelopment = process.env.NODE_ENV === 'development' || 
-                       process.env.NODE_ENV !== 'production';
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   
   return isDevelopment ? developmentCors : productionCors;
 };
@@ -137,8 +136,7 @@ export const dynamicOriginCheck = (origin: string | undefined, callback: (error:
     return;
   }
   
-  const isDevelopment = process.env.NODE_ENV === 'development' || 
-                       process.env.NODE_ENV !== 'production';
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   
   if (isDevelopment) {
     callback(null, true);

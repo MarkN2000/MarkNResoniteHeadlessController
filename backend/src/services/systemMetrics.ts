@@ -40,11 +40,11 @@ export class SystemMetricsCollector extends EventEmitter {
     console.log(`[SystemMetrics] Starting metrics collection (interval: ${this.intervalMs}ms)`);
     
     // 即座に一度実行
-    this.collectMetrics();
-    
+    this.collectMetrics().catch(err => console.error('[SystemMetrics] Unexpected error:', err));
+
     // 定期的に実行
     this.intervalId = setInterval(() => {
-      this.collectMetrics();
+      this.collectMetrics().catch(err => console.error('[SystemMetrics] Unexpected error:', err));
     }, this.intervalMs);
   }
 

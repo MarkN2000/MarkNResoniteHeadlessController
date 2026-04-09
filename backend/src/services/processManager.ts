@@ -261,6 +261,7 @@ export class ProcessManager extends EventEmitter {
       userId: this.lastUserId
     };
     this.emit('status', { ...this.status });
+    this.emit('started');
 
     // ランタイム状態を保存（非同期、完了を待たない）
     this.saveRuntimeState(resolvedConfig, 'start');
@@ -295,6 +296,7 @@ export class ProcessManager extends EventEmitter {
         userId: this.lastUserId
       };
       this.emit('status', { ...this.status });
+      this.emit('stopped');
       this.stopPromise = undefined as any;
 
       // ランタイム状態を保存
