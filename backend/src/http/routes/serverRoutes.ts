@@ -208,17 +208,26 @@ serverRoutes.get('/headless-credentials', normalRateLimit, async (_req, res, nex
   }
 });
 
-// コンフィグファイル一覧取得（認証不要）
-serverRoutes.get('/configs', normalRateLimit, (_req, res) => {
-  const configs = processManager.listConfigs().map(filePath => ({
-    path: filePath,
-    name: path.basename(filePath)
-  }));
-  res.json(configs);
+// 認証とレート制限を適用（以降のすべてのエンドポイントに適用）
+serverRoutes.use(authenticateToken);
+serverRoutes.use(normalRateLimit);
+
+// コンフィグファイル一覧取得
+serverRoutes.get('/configs', async (_req, res, next) => {
+  try {
+    const files = await processManager.listConfigs();
+    const configs = files.map(filePath => ({
+      path: filePath,
+      name: path.basename(filePath)
+    }));
+    res.json(configs);
+  } catch (error) {
+    next(error);
+  }
 });
 
-// コンフィグファイル読み込み（認証不要）
-serverRoutes.get('/configs/:path', normalRateLimit, async (req, res, next) => {
+// コンフィグファイル読み込み
+serverRoutes.get('/configs/:path', async (req, res, next) => {
   try {
     const configPath = req.params.path!;
     console.log(`[serverRoutes] Loading config: ${configPath}`);
@@ -232,8 +241,8 @@ serverRoutes.get('/configs/:path', normalRateLimit, async (req, res, next) => {
   }
 });
 
-// コンフィグファイル削除（認証不要）
-serverRoutes.delete('/configs/:path', normalRateLimit, async (req, res, next) => {
+// コンフィグファイル削除
+serverRoutes.delete('/configs/:path', async (req, res, next) => {
   try {
     const configPath = req.params.path!;
     console.log(`[serverRoutes] Deleting config: ${configPath}`);
@@ -246,10 +255,6 @@ serverRoutes.delete('/configs/:path', normalRateLimit, async (req, res, next) =>
     next(error);
   }
 });
-
-// 認証とレート制限を適用（以降のすべてのエンドポイントに適用）
-serverRoutes.use(authenticateToken);
-serverRoutes.use(normalRateLimit);
 
 serverRoutes.get('/status', (_req, res) => {
   res.json(processManager.getStatus());
@@ -288,11 +293,11 @@ serverRoutes.post('/configs/generate', async (req, res, next) => {
   }
 });
 
-serverRoutes.post('/start', (req, res, next) => {
+serverRoutes.post('/start', async (req, res, next) => {
   try {
     const { configPath } = req.body ?? {};
     console.log('[serverRoutes] Starting server with config:', configPath);
-    processManager.start(configPath);
+    await processManager.start(configPath);
     console.log('[serverRoutes] Server started successfully');
     res.json({ ok: true });
   } catch (error) {

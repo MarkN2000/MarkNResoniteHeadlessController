@@ -10,6 +10,7 @@ import { createApiRouter } from './http/index.js';
 import { registerSocketHandlers } from './ws/index.js';
 import { cidrRestriction } from './middleware/cidr.js';
 import { getCorsConfig, dynamicOriginCheck } from './config/cors.js';
+import { startRateLimitCleanup } from './utils/rateLimit.js';
 import { systemMetricsCollector } from './services/systemMetrics.js';
 import { processManager } from './services/processManager.js';
 import { RestartManager } from './services/restartManager.js';
@@ -54,6 +55,9 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' })); // リクエストサイズ制限
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URLエンコードされたデータの制限
+
+// ProcessManagerを初期化（ランタイム状態の読み込み）
+await processManager.initialize();
 
 // RestartManagerを初期化
 const restartManager = new RestartManager(processManager);
@@ -112,6 +116,9 @@ registerSocketHandlers(io);
 
 // システムメトリクスの収集を開始
 systemMetricsCollector.start();
+
+// レート制限のクリーンアップタイマーを開始
+startRateLimitCleanup();
 
 httpServer.listen(SERVER_PORT, () => {
   console.log(`Backend listening on port ${SERVER_PORT}`);

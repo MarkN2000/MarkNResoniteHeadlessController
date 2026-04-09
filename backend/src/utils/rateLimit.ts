@@ -23,12 +23,12 @@ const defaultConfig: RateLimitConfig = {
  * レート制限をチェック
  */
 export const checkRateLimit = (
-  key: string, 
+  key: string,
   config: RateLimitConfig = defaultConfig
 ): { allowed: boolean; remaining: number; resetTime: number } => {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
-  
+
   // エントリが存在しないか、リセット時間が過ぎている場合
   if (!entry || now > entry.resetTime) {
     const newEntry: RateLimitEntry = {
@@ -36,14 +36,14 @@ export const checkRateLimit = (
       resetTime: now + config.windowMs
     };
     rateLimitStore.set(key, newEntry);
-    
+
     return {
       allowed: true,
       remaining: config.maxRequests - 1,
       resetTime: newEntry.resetTime
     };
   }
-  
+
   // リクエスト数が上限に達している場合
   if (entry.count >= config.maxRequests) {
     return {
@@ -52,11 +52,11 @@ export const checkRateLimit = (
       resetTime: entry.resetTime
     };
   }
-  
+
   // リクエスト数を増加
   entry.count++;
   rateLimitStore.set(key, entry);
-  
+
   return {
     allowed: true,
     remaining: config.maxRequests - entry.count,
@@ -88,23 +88,31 @@ export const cleanupRateLimit = (): void => {
 };
 
 /**
- * レート制限キーを生成
+ * レート制限キーを生成（IPアドレスのみ）
  */
 export const generateRateLimitKey = (req: any): string => {
   const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
-  const userAgent = req.headers['user-agent'] || 'unknown';
-  
-  // IPアドレスとUser-Agentの組み合わせでキーを生成
-  return `${clientIp}:${userAgent}`.substring(0, 100); // キーの長さを制限
+  return clientIp;
 };
+
+// クリーンアップタイマーの参照
+let cleanupTimer: NodeJS.Timeout | null = null;
 
 /**
  * 定期的なクリーンアップを開始
  */
 export const startRateLimitCleanup = (): void => {
+  if (cleanupTimer) return;
   // 5分ごとにクリーンアップ
-  setInterval(cleanupRateLimit, 5 * 60 * 1000);
+  cleanupTimer = setInterval(cleanupRateLimit, 5 * 60 * 1000);
 };
 
-// 起動時にクリーンアップを開始
-startRateLimitCleanup();
+/**
+ * 定期的なクリーンアップを停止
+ */
+export const stopRateLimitCleanup = (): void => {
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
+};

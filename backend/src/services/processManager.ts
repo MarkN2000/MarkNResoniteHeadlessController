@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
-import fs from 'node:fs';
+import { promises as fs } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { HEADLESS_EXECUTABLE, HEADLESS_CONFIG_DIR, LOG_RING_BUFFER_SIZE, RUNTIME_STATE_PATH } from '../config/index.js';
 import { getHeadlessCredentials } from '../config/headlessCredentials.js';
@@ -48,49 +48,47 @@ export class ProcessManager extends EventEmitter {
   private lastUserId?: string;
   private commandQueue: QueuedCommand[] = [];
   private isExecutingCommand = false;
+  // P-5: lastUsedConfigPath のメモリキャッシュ
+  private cachedLastConfigPath: string | null = null;
 
   constructor() {
     super();
-    // 起動時にランタイム状態を読み込む
-    this.loadRuntimeState();
+  }
+
+  /**
+   * 非同期初期化（起動時にランタイム状態を読み込む）
+   */
+  async initialize(): Promise<void> {
+    await this.loadRuntimeState();
   }
 
   /**
    * ランタイム状態をファイルから読み込む
    */
-  private loadRuntimeState(): void {
+  private async loadRuntimeState(): Promise<void> {
     try {
-      if (fs.existsSync(RUNTIME_STATE_PATH)) {
-        const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
-        const state: RuntimeState = JSON.parse(content);
-        
-        // 最後に起動したコンフィグパスをステータスに反映
-        if (state.lastUsedConfigPath) {
-          this.status.configPath = state.lastUsedConfigPath;
-        }
-      } else {
+      const content = await fs.readFile(RUNTIME_STATE_PATH, 'utf-8');
+      const state: RuntimeState = JSON.parse(content);
+
+      // 最後に起動したコンフィグパスをステータスに反映
+      if (state.lastUsedConfigPath) {
+        this.status.configPath = state.lastUsedConfigPath;
+        this.cachedLastConfigPath = state.lastUsedConfigPath;
+      }
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
         // ファイルが存在しない場合はデフォルト状態を作成
         console.log('[ProcessManager] Runtime state file not found, creating default runtime-state.json');
-        const defaultState: RuntimeState = {
-          lastUsedConfigPath: null,
-          lastUsedConfigName: null,
-          isRunning: false
-        };
-        this.saveRuntimeState(null, 'stop');
-      }
-    } catch (error) {
-      console.error('[ProcessManager] Failed to load runtime state:', error);
-      // エラー時はデフォルト状態を作成
-      const defaultState: RuntimeState = {
-        lastUsedConfigPath: null,
-        lastUsedConfigName: null,
-        isRunning: false
-      };
-      try {
-        fs.writeFileSync(RUNTIME_STATE_PATH, JSON.stringify(defaultState, null, 2), 'utf-8');
-        console.log('[ProcessManager] Created default runtime state file');
-      } catch (writeError) {
-        console.error('[ProcessManager] Failed to create default runtime state file:', writeError);
+        await this.saveRuntimeState(null, 'stop');
+      } else {
+        console.error('[ProcessManager] Failed to load runtime state:', error);
+        // エラー時はデフォルト状態を作成
+        try {
+          await this.saveRuntimeState(null, 'stop');
+          console.log('[ProcessManager] Created default runtime state file');
+        } catch (writeError) {
+          console.error('[ProcessManager] Failed to create default runtime state file:', writeError);
+        }
       }
     }
   }
@@ -98,31 +96,30 @@ export class ProcessManager extends EventEmitter {
   /**
    * ランタイム状態をファイルに保存する
    */
-  private saveRuntimeState(configPath: string | null, event: 'start' | 'stop'): void {
+  private async saveRuntimeState(configPath: string | null, event: 'start' | 'stop'): Promise<void> {
     try {
-      const state: RuntimeState = {
-        lastUsedConfigPath: configPath,
-        lastUsedConfigName: configPath ? path.basename(configPath) : null,
-        isRunning: event === 'start'
-      };
+      let state: RuntimeState;
 
-      // 既存の状態を読み込んで更新
-      if (fs.existsSync(RUNTIME_STATE_PATH)) {
-        const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
-        const existingState: RuntimeState = JSON.parse(content);
-        
-        if (event === 'start') {
-          state.lastUsedConfigPath = configPath;
-          state.lastUsedConfigName = configPath ? path.basename(configPath) : null;
-          state.isRunning = true;
-        } else {
-          state.lastUsedConfigPath = existingState.lastUsedConfigPath;
-          state.lastUsedConfigName = existingState.lastUsedConfigName;
-          state.isRunning = false;
-        }
+      if (event === 'start') {
+        state = {
+          lastUsedConfigPath: configPath,
+          lastUsedConfigName: configPath ? path.basename(configPath) : null,
+          isRunning: true
+        };
+      } else {
+        // stop時は既存のconfigPath/configNameを保持する
+        state = {
+          lastUsedConfigPath: this.cachedLastConfigPath ?? configPath,
+          lastUsedConfigName: (this.cachedLastConfigPath ?? configPath)
+            ? path.basename(this.cachedLastConfigPath ?? configPath ?? '')
+            : null,
+          isRunning: false
+        };
       }
 
-      fs.writeFileSync(RUNTIME_STATE_PATH, JSON.stringify(state, null, 2), 'utf-8');
+      // キャッシュを更新
+      this.cachedLastConfigPath = state.lastUsedConfigPath;
+      await fs.writeFile(RUNTIME_STATE_PATH, JSON.stringify(state, null, 2), 'utf-8');
     } catch (error) {
       console.error('[ProcessManager] Failed to save runtime state:', error);
     }
@@ -132,16 +129,7 @@ export class ProcessManager extends EventEmitter {
    * 最後に起動したコンフィグファイルのパスを取得
    */
   getLastStartedConfigPath(): string | null {
-    try {
-      if (fs.existsSync(RUNTIME_STATE_PATH)) {
-        const content = fs.readFileSync(RUNTIME_STATE_PATH, 'utf-8');
-        const state: RuntimeState = JSON.parse(content);
-        return state.lastUsedConfigPath;
-      }
-    } catch (error) {
-      console.error('[ProcessManager] Failed to get last started config path:', error);
-    }
-    return null;
+    return this.cachedLastConfigPath;
   }
 
   getStatus(): HeadlessStatus {
@@ -152,49 +140,45 @@ export class ProcessManager extends EventEmitter {
     return this.logBuffer.toArray(limit);
   }
 
-  listConfigs(): string[] {
-    if (!fs.existsSync(HEADLESS_CONFIG_DIR)) {
-      return [];
+  async listConfigs(): Promise<string[]> {
+    try {
+      const files = await fs.readdir(HEADLESS_CONFIG_DIR);
+      return files
+        .filter(file => file.toLowerCase().endsWith('.json'))
+        .map(file => path.join(HEADLESS_CONFIG_DIR, file));
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return [];
+      }
+      throw error;
     }
-    return fs
-      .readdirSync(HEADLESS_CONFIG_DIR)
-      .filter(file => file.toLowerCase().endsWith('.json'))
-      .map(file => path.join(HEADLESS_CONFIG_DIR, file));
   }
 
   async loadConfig(configPath: string): Promise<any> {
     const fullPath = path.isAbsolute(configPath) ? configPath : path.join(HEADLESS_CONFIG_DIR, configPath);
-    
-    if (!fs.existsSync(fullPath)) {
-      throw new Error(`Config file not found: ${configPath}`);
-    }
-
-    const content = fs.readFileSync(fullPath, 'utf-8');
+    const content = await fs.readFile(fullPath, 'utf-8');
     return JSON.parse(content);
   }
 
   async deleteConfig(configPath: string): Promise<void> {
     const fullPath = path.isAbsolute(configPath) ? configPath : path.join(HEADLESS_CONFIG_DIR, configPath);
-    
-    if (!fs.existsSync(fullPath)) {
-      throw new Error(`Config file not found: ${configPath}`);
-    }
-
-    fs.unlinkSync(fullPath);
+    await fs.unlink(fullPath);
   }
 
   async generateConfig(name: string, username: string, password: string, configData: any, overwrite = false): Promise<string> {
     // 設定ディレクトリが存在しない場合は作成
-    if (!fs.existsSync(HEADLESS_CONFIG_DIR)) {
-      fs.mkdirSync(HEADLESS_CONFIG_DIR, { recursive: true });
-    }
+    await fs.mkdir(HEADLESS_CONFIG_DIR, { recursive: true });
 
     const configPath = path.join(HEADLESS_CONFIG_DIR, `${name}.json`);
-    
+
     // 既存のファイルがある場合の挙動
-    if (fs.existsSync(configPath)) {
-      if (!overwrite) {
+    if (!overwrite) {
+      try {
+        await fs.access(configPath);
         throw new Error(`Config file already exists: ${name}.json`);
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') throw error;
+        // ENOENT = ファイルが存在しない = OK
       }
     }
 
@@ -240,22 +224,24 @@ export class ProcessManager extends EventEmitter {
       "autoSpawnItems": configData.autoSpawnItems || null
     };
 
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
     return configPath;
   }
 
-  start(configPath?: string): void {
+  async start(configPath?: string): Promise<void> {
     if (this.child) {
       throw new Error('Headless process already running');
     }
 
-    const configs = this.listConfigs();
+    const configs = await this.listConfigs();
     const resolvedConfig = configPath ?? configs[0];
     if (!resolvedConfig) {
       throw new Error('No headless config file found. Please place one under config/headless');
     }
 
-    if (!fs.existsSync(resolvedConfig)) {
+    try {
+      await fs.access(resolvedConfig);
+    } catch {
       throw new Error(`Config file not found: ${resolvedConfig}`);
     }
 
@@ -276,7 +262,7 @@ export class ProcessManager extends EventEmitter {
     };
     this.emit('status', { ...this.status });
 
-    // ランタイム状態を保存
+    // ランタイム状態を保存（非同期、完了を待たない）
     this.saveRuntimeState(resolvedConfig, 'start');
 
     child.stdout.on('data', data => {
@@ -292,7 +278,12 @@ export class ProcessManager extends EventEmitter {
       emitLog(this, entry);
     });
 
+    let exitHandled = false;
     const handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      // B-1: 二重実行を防止
+      if (exitHandled) return;
+      exitHandled = true;
+
       this.child = undefined as any;
       this.status = {
         running: false,
@@ -305,7 +296,7 @@ export class ProcessManager extends EventEmitter {
       };
       this.emit('status', { ...this.status });
       this.stopPromise = undefined as any;
-      
+
       // ランタイム状態を保存
       this.saveRuntimeState(resolvedConfig, 'stop');
     };
@@ -528,10 +519,10 @@ export class ProcessManager extends EventEmitter {
   }
 
   private emitStatusUpdate(): void {
-    this.status = { 
-      ...this.status, 
-      userName: this.lastUserName as string | undefined, 
-      userId: this.lastUserId as string | undefined 
+    this.status = {
+      ...this.status,
+      userName: this.lastUserName as string | undefined,
+      userId: this.lastUserId as string | undefined
     };
     this.emit('status', { ...this.status });
   }
