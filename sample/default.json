@@ -23,6 +23,8 @@
       "loadWorldPresetName": "Grid",
       "overrideCorrespondingWorldId": null,
       "forcePort": null,
+      "enableResoniteLink": false,
+      "forceResoniteLinkPort": null,
       "keepOriginalRoles": false,
       "defaultUserRoles": null,
       "roleCloudVariable": null,
