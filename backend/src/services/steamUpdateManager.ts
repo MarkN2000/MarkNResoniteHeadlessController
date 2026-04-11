@@ -143,12 +143,21 @@ export class SteamUpdateManager extends EventEmitter {
     // インストール先ディレクトリを明示的に指定（SteamCMDデフォルトではなく設定されたパスへ）
     args.push('+force_install_dir', installDir);
 
-    args.push(
-      '+app_update',
-      appId,
-      'validate',
-      '+quit'
-    );
+    // Resonite Headless は Steam のベータブランチとして配布されているため、
+    // `-beta <branch>` を `+app_update` と `validate` の間に挟む必要がある。
+    // SteamCMD の構文上、ブランチ関連オプションは appId の後、`validate` より前に置く。
+    const branch = (this.config.resonite.branch ?? '').trim();
+    const betaPassword = this.config.resonite.betaPassword ?? '';
+
+    const updateArgs: string[] = ['+app_update', appId];
+    if (branch !== '') {
+      updateArgs.push('-beta', branch);
+      if (betaPassword !== '') {
+        updateArgs.push('-betapassword', betaPassword);
+      }
+    }
+    updateArgs.push('validate');
+    args.push(...updateArgs, '+quit');
 
     return new Promise<SteamUpdateResult>((resolve) => {
       let stdout = '';
@@ -176,6 +185,14 @@ export class SteamUpdateManager extends EventEmitter {
 
       this.emit('log', `[SteamUpdate] Starting SteamCMD: ${steamcmdPath}`);
       this.emit('log', `[SteamUpdate] Using account: ${username} (passwordはログに出力しません)`);
+      // 実際に発行した app_update の中身を要約してログに出す（betapassword は値を出さない）。
+      // これでフロントのログに "branch=headless" が出ているかどうかで
+      // 正しいブランチ指定が渡っているか目視確認できる。
+      this.emit(
+        'log',
+        `[SteamUpdate] app_update args: app=${appId} installDir="${installDir}" ` +
+          `branch=${branch || '(default)'} betaPassword=${betaPassword ? '(set)' : '(none)'}`
+      );
 
       // 行末バッファ（stdout/stderr 個別）
       // SteamCMD は data チャンクが行の途中で切れることがあるため、
@@ -339,6 +356,38 @@ export class SteamUpdateManager extends EventEmitter {
         const alreadyUpToDate =
           lowerLog.includes('already up to date') ||
           lowerLog.includes('fully installed, but no update was necessary');
+
+        // 終了コード0でも SteamCMD のログ中にエラーが含まれるケースがある。
+        // 代表例:
+        //   - ベータアクセスコード不備: "Invalid password" / "No subscription" / "No licenses"
+        //   - アプリ状態異常: "ERROR! App '2519830' state is 0x..."
+        //   - インストール失敗: "Failed to install"
+        // これらを検出した場合は誤って「完了」と通知せず failed として扱う。
+        const errorKeywords = [
+          "error! app '",
+          'failed to install',
+          'invalid password',
+          'no subscription',
+          'no licenses',
+          'invalid platform'
+        ];
+        const matchedError = errorKeywords.find((k) => lowerLog.includes(k));
+        if (matchedError) {
+          this.emit(
+            'log',
+            `[SteamUpdate] SteamCMD exited 0 but log contains error keyword: "${matchedError}"`
+          );
+          emitState('failed');
+          resolve({
+            success: false,
+            updated: false,
+            message:
+              'SteamCMDは終了コード0で終了しましたが、ログにエラーメッセージが含まれています。' +
+              'Headlessブランチへのアクセス権やベータパスワード（アクセスコード）を確認してください。',
+            rawLog
+          });
+          return;
+        }
 
         // アップデートが実際に走った場合のみ進捗100%を発火する。
         // 既に最新の場合は途中の進捗が一切流れていないため、

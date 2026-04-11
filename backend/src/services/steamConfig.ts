@@ -21,6 +21,19 @@ export interface ResoniteSteamConfig {
   appId: string;
   installDir: string;
   autoDetectFromExecutable: boolean;
+  /**
+   * Steam のベータブランチ名。
+   * Resonite Headless は `headless` ブランチで配布されているため、
+   * ここが空文字なら SteamCMD に `-beta` を渡さない（＝通常版を取得する）。
+   */
+  branch: string;
+  /**
+   * ベータブランチのアクセスコード（パスワード）。
+   * 限定ベータに Steam アカウントとしてまだ紐付いていない場合や
+   * パスワード保護されたブランチの場合に `-betapassword` として渡される。
+   * 空文字ならフラグ自体を付けない。
+   */
+  betaPassword: string;
 }
 
 export interface SteamConfig {
@@ -37,7 +50,11 @@ const DEFAULT_STEAM_CONFIG: SteamConfig = {
   resonite: {
     appId: '2519830',
     installDir: 'C:/Program Files (x86)/Steam/steamapps/common/Resonite',
-    autoDetectFromExecutable: true
+    autoDetectFromExecutable: true,
+    // Resonite Headless は Steam のベータブランチ `headless` として配布されているため、
+    // デフォルトで headless を指定する（-beta headless を SteamCMD に渡す）。
+    branch: 'headless',
+    betaPassword: ''
   },
   account: {
     username: '',
@@ -100,7 +117,15 @@ export async function loadSteamConfig(): Promise<SteamConfig> {
           DEFAULT_STEAM_CONFIG.resonite.installDir,
         autoDetectFromExecutable:
           fileConfig.resonite?.autoDetectFromExecutable ??
-          DEFAULT_STEAM_CONFIG.resonite.autoDetectFromExecutable
+          DEFAULT_STEAM_CONFIG.resonite.autoDetectFromExecutable,
+        // 既存の steam.json に branch / betaPassword が無い可能性があるため
+        // null/undefined の場合のみデフォルトへフォールバックする（空文字は意図された値として尊重）。
+        branch:
+          fileConfig.resonite?.branch ??
+          DEFAULT_STEAM_CONFIG.resonite.branch,
+        betaPassword:
+          fileConfig.resonite?.betaPassword ??
+          DEFAULT_STEAM_CONFIG.resonite.betaPassword
       },
       account: {
         username:
@@ -156,14 +181,27 @@ export async function saveSteamConfig(config: SteamConfig): Promise<void> {
 }
 
 /**
- * APIレスポンス用にパスワードをマスクした設定を返す
+ * APIレスポンス用に機密情報（パスワード・ベータパスワード）をマスクした設定を返す
  */
-export function maskSensitiveSteamConfig(config: SteamConfig): Omit<SteamConfig, 'account'> & {
+export type MaskedResoniteSteamConfig = Omit<ResoniteSteamConfig, 'betaPassword'> & {
+  hasBetaPassword: boolean;
+};
+
+export type MaskedSteamConfig = Omit<SteamConfig, 'account' | 'resonite'> & {
+  resonite: MaskedResoniteSteamConfig;
   account: Omit<SteamAccountConfig, 'password'> & { hasPassword: boolean };
-} {
+};
+
+export function maskSensitiveSteamConfig(config: SteamConfig): MaskedSteamConfig {
   return {
     steamCmd: config.steamCmd,
-    resonite: config.resonite,
+    resonite: {
+      appId: config.resonite.appId,
+      installDir: config.resonite.installDir,
+      autoDetectFromExecutable: config.resonite.autoDetectFromExecutable,
+      branch: config.resonite.branch,
+      hasBetaPassword: Boolean(config.resonite.betaPassword)
+    },
     account: {
       username: config.account.username,
       useSteamGuardFile: config.account.useSteamGuardFile,

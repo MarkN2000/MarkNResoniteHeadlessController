@@ -56,7 +56,15 @@ export function createSteamRoutes(processManager: ProcessManager): Router {
           autoDetectFromExecutable:
             typeof incoming.resonite?.autoDetectFromExecutable === 'boolean'
               ? incoming.resonite.autoDetectFromExecutable
-              : current.resonite.autoDetectFromExecutable
+              : current.resonite.autoDetectFromExecutable,
+          // ブランチ名はこのエンドポイントで更新可能（平文なので /config で扱ってよい）
+          branch:
+            typeof incoming.resonite?.branch === 'string'
+              ? incoming.resonite.branch
+              : current.resonite.branch,
+          // betaPassword はアカウントパスワードと同様の扱いにし、
+          // このエンドポイントでは絶対に更新しない（専用エンドポイントから更新する）
+          betaPassword: current.resonite.betaPassword
         },
         account: {
           username: incoming.account?.username ?? current.account.username,
@@ -111,6 +119,48 @@ export function createSteamRoutes(processManager: ProcessManager): Router {
       res.status(500).json({
         success: false,
         error: error?.message || 'Steamパスワードの更新に失敗しました'
+      });
+    }
+  });
+
+  /**
+   * POST /api/steam/config/beta-password
+   * Resonite Headless などのベータブランチ用アクセスコード（パスワード）のみを更新
+   * 空文字を送ればクリアできる（SteamCMD 呼び出し時に -betapassword を付けない動作）。
+   */
+  steamRoutes.post('/config/beta-password', async (req: Request, res: Response) => {
+    try {
+      const { betaPassword } = req.body as { betaPassword?: string };
+
+      if (typeof betaPassword !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'betaPassword は文字列で指定してください（空文字でクリア可能）'
+        });
+      }
+
+      const current = await loadSteamConfig();
+      const nextConfig = {
+        ...current,
+        resonite: {
+          ...current.resonite,
+          betaPassword
+        }
+      };
+
+      await saveSteamConfig(nextConfig);
+      res.json({
+        success: true,
+        message:
+          betaPassword === ''
+            ? 'ベータブランチのアクセスコードをクリアしました'
+            : 'ベータブランチのアクセスコードを更新しました'
+      });
+    } catch (error: any) {
+      console.error('[SteamRoutes] Failed to update beta password:', error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || 'ベータブランチのアクセスコードの更新に失敗しました'
       });
     }
   });

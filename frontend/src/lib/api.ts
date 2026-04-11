@@ -452,6 +452,16 @@ export interface ResoniteSteamConfig {
   appId: string;
   installDir: string;
   autoDetectFromExecutable: boolean;
+  /** Steam のベータブランチ名（Headless は "headless"）。空文字なら通常版。 */
+  branch: string;
+}
+
+/**
+ * /api/steam/config のレスポンスで返ってくる Resonite セクション。
+ * betaPassword は平文では返さず、設定済みかどうかの真偽値のみ。
+ */
+export interface ResoniteSteamConfigPublic extends ResoniteSteamConfig {
+  hasBetaPassword: boolean;
 }
 
 export interface SteamAccountConfigPublic {
@@ -463,7 +473,7 @@ export interface SteamAccountConfigPublic {
 
 export interface SteamConfigPublic {
   steamCmd: SteamCmdConfig;
-  resonite: ResoniteSteamConfig;
+  resonite: ResoniteSteamConfigPublic;
   account: SteamAccountConfigPublic;
 }
 
@@ -496,6 +506,16 @@ export const setSteamPassword = (password: string) =>
   request('/steam/config/password', {
     method: 'POST',
     body: JSON.stringify({ password })
+  }) as Promise<{ success: boolean; message: string }>;
+
+/**
+ * Resoniteベータブランチのアクセスコード（パスワード）を設定
+ * 空文字を送ればクリア。SteamCMD 呼び出し時に -betapassword を付けない動作に戻る。
+ */
+export const setSteamBetaPassword = (betaPassword: string) =>
+  request('/steam/config/beta-password', {
+    method: 'POST',
+    body: JSON.stringify({ betaPassword })
   }) as Promise<{ success: boolean; message: string }>;
 
 /**
