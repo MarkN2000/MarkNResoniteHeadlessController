@@ -1,4 +1,51 @@
+// ============================================================================
+// SteamCMD アップデート関連の型定義
+// （backend / frontend の双方から参照される共通型）
+// ============================================================================
+
+/**
+ * Resoniteアップデート時の状態
+ */
+export type SteamUpdateState =
+  | 'starting'
+  | 'authenticating'
+  | 'connecting'
+  | 'downloading'
+  | 'verifying'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
+  | 'guard-required'
+  | 'timeout';
+
+/**
+ * SteamCMDの出力からパースした進捗情報
+ */
+export interface SteamUpdateProgress {
+  percent: number;        // 0..100
+  state: SteamUpdateState;
+  downloaded?: number;    // bytes
+  total?: number;         // bytes
+  raw?: string;           // 元の行（デバッグ用）
+}
+
+/**
+ * WS再接続時に送信する現在の進捗スナップショット
+ *
+ * バックエンドが「いま何が起きているか」を保持し、
+ * 後から接続してきた / 再接続してきたソケットへ初期同期するために使う。
+ */
+export interface SteamUpdateSnapshot {
+  state: SteamUpdateState | null;
+  progress: SteamUpdateProgress | null;
+  isActive: boolean;       // 進行中かどうか（モーダル表示制御に使う）
+  recentLogs: string[];    // 直近のログ行（リングバッファ）
+}
+
+// ============================================================================
 // 自動再起動設定の型定義
+// ============================================================================
+
 export interface ScheduledRestartEntry {
   id: string;
   enabled: boolean;

@@ -34,6 +34,7 @@
     getRestartStatus,
     triggerRestart,
     updateResonite,
+    ApiError,
     type WorldSearchItem,
     type RuntimeStatusData,
     type RuntimeUsersData,
@@ -46,10 +47,25 @@
     type LogEntry,
     type ResoniteUserFull,
     type RestartConfig,
-    type RestartStatus
+    type RestartStatus,
+    type SteamUpdateState
   } from '$lib';
 
-  const { status, logs, configs, metrics, setConfigs, setStatus, setLogs, clearLogs } = createServerStores();
+  const {
+    status,
+    logs,
+    configs,
+    metrics,
+    steamUpdateState,
+    steamUpdateProgress,
+    steamUpdateLogLines,
+    setConfigs,
+    setStatus,
+    setLogs,
+    clearLogs,
+    resetSteamUpdate,
+    setSteamUpdateState
+  } = createServerStores();
   const PREVIEW_LOGIN_USERNAME_PLACEHOLDER = '<保存済みのユーザー名が使用されます>';
   const PREVIEW_LOGIN_PASSWORD_PLACEHOLDER = '<保存済みのパスワードが使用されます>';
 
@@ -118,6 +134,46 @@
       notifications.update(items => items.filter((item: { id: number }) => item.id !== id));
     }, duration);
   };
+
+  // SteamCMDアップデート状態の日本語ラベル
+  const STEAM_UPDATE_STATE_LABELS: Record<string, string> = {
+    starting: '開始しています...',
+    authenticating: 'Steamにログイン中...',
+    connecting: 'Steamサーバーに接続中...',
+    downloading: 'ダウンロード中',
+    verifying: 'ファイル検証中',
+    finalizing: '最終処理中',
+    completed: '完了しました',
+    failed: '失敗しました',
+    'guard-required': 'Steam Guard コードを入力してください',
+    timeout: 'タイムアウトしました'
+  };
+
+  const formatSteamUpdateState = (state: string | null | undefined): string => {
+    if (!state) return '待機中';
+    return STEAM_UPDATE_STATE_LABELS[state] ?? state;
+  };
+
+  // バイト数を人間が読める単位に整形
+  const formatBytes = (bytes: number | undefined): string => {
+    if (bytes === undefined || bytes === null || !Number.isFinite(bytes)) return '';
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
+  };
+
+  // モーダル表示中の終了状態判定
+  $: steamUpdateIsTerminal =
+    $steamUpdateState === 'completed' ||
+    $steamUpdateState === 'failed' ||
+    $steamUpdateState === 'timeout';
 
   // 認証関数
   const handleLogin = async () => {
@@ -331,6 +387,12 @@
 
   // Steam / Resonite アップデート用の状態
   let steamUpdateLoading = false;
+  let steamUpdateModalOpen = false;
+  let steamUpdateGuardCode = '';
+  let steamUpdateGuardSubmitting = false;
+  let steamUpdateGuardRequested = false; // モーダル内Guard入力待ち中かどうか
+  let steamUpdateLogContainer: HTMLDivElement | null = null;
+  let steamUpdateFinalMessage = ''; // 完了/失敗時にモーダルへ表示する最終メッセージ
 
   // Scheduled restart edit state
   let editingScheduleId: string | null = null;
@@ -485,7 +547,11 @@
   };
 
   const resetCurrentSessionField = (
-    field: keyof typeof DEFAULT_SESSION_FIELDS | 'customSessionIdSuffix' | 'defaultUserRoles'
+    field:
+      | keyof typeof DEFAULT_SESSION_FIELDS
+      | 'customSessionIdSuffix'
+      | 'defaultUserRoles'
+      | 'autoInviteUsernames'
   ) => {
     const cur = getCurrentSession();
     if (field === 'customSessionIdSuffix') {
@@ -1180,6 +1246,9 @@
   afterUpdate(() => {
     if (logContainer) {
       logContainer.scrollTop = logContainer.scrollHeight;
+    }
+    if (steamUpdateLogContainer) {
+      steamUpdateLogContainer.scrollTop = steamUpdateLogContainer.scrollHeight;
     }
   });
 
@@ -2399,62 +2468,149 @@
     }
   };
 
+  // Steam Guardコードのモーダル入力をPromiseで待ち受けるためのリゾルバ
+  let pendingGuardResolver: ((code: string | null) => void) | null = null;
+
+  const awaitGuardCode = (): Promise<string | null> =>
+    new Promise(resolve => {
+      pendingGuardResolver = resolve;
+    });
+
+  const submitSteamUpdateGuardCode = () => {
+    if (!pendingGuardResolver) return;
+    const code = steamUpdateGuardCode.trim();
+    if (!code) {
+      pushToast('Steam Guard コードを入力してください', 'error');
+      return;
+    }
+    steamUpdateGuardSubmitting = true;
+    const resolver = pendingGuardResolver;
+    pendingGuardResolver = null;
+    resolver(code);
+  };
+
+  const cancelSteamUpdateGuardCode = () => {
+    if (!pendingGuardResolver) return;
+    const resolver = pendingGuardResolver;
+    pendingGuardResolver = null;
+    resolver(null);
+  };
+
+  const closeSteamUpdateModal = () => {
+    // 実行中でもモーダルは閉じられる（バックグラウンド継続）
+    steamUpdateModalOpen = false;
+  };
+
+  // 「他クライアントによって既に実行中」と判定すべき進行中ステート
+  // （このいずれかが現在ストアに入っている場合、ボタン押下時にストアをリセットしない）
+  const STEAM_UPDATE_ONGOING_STATES: ReadonlySet<SteamUpdateState> = new Set<SteamUpdateState>([
+    'starting',
+    'authenticating',
+    'connecting',
+    'downloading',
+    'verifying',
+    'finalizing',
+    'guard-required'
+  ]);
+
   // Resoniteアップデートボタン（SteamCMDでアップデートのみ実行）
   const handleResoniteUpdate = async () => {
     if (steamUpdateLoading) return;
 
+    // WS スナップショット経由で「他クライアントが既に進行中」の状態を受け取っている場合は
+    // ストアをリセットせずモーダルだけ開く（既に流れているライブ進捗をそのまま見せる）
+    const isOngoing =
+      $steamUpdateState !== null && STEAM_UPDATE_ONGOING_STATES.has($steamUpdateState);
+    if (!isOngoing) {
+      resetSteamUpdate();
+    }
+
+    steamUpdateGuardCode = '';
+    steamUpdateGuardRequested = false;
+    steamUpdateGuardSubmitting = false;
+    steamUpdateFinalMessage = '';
+    steamUpdateModalOpen = true;
     steamUpdateLoading = true;
+
     try {
       // 1回目: Guardコードなしで試行
       const result = await updateResonite();
 
       if (result.success) {
-        pushToast(
+        const message =
           result.message ||
-            (result.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした'),
-          'success'
-        );
+          (result.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした');
+        steamUpdateFinalMessage = message;
+        pushToast(message, 'success');
         return;
       }
 
-      // Steam Guardコードが必要な場合は、ユーザーに入力してもらう
+      // Steam Guardコードが必要な場合は、モーダル内のフォームで入力してもらう
       if (result.requiresGuardCode) {
-        const guardCode = window.prompt('Steam Guard コードを入力してください（6桁）');
-        if (!guardCode || !guardCode.trim()) {
-          pushToast('Steam Guard コードが入力されませんでした', 'error');
+        steamUpdateGuardRequested = true;
+        const code = await awaitGuardCode();
+        steamUpdateGuardRequested = false;
+
+        if (!code) {
+          steamUpdateFinalMessage = 'Steam Guard コードが入力されませんでした';
+          pushToast(steamUpdateFinalMessage, 'error');
+          setSteamUpdateState('failed');
           return;
         }
 
-        const trimmedCode = guardCode.trim();
-        const second = await updateResonite(trimmedCode);
+        // 2回目の進捗を1回目と区別しやすくするため、ストアをリセット
+        resetSteamUpdate();
+        const second = await updateResonite(code);
+        steamUpdateGuardSubmitting = false;
 
         if (!second.success) {
-          pushToast(
+          const msg =
             second.message ||
-              'Steam Guard コードを使用したResoniteアップデートに失敗しました',
-            'error'
-          );
+            'Steam Guard コードを使用したResoniteアップデートに失敗しました';
+          steamUpdateFinalMessage = msg;
+          pushToast(msg, 'error');
           return;
         }
 
-        pushToast(
+        const successMsg =
           second.message ||
-            (second.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした'),
-          'success'
-        );
+          (second.updated ? 'Resoniteをアップデートしました' : 'アップデートはありませんでした');
+        steamUpdateFinalMessage = successMsg;
+        pushToast(successMsg, 'success');
         return;
       }
 
       // Guardコード不要だがアップデートに失敗した場合
-      pushToast(
-        result.message || 'Resoniteアップデートの実行に失敗しました',
-        'error'
-      );
+      const errMsg = result.message || 'Resoniteアップデートの実行に失敗しました';
+      steamUpdateFinalMessage = errMsg;
+      pushToast(errMsg, 'error');
     } catch (error: any) {
+      // 同時実行ロックによる 409 Conflict は、状態を「失敗」に固定するのではなく
+      // 「他クライアントが実行中」であることを明示する
+      if (error instanceof ApiError && error.status === 409) {
+        const conflictMsg =
+          error.message ||
+          '他のクライアントがResoniteアップデートを実行中です。完了までお待ちください。';
+        steamUpdateFinalMessage = conflictMsg;
+        pushToast(conflictMsg, 'info');
+        // ストアはリセットしない:
+        // 進行中のアップデートは別クライアント側で動いており、WSで進捗が流れてくる。
+        // resetSteamUpdate() を呼ぶとライブ進捗の表示先がクリアされてしまう。
+        return;
+      }
+
       const message = error.message || 'Resoniteアップデートの実行に失敗しました';
+      steamUpdateFinalMessage = message;
       pushToast(message, 'error');
     } finally {
       steamUpdateLoading = false;
+      steamUpdateGuardSubmitting = false;
+      // 念のためペンディングのリゾルバが残っていれば解放
+      if (pendingGuardResolver) {
+        const resolver = pendingGuardResolver;
+        pendingGuardResolver = null;
+        resolver(null);
+      }
     }
   };
 
@@ -5088,25 +5244,26 @@
                             max="1440"
                             bind:value={restartConfig.preRestartActions.waitControl.forceRestartTimeout}
                             on:input={(e) => {
+                              if (!restartConfig) return; // 型ナローイング用ガード（{#if restartConfig} 内でも closure では narrow されないため）
                               const target = e.target as HTMLInputElement;
                               const value = Number(target.value);
-                              
+
                               // 1未満の場合は1に補正
                               if (value < 1 || !Number.isFinite(value) || isNaN(value)) {
                                 restartConfig.preRestartActions.waitControl.forceRestartTimeout = 1;
                                 target.value = '1';
                                 return;
                               }
-                              
+
                               // 1440を超える場合は1440に補正
                               if (value > 1440) {
                                 restartConfig.preRestartActions.waitControl.forceRestartTimeout = 1440;
                                 target.value = '1440';
                                 return;
                               }
-                              
+
                               restartConfig.preRestartActions.waitControl.forceRestartTimeout = value;
-                              
+
                               // アクション実行タイミングが強制実行タイムアウトより大きい場合は自動調整
                               if (restartConfig.preRestartActions.waitControl.actionTiming > value) {
                                 restartConfig.preRestartActions.waitControl.actionTiming = value;
@@ -5127,10 +5284,11 @@
                             max={restartConfig.preRestartActions.waitControl.forceRestartTimeout}
                             bind:value={restartConfig.preRestartActions.waitControl.actionTiming}
                             on:input={(e) => {
+                              if (!restartConfig) return; // 型ナローイング用ガード
                               const target = e.target as HTMLInputElement;
                               const value = Number(target.value);
                               const maxValue = restartConfig.preRestartActions.waitControl.forceRestartTimeout;
-                              
+
                               // 強制実行タイムアウトより大きい場合は補正
                               if (value > maxValue) {
                                 restartConfig.preRestartActions.waitControl.actionTiming = maxValue;
@@ -5596,6 +5754,141 @@
               </button>
   </div>
           </form>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Resoniteアップデート進捗モーダル -->
+  {#if steamUpdateModalOpen}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="modal-overlay"
+      on:click={closeSteamUpdateModal}
+      on:keydown={(e) => { if (e.key === 'Escape') closeSteamUpdateModal(); }}
+      role="button"
+      tabindex="-1"
+    >
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="modal-content steam-update-modal"
+        on:click|stopPropagation
+        on:keydown|stopPropagation
+        role="dialog"
+        tabindex="-1"
+      >
+        <div class="modal-header">
+          <h2>Resonite アップデート</h2>
+          <button type="button" class="modal-close" on:click={closeSteamUpdateModal}>×</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- ステータス行 -->
+          <div class="steam-update-status-row">
+            <span class="steam-update-status-label">状態:</span>
+            <span
+              class="steam-update-status-value"
+              class:is-completed={$steamUpdateState === 'completed'}
+              class:is-failed={$steamUpdateState === 'failed' || $steamUpdateState === 'timeout'}
+              class:is-guard={$steamUpdateState === 'guard-required'}
+            >
+              {formatSteamUpdateState($steamUpdateState)}
+            </span>
+          </div>
+
+          <!-- 進捗バー -->
+          <div class="steam-update-progress-wrapper">
+            <div class="steam-update-progress-bar">
+              <div
+                class="steam-update-progress-fill"
+                class:is-completed={$steamUpdateState === 'completed'}
+                class:is-failed={$steamUpdateState === 'failed' || $steamUpdateState === 'timeout'}
+                style="width: {Math.min(100, Math.max(0, $steamUpdateProgress?.percent ?? 0))}%;"
+              ></div>
+            </div>
+            <div class="steam-update-progress-meta">
+              <span>{($steamUpdateProgress?.percent ?? 0).toFixed(1)} %</span>
+              {#if $steamUpdateProgress?.downloaded !== undefined && $steamUpdateProgress?.total !== undefined}
+                <span>
+                  {formatBytes($steamUpdateProgress.downloaded)} / {formatBytes($steamUpdateProgress.total)}
+                </span>
+              {/if}
+            </div>
+          </div>
+
+          <!-- Steam Guard コード入力 -->
+          {#if steamUpdateGuardRequested}
+            <div class="steam-update-guard-form">
+              <label class="modal-label">
+                <span>Steam Guard コード（6桁）</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="10"
+                  bind:value={steamUpdateGuardCode}
+                  disabled={steamUpdateGuardSubmitting}
+                  on:keydown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      submitSteamUpdateGuardCode();
+                    }
+                  }}
+                />
+              </label>
+              <div class="modal-actions" style="margin-top: 0.75rem;">
+                <button
+                  type="button"
+                  class="modal-cancel-btn"
+                  on:click={cancelSteamUpdateGuardCode}
+                  disabled={steamUpdateGuardSubmitting}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  class="modal-save-btn"
+                  on:click={submitSteamUpdateGuardCode}
+                  disabled={steamUpdateGuardSubmitting || !steamUpdateGuardCode.trim()}
+                >
+                  {steamUpdateGuardSubmitting ? '送信中...' : '送信'}
+                </button>
+              </div>
+            </div>
+          {/if}
+
+          <!-- ログ表示 -->
+          <div class="steam-update-log-wrapper">
+            <div class="steam-update-log-header">SteamCMD ログ</div>
+            <div class="steam-update-log-container selectable" bind:this={steamUpdateLogContainer}>
+              {#each $steamUpdateLogLines as line, index (index)}
+                <div class="steam-update-log-line">{line}</div>
+              {/each}
+              {#if $steamUpdateLogLines.length === 0}
+                <div class="steam-update-log-empty">ログ待機中...</div>
+              {/if}
+            </div>
+          </div>
+
+          <!-- 最終メッセージ -->
+          {#if steamUpdateFinalMessage}
+            <div
+              class="steam-update-final-message"
+              class:is-failed={$steamUpdateState === 'failed' || $steamUpdateState === 'timeout'}
+            >
+              {steamUpdateFinalMessage}
+            </div>
+          {/if}
+        </div>
+
+        <div class="modal-actions" style="padding: 0 1.5rem 1.5rem;">
+          <button type="button" class="modal-cancel-btn" on:click={closeSteamUpdateModal}>
+            {#if steamUpdateLoading && !steamUpdateIsTerminal}
+              バックグラウンドで継続して閉じる
+            {:else}
+              閉じる
+            {/if}
+          </button>
         </div>
       </div>
     </div>
@@ -8002,5 +8295,131 @@
     width: 100%;
     margin-left: 0;
   }
+  }
+
+  /* Resoniteアップデート進捗モーダル */
+  .steam-update-modal {
+    max-width: 720px;
+  }
+
+  .steam-update-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+  }
+
+  .steam-update-status-label {
+    color: #a0a0a0;
+  }
+
+  .steam-update-status-value {
+    font-weight: 600;
+    color: #61d1fa;
+  }
+
+  .steam-update-status-value.is-completed {
+    color: #51cf66;
+  }
+
+  .steam-update-status-value.is-failed {
+    color: #ff6b6b;
+  }
+
+  .steam-update-status-value.is-guard {
+    color: #ffd43b;
+  }
+
+  .steam-update-progress-wrapper {
+    margin-bottom: 1.25rem;
+  }
+
+  .steam-update-progress-bar {
+    width: 100%;
+    height: 14px;
+    background: #0f1218;
+    border: 1px solid #2b2f35;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .steam-update-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #38b6ff, #61d1fa);
+    transition: width 0.3s ease;
+  }
+
+  .steam-update-progress-fill.is-completed {
+    background: linear-gradient(90deg, #2f9e44, #51cf66);
+  }
+
+  .steam-update-progress-fill.is-failed {
+    background: linear-gradient(90deg, #c92a2a, #ff6b6b);
+  }
+
+  .steam-update-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.4rem;
+    color: #a0a0a0;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .steam-update-guard-form {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+    background: #1f1300;
+    border: 1px solid #ffd43b;
+    border-radius: 0.5rem;
+  }
+
+  .steam-update-log-wrapper {
+    margin-bottom: 1rem;
+  }
+
+  .steam-update-log-header {
+    color: #a0a0a0;
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .steam-update-log-container {
+    background: #0a0d12;
+    border: 1px solid #2b2f35;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    height: 220px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: #d4d4d4;
+  }
+
+  .steam-update-log-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .steam-update-log-empty {
+    color: #5a6068;
+    font-style: italic;
+  }
+
+  .steam-update-final-message {
+    padding: 0.75rem 1rem;
+    background: #0f2018;
+    border: 1px solid #2f9e44;
+    border-radius: 0.5rem;
+    color: #b2f2bb;
+    font-size: 0.9rem;
+  }
+
+  .steam-update-final-message.is-failed {
+    background: #200f0f;
+    border-color: #c92a2a;
+    color: #ffc9c9;
   }
 </style>

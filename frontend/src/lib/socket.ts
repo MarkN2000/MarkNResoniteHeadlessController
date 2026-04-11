@@ -1,6 +1,15 @@
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import type { HeadlessStatus, LogEntry, SystemMetrics } from './api';
+// SteamCMDアップデート関連の型は shared パッケージから再エクスポート
+// （バックエンドと完全一致を保証するため、フロント側で重複定義しない）
+import type {
+  SteamUpdateState,
+  SteamUpdateProgress,
+  SteamUpdateSnapshot
+} from '../../../shared/src/index.js';
+
+export type { SteamUpdateState, SteamUpdateProgress, SteamUpdateSnapshot };
 
 // 開発環境では直接バックエンドに接続、本番環境では現在のオリジンを使用
 const getSocketBase = () => {
@@ -25,6 +34,10 @@ export interface ServerSocketEvents {
   log: (entry: LogEntry) => void;
   logs: (entries: LogEntry[]) => void;
   metrics: (metrics: SystemMetrics) => void;
+  updateLog?: (text: string) => void;
+  updateStatus?: (state: SteamUpdateState) => void;
+  updateProgress?: (progress: SteamUpdateProgress) => void;
+  updateSnapshot?: (snapshot: SteamUpdateSnapshot) => void;
 }
 
 export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
@@ -66,6 +79,19 @@ export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
   socket.on('log', handlers.log);
   socket.on('logs', handlers.logs);
   socket.on('metrics', handlers.metrics);
+
+  if (handlers.updateLog) {
+    socket.on('update:log', handlers.updateLog);
+  }
+  if (handlers.updateStatus) {
+    socket.on('update:status', handlers.updateStatus);
+  }
+  if (handlers.updateProgress) {
+    socket.on('update:progress', handlers.updateProgress);
+  }
+  if (handlers.updateSnapshot) {
+    socket.on('update:snapshot', handlers.updateSnapshot);
+  }
 
   return socket;
 };

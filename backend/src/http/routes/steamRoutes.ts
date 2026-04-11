@@ -2,10 +2,17 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { loadSteamConfig, saveSteamConfig, maskSensitiveSteamConfig } from '../../services/steamConfig.js';
 import { SteamUpdateManager } from '../../services/steamUpdateManager.js';
+import type { SteamUpdateProgress, SteamUpdateState } from '../../services/steamUpdateManager.js';
+import { steamUpdateBus } from '../../services/steamUpdateBus.js';
 import type { ProcessManager } from '../../services/processManager.js';
 
 export function createSteamRoutes(processManager: ProcessManager): Router {
   const steamRoutes = Router();
+
+  // 同時に複数のアップデートが走らないようにするためのプロセス内ロック
+  // （複数の管理者が同時にボタンを押した場合のSteamCMDロック衝突や、
+  //   フロント側の進捗表示混線を防ぐ）
+  let updateInProgress = false;
 
   /**
    * GET /api/steam/config
@@ -114,63 +121,93 @@ export function createSteamRoutes(processManager: ProcessManager): Router {
    * body: { guardCode?: string }
    */
   steamRoutes.post('/update', async (req: Request, res: Response) => {
+    // 同時実行ガード: 既に走っているアップデートがあれば 409 Conflict を返す
+    if (updateInProgress) {
+      return res.status(409).json({
+        success: false,
+        updated: false,
+        conflict: true,
+        error: '別のリクエストでResoniteアップデートが既に実行中です。完了までお待ちください。'
+      });
+    }
+    updateInProgress = true;
+
     try {
       const { guardCode } = (req.body ?? {}) as { guardCode?: string };
 
       const config = await loadSteamConfig();
       const updater = new SteamUpdateManager(config);
 
-      updater.on('log', (message: string) => {
+      // updater のイベントを WebSocket バスへ転送
+      // （フロント側はバスを購読してリアルタイムに進捗を表示する）
+      const onLog = (message: string): void => {
         console.log(message);
-      });
+        steamUpdateBus.emitLog(message);
+      };
+      const onStatus = (state: SteamUpdateState): void => {
+        steamUpdateBus.emitStatus(state);
+      };
+      const onProgress = (progress: SteamUpdateProgress): void => {
+        steamUpdateBus.emitProgress(progress);
+      };
+      updater.on('log', onLog);
+      updater.on('status', onStatus);
+      updater.on('progress', onProgress);
 
-      // サーバーが起動中の場合は停止する（ファイルロック回避）
-      const status = processManager.getStatus();
-      const wasRunning = status.running;
-      const configPath = status.configPath;
+      try {
+        // サーバーが起動中の場合は停止する（ファイルロック回避）
+        const status = processManager.getStatus();
+        const wasRunning = status.running;
+        const configPath = status.configPath;
 
-      if (wasRunning) {
-        console.log('[SteamRoutes] Resoniteヘッドレスサーバーを停止しています...');
-        await processManager.stop();
-      }
-
-      const result = await updater.updateResonite(guardCode);
-
-      // サーバーを停止した場合は、アップデート結果に関わらず再起動を試みる
-      // （Guardコード要求で失敗した場合もサーバーは復帰させる）
-      if (wasRunning && !result.requiresGuardCode) {
-        try {
-          console.log('[SteamRoutes] Resoniteヘッドレスサーバーを再起動しています...');
-          await processManager.start(configPath);
-        } catch (restartError: any) {
-          console.error('[SteamRoutes] サーバーの再起動に失敗:', restartError);
-          result.message += '（注意: サーバーの自動再起動に失敗しました。手動で起動してください）';
+        if (wasRunning) {
+          console.log('[SteamRoutes] Resoniteヘッドレスサーバーを停止しています...');
+          await processManager.stop();
         }
-      }
 
-      if (!result.success) {
-        // Steam Guardコードが必要な場合は、2ステップ目の入力を促すためのフラグを返す
-        if (result.requiresGuardCode) {
-          return res.json({
+        const result = await updater.updateResonite(guardCode);
+
+        // サーバーを停止した場合は、アップデート結果に関わらず再起動を試みる
+        // （Guardコード要求で失敗した場合もサーバーは復帰させる）
+        if (wasRunning && !result.requiresGuardCode) {
+          try {
+            console.log('[SteamRoutes] Resoniteヘッドレスサーバーを再起動しています...');
+            await processManager.start(configPath);
+          } catch (restartError: any) {
+            console.error('[SteamRoutes] サーバーの再起動に失敗:', restartError);
+            result.message += '（注意: サーバーの自動再起動に失敗しました。手動で起動してください）';
+          }
+        }
+
+        if (!result.success) {
+          // Steam Guardコードが必要な場合は、2ステップ目の入力を促すためのフラグを返す
+          if (result.requiresGuardCode) {
+            return res.json({
+              success: false,
+              updated: false,
+              requiresGuardCode: true,
+              message: result.message
+            });
+          }
+
+          return res.status(500).json({
             success: false,
             updated: false,
-            requiresGuardCode: true,
-            message: result.message
+            error: result.message
           });
         }
 
-        return res.status(500).json({
-          success: false,
-          updated: false,
-          error: result.message
+        res.json({
+          success: true,
+          updated: result.updated,
+          message: result.message
         });
+      } finally {
+        // メモリリーク防止: 登録した3つのリスナーを必ず解除
+        updater.off('log', onLog);
+        updater.off('status', onStatus);
+        updater.off('progress', onProgress);
       }
-
-      res.json({
-        success: true,
-        updated: result.updated,
-        message: result.message
-      });
     } catch (error: any) {
       console.error('[SteamRoutes] Failed to update Resonite:', error);
       res.status(500).json({
@@ -178,6 +215,9 @@ export function createSteamRoutes(processManager: ProcessManager): Router {
         updated: false,
         error: error?.message || 'Resoniteのアップデートに失敗しました'
       });
+    } finally {
+      // 同時実行ロックを必ず解除
+      updateInProgress = false;
     }
   });
 

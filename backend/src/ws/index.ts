@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { processManager } from '../services/processManager.js';
 import { systemMetricsCollector } from '../services/systemMetrics.js';
+import { steamUpdateBus } from '../services/steamUpdateBus.js';
 import { isIpAllowed, getClientIp, logSecurityEvent } from '../utils/cidr.js';
 
 export const registerSocketHandlers = (io: Server): void => {
@@ -15,6 +16,17 @@ export const registerSocketHandlers = (io: Server): void => {
   });
   systemMetricsCollector.on('metrics', (metrics) => {
     namespace.emit('metrics', metrics);
+  });
+
+  // SteamCMDアップデートのイベントを中継（ルートハンドラ -> バス -> WS）
+  steamUpdateBus.on('log', (text) => {
+    namespace.emit('update:log', text);
+  });
+  steamUpdateBus.on('status', (state) => {
+    namespace.emit('update:status', state);
+  });
+  steamUpdateBus.on('progress', (progress) => {
+    namespace.emit('update:progress', progress);
   });
 
   namespace.on('connection', socket => {
@@ -42,6 +54,13 @@ export const registerSocketHandlers = (io: Server): void => {
     const currentMetrics = systemMetricsCollector.getCurrentMetrics();
     if (currentMetrics) {
       socket.emit('metrics', currentMetrics);
+    }
+
+    // SteamCMDアップデートが進行中、または直近の結果が残っている場合は
+    // 接続したクライアントだけにスナップショットを送る（再接続時の状態復元に使用）
+    const updateSnapshot = steamUpdateBus.getSnapshot();
+    if (updateSnapshot.state !== null) {
+      socket.emit('update:snapshot', updateSnapshot);
     }
 
     socket.on('disconnect', () => {

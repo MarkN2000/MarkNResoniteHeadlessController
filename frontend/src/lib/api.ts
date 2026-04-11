@@ -83,6 +83,21 @@ export interface ConfigEntry {
   name: string;
 }
 
+/**
+ * APIエラー: HTTPステータスコードを保持して呼び出し側で分岐できるようにする
+ * （例: 409 Conflict を「他のクライアントが実行中」と区別したい場合）
+ */
+export class ApiError extends Error {
+  status: number;
+  body: any;
+  constructor(message: string, status: number, body: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function request(path: string, init?: RequestInit) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -97,10 +112,10 @@ async function request(path: string, init?: RequestInit) {
     headers,
     ...init
   });
-  
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? res.statusText);
+    throw new ApiError(body.error ?? res.statusText, res.status, body);
   }
   return res.json();
 }
