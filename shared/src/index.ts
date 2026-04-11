@@ -42,6 +42,23 @@ export interface SteamUpdateSnapshot {
   recentLogs: string[];    // 直近のログ行（リングバッファ）
 }
 
+/**
+ * Resonite Headless の最新バージョン確認結果
+ *
+ * バックエンドが定期的に SteamCMD の `+app_info_print` を叩いて
+ * Steam 側の最新 buildid を取得し、ローカルの `appmanifest_<appid>.acf` と比較した結果。
+ * フロントはこれを見てボタンに赤ドットバッジを表示する。
+ */
+export interface SteamUpdateCheckResult {
+  branch: string;                    // チェック対象のブランチ名（例: "headless"）
+  installedBuildId: string | null;   // ローカルにインストール済みの buildid（未インストールなら null）
+  latestBuildId: string | null;      // Steam 側の最新 buildid（取得失敗なら null）
+  latestTimeUpdated: number | null;  // 最新ビルドの Unix 秒タイムスタンプ（Steam 側）
+  updateAvailable: boolean;          // 比較結果: 更新が必要かどうか
+  checkedAt: string;                 // チェック実行時刻（ISO 8601）
+  error: string | null;              // このチェック実行で発生したエラー（成功時 null）
+}
+
 // ============================================================================
 // 自動再起動設定の型定義
 // ============================================================================

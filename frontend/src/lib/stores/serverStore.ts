@@ -1,7 +1,12 @@
 import { readable, writable } from 'svelte/store';
 import type { HeadlessStatus, LogEntry, ConfigEntry, SystemMetrics } from '$lib/api';
 import { connectServerSocket } from '$lib/socket';
-import type { SteamUpdateState, SteamUpdateProgress, SteamUpdateSnapshot } from '$lib/socket';
+import type {
+  SteamUpdateState,
+  SteamUpdateProgress,
+  SteamUpdateSnapshot,
+  SteamUpdateCheckResult
+} from '$lib/socket';
 
 const statusStore = writable<HeadlessStatus>({ running: false });
 const logsStore = writable<LogEntry[]>([]);
@@ -12,6 +17,11 @@ const metricsStore = writable<SystemMetrics | null>(null);
 const steamUpdateStateStore = writable<SteamUpdateState | null>(null);
 const steamUpdateProgressStore = writable<SteamUpdateProgress | null>(null);
 const steamUpdateLogLinesStore = writable<string[]>([]);
+
+// Resonite 最新バージョン確認結果のストア
+// バックエンドが定期的に SteamCMD で収集した結果を保持し、
+// UI はこれを見て「新バージョンあり」の赤ドットバッジを出す
+export const steamUpdateCheckStore = writable<SteamUpdateCheckResult | null>(null);
 
 const STEAM_UPDATE_LOG_LIMIT = 500;
 
@@ -66,7 +76,9 @@ export const createServerStores = () => {
       updateLog: text => appendSteamUpdateLog(text),
       updateStatus: state => steamUpdateStateStore.set(state),
       updateProgress: progress => steamUpdateProgressStore.set(progress),
-      updateSnapshot: snapshot => applySteamUpdateSnapshot(snapshot)
+      updateSnapshot: snapshot => applySteamUpdateSnapshot(snapshot),
+      updateCheckResult: result => steamUpdateCheckStore.set(result),
+      updateCheckSnapshot: result => steamUpdateCheckStore.set(result)
     });
   }
 

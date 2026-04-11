@@ -5,8 +5,12 @@ import { SteamUpdateManager } from '../../services/steamUpdateManager.js';
 import type { SteamUpdateProgress, SteamUpdateState } from '../../services/steamUpdateManager.js';
 import { steamUpdateBus } from '../../services/steamUpdateBus.js';
 import type { ProcessManager } from '../../services/processManager.js';
+import type { SteamUpdateChecker } from '../../services/steamUpdateChecker.js';
 
-export function createSteamRoutes(processManager: ProcessManager): Router {
+export function createSteamRoutes(
+  processManager: ProcessManager,
+  steamUpdateChecker: SteamUpdateChecker
+): Router {
   const steamRoutes = Router();
 
   // 同時に複数のアップデートが走らないようにするためのプロセス内ロック
@@ -185,6 +189,10 @@ export function createSteamRoutes(processManager: ProcessManager): Router {
     try {
       const { guardCode } = (req.body ?? {}) as { guardCode?: string };
 
+      // バージョン確認 (`app_info_print`) が走っていたら中断する。
+      // 同じ installDir で SteamCMD を 2 本立ち上げると appworkshop_lock が競合するため。
+      await steamUpdateChecker.abort();
+
       const config = await loadSteamConfig();
       const updater = new SteamUpdateManager(config);
 
@@ -268,6 +276,57 @@ export function createSteamRoutes(processManager: ProcessManager): Router {
     } finally {
       // 同時実行ロックを必ず解除
       updateInProgress = false;
+
+      // アップデートが完了して isActive が false に戻ったので、最新 buildid を再取得して
+      // ボタンの赤ドットバッジをすぐに消せるようにする（await はしない）。
+      steamUpdateChecker
+        .check(true)
+        .catch((err) =>
+          console.warn('[SteamRoutes] post-update check failed:', err?.message ?? err)
+        );
+    }
+  });
+
+  /**
+   * GET /api/steam/update/check
+   * Resonite Headless の最新 buildid と、ローカル installed buildid を比較した結果を返す。
+   *
+   * - キャッシュがあり、かつ `?force=true` でない場合はキャッシュを返す
+   * - キャッシュがまだ無ければ 1 度同期的に check() を走らせて結果を返す
+   * - `?force=true` を付けると（キャッシュ TTL 無視で）強制的に再実行する
+   *
+   * レスポンスは常に 200 OK で `SteamUpdateCheckResult` 形式（error フィールドに文字列が入る場合あり）。
+   */
+  steamRoutes.get('/update/check', async (req: Request, res: Response) => {
+    try {
+      const force = req.query.force === 'true' || req.query.force === '1';
+      const cached = steamUpdateChecker.getCached();
+
+      // キャッシュ無し → 必ず 1 度走らせる
+      if (!cached) {
+        const result = await steamUpdateChecker.check(true);
+        return res.json(result);
+      }
+
+      if (force) {
+        const result = await steamUpdateChecker.check(true);
+        return res.json(result);
+      }
+
+      // force=false の通常呼び出しは checker 側の TTL に従う
+      const result = await steamUpdateChecker.check(false);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[SteamRoutes] Failed to run update check:', error);
+      res.status(500).json({
+        branch: '',
+        installedBuildId: null,
+        latestBuildId: null,
+        latestTimeUpdated: null,
+        updateAvailable: false,
+        checkedAt: new Date().toISOString(),
+        error: error?.message || 'Resoniteバージョン確認に失敗しました'
+      });
     }
   });
 

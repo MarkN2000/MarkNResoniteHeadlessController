@@ -14,6 +14,9 @@ import { startRateLimitCleanup } from './utils/rateLimit.js';
 import { systemMetricsCollector } from './services/systemMetrics.js';
 import { processManager } from './services/processManager.js';
 import { RestartManager } from './services/restartManager.js';
+import { SteamUpdateChecker } from './services/steamUpdateChecker.js';
+import { steamUpdateBus } from './services/steamUpdateBus.js';
+import { loadSteamConfig } from './services/steamConfig.js';
 import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,8 +68,14 @@ restartManager.initialize().catch((error) => {
   console.error('[App] Failed to initialize RestartManager:', error);
 });
 
-// APIルートを設定（RestartManager, ProcessManagerを渡す）
-const apiRouter = createApiRouter(restartManager, processManager);
+// Resonite 最新バージョン確認の checker を初期化し、結果を WS バスへ流す
+const steamUpdateChecker = new SteamUpdateChecker(() => loadSteamConfig());
+steamUpdateChecker.on('result', (result) => {
+  steamUpdateBus.emitCheckResult(result);
+});
+
+// APIルートを設定（RestartManager, ProcessManager, SteamUpdateCheckerを渡す）
+const apiRouter = createApiRouter(restartManager, processManager, steamUpdateChecker);
 app.use('/api', apiRouter);
 
 // フロントエンドの静的ファイルを配信（本番環境、または開発環境でビルド済みの場合）
@@ -123,4 +132,11 @@ startRateLimitCleanup();
 httpServer.listen(SERVER_PORT, () => {
   console.log(`Backend listening on port ${SERVER_PORT}`);
   console.log(`WebSocket server available at ws://localhost:${SERVER_PORT}`);
+
+  // Resonite 最新バージョンの定期チェックを開始。
+  // 起動直後にいきなり走らせると他の初期化処理と競合するため少し遅らせる。
+  // 間隔は ENV で上書き可能。既定は 60 分。
+  const initialDelayMs = Number(process.env.STEAM_UPDATE_CHECK_INITIAL_DELAY_MS) || 60 * 1000;
+  const intervalMs = Number(process.env.STEAM_UPDATE_CHECK_INTERVAL_MS) || 60 * 60 * 1000;
+  steamUpdateChecker.startPeriodic({ initialDelayMs, intervalMs });
 });

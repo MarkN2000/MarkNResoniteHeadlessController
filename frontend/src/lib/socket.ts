@@ -6,10 +6,11 @@ import type { HeadlessStatus, LogEntry, SystemMetrics } from './api';
 import type {
   SteamUpdateState,
   SteamUpdateProgress,
-  SteamUpdateSnapshot
+  SteamUpdateSnapshot,
+  SteamUpdateCheckResult
 } from '../../../shared/src/index.js';
 
-export type { SteamUpdateState, SteamUpdateProgress, SteamUpdateSnapshot };
+export type { SteamUpdateState, SteamUpdateProgress, SteamUpdateSnapshot, SteamUpdateCheckResult };
 
 // 開発環境では直接バックエンドに接続、本番環境では現在のオリジンを使用
 const getSocketBase = () => {
@@ -38,6 +39,8 @@ export interface ServerSocketEvents {
   updateStatus?: (state: SteamUpdateState) => void;
   updateProgress?: (progress: SteamUpdateProgress) => void;
   updateSnapshot?: (snapshot: SteamUpdateSnapshot) => void;
+  updateCheckResult?: (result: SteamUpdateCheckResult) => void;
+  updateCheckSnapshot?: (result: SteamUpdateCheckResult) => void;
 }
 
 export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
@@ -91,6 +94,12 @@ export const connectServerSocket = (handlers: ServerSocketEvents): Socket => {
   }
   if (handlers.updateSnapshot) {
     socket.on('update:snapshot', handlers.updateSnapshot);
+  }
+  if (handlers.updateCheckResult) {
+    socket.on('update:check-result', handlers.updateCheckResult);
+  }
+  if (handlers.updateCheckSnapshot) {
+    socket.on('update:check-snapshot', handlers.updateCheckSnapshot);
   }
 
   return socket;

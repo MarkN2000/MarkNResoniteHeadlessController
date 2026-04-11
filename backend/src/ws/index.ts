@@ -28,6 +28,10 @@ export const registerSocketHandlers = (io: Server): void => {
   steamUpdateBus.on('progress', (progress) => {
     namespace.emit('update:progress', progress);
   });
+  // Resonite 最新バージョン確認の結果を中継
+  steamUpdateBus.on('check-result', (result) => {
+    namespace.emit('update:check-result', result);
+  });
 
   namespace.on('connection', socket => {
     // WebSocket接続のCIDRチェック
@@ -61,6 +65,13 @@ export const registerSocketHandlers = (io: Server): void => {
     const updateSnapshot = steamUpdateBus.getSnapshot();
     if (updateSnapshot.state !== null) {
       socket.emit('update:snapshot', updateSnapshot);
+    }
+
+    // 既にバージョン確認が 1 度走っていれば、その結果を接続クライアントへ即送する。
+    // これでフロントは onMount 前でも赤ドットバッジの初期表示を復元できる。
+    const checkSnapshot = steamUpdateBus.getCheckSnapshot();
+    if (checkSnapshot) {
+      socket.emit('update:check-snapshot', checkSnapshot);
     }
 
     socket.on('disconnect', () => {

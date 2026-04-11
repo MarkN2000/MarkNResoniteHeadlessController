@@ -36,6 +36,8 @@
     updateResonite,
     getSteamConfig,
     setSteamBetaPassword,
+    getSteamUpdateCheck,
+    steamUpdateCheckStore,
     ApiError,
     type WorldSearchItem,
     type RuntimeStatusData,
@@ -50,7 +52,8 @@
     type ResoniteUserFull,
     type RestartConfig,
     type RestartStatus,
-    type SteamUpdateState
+    type SteamUpdateState,
+    type SteamUpdateCheckResult
   } from '$lib';
 
   const {
@@ -1870,9 +1873,44 @@
 
     loadInitialData();
 
+    // Resonite の最新バージョン確認結果を即座に取得（バッジの初期表示用）。
+    // 失敗しても WS 経由で後から `update:check-snapshot` が届くので致命的ではない。
+    getSteamUpdateCheck().then(result => {
+      steamUpdateCheckStore.set(result);
+    }).catch(error => {
+      console.warn('[UpdateCheck] initial fetch failed:', error);
+    });
+
+    // SteamCMD アップデートが「完了」に遷移した瞬間にバージョン確認を再実行し、
+    // 赤ドットバッジが自動的に消えるようにする。
+    //
+    // 注意: Svelte の subscribe は登録時に現在値で即時コールバックを発火する。
+    // バックエンド側の state は terminal state (completed 等) に到達後も次の 'starting' まで
+    // null に戻らないため、ページ再読込で WS スナップショットが 'completed' を復元した場合、
+    // それを「新しい遷移」と誤検知して不要な force チェックを走らせてしまう。
+    // → 初回同期呼び出しは「スナップショット復元」とみなして trigger しない。
+    let prevSteamUpdateState: SteamUpdateState | null = null;
+    let steamUpdateStateInitialized = false;
+    const unsubscribeSteamUpdateState = steamUpdateState.subscribe(state => {
+      if (!steamUpdateStateInitialized) {
+        steamUpdateStateInitialized = true;
+        prevSteamUpdateState = state;
+        return;
+      }
+      if (state === 'completed' && prevSteamUpdateState !== 'completed') {
+        getSteamUpdateCheck(true).then(result => {
+          steamUpdateCheckStore.set(result);
+        }).catch(error => {
+          console.warn('[UpdateCheck] post-update recheck failed:', error);
+        });
+      }
+      prevSteamUpdateState = state;
+    });
+
     return () => {
       unsubscribeConfigs();
       unsubscribeLogs();
+      unsubscribeSteamUpdateState();
     };
   });
 
@@ -5082,15 +5120,21 @@
                     {manualActionsOnlyLoading ? '実行中...' : 'トリガー後終了'}
                   </button>
                 </div>
-                <div class="config-create-button">
-                  <button 
-                    type="button" 
+                <div class="config-create-button btn-with-badge-wrapper">
+                  <button
+                    type="button"
                     class="config-create-btn"
                     on:click={handleResoniteUpdate}
                     disabled={steamUpdateLoading}
+                    title={$steamUpdateCheckStore?.updateAvailable
+                      ? `新バージョンあり (buildid ${$steamUpdateCheckStore.installedBuildId ?? '未インストール'} → ${$steamUpdateCheckStore.latestBuildId ?? '不明'})`
+                      : undefined}
                   >
                     {steamUpdateLoading ? '実行中...' : 'Resoniteアップデート'}
                   </button>
+                  {#if $steamUpdateCheckStore?.updateAvailable}
+                    <span class="update-available-badge" aria-label="新バージョンあり"></span>
+                  {/if}
                 </div>
                 {#if restartSaveLoading}
                   <div style="display: flex; align-items: center; gap: 0.5rem; color: #61d1fa; font-size: 0.9rem;">
@@ -7159,6 +7203,26 @@
   }
   .config-create-button {
     flex-shrink: 0;
+  }
+
+  /* Resoniteアップデートボタンの赤ドットバッジ用ラッパ。
+     config-create-button との併用を想定している。 */
+  .btn-with-badge-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+
+  .update-available-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ff4444;
+    box-shadow: 0 0 6px rgba(255, 68, 68, 0.9);
+    /* title 属性はボタン側に付与しているため、バッジ自体はホバーの邪魔にならないようにする */
+    pointer-events: none;
   }
 
   .config-preview {

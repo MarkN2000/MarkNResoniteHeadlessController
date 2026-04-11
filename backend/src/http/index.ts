@@ -7,8 +7,13 @@ import { createRestartRoutes } from './routes/restartRoutes.js';
 import { createSteamRoutes } from './routes/steamRoutes.js';
 import type { RestartManager } from '../services/restartManager.js';
 import type { ProcessManager } from '../services/processManager.js';
+import type { SteamUpdateChecker } from '../services/steamUpdateChecker.js';
 
-export function createApiRouter(restartManager?: RestartManager, processManager?: ProcessManager): Router {
+export function createApiRouter(
+  restartManager?: RestartManager,
+  processManager?: ProcessManager,
+  steamUpdateChecker?: SteamUpdateChecker
+): Router {
   const apiRouter = Router();
 
   apiRouter.use('/auth', authRoutes);
@@ -16,9 +21,10 @@ export function createApiRouter(restartManager?: RestartManager, processManager?
   apiRouter.use('/security', securityRoutes);
   apiRouter.use('/headless', headlessRoutes);
 
-  // ProcessManagerが提供されている場合のみsteamルートを追加
-  if (processManager) {
-    apiRouter.use('/steam', createSteamRoutes(processManager));
+  // ProcessManager と SteamUpdateChecker が両方提供されている場合のみ steam ルートを追加
+  // （アップデート実行と最新バージョン確認の両方に依存するため）
+  if (processManager && steamUpdateChecker) {
+    apiRouter.use('/steam', createSteamRoutes(processManager, steamUpdateChecker));
   }
 
   // RestartManagerが提供されている場合のみrestartルートを追加
@@ -31,7 +37,7 @@ export function createApiRouter(restartManager?: RestartManager, processManager?
     console.error('[API ERROR]', err);
     res.status(500).json({ error: message });
   });
-  
+
   return apiRouter;
 }
 

@@ -535,3 +535,27 @@ export interface HeadlessCredentialsResponse {
 
 export const getHeadlessCredentials = () =>
   request('/server/headless-credentials') as Promise<HeadlessCredentialsResponse>;
+
+/**
+ * Resonite Headless の最新 buildid 確認結果。
+ *
+ * バックエンドが定期的に SteamCMD の `app_info_print` を実行して収集し、
+ * ローカルの `appmanifest_<appid>.acf` と比較した結果を返す。
+ * shared/src/index.ts の `SteamUpdateCheckResult` と同じ形状。
+ */
+export interface SteamUpdateCheckResult {
+  branch: string;
+  installedBuildId: string | null;
+  latestBuildId: string | null;
+  latestTimeUpdated: number | null;
+  updateAvailable: boolean;
+  checkedAt: string;
+  error: string | null;
+}
+
+/**
+ * GET /api/steam/update/check
+ * force=true を指定すると TTL を無視して強制的に再実行する。
+ */
+export const getSteamUpdateCheck = (force: boolean = false) =>
+  request(`/steam/update/check${force ? '?force=true' : ''}`) as Promise<SteamUpdateCheckResult>;
