@@ -5124,11 +5124,16 @@
                   <button
                     type="button"
                     class="config-create-btn"
+                    class:update-muted={$steamUpdateCheckStore &&
+                      $steamUpdateCheckStore.error === null &&
+                      !$steamUpdateCheckStore.updateAvailable}
                     on:click={handleResoniteUpdate}
                     disabled={steamUpdateLoading}
                     title={$steamUpdateCheckStore?.updateAvailable
                       ? `新バージョンあり (buildid ${$steamUpdateCheckStore.installedBuildId ?? '未インストール'} → ${$steamUpdateCheckStore.latestBuildId ?? '不明'})`
-                      : undefined}
+                      : ($steamUpdateCheckStore && $steamUpdateCheckStore.error === null && !$steamUpdateCheckStore.updateAvailable
+                          ? `Resoniteは最新バージョンです (buildid ${$steamUpdateCheckStore.installedBuildId ?? '不明'})`
+                          : undefined)}
                   >
                     {steamUpdateLoading ? '実行中...' : 'Resoniteアップデート'}
                   </button>
@@ -7223,6 +7228,30 @@
     box-shadow: 0 0 6px rgba(255, 68, 68, 0.9);
     /* title 属性はボタン側に付与しているため、バッジ自体はホバーの邪魔にならないようにする */
     pointer-events: none;
+  }
+
+  /* 「最新バージョン」状態のグレーアウト表示。
+     ボタン機能はオンのまま（強制アップデート用途のためクリックは可能）。
+     :disabled のときはそちらを優先させるため :not(:disabled) で除外する。
+     既存の .config-create-btn:hover:not(:disabled) を上書きするために、
+     hover / active の具体ルールもここで再定義する。 */
+  .config-create-btn.update-muted:not(:disabled) {
+    background: #6b7280;
+    border-color: #4b5563;
+    color: #d1d5db;
+    box-shadow: none;
+  }
+
+  .config-create-btn.update-muted:not(:disabled):hover {
+    background: #7b8290;
+    border-color: #5b6472;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.25);
+  }
+
+  .config-create-btn.update-muted:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(107, 114, 128, 0.2);
   }
 
   .config-preview {
