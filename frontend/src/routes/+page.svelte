@@ -34,6 +34,8 @@
     getRestartStatus,
     triggerRestart,
     updateResonite,
+    getSteamConfig,
+    setSteamBetaPassword,
     ApiError,
     type WorldSearchItem,
     type RuntimeStatusData,
@@ -393,6 +395,16 @@
   let steamUpdateGuardRequested = false; // モーダル内Guard入力待ち中かどうか
   let steamUpdateLogContainer: HTMLDivElement | null = null;
   let steamUpdateFinalMessage = ''; // 完了/失敗時にモーダルへ表示する最終メッセージ
+
+  // 「アップデート開始前」の設定フォーム用状態
+  //   steamUpdatePreStartOpen=true: モーダルは開いているが SteamCMD はまだ実行していない
+  //   steamUpdatePreStartOpen=false: アップデート実行中（あるいは完了後）
+  let steamUpdatePreStartOpen = false;
+  let steamUpdateBranch = 'headless'; // 表示用（バックエンドの設定を反映）
+  let steamUpdateHasBetaPassword = false; // 既にアクセスコードが保存されているか
+  let steamUpdateBetaCodeInput = ''; // 入力中のアクセスコード（空なら既存値を維持）
+  let steamUpdatePreStartLoading = false; // 設定取得/保存中かどうか
+  let steamUpdatePreStartError = ''; // プリスタート画面に表示するエラー
 
   // Scheduled restart edit state
   let editingScheduleId: string | null = null;
@@ -2499,6 +2511,10 @@
   const closeSteamUpdateModal = () => {
     // 実行中でもモーダルは閉じられる（バックグラウンド継続）
     steamUpdateModalOpen = false;
+    // プリスタート画面用の一時状態を片付ける（次回開いた時にクリーンな状態から始まるように）
+    steamUpdatePreStartOpen = false;
+    steamUpdateBetaCodeInput = '';
+    steamUpdatePreStartError = '';
   };
 
   // 「他クライアントによって既に実行中」と判定すべき進行中ステート
@@ -2513,7 +2529,11 @@
     'guard-required'
   ]);
 
-  // Resoniteアップデートボタン（SteamCMDでアップデートのみ実行）
+  // Resoniteアップデートボタン: モーダルを開き、まず設定フォームを表示する
+  //   - 既に他クライアントで実行中(WSスナップショットで検知) の場合は
+  //     プリスタート画面をスキップして直接ログ画面に合流する
+  //   - それ以外の場合はアクセスコード入力欄を表示し、ユーザー操作で
+  //     executeSteamUpdate() を呼ぶことで初めて SteamCMD を実行する
   const handleResoniteUpdate = async () => {
     if (steamUpdateLoading) return;
 
@@ -2521,15 +2541,90 @@
     // ストアをリセットせずモーダルだけ開く（既に流れているライブ進捗をそのまま見せる）
     const isOngoing =
       $steamUpdateState !== null && STEAM_UPDATE_ONGOING_STATES.has($steamUpdateState);
-    if (!isOngoing) {
-      resetSteamUpdate();
+
+    if (isOngoing) {
+      // 進行中の他クライアントアップデートにライブ接続: プリスタート画面は出さない
+      steamUpdatePreStartOpen = false;
+      steamUpdateFinalMessage = '';
+      steamUpdateModalOpen = true;
+      return;
     }
 
+    // 進行中でなければ、まず設定フォームを開いて現在の branch / hasBetaPassword を表示する
+    resetSteamUpdate();
     steamUpdateGuardCode = '';
     steamUpdateGuardRequested = false;
     steamUpdateGuardSubmitting = false;
     steamUpdateFinalMessage = '';
+    steamUpdateBetaCodeInput = '';
+    steamUpdatePreStartError = '';
+    steamUpdatePreStartOpen = true;
     steamUpdateModalOpen = true;
+    steamUpdatePreStartLoading = true;
+
+    // バックエンドから現在の Steam 設定を取得（branch / hasBetaPassword の表示に使う）
+    try {
+      const config = await getSteamConfig();
+      steamUpdateBranch = config.resonite.branch || '(通常版)';
+      steamUpdateHasBetaPassword = Boolean(config.resonite.hasBetaPassword);
+    } catch (error: any) {
+      steamUpdatePreStartError =
+        error?.message || 'Steam設定の取得に失敗しました。再度お試しください。';
+    } finally {
+      steamUpdatePreStartLoading = false;
+    }
+  };
+
+  // プリスタートフォームで「アップデートを開始」ボタンが押された時のハンドラ
+  //   - ユーザーがアクセスコードを入力していれば先に setSteamBetaPassword で保存する
+  //   - その後 executeSteamUpdate() を呼び、実際の SteamCMD 実行フェーズに入る
+  const handleStartUpdateFromPreStart = async () => {
+    if (steamUpdatePreStartLoading || steamUpdateLoading) return;
+
+    const code = steamUpdateBetaCodeInput.trim();
+
+    // コードが入力されていれば先に保存する（空文字でクリアはしない: 空なら既存値を維持）
+    if (code !== '') {
+      steamUpdatePreStartLoading = true;
+      steamUpdatePreStartError = '';
+      try {
+        await setSteamBetaPassword(code);
+        steamUpdateHasBetaPassword = true;
+      } catch (error: any) {
+        steamUpdatePreStartError =
+          error?.message || 'ベータアクセスコードの保存に失敗しました。';
+        steamUpdatePreStartLoading = false;
+        return;
+      }
+      steamUpdatePreStartLoading = false;
+    }
+
+    // プリスタート画面を閉じ、ログ画面に切り替えてアップデートを実行
+    steamUpdatePreStartOpen = false;
+    steamUpdateBetaCodeInput = '';
+    await executeSteamUpdate();
+  };
+
+  // 保存されたアクセスコードをクリアするハンドラ（必要に応じて再入力を促す）
+  const handleClearBetaCode = async () => {
+    if (steamUpdatePreStartLoading || steamUpdateLoading) return;
+    steamUpdatePreStartLoading = true;
+    steamUpdatePreStartError = '';
+    try {
+      await setSteamBetaPassword('');
+      steamUpdateHasBetaPassword = false;
+      steamUpdateBetaCodeInput = '';
+    } catch (error: any) {
+      steamUpdatePreStartError =
+        error?.message || 'ベータアクセスコードのクリアに失敗しました。';
+    } finally {
+      steamUpdatePreStartLoading = false;
+    }
+  };
+
+  // 実際に SteamCMD を呼び出してアップデートを実行する部分
+  // （プリスタートフォームとは分離している。以前の handleResoniteUpdate 後半部分をそのまま移動）
+  const executeSteamUpdate = async () => {
     steamUpdateLoading = true;
 
     try {
@@ -5783,6 +5878,90 @@
         </div>
 
         <div class="modal-body">
+          {#if steamUpdatePreStartOpen}
+            <!-- アップデート開始前の設定フォーム -->
+            <div class="steam-update-prestart">
+              <div class="steam-update-prestart-info">
+                <div class="steam-update-prestart-row">
+                  <span class="steam-update-prestart-label">対象ブランチ:</span>
+                  <span class="steam-update-prestart-value">
+                    <code>{steamUpdateBranch}</code>
+                  </span>
+                </div>
+                <div class="steam-update-prestart-row">
+                  <span class="steam-update-prestart-label">アクセスコード:</span>
+                  <span class="steam-update-prestart-value">
+                    {#if steamUpdateHasBetaPassword}
+                      <span class="steam-update-prestart-badge is-set">設定済み</span>
+                      <button
+                        type="button"
+                        class="steam-update-prestart-clear-btn"
+                        on:click={handleClearBetaCode}
+                        disabled={steamUpdatePreStartLoading}
+                      >
+                        クリア
+                      </button>
+                    {:else}
+                      <span class="steam-update-prestart-badge is-unset">未設定</span>
+                    {/if}
+                  </span>
+                </div>
+              </div>
+
+              <label class="modal-label steam-update-prestart-input">
+                <span>
+                  ベータアクセスコード
+                  {#if steamUpdateHasBetaPassword}（変更する場合のみ入力）{/if}
+                </span>
+                <input
+                  type="password"
+                  autocomplete="off"
+                  placeholder={steamUpdateHasBetaPassword
+                    ? '空欄のままで既存のコードを使用'
+                    : 'Resonite Headless のアクセスコードを入力'}
+                  bind:value={steamUpdateBetaCodeInput}
+                  disabled={steamUpdatePreStartLoading}
+                  on:keydown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleStartUpdateFromPreStart();
+                    }
+                  }}
+                />
+              </label>
+
+              <p class="steam-update-prestart-hint">
+                Resonite Headless は Steam のベータブランチ <code>headless</code> で配布されており、
+                取得にはアクセスコード（Patreon 支援者向けコード）が必要です。
+                SteamCMD はコードがアカウントに紐付いていても個別に指定する必要があります。
+              </p>
+
+              {#if steamUpdatePreStartError}
+                <div class="steam-update-final-message is-failed">
+                  {steamUpdatePreStartError}
+                </div>
+              {/if}
+
+              <div class="modal-actions" style="margin-top: 1rem;">
+                <button
+                  type="button"
+                  class="modal-cancel-btn"
+                  on:click={closeSteamUpdateModal}
+                  disabled={steamUpdatePreStartLoading}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  class="modal-save-btn"
+                  on:click={handleStartUpdateFromPreStart}
+                  disabled={steamUpdatePreStartLoading}
+                >
+                  {steamUpdatePreStartLoading ? '処理中...' : 'アップデートを開始'}
+                </button>
+              </div>
+            </div>
+          {:else}
           <!-- ステータス行 -->
           <div class="steam-update-status-row">
             <span class="steam-update-status-label">状態:</span>
@@ -5879,17 +6058,20 @@
               {steamUpdateFinalMessage}
             </div>
           {/if}
+          {/if}
         </div>
 
-        <div class="modal-actions" style="padding: 0 1.5rem 1.5rem;">
-          <button type="button" class="modal-cancel-btn" on:click={closeSteamUpdateModal}>
-            {#if steamUpdateLoading && !steamUpdateIsTerminal}
-              バックグラウンドで継続して閉じる
-            {:else}
-              閉じる
-            {/if}
-          </button>
-        </div>
+        {#if !steamUpdatePreStartOpen}
+          <div class="modal-actions" style="padding: 0 1.5rem 1.5rem;">
+            <button type="button" class="modal-cancel-btn" on:click={closeSteamUpdateModal}>
+              {#if steamUpdateLoading && !steamUpdateIsTerminal}
+                バックグラウンドで継続して閉じる
+              {:else}
+                閉じる
+              {/if}
+            </button>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -8421,5 +8603,133 @@
     background: #200f0f;
     border-color: #c92a2a;
     color: #ffc9c9;
+  }
+
+  /* アップデート開始前の設定フォーム */
+  .steam-update-prestart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .steam-update-prestart-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #1a1f2a;
+    border: 1px solid #2d3341;
+    border-radius: 0.5rem;
+  }
+
+  .steam-update-prestart-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .steam-update-prestart-label {
+    color: #9aa3b2;
+  }
+
+  .steam-update-prestart-value {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #e1e1e0;
+  }
+
+  .steam-update-prestart-value code {
+    padding: 0.15rem 0.4rem;
+    background: #0f131a;
+    border-radius: 0.25rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #7ec5ff;
+  }
+
+  .steam-update-prestart-badge {
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .steam-update-prestart-badge.is-set {
+    background: #0f2018;
+    border: 1px solid #2f9e44;
+    color: #b2f2bb;
+  }
+
+  .steam-update-prestart-badge.is-unset {
+    background: #2a1f0f;
+    border: 1px solid #d9931a;
+    color: #ffe066;
+  }
+
+  .steam-update-prestart-clear-btn {
+    padding: 0.2rem 0.6rem;
+    background: transparent;
+    border: 1px solid #44505f;
+    border-radius: 0.3rem;
+    color: #c5ccd6;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .steam-update-prestart-clear-btn:hover:not(:disabled) {
+    background: #2d3341;
+  }
+
+  .steam-update-prestart-clear-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .steam-update-prestart-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .steam-update-prestart-input span {
+    font-size: 0.85rem;
+    color: #c5ccd6;
+  }
+
+  .steam-update-prestart-input input {
+    padding: 0.6rem 0.75rem;
+    background: #0f131a;
+    border: 1px solid #2d3341;
+    border-radius: 0.4rem;
+    color: #e1e1e0;
+    font-size: 0.9rem;
+  }
+
+  .steam-update-prestart-input input:focus {
+    outline: none;
+    border-color: #4f7cff;
+  }
+
+  .steam-update-prestart-hint {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: #0f1a20;
+    border-left: 3px solid #4f7cff;
+    border-radius: 0.25rem;
+    font-size: 0.8rem;
+    color: #a4b5c7;
+    line-height: 1.5;
+  }
+
+  .steam-update-prestart-hint code {
+    padding: 0.1rem 0.3rem;
+    background: #0a0e14;
+    border-radius: 0.2rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #7ec5ff;
   }
 </style>

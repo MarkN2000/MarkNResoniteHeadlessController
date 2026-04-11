@@ -127,7 +127,16 @@ export class SteamUpdateManager extends EventEmitter {
       };
     }
 
-    const args: string[] = ['+login', username, password];
+    // SteamCMD の仕様上、`+force_install_dir` は **必ず `+login` より前** に指定する必要がある。
+    // そうしないと以下のエラーで失敗する（特にベータブランチ指定時に顕在化する）:
+    //   "Please use force_install_dir before logon!"
+    //   "ERROR! Failed to set beta 'headless'"
+    // これは SteamCMD が login 時点でインストール先を決定してしまい、
+    // 後から force_install_dir でベータ設定を書き換えられなくなるため。
+    const args: string[] = ['+force_install_dir', installDir];
+
+    // login（必ず force_install_dir の後に配置する）
+    args.push('+login', username, password);
 
     // 2ステップ方式の2回目: フロントエンドから guardCode が渡された場合
     // steamcmd の +login ヘルプに従い、第3引数としてガードコードを渡す
@@ -139,9 +148,6 @@ export class SteamUpdateManager extends EventEmitter {
     if (useSteamGuardFile && steamGuardFile) {
       args.push('+set_steam_guard_file', steamGuardFile);
     }
-
-    // インストール先ディレクトリを明示的に指定（SteamCMDデフォルトではなく設定されたパスへ）
-    args.push('+force_install_dir', installDir);
 
     // Resonite Headless は Steam のベータブランチとして配布されているため、
     // `-beta <branch>` を `+app_update` と `validate` の間に挟む必要がある。
@@ -362,6 +368,8 @@ export class SteamUpdateManager extends EventEmitter {
         //   - ベータアクセスコード不備: "Invalid password" / "No subscription" / "No licenses"
         //   - アプリ状態異常: "ERROR! App '2519830' state is 0x..."
         //   - インストール失敗: "Failed to install"
+        //   - ブランチ設定失敗: "Failed to set beta 'xxx'"（force_install_dir の順序ミス等）
+        //   - force_install_dir の順序ミス: "Please use force_install_dir before logon!"
         // これらを検出した場合は誤って「完了」と通知せず failed として扱う。
         const errorKeywords = [
           "error! app '",
@@ -369,7 +377,9 @@ export class SteamUpdateManager extends EventEmitter {
           'invalid password',
           'no subscription',
           'no licenses',
-          'invalid platform'
+          'invalid platform',
+          'failed to set beta',
+          'please use force_install_dir before logon'
         ];
         const matchedError = errorKeywords.find((k) => lowerLog.includes(k));
         if (matchedError) {
