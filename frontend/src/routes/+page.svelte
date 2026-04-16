@@ -1442,8 +1442,12 @@
     const configList = await getConfigs();
     setConfigs(configList);
     if (configList.length && !configList.some(item => item.path === selectedConfig)) {
+      const serverPath = $status.configPath;
       const stored = localStorage.getItem(STORAGE_KEY);
-      const match = configList.find(item => item.path === stored) ?? configList[0];
+      const match =
+        configList.find(item => item.path === serverPath) ??
+        configList.find(item => item.path === stored) ??
+        configList[0];
       selectedConfig = match.path;
       localStorage.setItem(STORAGE_KEY, selectedConfig);
     }
@@ -1700,9 +1704,12 @@
     }
   };
 
-  const applyConfigList = (configList: ConfigEntry[]) => {
+  const applyConfigList = (configList: ConfigEntry[], serverConfigPath?: string) => {
     const storedConfig = localStorage.getItem(STORAGE_KEY);
-    const defaultConfig = configList.find(item => item.path === storedConfig) ?? configList[0];
+    const defaultConfig =
+      configList.find(item => item.path === serverConfigPath) ??
+      configList.find(item => item.path === storedConfig) ??
+      configList[0];
     selectedConfig = defaultConfig?.path;
     if (selectedConfig) {
       localStorage.setItem(STORAGE_KEY, selectedConfig);
@@ -1732,13 +1739,13 @@
         throw Object.assign(new Error('設定ファイルが見つかりません。設定ファイルを作成してください。'), { configMissing: true });
       }
       setConfigs(configList);
-      applyConfigList(configList);
 
       // headlessCredentialsを読み込む（サーバー起動前でも取得可能）
       await loadHeadlessCredentials();
 
       const statusValue = await getStatus();
       setStatus(statusValue);
+      applyConfigList(configList, statusValue.configPath);
       setLogs(await getLogs(LOG_DISPLAY_LIMIT));
 
       if (statusValue.running) {
