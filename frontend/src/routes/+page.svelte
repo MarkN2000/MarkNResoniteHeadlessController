@@ -5700,6 +5700,45 @@
                 </div>
                 </div>
                         </div>
+
+              <!-- 3️⃣ 再起動時アップデート -->
+              <div class="panel-column" style="margin-top: 0.175rem;">
+                <div class="panel-heading">
+                  <h2>3️⃣ 再起動時アップデート</h2>
+                </div>
+                <div class="card status-card">
+                  {#if restartConfig}
+                    <form class="status-form" on:submit|preventDefault={() => {}}>
+                      <label>
+                        <span style="font-size: 1rem; font-weight: 700;">再起動時にアップデートを確認・適用</span>
+                        <div class="field-row">
+                          <button
+                            type="button"
+                            class={restartConfig.updateOnRestart?.enabled ? 'status-action-button active' : 'status-action-button'}
+                            on:click={() => {
+                              if (!restartConfig) return;
+                              if (!restartConfig.updateOnRestart) {
+                                restartConfig.updateOnRestart = { enabled: true };
+                              } else {
+                                restartConfig.updateOnRestart.enabled = !restartConfig.updateOnRestart.enabled;
+                              }
+                              restartConfig = { ...restartConfig };
+                            }}
+                          >
+                            {restartConfig.updateOnRestart?.enabled ? 'オン' : 'オフ'}
+                          </button>
+                        </div>
+                      </label>
+                      <p style="color: #a0a0a0; font-size: 0.85rem; margin: 0;">
+                        有効にすると、自動再起動の際にサーバー停止後・起動前にSteamCMDでアップデートを確認し、利用可能であれば自動的に適用します。確認・適用に失敗した場合はスキップしてサーバーを起動します。
+                      </p>
+                    </form>
+                  {:else}
+                    <p class="empty">設定を読み込み中...</p>
+                  {/if}
+                </div>
+              </div>
+
           </section>
 
           <!-- リンク一覧タブ -->

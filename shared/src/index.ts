@@ -151,6 +151,11 @@ export interface RestartConfig {
     retryCount: number;
     retryIntervalSeconds: number;
   };
+
+  // 再起動時アップデート設定
+  updateOnRestart: {
+    enabled: boolean;
+  };
 }
 
 // 再起動ステータス（リアルタイム情報）

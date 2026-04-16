@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { RestartConfig, RestartStatus } from '../../../shared/src/index.js';
+import type { RestartConfig, RestartStatus, SteamUpdateState, SteamUpdateProgress } from '../../../shared/src/index.js';
 import { loadRestartConfig } from './restartConfig.js';
 import { ProcessManager } from './processManager.js';
 import { ScheduledRestartWatcher } from './scheduledRestartWatcher.js';
@@ -10,6 +10,10 @@ import { UserZeroWatcher } from './userZeroWatcher.js';
 import { systemMetricsCollector } from './systemMetrics.js';
 import type { SystemMetrics } from './systemMetrics.js';
 import { PROJECT_ROOT, RUNTIME_STATE_PATH } from '../config/index.js';
+import type { SteamUpdateChecker } from './steamUpdateChecker.js';
+import type { SteamConfig } from './steamConfig.js';
+import { SteamUpdateManager } from './steamUpdateManager.js';
+import { steamUpdateBus } from './steamUpdateBus.js';
 
 const STATUS_FILE = path.join(PROJECT_ROOT, 'config', 'restart-status.json');
 
@@ -49,7 +53,11 @@ export class RestartManager extends EventEmitter {
   private highLoadWatcher: HighLoadWatcher;
   private userZeroWatcher: UserZeroWatcher;
 
-  constructor(processManager: ProcessManager) {
+  constructor(
+    processManager: ProcessManager,
+    private readonly steamUpdateChecker?: SteamUpdateChecker,
+    private readonly loadSteamConfig?: () => Promise<SteamConfig>
+  ) {
     super();
     this.processManager = processManager;
     this.scheduledWatcher = new ScheduledRestartWatcher();
@@ -863,18 +871,62 @@ export class RestartManager extends EventEmitter {
     if (!this.config) {
       throw new Error('Config not loaded');
     }
-    
+
     const { failsafe } = this.config;
     let retryCount = 0;
-    
+    let updateAttempted = false;
+
     while (retryCount <= failsafe.retryCount) {
       try {
         // サーバーを停止
         await this.processManager.stop();
-        
+
         // 5秒待機
         await new Promise(resolve => setTimeout(resolve, 5000));
-        
+
+        // 再起動時アップデート: サーバー停止後・起動前にアップデートを確認・適用
+        // リトライ時に毎回走らないよう初回のみ実行する
+        if (!updateAttempted && this.config.updateOnRestart?.enabled && this.steamUpdateChecker && this.loadSteamConfig) {
+          updateAttempted = true;
+          try {
+            // 既にアップデートが進行中なら競合回避のためスキップ
+            if (steamUpdateBus.isUpdateActive()) {
+              console.log('[RestartManager] Update already in progress, skipping update on restart');
+            } else {
+              // check 実行中なら中断（SteamCMD ロック競合回避）
+              await this.steamUpdateChecker.abort();
+
+              console.log('[RestartManager] Checking for updates before restart...');
+              const checkResult = await this.steamUpdateChecker.check(true);
+              if (checkResult.updateAvailable) {
+                console.log('[RestartManager] Update available, applying...');
+                const steamConfig = await this.loadSteamConfig();
+                const updater = new SteamUpdateManager(steamConfig);
+                const onLog = (msg: string): void => { console.log(msg); steamUpdateBus.emitLog(msg); };
+                const onStatus = (state: SteamUpdateState): void => { steamUpdateBus.emitStatus(state); };
+                const onProgress = (progress: SteamUpdateProgress): void => { steamUpdateBus.emitProgress(progress); };
+                updater.on('log', onLog);
+                updater.on('status', onStatus);
+                updater.on('progress', onProgress);
+                try {
+                  const result = await updater.updateResonite();
+                  console.log(`[RestartManager] Update result: ${result.message}`);
+                } finally {
+                  updater.off('log', onLog);
+                  updater.off('status', onStatus);
+                  updater.off('progress', onProgress);
+                }
+                // アップデート後にバージョン再チェック（バッジ更新）
+                this.steamUpdateChecker.check(true).catch(() => {});
+              } else {
+                console.log('[RestartManager] No update available, continuing restart');
+              }
+            }
+          } catch (err: any) {
+            console.warn('[RestartManager] Update on restart failed, continuing with restart:', err?.message ?? err);
+          }
+        }
+
         // 最後に使用したコンフィグで起動
         const lastConfig = this.processManager.getLastStartedConfigPath();
         if (!lastConfig) {

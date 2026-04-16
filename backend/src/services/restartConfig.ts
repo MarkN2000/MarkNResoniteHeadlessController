@@ -50,6 +50,9 @@ const DEFAULT_CONFIG: RestartConfig = {
   failsafe: {
     retryCount: 3,
     retryIntervalSeconds: 30
+  },
+  updateOnRestart: {
+    enabled: false
   }
 };
 
@@ -110,6 +113,11 @@ function validateConfig(config: RestartConfig): void {
   // 基本的な構造チェック
   if (!config.triggers || !config.preRestartActions || !config.failsafe) {
     throw new Error('設定の構造が不正です');
+  }
+
+  // 後方互換: updateOnRestart がない既存 restart.json をサポート
+  if (!config.updateOnRestart) {
+    config.updateOnRestart = { enabled: false };
   }
   
   // 数値の範囲チェック
