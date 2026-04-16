@@ -7,7 +7,6 @@ import type { SteamUpdateCheckResult } from '../../../shared/src/index.js';
 import {
   parseKeyValues,
   getByPath,
-  readInstalledManifest,
   type KeyValuesNode
 } from './steamManifestReader.js';
 import { steamUpdateBus } from './steamUpdateBus.js';
@@ -15,9 +14,9 @@ import { steamUpdateBus } from './steamUpdateBus.js';
 export type { SteamUpdateCheckResult };
 
 /**
- * SteamCMD `+app_info_update 1 +app_info_print <appId> +quit` を実行して、
- * 対象アプリ（Resonite Headless）の Steam 側最新 buildid を取得し、
- * ローカルの appmanifest_<appId>.acf と比較するサービス。
+ * SteamCMD `+app_status <appId> +app_info_update 1 +app_info_print <appId> +quit` を実行して、
+ * ローカルにインストール済みの buildid（app_status）と Steam 側最新の buildid（app_info_print）
+ * を取得・比較するサービス。
  *
  * 発火するイベント:
  *   'result' (result: SteamUpdateCheckResult)  1 回のチェックが終わったとき（成功・失敗問わず）
@@ -239,10 +238,7 @@ export class SteamUpdateChecker extends EventEmitter {
       }
     }
 
-    // installed buildid はチェック本体と並行して読んでよい（ファイル I/O だけ）
-    const installedPromise = readInstalledManifest(installDir, appId, steamcmdPath);
-
-    // SteamCMD を起動して app_info_print の出力を取得する
+    // SteamCMD を起動して app_status + app_info_print の出力を取得する
     const spawnResult = await this.runSteamCmd(steamcmdPath, {
       installDir,
       username,
@@ -250,8 +246,8 @@ export class SteamUpdateChecker extends EventEmitter {
       appId
     });
 
-    const installed = await installedPromise;
-    const installedBuildId = installed.buildid;
+    // app_status の出力からインストール済み BuildID を抽出
+    const installedBuildId = this.extractInstalledBuildId(spawnResult.stdout);
 
     if (spawnResult.error) {
       // SteamCMD 実行が失敗してもログイン成功済みのキャッシュがあれば保持する
@@ -316,8 +312,8 @@ export class SteamUpdateChecker extends EventEmitter {
   }
 
   /**
-   * SteamCMD を spawn し、`+app_info_update 1 +app_info_print <appId> +quit` の stdout を
-   * 全て回収して返す。タイムアウト・aborted・起動失敗時はエラー文字列を返す。
+   * SteamCMD を spawn し、`+app_status <appId> +app_info_update 1 +app_info_print <appId> +quit`
+   * の stdout を全て回収して返す。タイムアウト・aborted・起動失敗時はエラー文字列を返す。
    */
   private runSteamCmd(
     steamcmdPath: string,
@@ -331,6 +327,8 @@ export class SteamUpdateChecker extends EventEmitter {
         '+login',
         params.username,
         params.password,
+        '+app_status',
+        params.appId,
         '+app_info_update',
         '1',
         '+app_info_print',
@@ -432,6 +430,29 @@ export class SteamUpdateChecker extends EventEmitter {
         finalize(null);
       });
     });
+  }
+
+  /**
+   * `+app_status` の stdout から、インストール済みの BuildID を抽出する。
+   *
+   * app_status の出力例:
+   *   - size on disk: 3367596428 bytes, BuildID 22787313
+   *
+   * `force_install_dir` 使用時でも正しい BuildID を返す（appmanifest とは異なる）。
+   */
+  private extractInstalledBuildId(rawOutput: string): string | null {
+    const match = rawOutput.match(/BuildID\s+(\d+)/);
+    if (!match?.[1]) {
+      console.warn('[SteamUpdateChecker] app_status output did not contain BuildID');
+      return null;
+    }
+    const buildId = match[1];
+    // "0" は無効値（未インストール等）
+    if (buildId === '0') {
+      console.warn('[SteamUpdateChecker] app_status returned BuildID 0 (not installed?)');
+      return null;
+    }
+    return buildId;
   }
 
   /**

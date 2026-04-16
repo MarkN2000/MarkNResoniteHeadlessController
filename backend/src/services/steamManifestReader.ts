@@ -1,12 +1,9 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-
 /**
  * Valve KeyValues (VDF / ACF) の最小パーサ。
  *
  * 対応スコープは「quoted key-value の列」と「nested block」のみで、
  * コメント (`//`) や escape (`\n`, `\"` など)、unquoted identifier、include 文などはサポートしない。
- * appmanifest_<appId>.acf と `app_info_print` の出力の両方を扱える最小の実装である。
+ * SteamCMD `+app_info_print` の出力をパースするために使用する。
  *
  * 例:
  *   "AppState"
@@ -140,89 +137,4 @@ export function getByPath(root: KeyValuesNode, dottedPath: string): string | Key
     cur = node[matchedKey] ?? null;
   }
   return cur;
-}
-
-export interface InstalledManifest {
-  /** ルートの `buildid`（現在インストールされているビルド ID） */
-  buildid: string | null;
-  /** `UserConfig.BetaKey`（選択されているベータブランチ名、public なら "public"） */
-  betaKey: string | null;
-  /** 全体の生ノード（デバッグ用） */
-  raw: KeyValuesNode | null;
-}
-
-/**
- * Steam の appmanifest_<appId>.acf を読み込み、installed buildid 等を返す。
- *
- * SteamCMD は `+force_install_dir` でゲームファイルの配置先を変更しても、
- * appmanifest は SteamCMD 自身の `steamapps/` ディレクトリに書き込む。
- * そのため、以下の優先順位で manifest を検索する:
- *
- *   1. `<steamcmd_dir>/steamapps/appmanifest_<appId>.acf`（SteamCMD が書く場所）
- *   2. `installDir/../../appmanifest_<appId>.acf`（Steam クライアント標準構造のフォールバック）
- *
- * - ファイル欠落 (ENOENT) → 次の候補を試す / 全候補で見つからなければ全フィールド null
- * - read 失敗・パース失敗 → 全フィールド null
- * - 例外は投げない（呼び出し側が null 扱いで継続できるように）
- */
-export async function readInstalledManifest(
-  installDir: string,
-  appId: string,
-  steamcmdPath?: string
-): Promise<InstalledManifest> {
-  const manifestName = `appmanifest_${appId}.acf`;
-
-  // 候補パスを優先順に構築
-  const candidates: string[] = [];
-  if (steamcmdPath) {
-    candidates.push(path.resolve(path.dirname(steamcmdPath), 'steamapps', manifestName));
-  }
-  candidates.push(path.resolve(installDir, '..', '..', manifestName));
-
-  // 重複除去（両方が同じパスに解決される場合）
-  const seen = new Set<string>();
-  const uniqueCandidates = candidates.filter((p) => {
-    const resolved = path.resolve(p);
-    if (seen.has(resolved)) return false;
-    seen.add(resolved);
-    return true;
-  });
-
-  for (const manifestPath of uniqueCandidates) {
-    try {
-      const text = await fs.readFile(manifestPath, 'utf-8');
-      const root = parseKeyValues(text);
-
-      const appState =
-        (getByPath(root, 'AppState') as KeyValuesNode | null) ?? root;
-
-      const buildidRaw = getByPath(appState, 'buildid');
-      const buildid = typeof buildidRaw === 'string' && buildidRaw !== '' ? buildidRaw : null;
-
-      const betaKeyRaw = getByPath(appState, 'UserConfig.BetaKey');
-      const betaKey = typeof betaKeyRaw === 'string' && betaKeyRaw !== '' ? betaKeyRaw : null;
-
-      console.log(`[SteamManifestReader] Read manifest from ${manifestPath} (buildid=${buildid})`);
-
-      return {
-        buildid,
-        betaKey,
-        raw: root
-      };
-    } catch (error: any) {
-      if (error?.code !== 'ENOENT') {
-        console.warn(`[SteamManifestReader] Failed to read ${manifestPath}:`, error?.message ?? error);
-      }
-      // 次の候補を試す
-    }
-  }
-
-  console.warn(
-    `[SteamManifestReader] appmanifest not found in any candidate path: ${uniqueCandidates.join(', ')}`
-  );
-  return {
-    buildid: null,
-    betaKey: null,
-    raw: null
-  };
 }
