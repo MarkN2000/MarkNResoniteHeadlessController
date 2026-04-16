@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { SteamConfig } from './steamConfig.js';
 import type { SteamUpdateCheckResult } from '../../../shared/src/index.js';
@@ -227,8 +228,19 @@ export class SteamUpdateChecker extends EventEmitter {
       return result;
     }
 
+    // SteamCMD の appcache/appinfo.vdf を削除して、app_info_print がキャッシュ済みの
+    // 古いデータを返すのを防ぐ（+app_info_update 1 だけでは不十分なケースがある）
+    try {
+      const appcachePath = path.resolve(path.dirname(steamcmdPath), 'appcache', 'appinfo.vdf');
+      await fs.unlink(appcachePath);
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        console.warn('[SteamUpdateChecker] Failed to delete appinfo.vdf:', err?.message ?? err);
+      }
+    }
+
     // installed buildid はチェック本体と並行して読んでよい（ファイル I/O だけ）
-    const installedPromise = readInstalledManifest(installDir, appId);
+    const installedPromise = readInstalledManifest(installDir, appId, steamcmdPath);
 
     // SteamCMD を起動して app_info_print の出力を取得する
     const spawnResult = await this.runSteamCmd(steamcmdPath, {
