@@ -30,3 +30,5 @@ backend/config/*.json
 # Sample files
 sample/バニラで起動したときのコンソール画面.txt
 sample/scripts/
+
+.claude/
