@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find:*)",
-      "Bash(grep -n '$status' /c/app/MRHC/MarkNResoniteHeadlessController/frontend/src/routes/+page.svelte)"
-    ]
-  }
-}
