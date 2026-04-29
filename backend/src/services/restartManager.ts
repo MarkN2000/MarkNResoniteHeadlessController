@@ -436,48 +436,79 @@ export class RestartManager extends EventEmitter {
     const startTime = Date.now();
     
     // 待機制御のPromise
+    // 競合防止のため: forceRestartTimer / actionTimer / userCheckInterval の
+    // 3経路から並列に呼ばれても executeActions は1本に集約し、resolve も1度だけ。
     await new Promise<void>((resolve) => {
+      let resolved = false;
+      let actionsPromise: Promise<void> | null = null;
+
+      // 何度呼ばれても executeActions は1回しか走らない。
+      // actionsExecuted フラグは await の前に立てる（race 防止）。
+      const runActionsOnce = (): Promise<void> => {
+        if (!actionsPromise) {
+          this.actionsExecuted = true;
+          actionsPromise = (async () => {
+            try {
+              await this.executeActions();
+            } catch (error) {
+              console.error('[RestartManager] executeActions error:', error);
+            }
+          })();
+        }
+        return actionsPromise;
+      };
+
+      // resolve は1度だけ。タイマー停止 → in-flight の actions を待ってから resolve。
+      // これにより executeRestart 開始後に並列の executeActions が残ることがなくなる。
+      const safeResolve = async (): Promise<void> => {
+        if (resolved) return;
+        resolved = true;
+
+        if (this.forceRestartTimer) {
+          clearTimeout(this.forceRestartTimer);
+          this.forceRestartTimer = null;
+        }
+        if (this.actionTimer) {
+          clearTimeout(this.actionTimer);
+          this.actionTimer = null;
+        }
+        if (this.userCheckInterval) {
+          clearInterval(this.userCheckInterval);
+          this.userCheckInterval = null;
+        }
+
+        if (actionsPromise) {
+          await actionsPromise;
+        }
+        resolve();
+      };
+
       // 1. 強制再起動タイマー（最終的な強制再起動）
-      // B-3: try-catch で unhandled promise rejection を防止
       this.forceRestartTimer = setTimeout(() => {
         (async () => {
-          try {
-            console.log('[RestartManager] Force restart timeout reached');
-
-            // アクションがまだ実行されていない場合は実行
-            if (!this.actionsExecuted) {
-              console.log('[RestartManager] Executing actions before forced restart');
-              await this.executeActions();
-              this.actionsExecuted = true;
-            }
-          } catch (error) {
-            console.error('[RestartManager] Error during forced restart actions:', error);
-          }
-          resolve();
-        })();
+          console.log('[RestartManager] Force restart timeout reached');
+          await runActionsOnce();
+          await safeResolve();
+        })().catch((error) => {
+          console.error('[RestartManager] Error in forceRestartTimer handler:', error);
+        });
       }, forceRestartTime);
 
       // 2. アクション実行タイマー（強制再起動のX分前）
       if (actionDelay > 0) {
         this.actionTimer = setTimeout(() => {
-          (async () => {
-            try {
-              if (!this.actionsExecuted) {
-                console.log(
-                  `[RestartManager] Action timing reached (${waitControl.actionTiming} minutes before forced restart)`
-                );
-                await this.executeActions();
-                this.actionsExecuted = true;
-              }
-            } catch (error) {
-              console.error('[RestartManager] Error during timed actions:', error);
-            }
-          })();
+          console.log(
+            `[RestartManager] Action timing reached (${waitControl.actionTiming} minutes before forced restart)`
+          );
+          // actions だけ早出し。resolve はしない（forceRestartTimer か zero-wait が担当）。
+          void runActionsOnce();
         }, actionDelay);
       }
 
       // ユーザー数チェック処理（初回 + インターバル共通）
       const checkUsers = async () => {
+        if (resolved) return;
+
         const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
         console.log(`[RestartManager] User check (elapsed: ${elapsedMinutes} minutes)...`);
 
@@ -512,22 +543,8 @@ export class RestartManager extends EventEmitter {
             if (zeroWaitElapsed >= ZERO_USER_WAIT_TIME_MS) {
               // 待機時間が経過したので再起動
               console.log('[RestartManager] Zero user wait completed. Proceeding to restart.');
-
-              // アクションがまだ実行されていない場合は実行
-              if (!this.actionsExecuted) {
-                console.log('[RestartManager] Executing actions before restart');
-                await this.executeActions();
-                this.actionsExecuted = true;
-              } else {
-                console.log('[RestartManager] Actions already executed');
-              }
-
-              // タイマーをクリアしてresolve
-              if (this.forceRestartTimer) clearTimeout(this.forceRestartTimer);
-              if (this.actionTimer) clearTimeout(this.actionTimer);
-              if (this.userCheckInterval) clearInterval(this.userCheckInterval);
-
-              resolve();
+              await runActionsOnce();
+              await safeResolve();
             }
           }
         } else {
@@ -547,7 +564,7 @@ export class RestartManager extends EventEmitter {
         });
       }, USER_CHECK_INTERVAL);
 
-      // B-2: 初回チェックを即座に実行（Promiseを適切にハンドリング）
+      // 初回チェックを即座に実行
       checkUsers().catch(error => {
         console.error('[RestartManager] Error during initial user check:', error);
       });

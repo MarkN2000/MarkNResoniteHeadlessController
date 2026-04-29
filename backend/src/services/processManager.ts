@@ -250,6 +250,14 @@ export class ProcessManager extends EventEmitter {
     this.child = child;
     this.stopPromise = undefined as any;
 
+    // EPIPE 等の stdin 書き込みエラーを握りつぶす（プロセス全体を落とさないため）。
+    // 停止中の sendCommand 競合などで write が失敗しても、Unhandled 'error' event で
+    // バックエンドが終了するのを防ぐ。
+    child.stdin?.on('error', (err) => {
+      const entry = this.logBuffer.push('stderr', `stdin error (suppressed): ${err.message}`);
+      emitLog(this, entry);
+    });
+
     this.status = {
       running: true,
       pid: child.pid as number | undefined,
@@ -313,10 +321,14 @@ export class ProcessManager extends EventEmitter {
 
   public sendCommand(command: string): void {
     if (!this.child || !this.child.stdin) return;
+    const stdin = this.child.stdin;
+    // パイプが既に閉じている／閉じる途中の場合は書き込まない（EPIPE 防止）。
+    // stop() が走り始めて stdin が閉じた後に並列の sendCommand が走るレース対策。
+    if (!stdin.writable || stdin.destroyed) return;
     try {
       const payload = `${command}\n`;
       const encoded = iconv.encode(payload, 'shift_jis');
-      this.child.stdin.write(encoded);
+      stdin.write(encoded);
       emitLog(this, this.logBuffer.push('stdout', `> ${command}`));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -328,6 +340,11 @@ export class ProcessManager extends EventEmitter {
   async executeCommand(command: string, timeoutMs = 3000, options?: ExecuteCommandOptions): Promise<LogEntry[]> {
     if (!this.child) {
       throw new Error('Headless process is not running');
+    }
+    // 停止中なら即時 reject。並列に残った再起動前アクションが新しいコマンドを
+    // キューに積んで stdin 書き込みでクラッシュするのを防ぐ。
+    if (this.stopPromise) {
+      throw new Error('Headless process is stopping');
     }
 
     return new Promise((resolve, reject) => {
