@@ -26,7 +26,9 @@ export type { SteamUpdateCheckResult };
  *   const checker = new SteamUpdateChecker(() => loadSteamConfig());
  *   checker.on('result', (r) => steamUpdateBus.emitCheckResult(r));
  *   await checker.check();          // 同期的に1回実行
- *   checker.startPeriodic({ initialDelayMs: 60_000, intervalMs: 30 * 60_000 });
+ *
+ * チェックの起点は「ブラウザからの API 呼び出し」「自動再起動シーケンス」のみ。
+ * 内部で 15 分の TTL キャッシュを持つので、短時間の再アクセスは SteamCMD を再起動しない。
  *
  * 同時実行は常に 1 本にまとめる（dedupe）。
  * `app_update` と同じ installDir を触るため、`steamUpdateBus.isUpdateActive()` が
@@ -47,10 +49,6 @@ export class SteamUpdateChecker extends EventEmitter {
   private currentChild: ChildProcess | null = null;
   /** abort 要求フラグ */
   private aborted = false;
-
-  /** 定期実行タイマー */
-  private initialTimer: NodeJS.Timeout | null = null;
-  private periodicTimer: NodeJS.Timeout | null = null;
 
   /** レート制限に引っかかった場合の cooldown（Unix ms） */
   private cooldownUntil = 0;
@@ -93,8 +91,8 @@ export class SteamUpdateChecker extends EventEmitter {
     // レート制限 cooldown 中はスキップ。
     // force=true でもバイパスしない。cooldown は Steam 側のレート制限を踏んだ結果として
     // 設定されているので、強引に再試行しても即 "Rate Limit Exceeded" で失敗するだけ。
-    // 定期実行は check(true) で呼ばれるため、ここを force で貫通させると
-    // 定期タイマーが cooldown を無視してレート制限を再度踏みに行ってしまう。
+    // 自動再起動シーケンスや手動アップデート後のフォローアップは check(true) で呼ばれるが、
+    // ここを force で貫通させるとレート制限を再度踏みに行ってしまうため明示的に止める。
     if (Date.now() < this.cooldownUntil) {
       if (this.lastResult) return this.lastResult;
       return this.buildPendingResult('Steam ログインのレート制限のため一時的にチェックをスキップしています');
@@ -139,51 +137,6 @@ export class SteamUpdateChecker extends EventEmitter {
       await this.currentCheck;
     } catch {
       // ignore
-    }
-  }
-
-  /**
-   * 定期実行を開始する。
-   * `initialDelayMs` 後に 1 回、その後 `intervalMs` ごとに check() を呼ぶ。
-   * 既に実行中なら再設定する（古いタイマーは破棄）。
-   */
-  startPeriodic(opts: { initialDelayMs: number; intervalMs: number }): void {
-    this.stopPeriodic();
-
-    const MIN_INTERVAL_MS = 10 * 60 * 1000; // 10 分未満は警告
-    if (opts.intervalMs < MIN_INTERVAL_MS) {
-      console.warn(
-        `[SteamUpdateChecker] interval=${opts.intervalMs}ms は短すぎます（Steam のレート制限に注意）。` +
-          `推奨は 30 分以上です。`
-      );
-    }
-
-    console.log(
-      `[SteamUpdateChecker] periodic check scheduled: initialDelay=${opts.initialDelayMs}ms interval=${opts.intervalMs}ms`
-    );
-
-    this.initialTimer = setTimeout(() => {
-      this.initialTimer = null;
-      this.check(true).catch((err) => {
-        console.warn('[SteamUpdateChecker] initial check failed:', err?.message ?? err);
-      });
-
-      this.periodicTimer = setInterval(() => {
-        this.check(true).catch((err) => {
-          console.warn('[SteamUpdateChecker] periodic check failed:', err?.message ?? err);
-        });
-      }, opts.intervalMs);
-    }, opts.initialDelayMs);
-  }
-
-  stopPeriodic(): void {
-    if (this.initialTimer) {
-      clearTimeout(this.initialTimer);
-      this.initialTimer = null;
-    }
-    if (this.periodicTimer) {
-      clearInterval(this.periodicTimer);
-      this.periodicTimer = null;
     }
   }
 

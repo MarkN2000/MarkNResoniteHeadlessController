@@ -32,3 +32,6 @@ sample/バニラで起動したときのコンソール画面.txt
 sample/scripts/
 
 .claude/
+
+# Cygwin/Git Bash crash dumps
+*.stackdump

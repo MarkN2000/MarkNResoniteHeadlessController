@@ -96,6 +96,6 @@ export class SystemMetricsCollector extends EventEmitter {
   }
 }
 
-// シングルトンインスタンス（5秒間隔で更新）
-export const systemMetricsCollector = new SystemMetricsCollector(5000);
+// シングルトンインスタンス（10秒間隔で更新）
+export const systemMetricsCollector = new SystemMetricsCollector(10000);
 

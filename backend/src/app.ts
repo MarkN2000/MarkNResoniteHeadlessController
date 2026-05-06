@@ -66,8 +66,10 @@ await processManager.initialize();
 const steamUpdateChecker = new SteamUpdateChecker(() => loadSteamConfig());
 
 // RestartManagerを初期化（steamUpdateChecker / loadSteamConfig を渡して再起動時アップデートに対応）
+// HTTPサーバー起動前に await することで、トリガー監視が未設定のままリクエストを受ける隙間を作らない。
+// エラー時もプロセスは落とさず、後続のリスナー登録・サーバー起動は継続する。
 const restartManager = new RestartManager(processManager, steamUpdateChecker, () => loadSteamConfig());
-restartManager.initialize().catch((error) => {
+await restartManager.initialize().catch((error) => {
   console.error('[App] Failed to initialize RestartManager:', error);
 });
 steamUpdateChecker.on('result', (result) => {
@@ -132,11 +134,4 @@ startRateLimitCleanup();
 httpServer.listen(SERVER_PORT, () => {
   console.log(`Backend listening on port ${SERVER_PORT}`);
   console.log(`WebSocket server available at ws://localhost:${SERVER_PORT}`);
-
-  // Resonite 最新バージョンの定期チェックを開始。
-  // 起動直後にいきなり走らせると他の初期化処理と競合するため少し遅らせる。
-  // 間隔は ENV で上書き可能。既定は 60 分。
-  const initialDelayMs = Number(process.env.STEAM_UPDATE_CHECK_INITIAL_DELAY_MS) || 60 * 1000;
-  const intervalMs = Number(process.env.STEAM_UPDATE_CHECK_INTERVAL_MS) || 60 * 60 * 1000;
-  steamUpdateChecker.startPeriodic({ initialDelayMs, intervalMs });
 });
