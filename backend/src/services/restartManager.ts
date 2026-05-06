@@ -155,16 +155,22 @@ export class RestartManager extends EventEmitter {
     // プロセス開始イベント
     this.processManager.on('started', () => {
       this.serverStartTime = new Date();
-      
+
       // 高負荷トリガーを30分間無効化
       const disabledUntil = new Date(Date.now() + HIGH_LOAD_COOLDOWN_MS);
       this.status.highLoadTriggerDisabledUntil = disabledUntil.toISOString();
-      
+
       // ユーザー0監視にサーバー起動時刻を設定
       this.userZeroWatcher.setServerStartTime(this.serverStartTime);
-      
+
       this.saveStatus();
-      
+
+      // 'stopped' で停止した予定/高負荷ウォッチャーを起動完了後に再 arm する。
+      // これがないと一度の自動再起動で interval が死に、翌日以降スケジュールが発火しない。
+      if (this.config) {
+        this.startTriggerWatchers();
+      }
+
       console.log('[RestartManager] Server started, high load trigger disabled until', disabledUntil.toISOString());
     });
     
