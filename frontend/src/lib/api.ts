@@ -1,3 +1,17 @@
+// 共通型は shared を single source of truth として参照
+// （backend / socket.ts と同じ相対パス参照パターン）
+import type {
+  ScheduledRestartEntry,
+  RestartConfig,
+  RestartStatus,
+  SteamUpdateCheckResult
+} from '../../../shared/src/index.js';
+
+// 利用側（+page.svelte 等）が `import type { RestartConfig } from '$lib'` で参照できるよう再エクスポート。
+// SteamUpdateCheckResult は socket.ts が既に shared から再エクスポートしているため、
+// ここでは再エクスポートしない（lib/index.ts のバレルで重複してしまうため）。
+export type { ScheduledRestartEntry, RestartConfig, RestartStatus };
+
 // 開発環境では直接バックエンドに接続、本番環境では相対パスを使用
 const getApiBase = () => {
   // 環境変数が設定されている場合はそれを使用（開発環境）
@@ -318,103 +332,6 @@ export const getResoniteUserId = (username: string) =>
 // 自動再起動機能のAPI
 // ============================================================
 
-export interface ScheduledRestartEntry {
-  id: string;
-  enabled: boolean;
-  type: 'once' | 'weekly' | 'daily';
-  specificDate?: {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-  };
-  weeklyDay?: number;
-  weeklyTime?: {
-    hour: number;
-    minute: number;
-  };
-  dailyTime?: {
-    hour: number;
-    minute: number;
-  };
-  configFile: string;
-  waitControl?: {
-    forceRestartTimeout: number;
-    actionTiming: number;
-  };
-}
-
-export interface RestartConfig {
-  triggers: {
-    scheduled: {
-      enabled: boolean;
-      schedules: ScheduledRestartEntry[];
-    };
-    highLoad: {
-      enabled: boolean;
-      cpuThreshold: number;
-      memoryThreshold: number;
-      durationMinutes: number;
-    };
-    userZero: {
-      enabled: boolean;
-      minUptimeMinutes: number;
-    };
-  };
-  preRestartActions: {
-    waitControl: {
-      forceRestartTimeout: number;
-      actionTiming: number;
-    };
-    chatMessage: {
-      enabled: boolean;
-      message: string;
-    };
-    itemSpawn: {
-      enabled: boolean;
-      itemType: string;
-      itemUrl: string;
-      message: string;
-    };
-    sessionChanges: {
-      setPrivate: boolean;
-      setMaxUserToOne: boolean;
-      changeSessionName: {
-        enabled: boolean;
-        newName: string;
-      };
-    };
-  };
-  failsafe: {
-    retryCount: number;
-    retryIntervalSeconds: number;
-  };
-}
-
-export interface RestartStatus {
-  nextScheduledRestart: {
-    scheduleId: string | null;
-    datetime: string | null;
-    configFile: string | null;
-  };
-  currentUptime: number;
-  lastRestart: {
-    timestamp: string | null;
-    trigger: 'scheduled' | 'highLoad' | 'userZero' | 'manual' | 'forced' | null;
-    scheduleId?: string;
-  };
-  highLoadTriggerDisabledUntil: string | null;
-  restartInProgress: boolean;
-  waitingForUsers: boolean;
-  scheduledRestartPreparing: {
-    preparing: boolean;
-    scheduleId: string | null;
-    scheduledTime: string | null;
-    configFile: string | null;
-  };
-}
-
 /**
  * 再起動設定を取得
  */
@@ -543,25 +460,11 @@ export const getHeadlessCredentials = () =>
   request('/server/headless-credentials') as Promise<HeadlessCredentialsResponse>;
 
 /**
- * Resonite Headless の最新 buildid 確認結果。
- *
- * バックエンドが定期的に SteamCMD の `app_info_print` を実行して収集し、
- * ローカルの `appmanifest_<appid>.acf` と比較した結果を返す。
- * shared/src/index.ts の `SteamUpdateCheckResult` と同じ形状。
- */
-export interface SteamUpdateCheckResult {
-  branch: string;
-  installedBuildId: string | null;
-  latestBuildId: string | null;
-  latestTimeUpdated: number | null;
-  updateAvailable: boolean;
-  checkedAt: string;
-  error: string | null;
-}
-
-/**
  * GET /api/steam/update/check
  * force=true を指定すると TTL を無視して強制的に再実行する。
+ *
+ * 戻り値の `SteamUpdateCheckResult` 型は shared/src/index.ts に定義されており、
+ * socket.ts 経由で `$lib` から再エクスポートされる。
  */
 export const getSteamUpdateCheck = (force: boolean = false) =>
   request(`/steam/update/check${force ? '?force=true' : ''}`) as Promise<SteamUpdateCheckResult>;
