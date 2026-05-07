@@ -123,6 +123,12 @@ async function request(path: string, init?: RequestInit) {
 export const getStatus = () => request('/server/status') as Promise<HeadlessStatus>;
 export const getLogs = (limit?: number) => request(`/server/logs${limit ? `?limit=${limit}` : ''}`) as Promise<LogEntry[]>;
 export const getConfigs = () => request('/server/configs') as Promise<ConfigEntry[]>;
+export const loadConfig = (fileName: string) =>
+  request(`/server/configs/${encodeURIComponent(fileName)}`) as Promise<any>;
+export const deleteConfig = (fileName: string) =>
+  request(`/server/configs/${encodeURIComponent(fileName)}`, {
+    method: 'DELETE'
+  }) as Promise<{ success: boolean; message: string }>;
 export const generateConfig = (name: string, configData?: any, overwrite?: boolean) =>
   request('/server/configs/generate', {
     method: 'POST',

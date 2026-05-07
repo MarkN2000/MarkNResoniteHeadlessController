@@ -6,6 +6,8 @@
     getStatus,
     getLogs,
     getConfigs,
+    loadConfig,
+    deleteConfig,
     generateConfig,
     getRuntimeStatus,
     getRuntimeUsers,
@@ -698,21 +700,10 @@
     if (!selectedConfigToLoad || configLoadLoading) return;
     
     configLoadLoading = true;
+    // パスからファイル名だけを抽出
+    const fileName = selectedConfigToLoad.split(/[/\\]/).pop() || selectedConfigToLoad;
     try {
-      // パスからファイル名だけを抽出
-      const fileName = selectedConfigToLoad.split(/[/\\]/).pop() || selectedConfigToLoad;
-      
-      // バックエンドからコンフィグファイルの内容を取得
-      const response = await fetch(`/api/server/configs/${encodeURIComponent(fileName)}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`コンフィグファイル "${fileName}" が見つかりません`);
-        }
-        const errorText = await response.text();
-        throw new Error(`コンフィグファイルの読み込みに失敗しました (${response.status}): ${errorText}`);
-      }
-      
-      const configData = await response.json();
+      const configData = await loadConfig(fileName);
       
       // フォーム更新中フラグを立てる
       isFormClearing = true;
@@ -746,7 +737,16 @@
       pushToast('コンフィグファイルを読み込みました', 'success');
       
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'コンフィグファイルの読み込みに失敗しました';
+      let message: string;
+      if (error instanceof ApiError && error.status === 404) {
+        message = `コンフィグファイル "${fileName}" が見つかりません`;
+      } else if (error instanceof ApiError) {
+        message = `コンフィグファイルの読み込みに失敗しました (${error.status}): ${error.body?.error ?? error.message}`;
+      } else if (error instanceof Error) {
+        message = error.message;
+      } else {
+        message = 'コンフィグファイルの読み込みに失敗しました';
+      }
       pushToast(message, 'error');
     } finally {
       configLoadLoading = false;
@@ -768,29 +768,28 @@
     
     configDeleteLoading = true;
     try {
-      const response = await fetch(`/api/server/configs/${encodeURIComponent(fileName)}`, {
-        method: 'DELETE'
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`コンフィグファイル "${fileName}" が見つかりません`);
-        }
-        const errorText = await response.text();
-        throw new Error(`コンフィグファイルの削除に失敗しました (${response.status}): ${errorText}`);
-      }
-      
+      await deleteConfig(fileName);
+
       pushToast('コンフィグファイルを削除しました', 'success');
-      
+
       // 選択をクリア
       selectedConfigToLoad = '';
-      
+
       // コンフィグファイル一覧を再取得
       const configsResponse = await getConfigs();
       setConfigs(configsResponse);
-      
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'コンフィグファイルの削除に失敗しました';
+      let message: string;
+      if (error instanceof ApiError && error.status === 404) {
+        message = `コンフィグファイル "${fileName}" が見つかりません`;
+      } else if (error instanceof ApiError) {
+        message = `コンフィグファイルの削除に失敗しました (${error.status}): ${error.body?.error ?? error.message}`;
+      } else if (error instanceof Error) {
+        message = error.message;
+      } else {
+        message = 'コンフィグファイルの削除に失敗しました';
+      }
       pushToast(message, 'error');
     } finally {
       configDeleteLoading = false;
