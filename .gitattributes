@@ -1,0 +1,2 @@
+# 改行コードを LF に統一（Go / Web / 設定すべて）
+* text=auto eol=lf
