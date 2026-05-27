@@ -7,10 +7,10 @@
 *.test
 *.out
 
-# --- Frontend (React / Vite) ---
+# --- Frontend (React / Vite / Mantine) ---
 node_modules/
-frontend/dist/
-frontend/.vite/
+web/dist/
+web/.vite/
 
 # --- ランタイム生成物（セットアップ時に作成・コミットしない） ---
 mrhc.config.json

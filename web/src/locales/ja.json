@@ -1,0 +1,27 @@
+{
+  "appTitle": "MRHC",
+  "login": {
+    "title": "MRHC ログイン",
+    "password": "管理パスワード",
+    "submit": "ログイン",
+    "error": "ログインに失敗しました",
+    "rateLimited": "試行が多すぎます。しばらく待って再試行してください"
+  },
+  "dashboard": {
+    "start": "起動",
+    "stop": "停止",
+    "logout": "ログアウト",
+    "commandPlaceholder": "コマンド (例: worlds)",
+    "send": "送信",
+    "ready": "準備完了",
+    "clearLogs": "ログをクリア"
+  },
+  "state": {
+    "label": "状態",
+    "stopped": "停止中",
+    "starting": "起動中",
+    "running": "稼働中",
+    "stopping": "停止処理中"
+  },
+  "langToggle": "English"
+}

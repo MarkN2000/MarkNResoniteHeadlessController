@@ -1,0 +1,27 @@
+{
+  "appTitle": "MRHC",
+  "login": {
+    "title": "MRHC Login",
+    "password": "Admin password",
+    "submit": "Log in",
+    "error": "Login failed",
+    "rateLimited": "Too many attempts. Please wait and try again"
+  },
+  "dashboard": {
+    "start": "Start",
+    "stop": "Stop",
+    "logout": "Log out",
+    "commandPlaceholder": "Command (e.g. worlds)",
+    "send": "Send",
+    "ready": "ready",
+    "clearLogs": "Clear logs"
+  },
+  "state": {
+    "label": "State",
+    "stopped": "stopped",
+    "starting": "starting",
+    "running": "running",
+    "stopping": "stopping"
+  },
+  "langToggle": "日本語"
+}
