@@ -172,7 +172,7 @@ Go PoCで本物のヘッドレスに対して検証した事実：
 
 ### Windows実機・文字コード（要対応）
 - **Windows実機**: Resoniteヘッドレスは既定パス `C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` に存在（開発PCで確認）。Steamライブラリ: `C:/Program Files (x86)/Steam` と `D:/SteamLibrary`。
-- ⚠️ **文字コード（最重要のクロスプラットフォーム課題・実機確認済）**: Linux=**UTF-8**、**Windows=Shift_JIS(CP932)** で確定。実Windowsヘッドレスの日本語セッション名 `mmc25 SUMA 作業セッション`／`グリッドスペース` がUTF-8読みで `��ƃZ�b�V����` 等に化け、`iconv -f SHIFT_JIS` で正しく復号できた。旧MRHC(Node)がShift_JISを使っていたのと一致。**現Go実装はUTF-8固定なのでJP Windowsで確実に文字化けする** → Encoding抽象が必須。stdin側も同様にコードページでエンコードが必要。
+- ⚠️ **文字コード（最重要のクロスプラットフォーム課題・実機確認済）**: **Windows=Shift_JIS(CP932)** は**実機確定**。Linuxは**UTF-8想定**（.NET＋UTF-8ロケールでほぼ確実だが**実機の日本語は未検証→要確認**）。実Windowsヘッドレスの日本語セッション名 `mmc25 SUMA 作業セッション`／`グリッドスペース` がUTF-8読みで `��ƃZ�b�V����` 等に化け、`iconv -f SHIFT_JIS` で正しく復号できた。旧MRHC(Node)がShift_JISを使っていたのと一致。**現Go実装はUTF-8固定なのでJP Windowsで確実に文字化けする** → Encoding抽象が必須。stdin側も同様にコードページでエンコードが必要。
   - 対策: プラットフォームに **Encoding抽象**（Win=コードページ/Linux=UTF-8）を実装。Windowsのコードページは `GetACP`/`GetConsoleOutputCP`(x/sys/windows)で取得し x/text/encoding で変換、または設定で上書き可能に。
   - 検証法: 起動ログは英語(ASCII)で顕在化しないため、`name "日本語テスト"`（stdin検証）→`worlds`/`status`（stdout検証）で日本語が往復するか確認する。
 - ⚠️ **`Headless/Config.json` は"ライブ"設定になりうる**: `-HeadlessConfig` を付けずに起動すると Headlessフォルダの `Config.json` を自動ロードする。実Windows機ではこれが**ユーザーの実アカウント認証＋実セッション定義**で、**no-config起動で実アカウントにログインし実セッションを開始してしまった**（Linux検証機のConfig.jsonは空/デフォルトだったため挙動が違った）。→ **MRHCは必ず明示的なconfigで起動し、テストでもno-configに依存しない**。
