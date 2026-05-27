@@ -169,3 +169,10 @@ Go PoCで本物のヘッドレスに対して検証した事実：
 - ⚠️ **起動直後の最初の1コマンドが `Unknown command` になる事象を観測**（同コマンドの2回目は正常）。エンジンが完全に応答可能になる前の入力が無視/誤処理される可能性 → v1では **readiness合図（"Engine Ready!"/"World running..."）を待ってからコマンド受付**、または初回にダミー改行を送る等を検討。
 - **`shutdown`**: `Exiting. Save Homes: False` → 設定保存 → 公開セッションは `BroadcastSessionEnded ... to Public` で閉じ → プロセスは**正常終了(exit 0)**。停止時に `UniLog.Log` 由来のスタックトレースが出るが**エラーではない**（RequestShutdown記録ログ）。
 - **無config起動はワールドが公開(Private→Anyone・public listing)になる** → v1は必ずconfigで適切なaccessLevelを設定。
+
+### Windows実機・文字コード（要対応）
+- **Windows実機**: Resoniteヘッドレスは既定パス `C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` に存在（開発PCで確認）。Steamライブラリ: `C:/Program Files (x86)/Steam` と `D:/SteamLibrary`。
+- ⚠️ **文字コード（最重要のクロスプラットフォーム課題）**: Linux=**UTF-8**（PoC確認済）。Windowsは未確定だが、旧MRHC(Node)が **stdin=Shift_JIS・stdout=utf8→shift_jisフォールバック** だったことから、**日本語ロケールWindowsではアクティブコードページ(CP932/Shift_JIS)で入出力**する可能性が高い。現Go実装はUTF-8固定 → **JP Windowsで日本語が文字化けする恐れ**。
+  - 対策: プラットフォームに **Encoding抽象**（Win=コードページ/Linux=UTF-8）を実装。Windowsのコードページは `GetACP`/`GetConsoleOutputCP`(x/sys/windows)で取得し x/text/encoding で変換、または設定で上書き可能に。
+  - 検証法: 起動ログは英語(ASCII)で顕在化しないため、`name "日本語テスト"`（stdin検証）→`worlds`/`status`（stdout検証）で日本語が往復するか確認する。
+- **Windows起動コマンド**: `Resonite.exe -HeadlessConfig <f>`（cwd=`Headless/`、直接実行）。.NETランタイムは同梱想定（Linux同様 dotnet-runtime/）。
