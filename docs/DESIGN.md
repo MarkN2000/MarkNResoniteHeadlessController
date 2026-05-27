@@ -51,7 +51,7 @@ Resonite Headless Controller を、要件からゼロ再定義して作り直す
 
 - **配布**: ランタイム不要の単一実行ファイル（`mrhc` / `mrhc.exe`）。フロント静的資産は `embed.FS` で同梱。インストール=DLして実行。
 - **クロスプラットフォーム**: Windows / Linux 対等。OS差（パス・文字コード・プロセス起動・steamcmd所在）は**プラットフォーム抽象層**に隔離。起動は Win=`Resonite.exe` / Linux=`dotnet Resonite.dll`（同一.NETアプリ）。
-- **前提ランタイム**: MRHC自体は単一Goバイナリで**ランタイム不要**。ただし起動対象の**ヘッドレスは .NET 10 Runtime を要する**（特にLinux）。セットアップ案内で.NET10導入を促す。
+- **前提ランタイム**: MRHC自体は単一Goバイナリで**ランタイム不要**。ヘッドレスは.NET 10で動くが、**Resoniteが自前のランタイムを同梱**（`<install>/dotnet-runtime/dotnet`、実機確認済）するため**別途の.NET導入は不要**。Linux起動はこの同梱dotnetで `dotnet Resonite.dll`。
 - **セキュリティ（LAN前提で右サイズ）**: §7参照。
 - **時刻（タイムゾーン）**: スケジュール再起動の毎日/毎週/日時は**サーバーのローカル時刻**で判定する。UIには適用タイムゾーンを明示する（「何時に再起動されるか」の事故防止）。
 - **秘密情報の扱い**: 管理パスワードは**ハッシュ保存**。一方、Resoniteアカウント/Steamのパスワードは子プロセス（ヘッドレス・steamcmd）へ渡すため**復元可能な形で保存せざるを得ない**。よって防御は「**設定ファイルのパーミッション制限（Linuxは0600相当）＋LAN前提**」とする。
@@ -85,7 +85,7 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
   └─ Process Lifecycle Monitor … ヘッドレスの異常終了を検知→状態反映＋(設定ONで)自動再起動(クラッシュループ保護)
   ↓
 プラットフォーム抽象層 (★OS差を隔離)
-  ├─ ProcessLauncher  … Win: `Resonite.exe -HeadlessConfig <f>` / Linux: `dotnet Resonite.dll -HeadlessConfig <f>`(要.NET10 Runtime)。両者とも同一の.NETアプリ＝差は exe起動 vs dotnet起動のみ
+  ├─ ProcessLauncher  … Win: `Resonite.exe -HeadlessConfig <f>` / Linux: `<install>/dotnet-runtime/dotnet Resonite.dll -HeadlessConfig <f>`(dotnetはResonite同梱・別途.NET不要)。cwd=`Headless/`。両者とも同一の.NETアプリ
   ├─ Encoding         … Win: ロケール(Shift_JIS等) / Linux: UTF-8
   └─ Paths            … steamcmd・Resoniteインストール先の検出。Win:`C:/Program Files (x86)/Steam/.../Resonite/Headless/Resonite.exe` / Linux:`~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`(Flatpak版`~/.var/app/com.valvesoftware.Steam/...`も候補)
 ```

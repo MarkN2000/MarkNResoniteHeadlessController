@@ -15,6 +15,7 @@
 | 起動 | `spawn(HEADLESS_EXECUTABLE, ['-HeadlessConfig', <configPath>], { cwd: dirname(exe) })` | processManager.ts:236-250 |
 | 実行ファイル | Windows=`Resonite.exe`。**Linux=`dotnet Resonite.dll`（要.NET10 Runtime、`Headless/`フォルダ内）**。両OSとも同一.NETアプリ。公式Wiki Setup参照 | config/index.ts / Wiki |
 | 既定パス(Linux) | `~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`（実機確認済）。Flatpak版は `~/.var/app/com.valvesoftware.Steam/.local/share/Steam/...` も候補 | 実機 |
+| dotnet(Linux) | **Resonite同梱**: `~/.local/share/Steam/steamapps/common/Resonite/dotnet-runtime/dotnet`（実機確認済）。**別途.NET導入は不要**。起動は `<同梱dotnet> Resonite.dll`、cwd=`Headless/` | 実機 |
 | 既定パス(Win) | `C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` | 旧コード |
 | stdin送信 | コマンド文字列＋`\n` を **Shift_JISエンコード**して書き込み | processManager.ts:330 |
 | stdout復号 | utf8試行 → 失敗時shift_jis → 最終utf8 | processManager.ts:503-513 |
@@ -155,3 +156,16 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 2. 各操作系コマンドの**成功/失敗時の出力**（kick/ban/silence/respawn/unban/acceptFriendRequest/invite/accessLevel/role）
 3. Linuxの**文字コード**（UTF-8想定でよいか）。起動方法は判明＝`dotnet Resonite.dll -HeadlessConfig <f>`（.NET10 Runtime、`Headless/`内）
 4. （任意）`spawn` / `dynamicImpulseString` 実行時の出力
+
+---
+
+## 7. 実機確認済（PoC, Resonite Beta 2026.5.20.291 / .NET 10.0.8 / Linux CachyOS）
+
+Go PoCで本物のヘッドレスに対して検証した事実：
+- **起動**: 同梱dotnetで `dotnet Resonite.dll`（無config）が起動し "Engine Ready!" → "World running..." まで到達。低スペックCPUで**初期化に約20秒**（途中の "Engine has been unresponsive for over 10.00 seconds" は正常な自己警告）。
+- **プロンプト**: フォーカス中セッション名＋`>`。例 `markn-linux-test World 0>`。**改行なしで次出力の行頭に連結**する。
+- **`worlds` 実出力（§3のregex一致を確認）**: `[0] markn-linux-test World 0        Users: 1\tPresent: 0\tAccessLevel: Anyone\tMaxUsers: 16`（区切りは空白＋タブ混在）。
+- **未知コマンド**: `Unknown command` を返す。
+- ⚠️ **起動直後の最初の1コマンドが `Unknown command` になる事象を観測**（同コマンドの2回目は正常）。エンジンが完全に応答可能になる前の入力が無視/誤処理される可能性 → v1では **readiness合図（"Engine Ready!"/"World running..."）を待ってからコマンド受付**、または初回にダミー改行を送る等を検討。
+- **`shutdown`**: `Exiting. Save Homes: False` → 設定保存 → 公開セッションは `BroadcastSessionEnded ... to Public` で閉じ → プロセスは**正常終了(exit 0)**。停止時に `UniLog.Log` 由来のスタックトレースが出るが**エラーではない**（RequestShutdown記録ログ）。
+- **無config起動はワールドが公開(Private→Anyone・public listing)になる** → v1は必ずconfigで適切なaccessLevelを設定。
