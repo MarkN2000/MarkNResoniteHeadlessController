@@ -1,37 +1,30 @@
-# Node.js dependencies
+# --- Go (backend) ---
+/mrhc
+/mrhc.exe
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# --- Frontend (React / Vite) ---
 node_modules/
+frontend/dist/
+frontend/.vite/
 
-# TypeScript build output
-dist/
+# --- ランタイム生成物（セットアップ時に作成・コミットしない） ---
+mrhc.config.json
+/data/
+*.log
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# --- OS / エディタ ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Setup marker
-.setup_completed
-
-# Resonite headless configs (keep templates only)
-config/headless/*.json
-!config/headless/*.template.json
-
-# Configuration files (keep examples only)
-config/auth.json
-config/security.json
-config/runtime-state.json
-backend/config/*.json
-
-# Sample files
-sample/バニラで起動したときのコンソール画面.txt
-sample/scripts/
-
-.claude/
-
-# Cygwin/Git Bash crash dumps
+# --- Git Bash / Cygwin crash dumps ---
 *.stackdump
+
+# --- Claude ---
+.claude/
