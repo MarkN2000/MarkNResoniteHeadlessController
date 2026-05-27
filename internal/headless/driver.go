@@ -1,16 +1,17 @@
 // Package headless はResoniteヘッドレスのプロセスを管理する Console Driver。
 // 起動/停止、コマンド送信（stdin）、ログ収集（stdout/stderr）、状態管理、
 // ログ/状態のSSE向けブロードキャストを担う。
-//
-// 注: 入出力は当面 UTF-8（Linuxヘッドレスは UTF-8）。Windowsのロケール
-// コードページ対応は後続でプラットフォーム抽象に追加する。
+// 文字コードは platform.ConsoleEncoding で抽象化（Win=コードページ/Linux=UTF-8、
+// nil=UTF-8パススルー）。stdoutは行単位でデコード、stdinはエンコードして送る。
 package headless
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -134,6 +135,10 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 		d.mu.Unlock()
 		return ErrNoPath
 	}
+	if _, err := os.Stat(headlessPath); err != nil {
+		d.mu.Unlock()
+		return fmt.Errorf("ヘッドレスパスが見つかりません: %s", headlessPath)
+	}
 
 	cmd := platform.BuildHeadlessCommand(headlessPath, configPath)
 	stdout, err := cmd.StdoutPipe()
@@ -177,18 +182,38 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 }
 
 func (d *Driver) readPipe(r io.Reader, kind string) {
-	if d.enc != nil { // 非UTF-8（Windowsコードページ等）はUTF-8へデコード
-		r = transform.NewReader(r, d.enc.NewDecoder())
-	}
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
-	for sc.Scan() {
-		text := sc.Text()
-		d.publishLog(kind, text)
-		if kind == "out" {
-			d.maybeReady(text)
+	br := bufio.NewReaderSize(r, 64*1024)
+	for {
+		raw, err := br.ReadBytes('\n')
+		if len(raw) > 0 {
+			text := d.decodeLine(raw)
+			d.publishLog(kind, text)
+			if kind == "out" {
+				d.maybeReady(text)
+			}
+		}
+		if err != nil {
+			if err != io.EOF {
+				d.publishLog("sys", fmt.Sprintf("ログ読取終了: %v", err))
+			}
+			return
 		}
 	}
+}
+
+// decodeLine は1行ぶんの生バイトを文字コードに応じてUTF-8文字列へ変換する。
+// 行単位で独立にデコードするため、不正バイトがあってもその行に閉じ込められ、
+// stdoutのdrain自体は止まらない（=プロセスのstdout詰まり/ハングを防ぐ）。
+func (d *Driver) decodeLine(raw []byte) string {
+	raw = bytes.TrimRight(raw, "\r\n")
+	if d.enc == nil {
+		return string(raw) // UTF-8パススルー
+	}
+	decoded, _, err := transform.Bytes(d.enc.NewDecoder(), raw)
+	if err != nil {
+		return string(raw) // デコード失敗時は生バイトにフォールバック（行は失わない）
+	}
+	return string(decoded)
 }
 
 // maybeReady は readiness 合図（"World running" / "Engine Ready"）を検出して

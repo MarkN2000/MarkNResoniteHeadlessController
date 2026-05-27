@@ -4,11 +4,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
@@ -51,8 +57,44 @@ func main() {
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
 	srv := server.New(cfg, cfgPath, driver, web.FS())
 
-	fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("サーバー起動に失敗しました: %v", err)
+	httpServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Port), Handler: srv.Handler()}
+	go func() {
+		fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("サーバー起動に失敗しました: %v", err)
+		}
+	}()
+
+	// SIGINT/SIGTERM で graceful 終了。稼働中のヘッドレスを shutdown して
+	// orphan（管理不能な残存プロセス）を防ぐ。もう一度シグナルが来たら即終了。
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	<-sigCh
+	fmt.Println("\n終了シグナル受信。ヘッドレスを停止しています...（もう一度Ctrl-Cで即終了）")
+
+	if driver.Status().State != headless.StateStopped {
+		go func() {
+			<-sigCh
+			fmt.Println("強制終了します。")
+			os.Exit(1)
+		}()
+		_ = driver.Stop()
+		waitForStopped(driver, 75*time.Second)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = httpServer.Shutdown(ctx)
+	fmt.Println("終了しました。")
+}
+
+// waitForStopped はヘッドレスが停止状態になるまで（または timeout まで）待つ。
+func waitForStopped(d *headless.Driver, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if d.Status().State == headless.StateStopped {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }

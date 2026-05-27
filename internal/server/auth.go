@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -18,9 +19,37 @@ const sessionTTL = 24 * time.Hour
 
 // authManager は人間向けのセッション（Cookie）と、スクリプト向けのAPIキー認証を扱う。
 type authManager struct {
-	cfg      *config.Config
-	mu       sync.Mutex
-	sessions map[string]time.Time // token -> 失効時刻
+	cfg       *config.Config
+	mu        sync.Mutex
+	sessions  map[string]time.Time // token -> 失効時刻
+	failures  int                  // 連続ログイン失敗回数
+	lockUntil time.Time            // ロックアウト解除時刻
+}
+
+// loginLocked はログインがレート制限でロック中かを返す。
+func (a *authManager) loginLocked() (bool, time.Duration) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if time.Now().Before(a.lockUntil) {
+		return true, time.Until(a.lockUntil)
+	}
+	return false, 0
+}
+
+// recordLoginResult はログイン結果を記録し、連続失敗が一定数を超えたら短時間ロックする。
+func (a *authManager) recordLoginResult(ok bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if ok {
+		a.failures = 0
+		a.lockUntil = time.Time{}
+		return
+	}
+	a.failures++
+	if a.failures >= 10 {
+		a.lockUntil = time.Now().Add(time.Minute)
+		a.failures = 0
+	}
 }
 
 func newAuthManager(cfg *config.Config) *authManager {
@@ -62,7 +91,10 @@ func (a *authManager) dropSession(tok string) {
 }
 
 func (a *authManager) validAPIKey(key string) bool {
-	return key != "" && a.cfg.APIKey != "" && key == a.cfg.APIKey
+	if key == "" || a.cfg.APIKey == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(key), []byte(a.cfg.APIKey)) == 1
 }
 
 // authorized は Cookieセッション or APIキー（ヘッダ優先・クエリも許容）で認証可否を返す。

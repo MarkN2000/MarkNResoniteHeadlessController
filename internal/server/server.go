@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
@@ -40,20 +39,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/login", s.handleLogin)
 	mux.HandleFunc("POST /api/v1/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/v1/status", s.requireAuth(s.handleStatus))
-	mux.HandleFunc("POST /api/v1/start", s.requireAuth(s.handleStart))
-	mux.HandleFunc("POST /api/v1/stop", s.requireAuth(s.handleStop))
+	mux.HandleFunc("/api/v1/start", s.requireAuth(s.handleStart))     // GET/POST両対応
+	mux.HandleFunc("/api/v1/stop", s.requireAuth(s.handleStop))       // GET/POST両対応
 	mux.HandleFunc("/api/v1/command", s.requireAuth(s.handleCommand)) // GET/POST両対応
 	mux.HandleFunc("GET /api/v1/events", s.requireAuth(s.handleEvents))
 
 	// フロントエンド（埋め込み静的資産）
 	mux.Handle("/", http.FileServerFS(s.webFS))
 	return mux
-}
-
-func (s *Server) ListenAndServe() error {
-	addr := ":" + strconv.Itoa(s.cfg.Port)
-	log.Printf("MRHC listening on %s", addr)
-	return http.ListenAndServe(addr, s.Handler())
 }
 
 // --- レスポンスヘルパ（統一形式 {ok, data} / {ok:false, error}） ---
@@ -75,6 +68,11 @@ func writeErr(w http.ResponseWriter, code int, errCode, msg string) {
 // --- ハンドラ ---
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if locked, remain := s.auth.loginLocked(); locked {
+		writeErr(w, http.StatusTooManyRequests, "rate_limited",
+			fmt.Sprintf("ログイン試行が多すぎます。約%d秒後に再試行してください", int(remain.Seconds())+1))
+		return
+	}
 	var body struct {
 		Password string `json:"password"`
 	}
@@ -82,7 +80,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正なリクエスト")
 		return
 	}
-	if !s.auth.checkPassword(body.Password) {
+	ok := s.auth.checkPassword(body.Password)
+	s.auth.recordLoginResult(ok)
+	if !ok {
 		writeErr(w, http.StatusUnauthorized, "invalid_password", "パスワードが違います")
 		return
 	}
@@ -174,11 +174,16 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	fl.Flush()
 
+	ticker := time.NewTicker(25 * time.Second)
+	defer ticker.Stop()
 	ctx := r.Context()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-ticker.C:
+			fmt.Fprint(w, ": ping\n\n") // keep-alive コメント
+			fl.Flush()
 		case l, ok := <-logCh:
 			if !ok {
 				return
