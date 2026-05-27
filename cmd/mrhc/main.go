@@ -29,6 +29,9 @@ func main() {
 		}
 		dir = filepath.Dir(exe)
 	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Fatalf("データディレクトリの作成に失敗: %v", err)
+	}
 	cfgPath := filepath.Join(dir, config.FileName)
 
 	if !config.FileExists(cfgPath) {

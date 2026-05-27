@@ -41,9 +41,11 @@ func BuildHeadlessCommand(headlessPath, configPath string) *exec.Cmd {
 // （PATH上のdotnet）にフォールバックする。
 func bundledDotnet(headlessDir string) string {
 	installRoot := filepath.Dir(headlessDir) // .../Resonite
-	candidate := filepath.Join(installRoot, "dotnet-runtime", "dotnet")
-	if _, err := os.Stat(candidate); err == nil {
-		return candidate
+	for _, name := range []string{"dotnet", "dotnet.exe"} {
+		candidate := filepath.Join(installRoot, "dotnet-runtime", name)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
 	}
 	return "dotnet"
 }

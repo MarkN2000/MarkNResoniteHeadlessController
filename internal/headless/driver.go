@@ -38,11 +38,11 @@ type LogLine struct {
 
 // Status はヘッドレスの現在状態。
 type Status struct {
-	State     State     `json:"state"`
-	PID       int       `json:"pid,omitempty"`
-	Config    string    `json:"config,omitempty"`
-	StartedAt time.Time `json:"startedAt,omitempty"`
-	Ready     bool      `json:"ready"`
+	State     State      `json:"state"`
+	PID       int        `json:"pid,omitempty"`
+	Config    string     `json:"config,omitempty"`
+	StartedAt *time.Time `json:"startedAt,omitempty"`
+	Ready     bool       `json:"ready"`
 }
 
 var (
@@ -89,7 +89,12 @@ func (d *Driver) Status() Status {
 }
 
 func (d *Driver) statusLocked() Status {
-	return Status{State: d.state, PID: d.pid, Config: d.cfgPath, StartedAt: d.started, Ready: d.ready}
+	var startedAt *time.Time
+	if d.state != StateStopped && !d.started.IsZero() {
+		t := d.started
+		startedAt = &t
+	}
+	return Status{State: d.state, PID: d.pid, Config: d.cfgPath, StartedAt: startedAt, Ready: d.ready}
 }
 
 // setStateLocked は d.mu 保持中に呼ぶ。状態を更新し購読者へ通知する。
@@ -157,9 +162,11 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 
 	d.publishLog("sys", fmt.Sprintf("起動: pid=%d config=%q", cmd.Process.Pid, configPath))
 
-	go d.readPipe(stdout, "out")
-	go d.readPipe(stderr, "err")
-	go d.waitExit(cmd)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); d.readPipe(stdout, "out") }()
+	go func() { defer wg.Done(); d.readPipe(stderr, "err") }()
+	go d.waitExit(cmd, &wg)
 	return nil
 }
 
@@ -193,7 +200,8 @@ func (d *Driver) maybeReady(text string) {
 	d.mu.Unlock()
 }
 
-func (d *Driver) waitExit(cmd *exec.Cmd) {
+func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
+	wg.Wait() // 全パイプをdrainしてから reap（Waitがパイプを閉じる前に読み切る＝末尾行の取りこぼし防止）
 	err := cmd.Wait()
 	d.mu.Lock()
 	wasStopping := d.stopping
