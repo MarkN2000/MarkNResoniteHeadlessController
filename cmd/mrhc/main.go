@@ -12,6 +12,7 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/server"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/setup"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/web"
@@ -47,7 +48,7 @@ func main() {
 		log.Fatalf("設定の読み込みに失敗しました: %v", err)
 	}
 
-	driver := headless.NewDriver()
+	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
 	srv := server.New(cfg, cfgPath, driver, web.FS())
 
 	fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)

@@ -16,6 +16,9 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/transform"
+
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 )
 
@@ -57,6 +60,7 @@ const logCapacity = 2000
 type Driver struct {
 	mu sync.Mutex
 
+	enc       encoding.Encoding // nil = UTF-8パススルー
 	logHub    *hub[LogLine]
 	statusHub *hub[Status]
 	history   []LogLine
@@ -72,8 +76,10 @@ type Driver struct {
 	stopping bool
 }
 
-func NewDriver() *Driver {
+// NewDriver は文字コード enc（nil=UTF-8パススルー）でドライバを生成する。
+func NewDriver(enc encoding.Encoding) *Driver {
 	return &Driver{
+		enc:       enc,
 		logHub:    newHub[LogLine](),
 		statusHub: newHub[Status](),
 		state:     StateStopped,
@@ -171,6 +177,9 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 }
 
 func (d *Driver) readPipe(r io.Reader, kind string) {
+	if d.enc != nil { // 非UTF-8（Windowsコードページ等）はUTF-8へデコード
+		r = transform.NewReader(r, d.enc.NewDecoder())
+	}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
 	for sc.Scan() {
@@ -263,7 +272,13 @@ func (d *Driver) SendCommand(command string) error {
 		return ErrNotRunning
 	}
 	d.publishLog("cmd", "> "+command)
-	_, err := io.WriteString(stdin, command+"\n")
+	payload := command + "\n"
+	if d.enc != nil { // 非UTF-8（Windowsコードページ等）へエンコードして送信
+		if out, _, e := transform.String(d.enc.NewEncoder(), payload); e == nil {
+			payload = out
+		}
+	}
+	_, err := io.WriteString(stdin, payload)
 	return err
 }
 

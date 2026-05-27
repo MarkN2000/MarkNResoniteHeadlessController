@@ -20,6 +20,7 @@ type Config struct {
 	Port              int    `json:"port"`                       // HTTP待受ポート
 	ResoniteHeadless  string `json:"resoniteHeadlessPath,omitempty"`  // Resonite.exe / Resonite.dll
 	HeadlessConfigDir string `json:"headlessConfigDir,omitempty"`     // ヘッドレスconfig格納先
+	Encoding          string `json:"encoding,omitempty"`              // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
 	// 後続でHeadlessCredentials / Restart / Steam / AllowedCidrs などを追加
 }
 
