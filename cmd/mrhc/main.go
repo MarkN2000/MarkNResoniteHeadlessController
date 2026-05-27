@@ -1,6 +1,6 @@
 // Command mrhc is the MarkN Resonite Headless Controller (v2).
 // On first run (no config) it launches an interactive CLI setup wizard;
-// otherwise it loads the config and starts the server.
+// otherwise it loads the config and starts the HTTP server.
 package main
 
 import (
@@ -11,7 +11,10 @@ import (
 	"path/filepath"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/server"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/setup"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/web"
 )
 
 func main() {
@@ -41,6 +44,11 @@ func main() {
 		log.Fatalf("設定の読み込みに失敗しました: %v", err)
 	}
 
-	// TODO(増分3): ここでHTTPサーバー（認証・SSE・API・embed配信）を起動する。
-	fmt.Printf("[mrhc] 設定読み込みOK（port=%d, config=%s）。サーバー起動は次の増分で実装します。\n", cfg.Port, cfgPath)
+	driver := headless.NewDriver()
+	srv := server.New(cfg, cfgPath, driver, web.FS())
+
+	fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatalf("サーバー起動に失敗しました: %v", err)
+	}
 }
