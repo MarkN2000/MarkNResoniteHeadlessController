@@ -10,7 +10,25 @@ ResoniteのヘッドレスサーバーをLAN内のブラウザ／スクリプト
 - **Resoniteドメイン事実**（コンソールコマンド・出力書式・起動方法など）: [docs/resonite-domain-facts.md](docs/resonite-domain-facts.md)
 
 ## ステータス
-要件定義・設計・主要リスク調査が完了し、実装（Go小実証 → v1.0 歩く骨格 → 段階出荷）に着手する段階です。
+v1.0「歩く骨格」を実装中（CLIセットアップ・ヘッドレス起動/停止・ライブログ(SSE)・コマンド送信・認証・React/Mantine製UI・両OS単一バイナリが動作）。以降、段階的に機能を肉付け。
+
+## ビルド / 開発
+前提: **Go 1.26+** と **Node 20+**。
+
+```sh
+# 1) フロントエンドをビルド（web/dist を生成 → Goが埋め込む）
+cd web && npm install && npm run build && cd ..
+
+# 2) バイナリをビルド
+go build -o bin/mrhc ./cmd/mrhc                         # 現OS向け
+GOOS=windows GOARCH=amd64 go build -o bin/mrhc.exe ./cmd/mrhc  # Windows向け
+GOOS=linux   GOARCH=amd64 go build -o bin/mrhc    ./cmd/mrhc   # Linux向け
+```
+> ⚠️ `web/dist` はビルド成果物のため **git管理外**。`go build`（embed.FSで同梱）の前に**必ずフロントをビルド**すること。
+
+開発時:
+- バックエンド: `go run ./cmd/mrhc -data ./bin/devdata`（初回は対話セットアップ）
+- フロント: `cd web && npm run dev`（`/api` を `:8080` のバックエンドへプロキシ）
 
 ## ライセンス
 MIT — [LICENSE](LICENSE)
