@@ -58,6 +58,12 @@ var (
 
 const logCapacity = 2000
 
+// maxLineBytes は改行が来ない病的に長い1行に対する安全網。
+// 旧 readPipe は bufio.NewReaderSize(r, 64*1024) で 64KB 上限があり、本実装は
+// チャンク読みのため明示的に上限を設ける。実 Resonite では到達しないが、
+// 不正な出力でメモリ無限増を起こさないため。超過時は強制的に1行として切り出す。
+const maxLineBytes = 1 << 20 // 1 MiB
+
 // Driver は単一のヘッドレスプロセスを管理する。
 type Driver struct {
 	mu sync.Mutex
@@ -215,6 +221,18 @@ func (d *Driver) readPipe(r io.Reader, kind string) {
 				case '\r':
 					// 行終端の前段。decodeLine 側でも吸収されるが、ここで落とすほうがシンプル。
 				default:
+					if len(lineBuf) >= maxLineBytes {
+						// 改行が来ない病的長行: 強制的に1行として記録（メモリ無限増を防ぐ安全網）
+						d.publishLog("sys", fmt.Sprintf("[truncate] %s: 単一行が %d bytes を超えたため強制改行", kind, maxLineBytes))
+						text := d.decodeLine(lineBuf)
+						d.publishLog(kind, text)
+						if kind == "out" {
+							if c := d.activeCollector.Load(); c != nil {
+								c.appendLine(text)
+							}
+						}
+						lineBuf = lineBuf[:0]
+					}
 					lineBuf = append(lineBuf, b)
 				}
 			}
@@ -271,8 +289,9 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	wg.Wait() // 全パイプをdrainしてから reap（Waitがパイプを閉じる前に読み切る＝末尾行の取りこぼし防止）
 	err := cmd.Wait()
 	// 実行中の Exec があればプロセス死亡を通知（waitComplete が ErrProcessGone を返す）
+	// 元エラー（cmd.Wait の戻り値）はそのまま渡す → waitComplete が %v で wrap する
 	if c := d.activeCollector.Load(); c != nil {
-		c.markGone(fmt.Errorf("process exited: %w", err))
+		c.markGone(err)
 	}
 	d.mu.Lock()
 	wasStopping := d.stopping

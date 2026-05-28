@@ -3,6 +3,7 @@ package headless
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -94,10 +95,16 @@ func (c *respCollector) updateTail(tail []byte) {
 	c.mu.Unlock()
 }
 
-// markGone: 監視中プロセスが終了したことを伝える。以降 waitComplete は ErrProcessGone を返す。
+// markGone: 監視中プロセスが終了したことを伝える。以降 waitComplete は
+// fmt.Errorf("%w: %v", ErrProcessGone, err) を返す（errors.Is で ErrProcessGone 判定可
+// + err.Error() で元エラー情報も得られる）。
+// 正常終了（err==nil）でも「プロセスが消えた」状態は同じなので clean exit のセンチネルを残す。
 func (c *respCollector) markGone(err error) {
 	c.mu.Lock()
 	if c.gone == nil {
+		if err == nil {
+			err = errors.New("clean exit")
+		}
 		c.gone = err
 	}
 	c.mu.Unlock()
@@ -136,7 +143,7 @@ func (c *respCollector) waitComplete(ctx context.Context, cfg execConfig) ([]str
 		lastChange := c.lastChange
 		c.mu.Unlock()
 		if gone != nil {
-			return c.snapshot(), ErrProcessGone
+			return c.snapshot(), fmt.Errorf("%w: %v", ErrProcessGone, gone)
 		}
 		// 3. 全体タイムアウト
 		if time.Now().After(deadline) {

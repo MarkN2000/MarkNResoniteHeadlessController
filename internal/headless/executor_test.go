@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -94,6 +95,39 @@ func TestWaitComplete_ProcessGone(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("expected partial result, got %v", got)
+	}
+}
+
+func TestWaitComplete_ProcessGoneWrapsUnderlying(t *testing.T) {
+	// markGone(err) で渡したエラーが返値のメッセージに含まれること。
+	// errors.Is(err, ErrProcessGone) も引き続き true。
+	c := newRespCollector()
+	cfg := fastConfig()
+	underlying := errors.New("exit status 137")
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		c.markGone(underlying)
+	}()
+	_, err := c.waitComplete(context.Background(), cfg)
+	if !errors.Is(err, ErrProcessGone) {
+		t.Fatalf("errors.Is(ErrProcessGone) failed: %v", err)
+	}
+	if !strings.Contains(err.Error(), "exit status 137") {
+		t.Fatalf("元エラーが err.Error() に含まれるべき: got=%q", err.Error())
+	}
+}
+
+func TestWaitComplete_ProcessGoneCleanExit(t *testing.T) {
+	// markGone(nil) でも「プロセスが消えた」状態は同じ → ErrProcessGone を返す
+	c := newRespCollector()
+	cfg := fastConfig()
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		c.markGone(nil)
+	}()
+	_, err := c.waitComplete(context.Background(), cfg)
+	if !errors.Is(err, ErrProcessGone) {
+		t.Fatalf("clean exit でも ErrProcessGone 判定されるべき: %v", err)
 	}
 }
 

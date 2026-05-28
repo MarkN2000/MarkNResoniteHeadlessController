@@ -21,8 +21,20 @@ type WorldsService interface {
 	List(ctx context.Context) ([]World, error)
 
 	// ForEach は各ワールドを focus してから fn を呼ぶ。
-	// 巡回は原子的グループ内で行われ、他の構造化コマンドが間に割り込まない。
-	// fn が non-nil error を返すと巡回を中断してその error を返す。
+	//
+	// 仕様:
+	//   - 巡回は ExecGroup（execMu 保持）内で行われ、他の構造化コマンドが
+	//     間に割り込まない（焦点ズレが構造的に起きない）。
+	//   - 対象ワールドは「巡回開始時の worlds スナップショット」。途中で追加された
+	//     ワールドは対象外（次回 ForEach で拾う）。
+	//   - 巡回中にヘッドレス側でワールドが close された場合の挙動は実機未検証だが、
+	//     focus N がエラーを返す（or timeout）場合は ForEach を中断してエラーを返す。
+	//     書き込み系（maxusers/role/accesslevel の一斉変更等）で half-applied 状態を
+	//     避けるための保守的な仕様。
+	//   - fn が non-nil error を返した場合も巡回を中断して error を返す。
+	//
+	// 読み取り系（users 収集等）で「途中失敗があっても部分結果が欲しい」場合は、
+	// 将来 ForEachBestEffort のような専用関数を追加する想定（現状未実装）。
 	ForEach(ctx context.Context, fn func(w World, s Scope) error) error
 }
 
