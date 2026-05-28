@@ -49,7 +49,8 @@ var statusUnknownKeysWarned sync.Map
 func ParseWorlds(lines []string) []World {
 	out := make([]World, 0, len(lines))
 	for _, line := range lines {
-		m := worldsLineRe.FindStringSubmatch(line)
+		cleaned := stripLineLeadingPrompts(line)
+		m := worldsLineRe.FindStringSubmatch(cleaned)
 		if m == nil {
 			continue
 		}
@@ -75,7 +76,8 @@ func ParseWorlds(lines []string) []World {
 func ParseStatus(lines []string) WorldStatus {
 	var s WorldStatus
 	for _, line := range lines {
-		m := statusKVRe.FindStringSubmatch(line)
+		cleaned := stripLineLeadingPrompts(line)
+		m := statusKVRe.FindStringSubmatch(cleaned)
 		if m == nil {
 			continue
 		}
@@ -119,7 +121,8 @@ func ParseStatus(lines []string) WorldStatus {
 func ParseUsers(lines []string) []UserInfo {
 	out := make([]UserInfo, 0, len(lines))
 	for _, line := range lines {
-		m := usersLineRe.FindStringSubmatch(line)
+		cleaned := stripLineLeadingPrompts(line)
+		m := usersLineRe.FindStringSubmatch(cleaned)
 		if m == nil {
 			continue
 		}
@@ -143,7 +146,8 @@ func ParseUsers(lines []string) []UserInfo {
 func ParseListBans(lines []string) []BanEntry {
 	out := make([]BanEntry, 0, len(lines))
 	for _, line := range lines {
-		m := listbansLineRe.FindStringSubmatch(line)
+		cleaned := stripLineLeadingPrompts(line)
+		m := listbansLineRe.FindStringSubmatch(cleaned)
 		if m == nil {
 			continue
 		}
@@ -196,6 +200,24 @@ func warnUnknownStatusKey(key string) {
 		return // 既に警告済
 	}
 	log.Printf("[structured-driver] status の未知Key %q を観測 (無視。Resoniteのバージョン変更で増えた可能性)", key)
+}
+
+// stripLineLeadingPrompts は単一行の先頭にある「連続プロンプト」を除去する。
+// 各パーサが per-line で呼ぶ。
+//
+// 必要な理由: Driver の collector は Exec 中に流れる全ての stdout 行を捕える
+// （ambient/起動ログ含む）。そのため応答行は collector の任意の位置に現れ得る。
+// stripPromptPrefix（lines[0] のみ）では不足で、応答らしい行が ambient と
+// glue したパターン（例: "World A>[0] foo  Users: 1 ..."）を全行で剥がす必要がある。
+//
+// 注意: ambient 行に '>' が含まれると過剰に剥がすが、その場合は parser regex に
+// 一致しないため最終結果に影響しない（無害な over-strip）。
+func stripLineLeadingPrompts(line string) string {
+	loc := leadingPromptsRe.FindStringIndex(line)
+	if loc == nil {
+		return line
+	}
+	return line[loc[1]:]
 }
 
 // stripPromptPrefix は応答の先頭行に限り、行頭の「連続プロンプト」を全て除去する。

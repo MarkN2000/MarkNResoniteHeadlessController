@@ -172,8 +172,22 @@ type WorldsService interface {
 | `friendrequests` | `[]string`（ユーザー名一覧） |
 
 - 正規表現は `docs/resonite-domain-facts.md` を出典。
-- 応答行は**プロンプト接頭辞除去後**に適用（`^` アンカー使用可）。
+- 各 parser は **`stripLineLeadingPrompts` を per-line で適用してから regex 照合**（Phase 6 e2e で発見）。
 - ambient/無関係行は正規表現に当たらず自然に無視。
+
+### Phase 6 e2e で発覚した重要事実
+
+Driver の collector は Exec 中に流れる stdout 行を**全て**捕える。
+Resonite 起動直後は boot output (BOOTSTRAP, SignalR, 各 world の Opening world など)
+が大量に流れているため、Exec("worlds") の応答行は collector の**末尾近く**に
+位置し、しかも応答1行目には前 prompt が glue している（例: 107行中 105行目に
+`MRHC Test World B>[0] World A ...`）。
+
+旧設計の「lines[0] のみ stripPromptPrefix」では、ambient 末尾の応答行を
+strip できず、`^\[(\d+)\]` regex が当たらず World A が parser から消えていた。
+修正: parser は per-line で `stripLineLeadingPrompts` を適用 → ambient と
+混在しても応答行を正しく抽出できる。ambient 行に `>` があれば過剰剥がしに
+なるが、その行は parser regex に当たらず無害。
 - **2026-05-28 実機採取での修正点**：
   - `status` パーサは **`ResoniteLink` Key を追加**（旧コードに無い）
   - `users` パーサは **`id` 空文字を許容**（旧 `\S+` → `[^\s]*` 等）

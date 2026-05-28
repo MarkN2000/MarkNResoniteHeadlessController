@@ -19,6 +19,9 @@ mrhc.config.json
 # 実機採取fixtureはパーサテストの土台なので明示的に許可
 !scripts/empirical-capture/fixtures/**
 
+# Phase 6 e2e 検証の生成物は ephemeral
+scripts/e2e-verify/results/
+
 # --- OS / エディタ ---
 .DS_Store
 Thumbs.db

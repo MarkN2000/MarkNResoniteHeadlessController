@@ -24,6 +24,49 @@ func TestParseWorlds(t *testing.T) {
 	}
 }
 
+// 回帰テスト (Phase 6 で発見): collector が boot/ambient ログを大量に捕えていて、
+// 応答行が末尾にあり、かつ第1応答行に prompt prefix が付くケースで、
+// 旧 stripPromptPrefix（lines[0]のみ）では World 0 が消失していた。
+// per-line の stripLineLeadingPrompts で両 world が取れることを確認する。
+func TestParseWorldsHandlesAmbientPlusPromptPrefix(t *testing.T) {
+	input := []string{
+		"BOOTSTRAP: Running userspace bootstrap",
+		"User Joined Userspace. Username: MARKNPC_MAIN, UserID: ...",
+		"Loading from URI: local://...",
+		"Updated: 0001/01/01 0:00:00 -> 2026/05/28 8:19:20",
+		"World running...",
+		"MRHC Test World B>[0] MRHC Test World A               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
+		"[1] MRHC Test World B               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
+	}
+	got := ParseWorlds(input)
+	if len(got) != 2 {
+		t.Fatalf("ambient+prompt の混在で 2 worlds 取れるべき: got %d - %+v", len(got), got)
+	}
+	if got[0].Name != "MRHC Test World A" || got[0].Index != 0 {
+		t.Fatalf("World 0 が prompt prefix で消失: %+v", got[0])
+	}
+	if got[1].Name != "MRHC Test World B" || got[1].Index != 1 {
+		t.Fatalf("World 1 mismatch: %+v", got[1])
+	}
+}
+
+func TestParseStatusHandlesAmbientPlusPromptPrefix(t *testing.T) {
+	// status 応答の Name 行が prompt prefix glue を含むケース
+	input := []string{
+		"Some ambient log line during status response",
+		"MRHC Test World A>Name: MRHC Test World A",
+		"SessionID: S-test-1234",
+		"Current Users: 1",
+	}
+	got := ParseStatus(input)
+	if got.Name != "MRHC Test World A" {
+		t.Fatalf("prompt-prefixed Name 行が parse されるべき: %+v", got)
+	}
+	if got.SessionID != "S-test-1234" || got.CurrentUsers != 1 {
+		t.Fatalf("通常行も parse されるべき: %+v", got)
+	}
+}
+
 func TestParseWorldsIgnoresNoise(t *testing.T) {
 	// パーサは正規表現に当たらない行を自然に無視する
 	input := []string{
