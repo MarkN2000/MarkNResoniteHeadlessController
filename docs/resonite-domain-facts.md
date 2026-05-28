@@ -46,7 +46,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 | `users` | フォーカス中セッションのユーザー一覧 | `<name>\tID: <id\|空>\tRole: <role>\tPresent: True\tPing: <int> ms\tFPS: <float>\tSilenced: True/False` ✅ 実機確定（**TAB区切り**） |
 | `sessionURL` | セッションURL取得 | `res-steam://.../S-xxxx` 等 |
 | `listbans` | BAN一覧 | `[N]\tUsername: <X>\tUserID: U-<id>\tMachineIds: <id1> <id2> ...` ✅ 実機確定（**TAB区切り**、`[N]`と`Username:`の間も TAB） |
-| `friendrequests` | 受信フレンド申請一覧 | ⚠️ **incoming pending のみ表示**（Accepted/Ignored 関係は出ない、2026-05-28 LAN実機確定）。pending エントリの実書式は **採取できず未確定** |
+| `friendrequests` | 受信フレンド申請一覧 | ⚠️ **incoming pending のみ表示**（Accepted/Ignored 関係は出ない、2026-05-28 LAN実機確定）。pending エントリの実書式は未採取だが、**v1 production で動いていた単純実装 (split+trim+filter '>')** を踏襲。boot ambient 多発時はノイズ混入可（v1 と同じ受容） |
 | `help` | 全コマンドの一覧 + Usage を表示 | 165行（usage 付きリファレンス）⭐ 実機発見 |
 | `version` | ヘッドレスバージョン文字列 | — |
 | `debugWorldState` | 全ワールドの診断情報 | — |
@@ -199,8 +199,8 @@ fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
 **friendrequests の限界 (重要)**:
 - Resonite の `friendrequests` は **incoming pending** のみ表示
 - Accepted/Ignored 関係は表示されない
-- → テスト環境では Accepted 状態への遷移後 pending エントリが残らず**実書式の採取が原理的に不可能**
-- 我々の実装では `ParseFriendRequests` および `/api/v1/friendrequests` を**撤去**（実書式に基づかない heuristic 実装を放置しない方針）
+- → テスト環境では Accepted 状態への遷移後 pending エントリが残らず**実書式の採取が困難**
+- ⭐ **方針改訂 (2026-05-28 後追い)**: 当初撤去判断したが、v1 (Node) では本機能が production で動いていた事実があり、撤去は早計と判断。v1 と同じシンプル実装 (`split + trim + filter('>')`) で復活。我々の Go 実装では prompt-glue 対応 (`safeStripLeadingPrompts`) も追加。limitation は godoc に明記
 
 **`/command` の API 上の仕様注意**:
 - POST body は **JSON のみ** (`{"cmd":"X"}`)

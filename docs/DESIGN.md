@@ -79,7 +79,7 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 ドメイン層
   ├─ Console Driver        … stdin送信(エンコード)・stdout収集(リングバッファ)・コマンドキュー＋応答相関・原子的コマンドグループ
   ├─ WorldsService         … worlds一覧 と「全ワールド巡回(ForEach)」の共通機構
-  ├─ Output Parser         … worlds/status/users/listbans を構造化（★Resonite事実を集約。friendRequestsはPhase6で撤去：実書式採取不可）
+  ├─ Output Parser         … worlds/status/users/listbans/friendRequests を構造化（★Resonite事実を集約。friendRequestsはv1互換のbest-effort: docs/resonite-domain-facts.md §6 参照）
   ├─ Restart Orchestrator  … 手動/scheduled/userZero → 単一の「安全に再起動」動作
   ├─ PreRestartAction(plugin) … chatWarning 等。レジストリで拡張
   └─ Process Lifecycle Monitor … ヘッドレスの異常終了を検知→状態反映＋(設定ONで)自動再起動(クラッシュループ保護)
@@ -116,8 +116,8 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 - `ForEach(fn)`: 稼働中の各ワールドを**focusしてから `fn` を実行**する処理を、**原子的コマンドグループ内**で行う共通部品。事前アクション・セッション変更・各ワールドのユーザー一覧取得などが共用する（DRY＋focus競合防止）。
 
 ### 5.3 Output Parser
-- `worlds` / `status` / `users` / `listbans` を構造体へ。**正規表現と出力書式は [`resonite-domain-facts.md`](./resonite-domain-facts.md) を正とする**（出力書式は実機採取で確定）。
-- ~~`friendRequests`~~ は Phase 6 で**撤去**：Resonite が Accepted/Ignored 関係を表示しない仕様のため、テスト環境では pending entry の実書式採取が原理的に不可能。ヒューリスティック実装を放置しない方針。詳細は `internal/headless/parser.go` の NOTE 参照。
+- `worlds` / `status` / `users` / `listbans` / `friendRequests` を構造体へ。**正規表現と出力書式は [`resonite-domain-facts.md`](./resonite-domain-facts.md) を正とする**（出力書式は実機採取で確定）。
+- `friendRequests` は **v1 互換の単純実装**（split + trim + filter('>')）+ 我々の prompt-glue 対応 (safeStripLeadingPrompts)。実機 pending entry の書式は未採取だが、v1 production で動いていた手法を踏襲。boot 直後等の ambient 多発時はノイズ混入の可能性あり（v1 と同じ受容、godoc に明記）。
 - 既知の脆さ（空白入りユーザー名等）は採取したフィクスチャで検証しながら堅牢化。実機検証済：[`scripts/empirical-capture/fixtures/2026-05-28-lan-login/`](../scripts/empirical-capture/fixtures/2026-05-28-lan-login/)。
 
 ### 5.4 Restart Orchestrator

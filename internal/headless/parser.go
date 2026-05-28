@@ -175,18 +175,61 @@ func ParseListBans(lines []string) []BanEntry {
 	return out
 }
 
-// NOTE: ParseFriendRequests は撤去（2026-05-28 LAN実機検証で判明）。
+// ParseFriendRequests は friendrequests コマンドの応答行からユーザー名一覧を構築する。
 //
-// 理由:
-//   - Resonite の friendrequests コマンドは「incoming pending」リクエストのみ表示し、
-//     既に Accepted/Ignored の関係は出力されない（実機確認）
-//   - 我々のテスト環境では Accepted 状態に遷移するため**pending エントリの実書式が
-//     原理的に採取不可**
-//   - ヒューリスティック（isLikelyUsername 等）は実機データなしで導入すべきでない
+// 実装方針 (v1 Node実装 parseFriendRequestsOutput と同じ単純戦略):
+//   - 各 line を trim
+//   - 空行 / プロンプトで終わる行 ('>') を除外
+//   - 残りを「pending friend request の username」として返す
 //
-// 将来の再実装条件:
-//   - 第三者アカウントから headless 宛に friend request 送信 → pending 状態で採取
-//   - 採取済み実書式に基づいて parser + endpoint を再実装
+// 我々の Go 実装は collector が prompt-glue 行を捕えるため、行頭の連続プロンプト
+// 接頭辞を **保守的に** (safeStripLeadingPrompts) 剥がしてから判定する。
+// この strip は「次の '>' までの prefix に `:` `\t` `[` `]` を含む行 (ambient っぽい)
+// は剥がさない」ので、`Updated: A -> B` 等の ambient は誤剥がしされない。
+//
+// === 既知の限界 ===
+// v1 と同じ限界を継承:
+//   - boot 直後など ambient ログが大量に流れる状況では、ambient 行が「friend request
+//     のユーザー名」として混入する可能性がある (v1 でも同じ問題)。
+//   - production の steady state (mrhc 24/7 稼働後) では ambient が希少なので
+//     実用上問題にならない。boot 直後の呼び出しは結果を信頼しすぎないこと。
+//   - 完全に信頼できる検証は、第三者からの pending friend request の実書式を
+//     採取してから (現状: 未採取)。実書式が判明したらより厳密な regex に差し替え可能。
+func ParseFriendRequests(lines []string) []string {
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		t := strings.TrimSpace(safeStripLeadingPrompts(strings.TrimSpace(line)))
+		if t == "" {
+			continue
+		}
+		if strings.HasSuffix(t, ">") {
+			continue // プロンプトのみの行 (v1 と同じフィルタ)
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// safeStripLeadingPrompts は行頭の prompt prefix を「保守的に」剥がす。
+// "Renamed>Renamed>alice" のような prompt accumulation は剥がすが、
+// "Updated: A -> B" のような ambient 行 ('>' 前に `:` `\t` `[` `]` を含む) は剥がさない。
+// → ambient を誤剥がしして「username らしき何か」に化けるのを防ぐ。
+//
+// 判定基準: 次の '>' までの prefix が `:` `\t` `[` `]` を含まなければ "prompt-like"
+// として剥がす。promptlike なら剥がして残りで再判定 (多段プロンプト対応)。
+func safeStripLeadingPrompts(s string) string {
+	for {
+		i := strings.IndexByte(s, '>')
+		if i < 0 {
+			return s
+		}
+		prefix := s[:i]
+		if strings.ContainsAny(prefix, ":\t[]") {
+			return s // prompt-like でない → ここで停止
+		}
+		s = s[i+1:]
+	}
+}
 
 // --- ヘルパ ---
 

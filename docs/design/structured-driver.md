@@ -74,8 +74,7 @@ fn Exec(cmd):
 ```
 
 ### 4.3 cmd 毎の最大 timeout（既定）
-- `worlds`/`status`/`users`/`listbans`/`accesslevel`/`role`/`invite`/`kick`/`ban`/`name`/`maxusers` … **3〜5 秒**
-  - ※ `friendrequests` は仕様問題で撤去済 → 詳細は `internal/headless/parser.go` の NOTE 参照
+- `worlds`/`status`/`users`/`listbans`/`friendrequests`/`accesslevel`/`role`/`invite`/`kick`/`ban`/`name`/`maxusers` … **3〜5 秒**
 - `focus` … **2 秒**
 - `startworldurl` … **60 秒**
 - 上記は設定可能（config 経由で上書き可）
@@ -132,7 +131,7 @@ ExecGroup 内では前コマンドの prompt が次コマンドの応答に必�
 
 ### 既知の限界
 構造化コマンドの応答1行目に `>` が含まれる場合、過剰に剥がす可能性がある。
-現在対応するコマンド（worlds/status/users/listbans/accesslevel/Unknown）の
+現在対応するコマンド（worlds/status/users/listbans/friendrequests/accesslevel/Unknown）の
 1行目はいずれも `>` を含まないため実害なし。世界名等に `>` を含めるエッジケースは
 ドキュメント明記の限界として受容する。
 
@@ -170,7 +169,7 @@ type WorldsService interface {
 | `status`         | `Status{Name, SessionID, CurrentUsers, PresentUsers, MaxUsers, Uptime, AccessLevel, HiddenFromListing, MobileFriendly, Description, Tags, Users}` |
 | `users`          | `[]User{Name, ID, Role, Present, PingMs, FPS, Silenced}` |
 | `listbans`       | `[]Ban{Index, Username, UserID, MachineIDs}` |
-| ~~`friendrequests`~~ | **撤去済** (parser.go の NOTE 参照) |
+| `friendrequests` | `[]string` (ユーザー名一覧、v1 互換実装。boot ambient 多発時はノイズ可) |
 
 - 正規表現は `docs/resonite-domain-facts.md` を出典。
 - 各 parser は **`stripLineLeadingPrompts` を per-line で適用してから regex 照合**（Phase 6 e2e で発見）。

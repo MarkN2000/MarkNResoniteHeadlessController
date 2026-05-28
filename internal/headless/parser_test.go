@@ -204,8 +204,65 @@ func TestParseListBans(t *testing.T) {
 	}
 }
 
-// NOTE: ParseFriendRequests テスト群は撤去（parser.go の同関数撤去に伴う）。
-// 詳細理由は parser.go の同名 NOTE 参照。
+// ParseFriendRequests のテスト（v1 互換実装）
+func TestParseFriendRequests_Basic(t *testing.T) {
+	// プレーンなユーザー名行 (実書式の代表例)
+	got := ParseFriendRequests([]string{"alice", " bob ", "", "carol"})
+	want := []string{"alice", "bob", "carol"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got=%v want=%v", got, want)
+	}
+}
+
+func TestParseFriendRequests_EmptyResponse(t *testing.T) {
+	// 空のレスポンス (pending 無し)
+	got := ParseFriendRequests([]string{})
+	if len(got) != 0 {
+		t.Fatalf("expected empty, got %v", got)
+	}
+}
+
+func TestParseFriendRequests_PromptOnlyLineExcluded(t *testing.T) {
+	// プロンプトのみ ('>' で終わる) 行は除外 (v1 と同じ)
+	got := ParseFriendRequests([]string{"alice", "MyHeadless>", "bob"})
+	want := []string{"alice", "bob"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got=%v want=%v", got, want)
+	}
+}
+
+func TestParseFriendRequests_PromptGluedFirstLine(t *testing.T) {
+	// 我々の collector が捕える prompt-glue を safeStripLeadingPrompts で剥がす
+	got := ParseFriendRequests([]string{"MRHC>alice", "bob", "Renamed>Renamed>carol"})
+	want := []string{"alice", "bob", "carol"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got=%v want=%v", got, want)
+	}
+}
+
+func TestParseFriendRequests_AmbientNotOverStripped(t *testing.T) {
+	// "Updated: A -> B" のような ambient は safeStripLeadingPrompts が剥がさない
+	// → ambient 文字列のまま残るが、明らかにユーザー名でない形なので UI 側で
+	//   見分け可能 (v1 と同じ挙動)
+	got := ParseFriendRequests([]string{
+		"Updated: 0001/01/01 0:00:00 -> 2026/05/28 8:19:20",
+		"alice",
+		"BOOTSTRAP: Running userspace bootstrap",
+	})
+	// ambient は剥がされず明らかな非ユーザー名形で残る (v1 と同じ受容)
+	if len(got) != 3 {
+		t.Fatalf("v1 互換: ambient も含めて 3 件、got=%v", got)
+	}
+	if got[1] != "alice" {
+		t.Fatalf("alice が壊れている: %v", got)
+	}
+	// 重要: ambient の '>' を含む行が "B" に化けていないこと
+	for _, s := range got {
+		if s == "B" {
+			t.Fatalf("ambient の '>' を含む行が誤剥がしされて 'B' に化けた: %v", got)
+		}
+	}
+}
 
 func TestStripLineLeadingPrompts(t *testing.T) {
 	cases := []struct {

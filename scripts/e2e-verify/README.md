@@ -45,7 +45,7 @@
 | `13-session-1-status.json` | World 1 の status |
 | `14-session-1-users.json` | World 1 の users |
 | `15-listbans.json` | `GET /api/v1/listbans` 応答 |
-| (撤去済) | ~~`16-friendrequests.json`~~ → `/api/v1/friendrequests` は撤去（実書式採取不可のため）|
+| `16-friendrequests.json` | `GET /api/v1/friendrequests` 応答（pending entry 無いと `[]`） |
 | `90-stop.json` | shutdown 応答 |
 | `mrhc.out.log` / `mrhc.err.log` | mrhc 自身のログ |
 
@@ -54,7 +54,7 @@
 - `10-sessions.json`: 2 worlds (`Fake/MRHC Test World A`/`B`)
 - `11-session-0-status.json`: `Name: "MRHC Test World A"` + 13 keys（`ResoniteLink: "off"` 含む）
 - `12-session-0-users.json`: 1 user (`MARKNPC_MAIN`/`Admin`)
-- `15-listbans.json`: `[]`（test config では空）
+- `15-listbans.json` / `16-friendrequests.json`: `[]`（test config では空。boot 直後の friendrequests は ambient ノイズが混入する可能性あり、production では steady-state で叩くこと）
 
 ## Phase 6 で発見された重要バグ（修正済）
 

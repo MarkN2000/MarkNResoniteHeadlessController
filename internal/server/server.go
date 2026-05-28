@@ -55,8 +55,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/status", s.requireAuth(s.handleSessionStatus))
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/users", s.requireAuth(s.handleSessionUsers))
 	mux.HandleFunc("GET /api/v1/listbans", s.requireAuth(s.handleListBans))
-	// NOTE: /api/v1/friendrequests は撤去 (2026-05-28 LAN実機検証で「pending entry の
-	// 実書式採取が原理的に不可能」と判明したため)。詳細: parser.go の同名 NOTE 参照。
+	mux.HandleFunc("GET /api/v1/friendrequests", s.requireAuth(s.handleFriendRequests))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
@@ -250,7 +249,17 @@ func (s *Server) handleListBans(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, headless.ParseListBans(lines))
 }
 
-// NOTE: handleFriendRequests は撤去（parser.ParseFriendRequests と同じ理由・docs参照）
+// handleFriendRequests: GET /api/v1/friendrequests → []string（focus 不要・グローバル）
+// 注意: v1 互換の単純実装。boot 直後 ambient が多い時はノイズ混入可。
+// 詳細: internal/headless/parser.go の ParseFriendRequests godoc 参照。
+func (s *Server) handleFriendRequests(w http.ResponseWriter, r *http.Request) {
+	lines, err := s.driver.Exec(r.Context(), "friendrequests")
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, headless.ParseFriendRequests(lines))
+}
 
 // parseSessionIdx は /api/v1/sessions/{idx}/... のパスパラメータを int に変換する。
 func parseSessionIdx(r *http.Request) (int, error) {
