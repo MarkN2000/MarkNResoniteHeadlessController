@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
@@ -146,22 +145,15 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
-	// cmd は URL query / JSON body / form-urlencoded body の何れも受理する。
-	// 互換性のため広く受ける（curl --data-urlencode はデフォルトで form-urlencoded を送るため）。
+	// cmd は URL query または JSON body で受理。
+	// form-urlencoded body は対応外（必要なら呼び出し側で URL query を使う）。
 	cmd := r.URL.Query().Get("cmd")
 	if cmd == "" && r.Method == http.MethodPost {
-		ct := r.Header.Get("Content-Type")
-		if strings.HasPrefix(ct, "application/json") {
-			var body struct {
-				Cmd string `json:"cmd"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			cmd = body.Cmd
-		} else {
-			// application/x-www-form-urlencoded など
-			_ = r.ParseForm()
-			cmd = r.FormValue("cmd")
+		var body struct {
+			Cmd string `json:"cmd"`
 		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		cmd = body.Cmd
 	}
 	if cmd == "" {
 		writeErr(w, http.StatusBadRequest, "bad_request", "cmd がありません")
@@ -275,20 +267,27 @@ func parseSessionIdx(r *http.Request) (int, error) {
 }
 
 // writeExecErr は headless パッケージのセンチネルエラーを HTTP ステータスにマップする。
-// 部分結果（lines）は呼び出し側で扱う設計なので、ここでは err のみで分岐する。
+// 2区分:
+//   - ErrNotReady → 409 (UI は「起動してください」を出す)
+//   - その他 (Timeout/ProcessGone/Canceled/内部エラー) → 500 (UI は「失敗、再試行」)
+// クライアント側で原因の細かい区別は不要と判断（複雑化を避ける）。
+// 必要なら error.code フィールドで内訳を返すので、UI 詳細表示は可能。
 func writeExecErr(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, headless.ErrNotReady):
+	if errors.Is(err, headless.ErrNotReady) {
 		writeErr(w, http.StatusConflict, "not_ready", "ヘッドレスが起動中/停止中で構造化コマンドを受け付けられません")
-	case errors.Is(err, headless.ErrTimeout):
-		writeErr(w, http.StatusGatewayTimeout, "timeout", err.Error())
-	case errors.Is(err, headless.ErrProcessGone):
-		writeErr(w, http.StatusGone, "process_gone", err.Error())
-	case errors.Is(err, headless.ErrCanceled):
-		writeErr(w, 499, "canceled", "リクエストがキャンセルされました") // 499 Client Closed Request (nginx 互換)
-	default:
-		writeErr(w, http.StatusInternalServerError, "internal", err.Error())
+		return
 	}
+	// その他は全て 500 + 詳細コードで区別可能に
+	code := "exec_failed"
+	switch {
+	case errors.Is(err, headless.ErrTimeout):
+		code = "timeout"
+	case errors.Is(err, headless.ErrProcessGone):
+		code = "process_gone"
+	case errors.Is(err, headless.ErrCanceled):
+		code = "canceled"
+	}
+	writeErr(w, http.StatusInternalServerError, code, err.Error())
 }
 
 // --- SSE ---

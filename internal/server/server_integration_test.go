@@ -300,25 +300,35 @@ func TestServer_ExecError_NotReady_After_Stop(t *testing.T) {
 }
 
 func TestServer_ExecError_Timeout(t *testing.T) {
-	// fakehl の hang コマンドで stdin 処理を停止 → 後続 /sessions は timeout (504)
+	// fakehl の hang コマンドで stdin 処理を停止 → 後続 /sessions は timeout
+	// (writeExecErr 2区分化: NotReady以外は 500 + code=timeout)
 	ts, key := newTestServer(t)
 
-	// raw /command で hang を送る（fakehl は main goroutine が time.Sleep 1h でブロック）
 	r, err := http.Post(ts.URL+"/api/v1/command?apiKey="+key+"&cmd=hang", "", nil)
 	if err != nil {
 		t.Fatalf("send hang: %v", err)
 	}
 	r.Body.Close()
-	time.Sleep(150 * time.Millisecond) // hang が始まるまで少し待つ
+	time.Sleep(150 * time.Millisecond)
 
-	// /sessions は Exec("worlds") を呼ぶが、fakehl が応答しない → MaxTimeout 5s で 504
 	r2, err := http.Get(ts.URL + "/api/v1/sessions?apiKey=" + key)
 	if err != nil {
 		t.Fatalf("GET /sessions: %v", err)
 	}
 	defer r2.Body.Close()
-	if r2.StatusCode != http.StatusGatewayTimeout {
-		t.Fatalf("expected 504 (ErrTimeout), got %d", r2.StatusCode)
+	if r2.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", r2.StatusCode)
+	}
+	// error code が "timeout" であること
+	var body struct {
+		OK    bool `json:"ok"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.NewDecoder(r2.Body).Decode(&body)
+	if body.OK || body.Error.Code != "timeout" {
+		t.Fatalf("expected code=timeout, got %+v", body)
 	}
 }
 
@@ -337,9 +347,9 @@ func TestServer_RawCommand_StillWorks(t *testing.T) {
 	}
 }
 
-// 2026-05-28 改: /command の cmd を URL query / JSON body / form-urlencoded body の
-// 3 経路で受理することを確認（curl --data-urlencode 互換）
-func TestServer_RawCommand_AcceptsThreeBodyForms(t *testing.T) {
+// /command の cmd を URL query / JSON body の 2 経路で受理することを確認。
+// form-urlencoded body は対応外（呼び出し側は URL query を使う）。
+func TestServer_RawCommand_AcceptsTwoBodyForms(t *testing.T) {
 	ts, key := newTestServer(t)
 	cases := []struct {
 		name        string
@@ -349,7 +359,6 @@ func TestServer_RawCommand_AcceptsThreeBodyForms(t *testing.T) {
 	}{
 		{"URL_query", ts.URL + "/api/v1/command?apiKey=" + key + "&cmd=worlds", "", ""},
 		{"JSON_body", ts.URL + "/api/v1/command?apiKey=" + key, "application/json", `{"cmd":"worlds"}`},
-		{"form_urlencoded_body", ts.URL + "/api/v1/command?apiKey=" + key, "application/x-www-form-urlencoded", "cmd=worlds"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -368,6 +377,23 @@ func TestServer_RawCommand_AcceptsThreeBodyForms(t *testing.T) {
 				t.Fatalf("expected 200, got %d", resp.StatusCode)
 			}
 		})
+	}
+}
+
+// form-urlencoded body は対応外であることを明示的に確認 (400 が返る)
+func TestServer_RawCommand_FormBodyRejected(t *testing.T) {
+	ts, key := newTestServer(t)
+	resp, err := http.Post(
+		ts.URL+"/api/v1/command?apiKey="+key,
+		"application/x-www-form-urlencoded",
+		strings.NewReader("cmd=worlds"),
+	)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 (form-urlencoded is not supported), got %d", resp.StatusCode)
 	}
 }
 

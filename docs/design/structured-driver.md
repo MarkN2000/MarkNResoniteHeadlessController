@@ -250,20 +250,11 @@ type Scope interface { // ForEach の fn 内で使う
 - **統合**: `poc/fakehl` を拡張して worlds/status/users 風の応答を返せるようにし、Executor→WorldsService→ハンドラまで通す。
 - **e2e（任意）**: 実 Resonite ヘッドレスを使った任意検証（ユーザーの 24/7 機で）。
 
-## 12. 将来性: HeadlessBackend 抽象（軽量）
+## 12. 将来性メモ
 
-今は stock+stdout 1経路だが、将来 Crystite/mod系API へ拡張可能なよう、**通信境界に薄いインターフェース**を置く：
-
-```go
-// 命名と境界だけ意識（今は1実装のみ）
-type HeadlessBackend interface {
-    Status() Status
-    Subscribe(...) (chan ..., ...)
-    Execute(cmd) ([]string, error)
-    // ...
-}
-```
-今は実装1本だが、`adapter/headless/stdout/` 等のディレクトリ命名で**将来 `adapter/headless/grpc/` を足せる**形にしておく。**今回は実装しない**（命名と境界のみ）。
+(旧 §12 「HeadlessBackend 抽象」は撤去 — Crystite/mod 不採用が確定し、Resonite 自身が
+構造化 API を提供する予定も無いため、抽象化の意味的価値が無い。Driver = stock+stdout の
+唯一の実装で十分。将来別経路が必要になった時点で改めて検討する。)
 
 ## 13. 受け入れ基準
 
@@ -277,6 +268,5 @@ type HeadlessBackend interface {
 ## 14. 未決・後追い
 
 - 実フィクスチャ（status/users/listbans）は **2026-05-28 LAN+login 実機採取済** (`scripts/empirical-capture/fixtures/2026-05-28-lan-login/` 参照)。
-- friendrequests は実書式採取不可で撤去済。将来第三者からの pending request を採取できた時点で再実装。
-- HeadlessBackend 抽象の**他実装は未定**（Crystite/mod は採用見送り）。
+- friendrequests は v1 互換実装で復活。pending entry の実書式は今後の追加採取で確証化予定。
 - 設定での timeout/settle 上書きは v1.x のどこかで設定UIから可能にする（今は config に書ける程度）。
