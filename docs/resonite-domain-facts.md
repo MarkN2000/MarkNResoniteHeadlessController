@@ -40,13 +40,16 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 | コマンド | 用途 | 出力書式（例） |
 |---|---|---|
-| `worlds` | セッション一覧 | `[0] セッション名    Users: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 16` |
-| `focus <index>` | セッションにフォーカス（以降の操作対象を切替） | — |
-| `status` | フォーカス中セッションの詳細 | `Key: Value` の複数行（下記） |
-| `users` | フォーカス中セッションのユーザー一覧 | `<name>  ID: <id>  Role: <role>  Present: True  Ping: <n> ms  FPS: <n>  Silenced: False` |
+| `worlds` | セッション一覧 | `[0] セッション名(空白パディング)\tUsers: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 16` ✅ 実機確定 |
+| `focus <index>` | セッションにフォーカス（以降の操作対象を切替） | silent（プロンプトのみ変化） |
+| `status` | フォーカス中セッションの詳細 | `Key: Value` の複数行（下記、13 keys） ✅ 実機確定 |
+| `users` | フォーカス中セッションのユーザー一覧 | `<name>\tID: <id\|空>\tRole: <role>\tPresent: True\tPing: <int> ms\tFPS: <float>\tSilenced: True/False` ✅ 実機確定（**TAB区切り**） |
 | `sessionURL` | セッションURL取得 | `res-steam://.../S-xxxx` 等 |
-| `listbans` | BAN一覧 | `[0]     Username: xxxx UserID: U-xxxx   MachineIds: xxxx` |
-| `friendrequests` | 受信フレンド申請一覧 | ユーザー名のリスト（**書式要実機確認**） |
+| `listbans` | BAN一覧 | `[N]\tUsername: <X>\tUserID: U-<id>\tMachineIds: <id1> <id2> ...` ✅ 実機確定（**TAB区切り**、`[N]`と`Username:`の間も TAB） |
+| `friendrequests` | 受信フレンド申請一覧 | ⚠️ **incoming pending のみ表示**（Accepted/Ignored 関係は出ない、2026-05-28 LAN実機確定）。pending エントリの実書式は **採取できず未確定** |
+| `help` | 全コマンドの一覧 + Usage を表示 | 165行（usage 付きリファレンス）⭐ 実機発見 |
+| `version` | ヘッドレスバージョン文字列 | — |
+| `debugWorldState` | 全ワールドの診断情報 | — |
 
 **`status` のKey一覧（2026-05-28 Windows Beta 2026.5.27.1300 実機採取で再検証）**: `Name`, `SessionID`, `Current Users`, `Present Users`, `Max Users`, `Uptime`, `Access Level`, `Hidden from listing`(bool), `Mobile Friendly`(bool), `Description`, `Tags`(カンマ区切り), `Users`(カンマ区切り), **`ResoniteLink`** ⭐**NEW（旧コードに無い・要追加）**。
 
@@ -54,20 +57,25 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 | コマンド | 用途 | 成功時出力 |
 |---|---|---|
-| `invite "<username>"` | フレンドを招待 | `Invite sent!` |
-| `accesslevel <Private\|LAN\|Friends\|Anyone>` | アクセスレベル変更 | `World <name> now has access level <Level>` |
-| `role "<username>" "<role>"` | ロール変更（Admin/Builder/Moderator/Guest/Spectator） | `<username> now has role <Role>!` |
-| `kick "<username>"` | キック | — |
-| `ban "<username>"` | BAN | — |
-| `silence "<username>"` / `unsilence "<username>"` | ミュート/解除 | — |
-| `respawn "<username>"` | リスポーン | — |
-| `unban <userId>` | BAN解除（**userIdは引用符なし**） | — |
-| `acceptfriendrequest "<username>"` | フレンド申請承認 | — |
-| `message "<username>" "<text>"` | **個別DM送信**（※セッション全体ブロードキャストではない） | — |
-| `name "<newName>"` | フォーカス中セッション名変更 | **silent（出力なし）・新プロンプトが新名に変化**で識別 |
-| `maxusers <n>` | 最大人数変更 | **silent（出力なし）** |
+| `invite "<username>"` | フレンドを招待 | 旧コード推測 `Invite sent!` — **実機未確定**（in-session 相手だと ambient のみ。実 friend に未join 状態への送信は未検証） |
+| `accesslevel <Private\|LAN\|Friends\|Anyone>` | アクセスレベル変更 | `World <name> now has access level <Level>` ✅ 実機確定 |
+| `role "<username>" "<role>"` | ロール変更（Admin/Builder/Moderator/Guest/Spectator） | `<username> now has role <Role>!` ✅ 実機確定（全 5 role） |
+| `kick "<username>"` | キック | **複数行**：`KickRequest: KickAndRevokeInvite for User ID... - UserName: X, UserId: U-X, MachineId: ..., Role: Y. Changing User: , ScheduledForValidation: True` + **UniLog stack trace** ⚠️ノイジー |
+| `ban "<username>"` | BAN（実機未検証） | — |
+| `silence "<username>"` / `unsilence "<username>"` | ミュート/解除 | **複数行**：`Silence: True/False for User ID... - UserName: X, UserId: U-X, MachineId: ..., Role: Y. Changing User: ...` + **UniLog stack trace** ⚠️ノイジー |
+| `respawn "<username>"` | リスポーン | **複数行**：`Destroying User: User ID... - UserName: X, ...` + UniLog stack trace ⚠️ノイジー |
+| `unban <userId>` | BAN解除（**userIdは引用符なし**） | 実機未検証 |
+| `acceptfriendrequest "<username>"` | フレンド申請承認 | 失敗時: `There's no friend request from this user` ✅実機確定 / 成功書式は未確定 |
+| `sendFriendRequest "<username>"` | フレンド申請送信 | `Contact request sent to <userId>.` ✅実機確定 |
+| `removeFriend "<username>"` | フレンド削除 | `<userId> has been removed from your contacts.` ✅実機確定 |
+| `message "<username>" "<text>"` | **個別DM送信**（※セッション全体ブロードキャストではない） | `Message sent!` ✅実機確定 |
+| `name "<newName>"` | フォーカス中セッション名変更 | **silent（出力なし）・新プロンプトが新名に変化**で識別 ✅実機 |
+| `maxusers <n>` | 最大人数変更 | **silent（出力なし）** ✅実機 |
+| `hideFromListing <true\|false>` | listing 表示切替 | `World <name> will now show in listing` / `... will now be hidden from listing` ✅実機確定 |
+| `description "<text>"` | ワールド説明変更 | 実機未検証 |
 | `startworldurl "<url>"` | URLから新規セッション開始（プロンプトまで待機） | — |
-| `save` / `close` / `restart` | フォーカス中セッションの保存/閉じ/再起動 | — |
+| `save` / `close` / `restart` | フォーカス中セッションの保存/閉じ/再起動 | 実機未検証 |
+| `crash` | デバッグ用：プロセスを即クラッシュ | プロセス終了（ProcessGone テストに利用可能）⭐ |
 | `shutdown` | ヘッドレス全体の正常終了 | `Exiting. Save Homes: <bool>` 以降の終了ログ多数 |
 
 > ⭐ **silent成功（出力なし）コマンドの存在**（2026-05-28 採取）: `name`/`maxusers`/`focus`/空の `listbans`/空の `friendrequests` などは**応答行をまったく返さず、次のプロンプトのみ出る**。構造化Driver の完了検出は「プロンプト末尾＋安定窓」なので silent でも問題なく検出できる（応答=空行リスト）。パーサ側は空応答=成功として扱う。
@@ -78,9 +86,9 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 ### コード内不整合 → 公式Wikiで決着済
 
-| 機能 | 正（公式Wiki） | 誤 |
+| 機能 | 正（実機 help コマンド） | 誤 |
 |---|---|---|
-| アイテムスポーン | **`spawn <Resonite url> <active state>`**（例 `spawn <url> true`。restartManager側が正） | frontendの`spawnitem`は**誤り** |
+| アイテムスポーン | **`spawn <url> <active> <persistent>`**（**3 引数**、2026-05-28 help 確定） | 旧コード `spawn <url> <active>` の **2 引数は誤り** |
 | ダイナミックインパルス | **`dynamicImpulse <tag>` / `dynamicImpulseString <tag> <value>` / `dynamicImpulseInt` / `dynamicImpulseFloat`**（値付きは`dynamicImpulseString`。restartManager側が正） | frontendの`dynamicimpulse <tag> <text>`（値を送るなら`dynamicImpulseString`を使う） |
 | チャット全体送信 | **存在しない**。`message <friend name> <message>` の**個別DMのみ（フレンド宛）**。セッション内告知は実質「全員へDM」か「`dynamicImpulse`系でワールド内の通知機構を起動」 | — |
 
@@ -171,6 +179,33 @@ Go PoCで本物のヘッドレスに対して検証した事実：
 - ⚠️ **起動直後の最初の1コマンドが `Unknown command` になる事象を観測**（同コマンドの2回目は正常）。エンジンが完全に応答可能になる前の入力が無視/誤処理される可能性 → v1では **readiness合図（"Engine Ready!"/"World running..."）を待ってからコマンド受付**、または初回にダミー改行を送る等を検討。
 - **`shutdown`**: `Exiting. Save Homes: False` → 設定保存 → 公開セッションは `BroadcastSessionEnded ... to Public` で閉じ → プロセスは**正常終了(exit 0)**。停止時に `UniLog.Log` 由来のスタックトレースが出るが**エラーではない**（RequestShutdown記録ログ）。
 - **無config起動はワールドが公開(Private→Anyone・public listing)になる** → v1は必ずconfigで適切なaccessLevelを設定。
+
+### LAN実機・別PC join・logged-in 採取（2026-05-28 後追い, Beta 2026.5.27.1300）
+
+fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
+
+**実証された事実**:
+1. **ParseListBans 実機確定** — 実 BAN 2 件で書式確認（**TAB 区切り**で `[N]\tUsername:...\tUserID: U-...\tMachineIds: ...`）
+2. **ParseUsers 実機確定** — Guest+Admin 両 role、実 UserID `U-1NzqeqewOpM`、実 FPS 値
+3. **stripLineLeadingPrompts 実機確定** — **3 連プロンプト累積**（`MRHC LAN Capture Session>MRHC LAN Capture Session>MRHC LAN Capture Session>[0]...`）で per-line strip が機能
+4. **status.users カンマ区切り** — `MARKNPC_MAIN, MarkN_headless` 形式確定
+5. **write op 実書式採取**: role/silence/respawn/kick/message/removeFriend/sendFriendRequest/acceptFriendRequest（前節の表参照）
+6. **help コマンド完全取得** — 165 行のリファレンス（fixture: `02-logged-in/help-output.txt`）
+
+**新発見コマンド**:
+- `help` ⭐ — authoritative リファレンス（usage 付き）
+- `crash` ⭐ — デバッグ即クラッシュ（ProcessGone テスト用）
+
+**friendrequests の限界 (重要)**:
+- Resonite の `friendrequests` は **incoming pending** のみ表示
+- Accepted/Ignored 関係は表示されない
+- → テスト環境では Accepted 状態への遷移後 pending エントリが残らず**実書式の採取が原理的に不可能**
+- 我々の実装では `ParseFriendRequests` および `/api/v1/friendrequests` を**撤去**（実書式に基づかない heuristic 実装を放置しない方針）
+
+**`/command` の API 上の仕様注意**:
+- POST body は **JSON のみ** (`{"cmd":"X"}`)
+- form-urlencoded body (`cmd=X`) は受け付けない → 400
+- 推奨は URL query (`?cmd=X`) または JSON body
 
 ### Windows実機・複数ワールド・コマンド網羅採取（2026-05-28, Beta 2026.5.27.1300, .NET 10.0.8）
 

@@ -139,7 +139,7 @@ Save-Get "/api/v1/sessions/0/users" "12-session-0-users.json"
 Save-Get "/api/v1/sessions/1/status" "13-session-1-status.json"
 Save-Get "/api/v1/sessions/1/users" "14-session-1-users.json"
 Save-Get "/api/v1/listbans" "15-listbans.json"
-Save-Get "/api/v1/friendrequests" "16-friendrequests.json"
+# NOTE: /api/v1/friendrequests は撤去 (実書式採取不可)
 
 # cleanup
 Write-Output "=== shutdown headless ==="

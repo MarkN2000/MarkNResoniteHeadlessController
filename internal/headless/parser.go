@@ -8,10 +8,22 @@ import (
 	"sync"
 )
 
-// 各構造化コマンドの応答パーサ。入力 lines は Executor 側で
-//   1. 各行 \r\n trim 済（既存 decodeLine の仕様）
-//   2. 先頭行のプロンプト接頭辞除去済（案X：「行頭から最初の '>' まで」を除去）
-// である前提。ambient/無関係行は regex に当たらず自然に無視される。
+// 各構造化コマンドの応答パーサ。入力 lines は Executor 側で各行 \r\n trim 済
+// （既存 decodeLine の仕様）。プロンプト接頭辞は parser 側で per-line に
+// stripLineLeadingPrompts で剥がす（collector が ambient + 応答行を捕える
+// 性質上、応答行は任意位置に現れ得るため）。
+// ambient/無関係行は regex に当たらず自然に無視される。
+//
+// === 既知の理論的限界（実害低）===
+//   - splitCommaList で `status.Users`/`Tags` を分割: ユーザー名/タグに ',' を
+//     含むケースは誤分割。Resonite のユーザー名仕様は寛容なため理論上ありうるが、
+//     2026-05-28 実機採取の範囲では発生せず。検証可能なケースが出たら対応。
+//   - プロンプト末尾検出 (`waitComplete`): ワールド名末尾が '>' のとき誤検出。
+//     極めて稀。Resonite UI で `>` で終わる名前を作るのは通常想定外。
+//   - `worldsLineRe` の `(.+?)` 名前: name に "Users:" 含むと誤分割。
+//     名前に「 Users: 」というスペース＋コロン列を入れるのは想定外で実用上問題なし。
+//   - `stripLineLeadingPrompts` の `^([^>]*>)+`: ambient 行に '>' があると過剰
+//     剥がしになる。しかし剥がした結果は parser regex に当たらず無視されるため無害。
 
 var (
 	// worlds: `[<idx>] <name padded>\tUsers: N\tPresent: N\tAccessLevel: L\tMaxUsers: N`
@@ -163,62 +175,18 @@ func ParseListBans(lines []string) []BanEntry {
 	return out
 }
 
-// ParseFriendRequests は friendrequests コマンドの応答行からユーザー名一覧を構築する。
-// 出力はユーザー名1人/行（プロンプト/空行は除外）。空リストは []string{} を返す。
+// NOTE: ParseFriendRequests は撤去（2026-05-28 LAN実機検証で判明）。
 //
-// 注意: collector は Exec 中の ambient ログも全て捕えるため、生の trim だけでは
-// ambient 行を「友達申請」として誤取込みする。次の対策で防ぐ：
-//   - "safe-strip": 行頭の prompt prefix のみ剥がす（prompt-like = prefix に `:`等を含まない）
-//     → "Updated: A -> B" のような ambient は剥がさず保持
-//   - isLikelyUsername でユーザー名らしくない行を除外（`:` `\t` `>` `[` `]` 含む / 長すぎる / 空）
-func ParseFriendRequests(lines []string) []string {
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
-		t := safeStripLeadingPrompts(strings.TrimSpace(line))
-		t = strings.TrimSpace(t)
-		if !isLikelyUsername(t) {
-			continue
-		}
-		out = append(out, t)
-	}
-	return out
-}
-
-// safeStripLeadingPrompts は行頭の prompt prefix を「保守的に」剥がす。
-// "Renamed>Renamed>dave" のような prompt accumulation は剥がすが、
-// "Updated: A -> B" のような ambient 行（'>' 前に prompt-like でない文字を含む）は剥がさない。
+// 理由:
+//   - Resonite の friendrequests コマンドは「incoming pending」リクエストのみ表示し、
+//     既に Accepted/Ignored の関係は出力されない（実機確認）
+//   - 我々のテスト環境では Accepted 状態に遷移するため**pending エントリの実書式が
+//     原理的に採取不可**
+//   - ヒューリスティック（isLikelyUsername 等）は実機データなしで導入すべきでない
 //
-// 判定基準: 次の '>' までの prefix が `:` `\t` `[` `]` を含まなければ "prompt-like"。
-// promptlike なら剥がして残りで再判定（多段プロンプトに対応）。
-func safeStripLeadingPrompts(s string) string {
-	for {
-		i := strings.IndexByte(s, '>')
-		if i < 0 {
-			return s
-		}
-		prefix := s[:i]
-		if strings.ContainsAny(prefix, ":\t[]") {
-			return s // prompt-like でない → ここで停止
-		}
-		s = s[i+1:]
-	}
-}
-
-// isLikelyUsername は Resonite ユーザー名らしさを「ambient 行でないか」の観点で判定する。
-// Resonite ambient ログ行は典型的に ':' (key:value), '\t' (tabular), '[' (indexed),
-// '>' (prompt 残骸) を含む。ユーザー名はこれらを含まない。長さも 64 字までを想定。
-// 控えめな heuristic（誤陰性より誤陽性回避を優先）。
-func isLikelyUsername(s string) bool {
-	if s == "" || len(s) > 64 {
-		return false
-	}
-	for _, r := range s {
-		if r == ':' || r == '\t' || r == '>' || r == '[' || r == ']' {
-			return false
-		}
-	}
-	return true
-}
+// 将来の再実装条件:
+//   - 第三者アカウントから headless 宛に friend request 送信 → pending 状態で採取
+//   - 採取済み実書式に基づいて parser + endpoint を再実装
 
 // --- ヘルパ ---
 

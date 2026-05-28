@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
+  "comment": "MRHC LAN実機データ採取用：1ワールド・LAN公開（別PCからのjoinで実users/realdata採取）",
+  "universeId": null,
+  "tickRate": 60.0,
+  "maxConcurrentAssetTransfers": 64,
+  "usernameOverride": null,
+  "loginCredential": null,
+  "loginPassword": null,
+  "startWorlds": [
+    {
+      "isEnabled": true,
+      "sessionName": "MRHC LAN Capture Session",
+      "description": "LAN data capture for MRHC structured driver",
+      "maxUsers": 8,
+      "accessLevel": "LAN",
+      "hideFromPublicListing": true,
+      "mobileFriendly": false,
+      "loadWorldPresetName": "Grid",
+      "keepOriginalRoles": false,
+      "autoRecover": false,
+      "saveOnExit": false
+    }
+  ]
+}

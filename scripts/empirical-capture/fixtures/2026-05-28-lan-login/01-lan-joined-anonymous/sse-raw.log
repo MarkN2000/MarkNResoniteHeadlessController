@@ -1,0 +1,861 @@
+event: status
+data: {"state":"running","pid":19152,"config":"C:\\app\\MRHC\\MarkNResoniteHeadlessController\\scripts\\empirical-capture\\test-lan-1world.json","startedAt":"2026-05-28T18:01:37.672533+09:00","ready":true}
+
+event: log
+data: {"seq":1,"time":"2026-05-28T18:01:37.672533+09:00","kind":"sys","text":"起動: pid=19152 config=\"C:\\\\app\\\\MRHC\\\\MarkNResoniteHeadlessController\\\\scripts\\\\empirical-capture\\\\test-lan-1world.json\""}
+
+event: log
+data: {"seq":2,"time":"2026-05-28T18:01:38.0551766+09:00","kind":"out","text":"AppPath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless"}
+
+event: log
+data: {"seq":3,"time":"2026-05-28T18:01:38.0551766+09:00","kind":"out","text":"DataPath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless\\Data"}
+
+event: log
+data: {"seq":4,"time":"2026-05-28T18:01:38.0551766+09:00","kind":"out","text":"CachePath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless\\Cache"}
+
+event: log
+data: {"seq":5,"time":"2026-05-28T18:01:38.0551766+09:00","kind":"out","text":"LocalePath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless\\Locale"}
+
+event: log
+data: {"seq":6,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"Initializing App: Beta 2026.5.27.1300"}
+
+event: log
+data: {"seq":7,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"Runtime version: 10.0.8"}
+
+event: log
+data: {"seq":8,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"Platform: Windows"}
+
+event: log
+data: {"seq":9,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"IsAOT: False"}
+
+event: log
+data: {"seq":10,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"OS: Microsoft Windows 11 Pro"}
+
+event: log
+data: {"seq":11,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"CPU: AMD Ryzen 7 7800X3D 8-Core Processor           "}
+
+event: log
+data: {"seq":12,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"GPU: NVIDIA GeForce RTX 3070"}
+
+event: log
+data: {"seq":13,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"PhysicalCores: 8"}
+
+event: log
+data: {"seq":14,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"MemoryBytes: 63.41 GB"}
+
+event: log
+data: {"seq":15,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"VRAMBytes: 8.00 GB"}
+
+event: log
+data: {"seq":16,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"XR Device Name: "}
+
+event: log
+data: {"seq":17,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"XR Device Model: "}
+
+event: log
+data: {"seq":18,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"Max GC Generation: 2, IsLittleEndian: True"}
+
+event: log
+data: {"seq":19,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"System.Numerics.Vectors HW accelerated: True, Vector\u003cfloat\u003e.Count: 8"}
+
+event: log
+data: {"seq":20,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"Brotli native encoding/decoding supported: True"}
+
+event: log
+data: {"seq":21,"time":"2026-05-28T18:01:38.0632268+09:00","kind":"out","text":"Unique Session ID: 6902a6db-5e55-4ec1-9284-86a3ec8487d3"}
+
+event: log
+data: {"seq":22,"time":"2026-05-28T18:01:38.0657398+09:00","kind":"out","text":"Initializing RenderSystem..."}
+
+event: log
+data: {"seq":23,"time":"2026-05-28T18:01:38.0717723+09:00","kind":"out","text":"Processing startup commands..."}
+
+event: log
+data: {"seq":24,"time":"2026-05-28T18:01:38.074285+09:00","kind":"out","text":"Scanning locales..."}
+
+event: log
+data: {"seq":25,"time":"2026-05-28T18:01:38.0755208+09:00","kind":"out","text":"Available locales: cs, de, en, en-gb, eo, es, et, fi, fr, hu, is, ja, ko, mn, nl, no, pl, pt-br, ru, sv, th, tr, uk, zh-cn, zh-tw"}
+
+event: log
+data: {"seq":26,"time":"2026-05-28T18:01:38.078045+09:00","kind":"out","text":"Loading Config.json..."}
+
+event: log
+data: {"seq":27,"time":"2026-05-28T18:01:38.0795529+09:00","kind":"out","text":"Computing compatibility hash..."}
+
+event: log
+data: {"seq":28,"time":"2026-05-28T18:01:38.0805583+09:00","kind":"out","text":"Engine WebProxy initialization failed."}
+
+event: log
+data: {"seq":29,"time":"2026-05-28T18:01:38.0805583+09:00","kind":"out","text":"Initializing FrooxEngine..."}
+
+event: log
+data: {"seq":30,"time":"2026-05-28T18:01:38.1918495+09:00","kind":"out","text":"FreeImage Version: 3.18.1"}
+
+event: log
+data: {"seq":31,"time":"2026-05-28T18:01:38.1918495+09:00","kind":"out","text":"BepuPhysics Version: 2.4.0.2-ydm-0.1.7+42f333b01e49414a137ceeb41b1bb19404d7b28d"}
+
+event: log
+data: {"seq":32,"time":"2026-05-28T18:01:38.1963733+09:00","kind":"out","text":"FreeType Version: 2.10.4"}
+
+event: log
+data: {"seq":33,"time":"2026-05-28T18:01:38.1968761+09:00","kind":"out","text":"Opus Version: libopus unknown"}
+
+event: log
+data: {"seq":34,"time":"2026-05-28T18:01:38.2147573+09:00","kind":"out","text":"Supported 3D model formats: meshx, 3d, 3ds, 3mf, ac, ac3d, acc, amf, ase, ask, assbin, b3d, blend, bsp, bvh, cob, csm, dae, dxf, enff, fbx, glb, gltf, hmp, ifc, ifczip, iqm, irr, irrmesh, lwo, lws, lxo, md2, md3, md5anim, md5camera, md5mesh, mdc, mdl, mesh, mesh.xml, mot, ms3d, ndo, nff, obj, off, ogex, pk3, ply, pmx, prj, q3o, q3s, raw, scn, sib, smd, step, stl, stp, ter, uc, vta, x, x3d, x3db, xgl, xml, zae, zgl"}
+
+event: log
+data: {"seq":35,"time":"2026-05-28T18:01:38.2152606+09:00","kind":"out","text":"Supported point cloud formats: pts, las, laz"}
+
+event: log
+data: {"seq":36,"time":"2026-05-28T18:01:38.2152606+09:00","kind":"out","text":"Supported gaussian splat formats: frsplt, ply, spz"}
+
+event: log
+data: {"seq":37,"time":"2026-05-28T18:01:38.2197934+09:00","kind":"out","text":"Supported image formats: bmp, ico, jpg, jif, jpeg, jpe, jng, koa, iff, lbm, mng, pbm, pcd, pcx, pgm, png, ppm, ras, tga, targa, tif, tiff, wap, wbmp, wbm, psd, psb, cut, xbm, xpm, dds, gif, hdr, g3, sgi, rgb, rgba, bw, exr, j2k, j2c, jp2, pfm, pct, pict, pic, 3fr, arw, bay, bmq, cap, cine, cr2, crw, cs1, dc2, dcr, drf, dsc, dng, erf, fff, ia, iiq, k25, kc2, kdc, mdc, mef, mos, mrw, nef, nrw, orf, pef, ptx, pxn, qtk, raf, raw, rdc, rw2, rwl, rwz, sr2, srf, srw, sti, x3f, webp, jxr, wdp, hdp"}
+
+event: log
+data: {"seq":38,"time":"2026-05-28T18:01:38.2197934+09:00","kind":"out","text":"Supported audio formats: wav, wave, flac, fla, ogg, aiff, aif, aifc"}
+
+event: log
+data: {"seq":39,"time":"2026-05-28T18:01:38.2197934+09:00","kind":"out","text":"Supported video formats: mp4, mpeg, avi, mov, mpg, mkv, flv, webm, mts, 3gp, bik, m2v, m2s, wmv, m3u8, m3u, pls, ogv, m4a, mp3, mpeg3, aac, ac3, aif, aiff, ape, au, it, mka, mod, mp1, mp2, opus, s3m, sid, w64, wma, xm, nsf, nsfe, gbs, vgm, vgz, spc, gym"}
+
+event: log
+data: {"seq":40,"time":"2026-05-28T18:01:38.2197934+09:00","kind":"out","text":"Supported font formats: ttf, otf, ttc, otc, woff"}
+
+event: log
+data: {"seq":41,"time":"2026-05-28T18:01:38.2197934+09:00","kind":"out","text":"Supported document formats: pdf"}
+
+event: log
+data: {"seq":42,"time":"2026-05-28T18:01:38.220799+09:00","kind":"out","text":"Supported subtitle formats: srt, sub, sub, ssa, ttml, vtt"}
+
+event: log
+data: {"seq":43,"time":"2026-05-28T18:01:38.2282649+09:00","kind":"out","text":"Scanning assemblies"}
+
+event: log
+data: {"seq":44,"time":"2026-05-28T18:01:38.2691606+09:00","kind":"out","text":"Data Model Assembly: Awwdio, Type Count: 1 (total: 78, Compatibility Hash: Hzv2eaXC8iH4+rN2ycyonw==, Type: Core)"}
+
+event: log
+data: {"seq":45,"time":"2026-05-28T18:01:38.2691606+09:00","kind":"out","text":"Data Model Assembly: Renderite.Shared, Type Count: 33 (total: 281, Compatibility Hash: 4H6WoqxoY6a5K+Rj/hv4bQ==, Type: Core)"}
+
+event: log
+data: {"seq":46,"time":"2026-05-28T18:01:38.2702368+09:00","kind":"out","text":"Data Model Assembly: SkyFrost.Base.Models, Type Count: 4 (total: 207, Compatibility Hash: Xc3r23cJGUbY/hTAfV4LAA==, Type: Core)"}
+
+event: log
+data: {"seq":47,"time":"2026-05-28T18:01:38.2707402+09:00","kind":"out","text":"Data Model Assembly: Elements.Assets, Type Count: 87 (total: 521, Compatibility Hash: UYSwaNgS/7tCju7u4WSWfQ==, Type: Core)"}
+
+event: log
+data: {"seq":48,"time":"2026-05-28T18:01:38.2707402+09:00","kind":"out","text":"Data Model Assembly: Elements.Core, Type Count: 67 (total: 606, Compatibility Hash: tLHEOjVdlqZ7zgjExJnsWQ==, Type: Core)"}
+
+event: log
+data: {"seq":49,"time":"2026-05-28T18:01:38.2858449+09:00","kind":"out","text":"Data Model Assembly: FrooxEngine.Store, Type Count: 1 (total: 101, Compatibility Hash: K22/sKfODKjKTdTi7M/GnQ==, Type: Core)"}
+
+event: log
+data: {"seq":50,"time":"2026-05-28T18:01:38.2934401+09:00","kind":"out","text":"Data Model Assembly: ProtoFlux.Nodes.FrooxEngine, Type Count: 160 (total: 809, Compatibility Hash: W8IGghZQNdMCntYzEFF9yA==, Type: Core)"}
+
+event: log
+data: {"seq":51,"time":"2026-05-28T18:01:38.30098+09:00","kind":"out","text":"Data Model Assembly: SkyFrost.Base, Type Count: 4 (total: 420, Compatibility Hash: u6RQJ4KYILRae4JlYc9ppQ==, Type: Core)"}
+
+event: log
+data: {"seq":52,"time":"2026-05-28T18:01:38.3164954+09:00","kind":"out","text":"Data Model Assembly: PhotonDust, Type Count: 25 (total: 178, Compatibility Hash: WiDRSsmN9USg/HovVGnQ2Q==, Type: Core)"}
+
+event: log
+data: {"seq":53,"time":"2026-05-28T18:01:38.3960414+09:00","kind":"out","text":"Data Model Assembly: ProtoFlux.Nodes.Core, Type Count: 10 (total: 2603, Compatibility Hash: 0yjHmp2UnfzxoYPzyTgf1w==, Type: Core)"}
+
+event: log
+data: {"seq":54,"time":"2026-05-28T18:01:38.8741873+09:00","kind":"out","text":"Data Model Assembly: ProtoFluxBindings, Type Count: 6414 (total: 6515, Compatibility Hash: xjdW+ZAUx+lM1eXNj9HdcA==, Type: Core)"}
+
+event: log
+data: {"seq":55,"time":"2026-05-28T18:01:38.9249271+09:00","kind":"out","text":"Data Model Assembly: FrooxEngine, Type Count: 2689 (total: 11387, Compatibility Hash: DMr4z4/aIdgJHP18wqq3aw==, Type: Core)"}
+
+event: log
+data: {"seq":56,"time":"2026-05-28T18:01:38.9682631+09:00","kind":"out","text":"Dependency Assembly: BepuPhysics, TypeCount: 7, (total: 7, Compatibility Hash: "}
+
+event: log
+data: {"seq":57,"time":"2026-05-28T18:01:38.9682631+09:00","kind":"out","text":"Dependency Assembly: Elements.Quantity, TypeCount: 1, (total: 1, Compatibility Hash: "}
+
+event: log
+data: {"seq":58,"time":"2026-05-28T18:01:38.9682631+09:00","kind":"out","text":"Dependency Assembly: NYoutubeDL, TypeCount: 1, (total: 1, Compatibility Hash: "}
+
+event: log
+data: {"seq":59,"time":"2026-05-28T18:01:38.9682631+09:00","kind":"out","text":"Dependency Assembly: POpusCodec, TypeCount: 2, (total: 2, Compatibility Hash: "}
+
+event: log
+data: {"seq":60,"time":"2026-05-28T18:01:38.9682631+09:00","kind":"out","text":"Dependency Assembly: ProtoFlux.Core, TypeCount: 24, (total: 24, Compatibility Hash: "}
+
+event: log
+data: {"seq":61,"time":"2026-05-28T18:01:38.9682631+09:00","kind":"out","text":"Dependency Assembly: QRCoder, TypeCount: 2, (total: 1, Compatibility Hash: "}
+
+event: log
+data: {"seq":62,"time":"2026-05-28T18:01:38.9692716+09:00","kind":"out","text":"Dependency Assembly: SharpPipe, TypeCount: 2, (total: 2, Compatibility Hash: "}
+
+event: log
+data: {"seq":63,"time":"2026-05-28T18:01:38.9692716+09:00","kind":"out","text":"Dependency Assembly: TwitchLib.Client.Enums, TypeCount: 2, (total: 2, Compatibility Hash: "}
+
+event: log
+data: {"seq":64,"time":"2026-05-28T18:01:39.0860603+09:00","kind":"out","text":"Initializing InputInterface..."}
+
+event: log
+data: {"seq":65,"time":"2026-05-28T18:01:39.0885936+09:00","kind":"out","text":"HeadOutputDevice: Headless"}
+
+event: log
+data: {"seq":66,"time":"2026-05-28T18:01:39.0916095+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GeneralControlsSettings"}
+
+event: log
+data: {"seq":67,"time":"2026-05-28T18:01:39.0921123+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GeneralHapticsSettings"}
+
+event: log
+data: {"seq":68,"time":"2026-05-28T18:01:39.0921123+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GeneralVRSettings"}
+
+event: log
+data: {"seq":69,"time":"2026-05-28T18:01:39.0921123+09:00","kind":"out","text":"New setting type registered: FrooxEngine.UserMetricsSettings"}
+
+event: log
+data: {"seq":70,"time":"2026-05-28T18:01:39.0956308+09:00","kind":"out","text":"Initializing LocalDB..."}
+
+event: log
+data: {"seq":71,"time":"2026-05-28T18:01:39.0991495+09:00","kind":"out","text":"Initializing Local Data"}
+
+event: log
+data: {"seq":72,"time":"2026-05-28T18:01:39.0991495+09:00","kind":"out","text":"\t"}
+
+event: log
+data: {"seq":73,"time":"2026-05-28T18:01:39.1051813+09:00","kind":"out","text":"MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":74,"time":"2026-05-28T18:01:39.1051813+09:00","kind":"out","text":"Loading LiteDB database. Version: 1"}
+
+event: log
+data: {"seq":75,"time":"2026-05-28T18:01:39.1051813+09:00","kind":"out","text":"\t"}
+
+event: log
+data: {"seq":76,"time":"2026-05-28T18:01:39.1618504+09:00","kind":"out","text":"Configuring LiteDB database"}
+
+event: log
+data: {"seq":77,"time":"2026-05-28T18:01:39.1623551+09:00","kind":"out","text":"\t"}
+
+event: log
+data: {"seq":78,"time":"2026-05-28T18:01:39.2128062+09:00","kind":"out","text":"Processing LocalDB export"}
+
+event: log
+data: {"seq":79,"time":"2026-05-28T18:01:39.2133089+09:00","kind":"out","text":"Initializing WorkProcessor..."}
+
+event: log
+data: {"seq":80,"time":"2026-05-28T18:01:39.2147344+09:00","kind":"out","text":"Initialized WorkProcessor"}
+
+event: log
+data: {"seq":81,"time":"2026-05-28T18:01:39.2147344+09:00","kind":"out","text":"Initializing AudioSystem..."}
+
+event: log
+data: {"seq":82,"time":"2026-05-28T18:01:39.2434725+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioInputDeviceSettings"}
+
+event: log
+data: {"seq":83,"time":"2026-05-28T18:01:39.2434725+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioOutputDeviceSettings"}
+
+event: log
+data: {"seq":84,"time":"2026-05-28T18:01:39.2434725+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioVolumeSettings"}
+
+event: log
+data: {"seq":85,"time":"2026-05-28T18:01:39.2434725+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioAccessibilitySettings"}
+
+event: log
+data: {"seq":86,"time":"2026-05-28T18:01:39.2434725+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioInputFilteringSettings"}
+
+event: log
+data: {"seq":87,"time":"2026-05-28T18:01:39.2434725+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioPerformanceSettings"}
+
+event: log
+data: {"seq":88,"time":"2026-05-28T18:01:39.2447304+09:00","kind":"out","text":"New setting type registered: FrooxEngine.VoiceSettings"}
+
+event: log
+data: {"seq":89,"time":"2026-05-28T18:01:39.2452374+09:00","kind":"out","text":"Initializing OVRLipSync. SampleRate: 48000, BufferSize: 1024"}
+
+event: log
+data: {"seq":90,"time":"2026-05-28T18:01:39.2895966+09:00","kind":"out","text":"Initializing GlobalCoroutineManager..."}
+
+event: log
+data: {"seq":91,"time":"2026-05-28T18:01:39.2905993+09:00","kind":"out","text":"Initializing WorldManager..."}
+
+event: log
+data: {"seq":92,"time":"2026-05-28T18:01:39.2909455+09:00","kind":"out","text":"Initializing NetworkManager..."}
+
+event: log
+data: {"seq":93,"time":"2026-05-28T18:01:39.2916165+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RealtimeNetworkingSettings"}
+
+event: log
+data: {"seq":94,"time":"2026-05-28T18:01:39.292119+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RelaySettings"}
+
+event: log
+data: {"seq":95,"time":"2026-05-28T18:01:39.2926218+09:00","kind":"out","text":"Initializing SecurityManager..."}
+
+event: log
+data: {"seq":96,"time":"2026-05-28T18:01:39.2936271+09:00","kind":"out","text":"New setting type registered: FrooxEngine.HostAccessSettings"}
+
+event: log
+data: {"seq":97,"time":"2026-05-28T18:01:39.2936271+09:00","kind":"out","text":"Initializing PlatformInterface..."}
+
+event: log
+data: {"seq":98,"time":"2026-05-28T18:01:39.2946324+09:00","kind":"out","text":"\tInitializing Windows Platform Interface"}
+
+event: log
+data: {"seq":99,"time":"2026-05-28T18:01:39.2951351+09:00","kind":"out","text":"New setting type registered: FrooxEngine.OperatingSystemSettings"}
+
+event: log
+data: {"seq":100,"time":"2026-05-28T18:01:39.2951351+09:00","kind":"out","text":"\tInitializing Steam Platform Interface"}
+
+event: log
+data: {"seq":101,"time":"2026-05-28T18:01:39.354724+09:00","kind":"out","text":"Steam API failed to initialize, Steam API Error Message:No appID found.  Either launch the game from Steam, or put the file steam_appid.txt containing the correct appID in your game folder."}
+
+event: log
+data: {"seq":102,"time":"2026-05-28T18:01:39.354724+09:00","kind":"out","text":"\tInitializing Linux Platform Interface"}
+
+event: log
+data: {"seq":103,"time":"2026-05-28T18:01:39.3552267+09:00","kind":"out","text":"\tInitializing Discord Platform Interface"}
+
+event: log
+data: {"seq":104,"time":"2026-05-28T18:01:39.3667881+09:00","kind":"out","text":"Exception initializing connector: FrooxEngine.Interfacing.DiscordConnector"}
+
+event: log
+data: {"seq":105,"time":"2026-05-28T18:01:39.3667881+09:00","kind":"out","text":"DiscordGameSDKWrapper.ResultException: InternalError"}
+
+event: log
+data: {"seq":106,"time":"2026-05-28T18:01:39.3667881+09:00","kind":"out","text":"   at DiscordGameSDKWrapper.Discord..ctor(Int64 clientId, UInt64 flags) in F:\\Rider\\DiscordGameSDKWrapper\\DiscordGameSDKWrapper\\Core.cs:line 1073"}
+
+event: log
+data: {"seq":107,"time":"2026-05-28T18:01:39.3667881+09:00","kind":"out","text":"   at FrooxEngine.Interfacing.DiscordConnector.Initialize(PlatformInterface platformInterface) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Interfacing/DiscordConnector.cs:line 44"}
+
+event: log
+data: {"seq":108,"time":"2026-05-28T18:01:39.3667881+09:00","kind":"out","text":"   at FrooxEngine.PlatformInterface.Initialize(Engine engine) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Interfacing/PlatformInterface.cs:line 68"}
+
+event: log
+data: {"seq":109,"time":"2026-05-28T18:01:39.3677934+09:00","kind":"out","text":"Supported network protocols: lnl-nat, lnl, tcp"}
+
+event: log
+data: {"seq":110,"time":"2026-05-28T18:01:39.3683031+09:00","kind":"out","text":"Initializing SkyFrost Interface..."}
+
+event: log
+data: {"seq":111,"time":"2026-05-28T18:01:39.3688059+09:00","kind":"out","text":"Computing UID"}
+
+event: log
+data: {"seq":112,"time":"2026-05-28T18:01:39.389939+09:00","kind":"out","text":"Creating SkyFrost Interface"}
+
+event: log
+data: {"seq":113,"time":"2026-05-28T18:01:39.3934729+09:00","kind":"out","text":"Proxy configuration for SkyFrost not found or failed to initialize."}
+
+event: log
+data: {"seq":114,"time":"2026-05-28T18:01:39.3934729+09:00","kind":"out","text":"HttpClient AutomaticDecompressionSupported: True"}
+
+event: log
+data: {"seq":115,"time":"2026-05-28T18:01:39.3995294+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MessagingPrivacySettings"}
+
+event: log
+data: {"seq":116,"time":"2026-05-28T18:01:39.4000347+09:00","kind":"out","text":"New setting type registered: FrooxEngine.OnlineStatusSettings"}
+
+event: log
+data: {"seq":117,"time":"2026-05-28T18:01:39.4000347+09:00","kind":"out","text":"Initializing EngineSkyFrostInterface"}
+
+event: log
+data: {"seq":118,"time":"2026-05-28T18:01:39.4010426+09:00","kind":"out","text":"EngineSkyFrostInterface Initialized"}
+
+event: log
+data: {"seq":119,"time":"2026-05-28T18:01:39.4015448+09:00","kind":"out","text":"Initializing AssetManager..."}
+
+event: log
+data: {"seq":120,"time":"2026-05-28T18:01:39.4035554+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AssetGatherSettings"}
+
+event: log
+data: {"seq":121,"time":"2026-05-28T18:01:39.4121005+09:00","kind":"out","text":"New setting type registered: FrooxEngine.TextureQualitySettings"}
+
+event: log
+data: {"seq":122,"time":"2026-05-28T18:01:39.4121005+09:00","kind":"out","text":"Initializing RecordManager..."}
+
+event: log
+data: {"seq":123,"time":"2026-05-28T18:01:39.4136085+09:00","kind":"out","text":"Initializing SessionAnnouncer..."}
+
+event: log
+data: {"seq":124,"time":"2026-05-28T18:01:39.4370723+09:00","kind":"out","text":"Initializing Input Drivers..."}
+
+event: log
+data: {"seq":125,"time":"2026-05-28T18:01:39.4370723+09:00","kind":"out","text":"Finalizing initialization"}
+
+event: log
+data: {"seq":126,"time":"2026-05-28T18:01:39.4380777+09:00","kind":"out","text":"FrooxEngine Initialization Finished"}
+
+event: log
+data: {"seq":127,"time":"2026-05-28T18:01:39.4380777+09:00","kind":"out","text":"Engine Ready!"}
+
+event: log
+data: {"seq":128,"time":"2026-05-28T18:01:39.4380777+09:00","kind":"sys","text":"ヘッドレス準備完了（コマンド受付可）"}
+
+event: log
+data: {"seq":129,"time":"2026-05-28T18:01:39.4385803+09:00","kind":"out","text":"Engine Ready"}
+
+event: log
+data: {"seq":130,"time":"2026-05-28T18:01:39.4385803+09:00","kind":"out","text":"FrooxEngine Initialized in 1384.5274000000002 ms"}
+
+event: log
+data: {"seq":131,"time":"2026-05-28T18:01:39.445115+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DebugSettings"}
+
+event: log
+data: {"seq":132,"time":"2026-05-28T18:01:40.1519421+09:00","kind":"out","text":"Starting running world: "}
+
+event: log
+data: {"seq":133,"time":"2026-05-28T18:01:40.1585193+09:00","kind":"out","text":"Updated: 0001/01/01 0:00:00 -\u003e 2026/05/28 9:01:39"}
+
+event: log
+data: {"seq":134,"time":"2026-05-28T18:01:40.1595246+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":135,"time":"2026-05-28T18:01:40.1595246+09:00","kind":"out","text":"Updated: 0 -\u003e 5"}
+
+event: log
+data: {"seq":136,"time":"2026-05-28T18:01:40.1610325+09:00","kind":"out","text":"Updated:  -\u003e MARKNPC_MAIN"}
+
+event: log
+data: {"seq":137,"time":"2026-05-28T18:01:40.1615351+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":138,"time":"2026-05-28T18:01:40.1615351+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":139,"time":"2026-05-28T18:01:40.2639036+09:00","kind":"out","text":"Running default bootstrap"}
+
+event: log
+data: {"seq":140,"time":"2026-05-28T18:01:40.2639036+09:00","kind":"out","text":"BOOTSTRAP: Running userspace bootstrap"}
+
+event: log
+data: {"seq":141,"time":"2026-05-28T18:01:40.266707+09:00","kind":"out","text":"BOOTSTRAP: Processing launch arguments"}
+
+event: log
+data: {"seq":142,"time":"2026-05-28T18:01:40.2672097+09:00","kind":"out","text":"BOOTSTRAP: Checking auto-login"}
+
+event: log
+data: {"seq":143,"time":"2026-05-28T18:01:40.2692205+09:00","kind":"out","text":"New setting type registered: FrooxEngine.CustomizationSettings"}
+
+event: log
+data: {"seq":144,"time":"2026-05-28T18:01:40.3363302+09:00","kind":"out","text":"New setting type registered: FrooxEngine.UserRestrictionsSettings"}
+
+event: log
+data: {"seq":145,"time":"2026-05-28T18:01:40.3428648+09:00","kind":"out","text":"User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":146,"time":"2026-05-28T18:01:40.3509074+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MediaPrivacySettings"}
+
+event: log
+data: {"seq":147,"time":"2026-05-28T18:01:40.378721+09:00","kind":"out","text":"Opening world. URI's: "}
+
+event: log
+data: {"seq":148,"time":"2026-05-28T18:01:40.3842595+09:00","kind":"out","text":"NetworkInitStart"}
+
+event: log
+data: {"seq":149,"time":"2026-05-28T18:01:40.3980403+09:00","kind":"out","text":"LNL Listener for World  (Handle: 2. Focus: Background, State: Initializing, InitState: InitializingNetwork, FailState: None, FailReason: , IsDestroyed: False, IsAuthority: True, SyncTick: 1, StateVersion: 1, Time: 0, TimeSinceLastUpdate: 0.017574701, running on 0.0.0.0, port 61401"}
+
+event: log
+data: {"seq":150,"time":"2026-05-28T18:01:40.4106122+09:00","kind":"out","text":"LNL Listener for World  (Handle: 2. Focus: Background, State: Initializing, InitState: InitializingNetwork, FailState: None, FailReason: , IsDestroyed: False, IsAuthority: True, SyncTick: 1, StateVersion: 1, Time: 0, TimeSinceLastUpdate: 0.030998, running on 192.168.11.2, port 61402"}
+
+event: log
+data: {"seq":151,"time":"2026-05-28T18:01:40.411115+09:00","kind":"out","text":"LNL Listener for World  (Handle: 2. Focus: Background, State: Initializing, InitState: InitializingNetwork, FailState: None, FailReason: , IsDestroyed: False, IsAuthority: True, SyncTick: 1, StateVersion: 1, Time: 0, TimeSinceLastUpdate: 0.0313856, running on 192.168.1.10, port 61403"}
+
+event: log
+data: {"seq":152,"time":"2026-05-28T18:01:40.4121202+09:00","kind":"out","text":"Starting running world: "}
+
+event: log
+data: {"seq":153,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated: 0001/01/01 0:00:00 -\u003e 2026/05/28 9:01:40"}
+
+event: log
+data: {"seq":154,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated:  -\u003e S-019e6dd1-669c-7543-ae8e-9728e5948d06"}
+
+event: log
+data: {"seq":155,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":156,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated: 0 -\u003e 5"}
+
+event: log
+data: {"seq":157,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated:  -\u003e MARKNPC_MAIN"}
+
+event: log
+data: {"seq":158,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":159,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":160,"time":"2026-05-28T18:01:40.8007738+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LocaleSettings"}
+
+event: log
+data: {"seq":161,"time":"2026-05-28T18:01:42.0651437+09:00","kind":"out","text":"User Joined MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":162,"time":"2026-05-28T18:01:42.0651437+09:00","kind":"out","text":"User Spawn MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":163,"time":"2026-05-28T18:01:42.1066303+09:00","kind":"out","text":"BOOTSTRAP: Setting up settings"}
+
+event: log
+data: {"seq":164,"time":"2026-05-28T18:01:42.1101409+09:00","kind":"out","text":"Loading local settings"}
+
+event: log
+data: {"seq":165,"time":"2026-05-28T18:01:42.151764+09:00","kind":"out","text":"Loading from URI: local://uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o/rm2eAQCskX2JSi8lHHfFDQ.lz4bson"}
+
+event: log
+data: {"seq":166,"time":"2026-05-28T18:01:42.1805933+09:00","kind":"out","text":"Loading object from record: "}
+
+event: log
+data: {"seq":167,"time":"2026-05-28T18:01:42.1811333+09:00","kind":"out","text":"Source record: "}
+
+event: log
+data: {"seq":168,"time":"2026-05-28T18:01:42.1821383+09:00","kind":"out","text":"FeatureFlag: ColorManagement = 0"}
+
+event: log
+data: {"seq":169,"time":"2026-05-28T18:01:42.1821383+09:00","kind":"out","text":"FeatureFlag: ResetGUID = 0"}
+
+event: log
+data: {"seq":170,"time":"2026-05-28T18:01:42.1821383+09:00","kind":"out","text":"FeatureFlag: ProtoFlux = 0"}
+
+event: log
+data: {"seq":171,"time":"2026-05-28T18:01:42.1821383+09:00","kind":"out","text":"FeatureFlag: TEXTURE_QUALITY = 0"}
+
+event: log
+data: {"seq":172,"time":"2026-05-28T18:01:42.182641+09:00","kind":"out","text":"FeatureFlag: TypeManagement = 0"}
+
+event: log
+data: {"seq":173,"time":"2026-05-28T18:01:42.182641+09:00","kind":"out","text":"FeatureFlag: ALIGNER_FILTERING = 0"}
+
+event: log
+data: {"seq":174,"time":"2026-05-28T18:01:42.182641+09:00","kind":"out","text":"FeatureFlag: PhotonDust = 0"}
+
+event: log
+data: {"seq":175,"time":"2026-05-28T18:01:42.182641+09:00","kind":"out","text":"FeatureFlag: Awwdio = 0"}
+
+event: log
+data: {"seq":176,"time":"2026-05-28T18:01:42.182641+09:00","kind":"out","text":"FeatureFlag: NetCore = 0"}
+
+event: log
+data: {"seq":177,"time":"2026-05-28T18:01:42.182641+09:00","kind":"out","text":"FeatureFlag: RESONITE_LINK = 0"}
+
+event: log
+data: {"seq":178,"time":"2026-05-28T18:01:42.2145003+09:00","kind":"out","text":"Initializing SignalR: Initial Startup"}
+
+event: log
+data: {"seq":179,"time":"2026-05-28T18:01:42.2430342+09:00","kind":"out","text":"Setting user agent to Resonite/2026.5.27.1300"}
+
+event: log
+data: {"seq":180,"time":"2026-05-28T18:01:42.2495721+09:00","kind":"out","text":"Connecting to SignalR (Initial Startup)..."}
+
+event: log
+data: {"seq":181,"time":"2026-05-28T18:01:42.7645789+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":182,"time":"2026-05-28T18:01:42.9496258+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LocomotionSettings"}
+
+event: log
+data: {"seq":183,"time":"2026-05-28T18:01:42.955155+09:00","kind":"out","text":"Created setting switch source: DeviceIDSettingSwitchSource"}
+
+event: log
+data: {"seq":184,"time":"2026-05-28T18:01:42.9561602+09:00","kind":"out","text":"Created setting switch source: VR_ActiveSetttingSwitchSource"}
+
+event: log
+data: {"seq":185,"time":"2026-05-28T18:01:42.9611869+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
+
+event: log
+data: {"seq":186,"time":"2026-05-28T18:01:42.9621923+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: , Current: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, MutePersistence: StartUnmuted"}
+
+event: log
+data: {"seq":187,"time":"2026-05-28T18:01:42.9631976+09:00","kind":"out","text":"New setting type registered: FrooxEngine.SteamIntegrationSettings"}
+
+event: log
+data: {"seq":188,"time":"2026-05-28T18:01:42.9637002+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LeapMotionSettings"}
+
+event: log
+data: {"seq":189,"time":"2026-05-28T18:01:42.9647055+09:00","kind":"out","text":"New setting type registered: FrooxEngine.NamePlateSettings"}
+
+event: log
+data: {"seq":190,"time":"2026-05-28T18:01:42.9647055+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LaserSettings"}
+
+event: log
+data: {"seq":191,"time":"2026-05-28T18:01:42.9647055+09:00","kind":"out","text":"New setting type registered: FrooxEngine.EditSettings"}
+
+event: log
+data: {"seq":192,"time":"2026-05-28T18:01:42.9652102+09:00","kind":"out","text":"New setting type registered: FrooxEngine.FavoritesSettings"}
+
+event: log
+data: {"seq":193,"time":"2026-05-28T18:01:42.9652102+09:00","kind":"out","text":"New setting type registered: FrooxEngine.VideoStreamingServicesSettings"}
+
+event: log
+data: {"seq":194,"time":"2026-05-28T18:01:42.9652102+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LegacyFeatureSettings"}
+
+event: log
+data: {"seq":195,"time":"2026-05-28T18:01:42.9652102+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RendererDecouplingSettings"}
+
+event: log
+data: {"seq":196,"time":"2026-05-28T18:01:42.9652102+09:00","kind":"out","text":"New setting type registered: FrooxEngine.PostProcessingSettings"}
+
+event: log
+data: {"seq":197,"time":"2026-05-28T18:01:42.9657109+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DesktopRenderSettings"}
+
+event: log
+data: {"seq":198,"time":"2026-05-28T18:01:42.9657109+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MovementSettings"}
+
+event: log
+data: {"seq":199,"time":"2026-05-28T18:01:42.9657109+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GrabbingSettings"}
+
+event: log
+data: {"seq":200,"time":"2026-05-28T18:01:42.9657109+09:00","kind":"out","text":"New setting type registered: FrooxEngine.EarmuffSettings"}
+
+event: log
+data: {"seq":201,"time":"2026-05-28T18:01:42.9662135+09:00","kind":"out","text":"New setting type registered: FrooxEngine.ResolutionSettings"}
+
+event: log
+data: {"seq":202,"time":"2026-05-28T18:01:42.9662135+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RenderingQualitySettings"}
+
+event: log
+data: {"seq":203,"time":"2026-05-28T18:01:42.9662135+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GaussianSplatQualitySettings"}
+
+event: log
+data: {"seq":204,"time":"2026-05-28T18:01:42.9667162+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":205,"time":"2026-05-28T18:01:42.9672188+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":206,"time":"2026-05-28T18:01:42.9692329+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
+
+event: log
+data: {"seq":207,"time":"2026-05-28T18:01:42.9697357+09:00","kind":"out","text":"New setting type registered: FrooxEngine.CursorSettings"}
+
+event: log
+data: {"seq":208,"time":"2026-05-28T18:01:42.9702382+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":209,"time":"2026-05-28T18:01:42.9702382+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":210,"time":"2026-05-28T18:01:42.9712435+09:00","kind":"out","text":"Local settings loaded"}
+
+event: log
+data: {"seq":211,"time":"2026-05-28T18:01:42.9727656+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":212,"time":"2026-05-28T18:01:42.9727656+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":213,"time":"2026-05-28T18:01:42.9954841+09:00","kind":"out","text":"BOOTSTRAP: Setting up core UI"}
+
+event: log
+data: {"seq":214,"time":"2026-05-28T18:01:42.9959881+09:00","kind":"out","text":"BOOTSTRAP: Checking tutorial start. Force: False, Skip: False"}
+
+event: log
+data: {"seq":215,"time":"2026-05-28T18:01:43.0111171+09:00","kind":"out","text":"BOOTSTRAP: Starting platform update"}
+
+event: log
+data: {"seq":216,"time":"2026-05-28T18:01:43.0121225+09:00","kind":"out","text":"BOOTSTRAP: Bootstrap complete"}
+
+event: log
+data: {"seq":217,"time":"2026-05-28T18:01:43.0765117+09:00","kind":"out","text":"World running..."}
+
+event: log
+data: {"seq":218,"time":"2026-05-28T18:01:43.1980509+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":219,"time":"2026-05-28T18:04:41.9659605+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":220,"time":"2026-05-28T18:04:41.9664635+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":221,"time":"2026-05-28T18:04:42.0476848+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":222,"time":"2026-05-28T18:04:42.1135374+09:00","kind":"cmd","text":"\u003e status"}
+
+event: log
+data: {"seq":223,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eName: MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":224,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"SessionID: S-019e6dd1-669c-7543-ae8e-9728e5948d06"}
+
+event: log
+data: {"seq":225,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Current Users: 1"}
+
+event: log
+data: {"seq":226,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Present Users: 0"}
+
+event: log
+data: {"seq":227,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Max Users: 8"}
+
+event: log
+data: {"seq":228,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Uptime: 00:03:01.7456489"}
+
+event: log
+data: {"seq":229,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Access Level: LAN"}
+
+event: log
+data: {"seq":230,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Hidden from listing: True"}
+
+event: log
+data: {"seq":231,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Mobile Friendly: False"}
+
+event: log
+data: {"seq":232,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Description: LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":233,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Tags: "}
+
+event: log
+data: {"seq":234,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"Users: MARKNPC_MAIN"}
+
+event: log
+data: {"seq":235,"time":"2026-05-28T18:04:42.1252679+09:00","kind":"out","text":"ResoniteLink: off"}
+
+event: log
+data: {"seq":236,"time":"2026-05-28T18:05:04.3817676+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":237,"time":"2026-05-28T18:05:04.896346+09:00","kind":"cmd","text":"\u003e hideFromListing false"}
+
+event: log
+data: {"seq":238,"time":"2026-05-28T18:05:04.9119632+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eWorld MRHC LAN Capture Session will now show in listing"}
+
+event: log
+data: {"seq":239,"time":"2026-05-28T18:05:05.9153935+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":240,"time":"2026-05-28T18:05:05.979553+09:00","kind":"cmd","text":"\u003e status"}
+
+event: log
+data: {"seq":241,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eName: MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":242,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"SessionID: S-019e6dd1-669c-7543-ae8e-9728e5948d06"}
+
+event: log
+data: {"seq":243,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Current Users: 1"}
+
+event: log
+data: {"seq":244,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Present Users: 0"}
+
+event: log
+data: {"seq":245,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Max Users: 8"}
+
+event: log
+data: {"seq":246,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Uptime: 00:03:25.6107892"}
+
+event: log
+data: {"seq":247,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Access Level: LAN"}
+
+event: log
+data: {"seq":248,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Hidden from listing: False"}
+
+event: log
+data: {"seq":249,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Mobile Friendly: False"}
+
+event: log
+data: {"seq":250,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Description: LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":251,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Tags: "}
+
+event: log
+data: {"seq":252,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"Users: MARKNPC_MAIN"}
+
+event: log
+data: {"seq":253,"time":"2026-05-28T18:05:05.9905454+09:00","kind":"out","text":"ResoniteLink: off"}
+
+event: log
+data: {"seq":254,"time":"2026-05-28T18:06:01.2836107+09:00","kind":"err","text":"E0528 18:06:01.282099 11680 init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU."}
+
+event: log
+data: {"seq":255,"time":"2026-05-28T18:06:01.2836107+09:00","kind":"err","text":"E0528 18:06:01.283609 11680 init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU."}
+
+event: log
+data: {"seq":256,"time":"2026-05-28T18:06:01.2836107+09:00","kind":"err","text":"E0528 18:06:01.283609 11680 init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU."}
+
+event: log
+data: {"seq":257,"time":"2026-05-28T18:06:13.0889994+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":258,"time":"2026-05-28T18:06:13.0889994+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":259,"time":"2026-05-28T18:06:13.175191+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":260,"time":"2026-05-28T18:06:13.2483798+09:00","kind":"cmd","text":"\u003e status"}
+
+event: log
+data: {"seq":261,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eName: MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":262,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"SessionID: S-019e6dd1-669c-7543-ae8e-9728e5948d06"}
+
+event: log
+data: {"seq":263,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Current Users: 2"}
+
+event: log
+data: {"seq":264,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Present Users: 1"}
+
+event: log
+data: {"seq":265,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Max Users: 8"}
+
+event: log
+data: {"seq":266,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Uptime: 00:04:32.8803471"}
+
+event: log
+data: {"seq":267,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Access Level: LAN"}
+
+event: log
+data: {"seq":268,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Hidden from listing: False"}
+
+event: log
+data: {"seq":269,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Mobile Friendly: False"}
+
+event: log
+data: {"seq":270,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Description: LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":271,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Tags: "}
+
+event: log
+data: {"seq":272,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"Users: MARKNPC_MAIN, MarkN_headless"}
+
+event: log
+data: {"seq":273,"time":"2026-05-28T18:06:13.2599633+09:00","kind":"out","text":"ResoniteLink: off"}
+
+event: log
+data: {"seq":274,"time":"2026-05-28T18:06:13.3379507+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":275,"time":"2026-05-28T18:06:13.4026628+09:00","kind":"cmd","text":"\u003e users"}
+
+event: log
+data: {"seq":276,"time":"2026-05-28T18:06:13.4147176+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMARKNPC_MAIN\tID: \tRole: Admin\tPresent: False\tPing: 0 ms\tFPS: 59.658344\tSilenced: False"}
+
+event: log
+data: {"seq":277,"time":"2026-05-28T18:06:13.4147176+09:00","kind":"out","text":"MarkN_headless\tID: U-1NzqeqewOpM\tRole: Guest\tPresent: True\tPing: 0 ms\tFPS: 59.98881\tSilenced: False"}
+
+event: log
+data: {"seq":278,"time":"2026-05-28T18:06:13.4916009+09:00","kind":"cmd","text":"\u003e listbans"}
+
+event: log
+data: {"seq":279,"time":"2026-05-28T18:06:13.585013+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":280,"time":"2026-05-28T18:08:20.5290698+09:00","kind":"cmd","text":"\u003e users"}
+
+event: log
+data: {"seq":281,"time":"2026-05-28T18:08:20.5419005+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMARKNPC_MAIN\tID: \tRole: Admin\tPresent: False\tPing: 0 ms\tFPS: 59.557484\tSilenced: False"}
+
+event: log
+data: {"seq":282,"time":"2026-05-28T18:08:20.5419005+09:00","kind":"out","text":"MarkN_headless\tID: U-1NzqeqewOpM\tRole: Guest\tPresent: True\tPing: 0 ms\tFPS: 60.074604\tSilenced: False"}
+
+event: log
+data: {"seq":283,"time":"2026-05-28T18:08:22.5462588+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":284,"time":"2026-05-28T18:08:24.559696+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":285,"time":"2026-05-28T18:08:24.559696+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":286,"time":"2026-05-28T18:08:26.5808396+09:00","kind":"cmd","text":"\u003e listbans"}
+

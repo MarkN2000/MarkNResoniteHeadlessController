@@ -1,0 +1,2666 @@
+event: status
+data: {"state":"running","pid":7412,"config":"C:\\app\\MRHC\\MarkNResoniteHeadlessController\\scripts\\empirical-capture\\lan-run\\test-lan-login.json","startedAt":"2026-05-28T18:27:00.1777778+09:00","ready":true}
+
+event: log
+data: {"seq":1,"time":"2026-05-28T18:27:00.1777778+09:00","kind":"sys","text":"起動: pid=7412 config=\"C:\\\\app\\\\MRHC\\\\MarkNResoniteHeadlessController\\\\scripts\\\\empirical-capture\\\\lan-run\\\\test-lan-login.json\""}
+
+event: log
+data: {"seq":2,"time":"2026-05-28T18:27:00.5100272+09:00","kind":"out","text":"AppPath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless"}
+
+event: log
+data: {"seq":3,"time":"2026-05-28T18:27:00.5100272+09:00","kind":"out","text":"DataPath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless\\Data"}
+
+event: log
+data: {"seq":4,"time":"2026-05-28T18:27:00.5100272+09:00","kind":"out","text":"CachePath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless\\Cache"}
+
+event: log
+data: {"seq":5,"time":"2026-05-28T18:27:00.5100272+09:00","kind":"out","text":"LocalePath: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Resonite\\Headless\\Locale"}
+
+event: log
+data: {"seq":6,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"Initializing App: Beta 2026.5.27.1300"}
+
+event: log
+data: {"seq":7,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"Runtime version: 10.0.8"}
+
+event: log
+data: {"seq":8,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"Platform: Windows"}
+
+event: log
+data: {"seq":9,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"IsAOT: False"}
+
+event: log
+data: {"seq":10,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"OS: Microsoft Windows 11 Pro"}
+
+event: log
+data: {"seq":11,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"CPU: AMD Ryzen 7 7800X3D 8-Core Processor           "}
+
+event: log
+data: {"seq":12,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"GPU: NVIDIA GeForce RTX 3070"}
+
+event: log
+data: {"seq":13,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"PhysicalCores: 8"}
+
+event: log
+data: {"seq":14,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"MemoryBytes: 63.41 GB"}
+
+event: log
+data: {"seq":15,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"VRAMBytes: 8.00 GB"}
+
+event: log
+data: {"seq":16,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"XR Device Name: "}
+
+event: log
+data: {"seq":17,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"XR Device Model: "}
+
+event: log
+data: {"seq":18,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"Max GC Generation: 2, IsLittleEndian: True"}
+
+event: log
+data: {"seq":19,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"System.Numerics.Vectors HW accelerated: True, Vector\u003cfloat\u003e.Count: 8"}
+
+event: log
+data: {"seq":20,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"Brotli native encoding/decoding supported: True"}
+
+event: log
+data: {"seq":21,"time":"2026-05-28T18:27:00.5170688+09:00","kind":"out","text":"Unique Session ID: 791ed982-8e4a-4dad-8cdd-263383e8ed08"}
+
+event: log
+data: {"seq":22,"time":"2026-05-28T18:27:00.5200848+09:00","kind":"out","text":"Initializing RenderSystem..."}
+
+event: log
+data: {"seq":23,"time":"2026-05-28T18:27:00.5251114+09:00","kind":"out","text":"Processing startup commands..."}
+
+event: log
+data: {"seq":24,"time":"2026-05-28T18:27:00.5276247+09:00","kind":"out","text":"Scanning locales..."}
+
+event: log
+data: {"seq":25,"time":"2026-05-28T18:27:00.5281274+09:00","kind":"out","text":"Available locales: cs, de, en, en-gb, eo, es, et, fi, fr, hu, is, ja, ko, mn, nl, no, pl, pt-br, ru, sv, th, tr, uk, zh-cn, zh-tw"}
+
+event: log
+data: {"seq":26,"time":"2026-05-28T18:27:00.5301995+09:00","kind":"out","text":"Loading Config.json..."}
+
+event: log
+data: {"seq":27,"time":"2026-05-28T18:27:00.5315418+09:00","kind":"out","text":"Computing compatibility hash..."}
+
+event: log
+data: {"seq":28,"time":"2026-05-28T18:27:00.5325479+09:00","kind":"out","text":"Engine WebProxy initialization failed."}
+
+event: log
+data: {"seq":29,"time":"2026-05-28T18:27:00.5325479+09:00","kind":"out","text":"Initializing FrooxEngine..."}
+
+event: log
+data: {"seq":30,"time":"2026-05-28T18:27:00.6435863+09:00","kind":"out","text":"FreeImage Version: 3.18.1"}
+
+event: log
+data: {"seq":31,"time":"2026-05-28T18:27:00.6435863+09:00","kind":"out","text":"BepuPhysics Version: 2.4.0.2-ydm-0.1.7+42f333b01e49414a137ceeb41b1bb19404d7b28d"}
+
+event: log
+data: {"seq":32,"time":"2026-05-28T18:27:00.6479049+09:00","kind":"out","text":"FreeType Version: 2.10.4"}
+
+event: log
+data: {"seq":33,"time":"2026-05-28T18:27:00.6484062+09:00","kind":"out","text":"Opus Version: libopus unknown"}
+
+event: log
+data: {"seq":34,"time":"2026-05-28T18:27:00.666423+09:00","kind":"out","text":"Supported 3D model formats: meshx, 3d, 3ds, 3mf, ac, ac3d, acc, amf, ase, ask, assbin, b3d, blend, bsp, bvh, cob, csm, dae, dxf, enff, fbx, glb, gltf, hmp, ifc, ifczip, iqm, irr, irrmesh, lwo, lws, lxo, md2, md3, md5anim, md5camera, md5mesh, mdc, mdl, mesh, mesh.xml, mot, ms3d, ndo, nff, obj, off, ogex, pk3, ply, pmx, prj, q3o, q3s, raw, scn, sib, smd, step, stl, stp, ter, uc, vta, x, x3d, x3db, xgl, xml, zae, zgl"}
+
+event: log
+data: {"seq":35,"time":"2026-05-28T18:27:00.6674288+09:00","kind":"out","text":"Supported point cloud formats: pts, las, laz"}
+
+event: log
+data: {"seq":36,"time":"2026-05-28T18:27:00.6674288+09:00","kind":"out","text":"Supported gaussian splat formats: frsplt, ply, spz"}
+
+event: log
+data: {"seq":37,"time":"2026-05-28T18:27:00.6722881+09:00","kind":"out","text":"Supported image formats: bmp, ico, jpg, jif, jpeg, jpe, jng, koa, iff, lbm, mng, pbm, pcd, pcx, pgm, png, ppm, ras, tga, targa, tif, tiff, wap, wbmp, wbm, psd, psb, cut, xbm, xpm, dds, gif, hdr, g3, sgi, rgb, rgba, bw, exr, j2k, j2c, jp2, pfm, pct, pict, pic, 3fr, arw, bay, bmq, cap, cine, cr2, crw, cs1, dc2, dcr, drf, dsc, dng, erf, fff, ia, iiq, k25, kc2, kdc, mdc, mef, mos, mrw, nef, nrw, orf, pef, ptx, pxn, qtk, raf, raw, rdc, rw2, rwl, rwz, sr2, srf, srw, sti, x3f, webp, jxr, wdp, hdp"}
+
+event: log
+data: {"seq":38,"time":"2026-05-28T18:27:00.6722881+09:00","kind":"out","text":"Supported audio formats: wav, wave, flac, fla, ogg, aiff, aif, aifc"}
+
+event: log
+data: {"seq":39,"time":"2026-05-28T18:27:00.6722881+09:00","kind":"out","text":"Supported video formats: mp4, mpeg, avi, mov, mpg, mkv, flv, webm, mts, 3gp, bik, m2v, m2s, wmv, m3u8, m3u, pls, ogv, m4a, mp3, mpeg3, aac, ac3, aif, aiff, ape, au, it, mka, mod, mp1, mp2, opus, s3m, sid, w64, wma, xm, nsf, nsfe, gbs, vgm, vgz, spc, gym"}
+
+event: log
+data: {"seq":40,"time":"2026-05-28T18:27:00.6722881+09:00","kind":"out","text":"Supported font formats: ttf, otf, ttc, otc, woff"}
+
+event: log
+data: {"seq":41,"time":"2026-05-28T18:27:00.6722881+09:00","kind":"out","text":"Supported document formats: pdf"}
+
+event: log
+data: {"seq":42,"time":"2026-05-28T18:27:00.6729752+09:00","kind":"out","text":"Supported subtitle formats: srt, sub, sub, ssa, ttml, vtt"}
+
+event: log
+data: {"seq":43,"time":"2026-05-28T18:27:00.6810225+09:00","kind":"out","text":"Scanning assemblies"}
+
+event: log
+data: {"seq":44,"time":"2026-05-28T18:27:00.7227131+09:00","kind":"out","text":"Data Model Assembly: Awwdio, Type Count: 1 (total: 78, Compatibility Hash: Hzv2eaXC8iH4+rN2ycyonw==, Type: Core)"}
+
+event: log
+data: {"seq":45,"time":"2026-05-28T18:27:00.7227131+09:00","kind":"out","text":"Data Model Assembly: Renderite.Shared, Type Count: 33 (total: 281, Compatibility Hash: 4H6WoqxoY6a5K+Rj/hv4bQ==, Type: Core)"}
+
+event: log
+data: {"seq":46,"time":"2026-05-28T18:27:00.7227131+09:00","kind":"out","text":"Data Model Assembly: SkyFrost.Base.Models, Type Count: 4 (total: 207, Compatibility Hash: Xc3r23cJGUbY/hTAfV4LAA==, Type: Core)"}
+
+event: log
+data: {"seq":47,"time":"2026-05-28T18:27:00.7227131+09:00","kind":"out","text":"Data Model Assembly: PhotonDust, Type Count: 25 (total: 178, Compatibility Hash: WiDRSsmN9USg/HovVGnQ2Q==, Type: Core)"}
+
+event: log
+data: {"seq":48,"time":"2026-05-28T18:27:00.7227131+09:00","kind":"out","text":"Data Model Assembly: SkyFrost.Base, Type Count: 4 (total: 420, Compatibility Hash: u6RQJ4KYILRae4JlYc9ppQ==, Type: Core)"}
+
+event: log
+data: {"seq":49,"time":"2026-05-28T18:27:00.7246319+09:00","kind":"out","text":"Data Model Assembly: Elements.Core, Type Count: 67 (total: 606, Compatibility Hash: tLHEOjVdlqZ7zgjExJnsWQ==, Type: Core)"}
+
+event: log
+data: {"seq":50,"time":"2026-05-28T18:27:00.7251346+09:00","kind":"out","text":"Data Model Assembly: Elements.Assets, Type Count: 87 (total: 521, Compatibility Hash: UYSwaNgS/7tCju7u4WSWfQ==, Type: Core)"}
+
+event: log
+data: {"seq":51,"time":"2026-05-28T18:27:00.7371959+09:00","kind":"out","text":"Data Model Assembly: FrooxEngine.Store, Type Count: 1 (total: 101, Compatibility Hash: K22/sKfODKjKTdTi7M/GnQ==, Type: Core)"}
+
+event: log
+data: {"seq":52,"time":"2026-05-28T18:27:00.7487535+09:00","kind":"out","text":"Data Model Assembly: ProtoFlux.Nodes.FrooxEngine, Type Count: 160 (total: 809, Compatibility Hash: W8IGghZQNdMCntYzEFF9yA==, Type: Core)"}
+
+event: log
+data: {"seq":53,"time":"2026-05-28T18:27:00.8575411+09:00","kind":"out","text":"Data Model Assembly: ProtoFlux.Nodes.Core, Type Count: 10 (total: 2603, Compatibility Hash: 0yjHmp2UnfzxoYPzyTgf1w==, Type: Core)"}
+
+event: log
+data: {"seq":54,"time":"2026-05-28T18:27:01.3465461+09:00","kind":"out","text":"Data Model Assembly: ProtoFluxBindings, Type Count: 6414 (total: 6515, Compatibility Hash: xjdW+ZAUx+lM1eXNj9HdcA==, Type: Core)"}
+
+event: log
+data: {"seq":55,"time":"2026-05-28T18:27:01.4037296+09:00","kind":"out","text":"Data Model Assembly: FrooxEngine, Type Count: 2689 (total: 11387, Compatibility Hash: DMr4z4/aIdgJHP18wqq3aw==, Type: Core)"}
+
+event: log
+data: {"seq":56,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: BepuPhysics, TypeCount: 7, (total: 7, Compatibility Hash: "}
+
+event: log
+data: {"seq":57,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: Elements.Quantity, TypeCount: 1, (total: 1, Compatibility Hash: "}
+
+event: log
+data: {"seq":58,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: NYoutubeDL, TypeCount: 1, (total: 1, Compatibility Hash: "}
+
+event: log
+data: {"seq":59,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: POpusCodec, TypeCount: 2, (total: 2, Compatibility Hash: "}
+
+event: log
+data: {"seq":60,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: ProtoFlux.Core, TypeCount: 24, (total: 24, Compatibility Hash: "}
+
+event: log
+data: {"seq":61,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: QRCoder, TypeCount: 2, (total: 1, Compatibility Hash: "}
+
+event: log
+data: {"seq":62,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: SharpPipe, TypeCount: 2, (total: 2, Compatibility Hash: "}
+
+event: log
+data: {"seq":63,"time":"2026-05-28T18:27:01.4525476+09:00","kind":"out","text":"Dependency Assembly: TwitchLib.Client.Enums, TypeCount: 2, (total: 2, Compatibility Hash: "}
+
+event: log
+data: {"seq":64,"time":"2026-05-28T18:27:01.5776608+09:00","kind":"out","text":"Initializing InputInterface..."}
+
+event: log
+data: {"seq":65,"time":"2026-05-28T18:27:01.5806756+09:00","kind":"out","text":"HeadOutputDevice: Headless"}
+
+event: log
+data: {"seq":66,"time":"2026-05-28T18:27:01.5836915+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GeneralControlsSettings"}
+
+event: log
+data: {"seq":67,"time":"2026-05-28T18:27:01.5836915+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GeneralHapticsSettings"}
+
+event: log
+data: {"seq":68,"time":"2026-05-28T18:27:01.5841941+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GeneralVRSettings"}
+
+event: log
+data: {"seq":69,"time":"2026-05-28T18:27:01.5841941+09:00","kind":"out","text":"New setting type registered: FrooxEngine.UserMetricsSettings"}
+
+event: log
+data: {"seq":70,"time":"2026-05-28T18:27:01.5877128+09:00","kind":"out","text":"Initializing LocalDB..."}
+
+event: log
+data: {"seq":71,"time":"2026-05-28T18:27:01.5912314+09:00","kind":"out","text":"Initializing Local Data"}
+
+event: log
+data: {"seq":72,"time":"2026-05-28T18:27:01.5912314+09:00","kind":"out","text":"\t"}
+
+event: log
+data: {"seq":73,"time":"2026-05-28T18:27:01.5972665+09:00","kind":"out","text":"MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":74,"time":"2026-05-28T18:27:01.5972665+09:00","kind":"out","text":"Loading LiteDB database. Version: 1"}
+
+event: log
+data: {"seq":75,"time":"2026-05-28T18:27:01.5972665+09:00","kind":"out","text":"\t"}
+
+event: log
+data: {"seq":76,"time":"2026-05-28T18:27:01.6601277+09:00","kind":"out","text":"Configuring LiteDB database"}
+
+event: log
+data: {"seq":77,"time":"2026-05-28T18:27:01.6601277+09:00","kind":"out","text":"\t"}
+
+event: log
+data: {"seq":78,"time":"2026-05-28T18:27:01.7126932+09:00","kind":"out","text":"Processing LocalDB export"}
+
+event: log
+data: {"seq":79,"time":"2026-05-28T18:27:01.7132025+09:00","kind":"out","text":"Initializing WorkProcessor..."}
+
+event: log
+data: {"seq":80,"time":"2026-05-28T18:27:01.714208+09:00","kind":"out","text":"Initialized WorkProcessor"}
+
+event: log
+data: {"seq":81,"time":"2026-05-28T18:27:01.7147105+09:00","kind":"out","text":"Initializing AudioSystem..."}
+
+event: log
+data: {"seq":82,"time":"2026-05-28T18:27:01.7424841+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioInputDeviceSettings"}
+
+event: log
+data: {"seq":83,"time":"2026-05-28T18:27:01.7429+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioOutputDeviceSettings"}
+
+event: log
+data: {"seq":84,"time":"2026-05-28T18:27:01.7429+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioVolumeSettings"}
+
+event: log
+data: {"seq":85,"time":"2026-05-28T18:27:01.7435079+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioAccessibilitySettings"}
+
+event: log
+data: {"seq":86,"time":"2026-05-28T18:27:01.7435079+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioInputFilteringSettings"}
+
+event: log
+data: {"seq":87,"time":"2026-05-28T18:27:01.7435079+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AudioPerformanceSettings"}
+
+event: log
+data: {"seq":88,"time":"2026-05-28T18:27:01.7435079+09:00","kind":"out","text":"New setting type registered: FrooxEngine.VoiceSettings"}
+
+event: log
+data: {"seq":89,"time":"2026-05-28T18:27:01.7445133+09:00","kind":"out","text":"Initializing OVRLipSync. SampleRate: 48000, BufferSize: 1024"}
+
+event: log
+data: {"seq":90,"time":"2026-05-28T18:27:01.7881407+09:00","kind":"out","text":"Initializing GlobalCoroutineManager..."}
+
+event: log
+data: {"seq":91,"time":"2026-05-28T18:27:01.789146+09:00","kind":"out","text":"Initializing WorldManager..."}
+
+event: log
+data: {"seq":92,"time":"2026-05-28T18:27:01.7901519+09:00","kind":"out","text":"Initializing NetworkManager..."}
+
+event: log
+data: {"seq":93,"time":"2026-05-28T18:27:01.7906539+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RealtimeNetworkingSettings"}
+
+event: log
+data: {"seq":94,"time":"2026-05-28T18:27:01.7911565+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RelaySettings"}
+
+event: log
+data: {"seq":95,"time":"2026-05-28T18:27:01.7916593+09:00","kind":"out","text":"Initializing SecurityManager..."}
+
+event: log
+data: {"seq":96,"time":"2026-05-28T18:27:01.7921619+09:00","kind":"out","text":"New setting type registered: FrooxEngine.HostAccessSettings"}
+
+event: log
+data: {"seq":97,"time":"2026-05-28T18:27:01.7926646+09:00","kind":"out","text":"Initializing PlatformInterface..."}
+
+event: log
+data: {"seq":98,"time":"2026-05-28T18:27:01.79367+09:00","kind":"out","text":"\tInitializing Windows Platform Interface"}
+
+event: log
+data: {"seq":99,"time":"2026-05-28T18:27:01.7941727+09:00","kind":"out","text":"New setting type registered: FrooxEngine.OperatingSystemSettings"}
+
+event: log
+data: {"seq":100,"time":"2026-05-28T18:27:01.7946753+09:00","kind":"out","text":"\tInitializing Steam Platform Interface"}
+
+event: log
+data: {"seq":101,"time":"2026-05-28T18:27:01.889267+09:00","kind":"out","text":"Steam API failed to initialize, Steam API Error Message:No appID found.  Either launch the game from Steam, or put the file steam_appid.txt containing the correct appID in your game folder."}
+
+event: log
+data: {"seq":102,"time":"2026-05-28T18:27:01.889267+09:00","kind":"out","text":"\tInitializing Linux Platform Interface"}
+
+event: log
+data: {"seq":103,"time":"2026-05-28T18:27:01.8902746+09:00","kind":"out","text":"\tInitializing Discord Platform Interface"}
+
+event: log
+data: {"seq":104,"time":"2026-05-28T18:27:01.9023916+09:00","kind":"out","text":"Exception initializing connector: FrooxEngine.Interfacing.DiscordConnector"}
+
+event: log
+data: {"seq":105,"time":"2026-05-28T18:27:01.9023916+09:00","kind":"out","text":"DiscordGameSDKWrapper.ResultException: InternalError"}
+
+event: log
+data: {"seq":106,"time":"2026-05-28T18:27:01.9023916+09:00","kind":"out","text":"   at DiscordGameSDKWrapper.Discord..ctor(Int64 clientId, UInt64 flags) in F:\\Rider\\DiscordGameSDKWrapper\\DiscordGameSDKWrapper\\Core.cs:line 1073"}
+
+event: log
+data: {"seq":107,"time":"2026-05-28T18:27:01.9023916+09:00","kind":"out","text":"   at FrooxEngine.Interfacing.DiscordConnector.Initialize(PlatformInterface platformInterface) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Interfacing/DiscordConnector.cs:line 44"}
+
+event: log
+data: {"seq":108,"time":"2026-05-28T18:27:01.9023916+09:00","kind":"out","text":"   at FrooxEngine.PlatformInterface.Initialize(Engine engine) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Interfacing/PlatformInterface.cs:line 68"}
+
+event: log
+data: {"seq":109,"time":"2026-05-28T18:27:01.9023916+09:00","kind":"out","text":"Supported network protocols: lnl-nat, lnl, tcp"}
+
+event: log
+data: {"seq":110,"time":"2026-05-28T18:27:01.9028949+09:00","kind":"out","text":"Initializing SkyFrost Interface..."}
+
+event: log
+data: {"seq":111,"time":"2026-05-28T18:27:01.9033969+09:00","kind":"out","text":"Computing UID"}
+
+event: log
+data: {"seq":112,"time":"2026-05-28T18:27:01.9265815+09:00","kind":"out","text":"Creating SkyFrost Interface"}
+
+event: log
+data: {"seq":113,"time":"2026-05-28T18:27:01.9296034+09:00","kind":"out","text":"Proxy configuration for SkyFrost not found or failed to initialize."}
+
+event: log
+data: {"seq":114,"time":"2026-05-28T18:27:01.930106+09:00","kind":"out","text":"HttpClient AutomaticDecompressionSupported: True"}
+
+event: log
+data: {"seq":115,"time":"2026-05-28T18:27:01.9361381+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MessagingPrivacySettings"}
+
+event: log
+data: {"seq":116,"time":"2026-05-28T18:27:01.9366408+09:00","kind":"out","text":"New setting type registered: FrooxEngine.OnlineStatusSettings"}
+
+event: log
+data: {"seq":117,"time":"2026-05-28T18:27:01.9366408+09:00","kind":"out","text":"Initializing EngineSkyFrostInterface"}
+
+event: log
+data: {"seq":118,"time":"2026-05-28T18:27:01.937646+09:00","kind":"out","text":"EngineSkyFrostInterface Initialized"}
+
+event: log
+data: {"seq":119,"time":"2026-05-28T18:27:01.9381487+09:00","kind":"out","text":"Initializing AssetManager..."}
+
+event: log
+data: {"seq":120,"time":"2026-05-28T18:27:01.9401593+09:00","kind":"out","text":"New setting type registered: FrooxEngine.AssetGatherSettings"}
+
+event: log
+data: {"seq":121,"time":"2026-05-28T18:27:01.9482042+09:00","kind":"out","text":"New setting type registered: FrooxEngine.TextureQualitySettings"}
+
+event: log
+data: {"seq":122,"time":"2026-05-28T18:27:01.9486712+09:00","kind":"out","text":"Initializing RecordManager..."}
+
+event: log
+data: {"seq":123,"time":"2026-05-28T18:27:01.9498702+09:00","kind":"out","text":"Initializing SessionAnnouncer..."}
+
+event: log
+data: {"seq":124,"time":"2026-05-28T18:27:01.9736355+09:00","kind":"out","text":"Initializing Input Drivers..."}
+
+event: log
+data: {"seq":125,"time":"2026-05-28T18:27:01.9741381+09:00","kind":"out","text":"Finalizing initialization"}
+
+event: log
+data: {"seq":126,"time":"2026-05-28T18:27:01.9751431+09:00","kind":"out","text":"FrooxEngine Initialization Finished"}
+
+event: log
+data: {"seq":127,"time":"2026-05-28T18:27:01.9751431+09:00","kind":"out","text":"Engine Ready!"}
+
+event: log
+data: {"seq":128,"time":"2026-05-28T18:27:01.9751431+09:00","kind":"sys","text":"ヘッドレス準備完了（コマンド受付可）"}
+
+event: log
+data: {"seq":129,"time":"2026-05-28T18:27:01.9751431+09:00","kind":"out","text":"Engine Ready"}
+
+event: log
+data: {"seq":130,"time":"2026-05-28T18:27:01.9751431+09:00","kind":"out","text":"FrooxEngine Initialized in 1466.4355 ms"}
+
+event: log
+data: {"seq":131,"time":"2026-05-28T18:27:01.9821807+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DebugSettings"}
+
+event: log
+data: {"seq":132,"time":"2026-05-28T18:27:02.6982551+09:00","kind":"out","text":"Starting running world: "}
+
+event: log
+data: {"seq":133,"time":"2026-05-28T18:27:02.7042874+09:00","kind":"out","text":"Updated: 0001/01/01 0:00:00 -\u003e 2026/05/28 9:27:01"}
+
+event: log
+data: {"seq":134,"time":"2026-05-28T18:27:02.7052924+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":135,"time":"2026-05-28T18:27:02.705795+09:00","kind":"out","text":"Updated: 0 -\u003e 5"}
+
+event: log
+data: {"seq":136,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated:  -\u003e MARKNPC_MAIN"}
+
+event: log
+data: {"seq":137,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":138,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":139,"time":"2026-05-28T18:27:02.8117373+09:00","kind":"out","text":"Running default bootstrap"}
+
+event: log
+data: {"seq":140,"time":"2026-05-28T18:27:02.8117373+09:00","kind":"out","text":"BOOTSTRAP: Running userspace bootstrap"}
+
+event: log
+data: {"seq":141,"time":"2026-05-28T18:27:02.8137663+09:00","kind":"out","text":"BOOTSTRAP: Processing launch arguments"}
+
+event: log
+data: {"seq":142,"time":"2026-05-28T18:27:02.8142689+09:00","kind":"out","text":"BOOTSTRAP: Checking auto-login"}
+
+event: log
+data: {"seq":143,"time":"2026-05-28T18:27:02.8162796+09:00","kind":"out","text":"New setting type registered: FrooxEngine.CustomizationSettings"}
+
+event: log
+data: {"seq":144,"time":"2026-05-28T18:27:02.8813377+09:00","kind":"out","text":"New setting type registered: FrooxEngine.UserRestrictionsSettings"}
+
+event: log
+data: {"seq":145,"time":"2026-05-28T18:27:02.8878723+09:00","kind":"out","text":"User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":146,"time":"2026-05-28T18:27:02.8959149+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MediaPrivacySettings"}
+
+event: log
+data: {"seq":147,"time":"2026-05-28T18:27:02.9158422+09:00","kind":"out","text":"Logging in as MarkN_headless"}
+
+event: log
+data: {"seq":148,"time":"2026-05-28T18:27:02.9741606+09:00","kind":"out","text":"BOOTSTRAP: Setting up settings"}
+
+event: log
+data: {"seq":149,"time":"2026-05-28T18:27:02.976697+09:00","kind":"out","text":"Loading local settings"}
+
+event: log
+data: {"seq":150,"time":"2026-05-28T18:27:03.0067464+09:00","kind":"out","text":"Loading from URI: local://uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o/6G2eAfxre3OTzFY5EuWqFg.lz4bson"}
+
+event: log
+data: {"seq":151,"time":"2026-05-28T18:27:03.0229235+09:00","kind":"out","text":"Initializing SignalR: Initial Startup"}
+
+event: log
+data: {"seq":152,"time":"2026-05-28T18:27:03.0354985+09:00","kind":"out","text":"Loading object from record: "}
+
+event: log
+data: {"seq":153,"time":"2026-05-28T18:27:03.0366113+09:00","kind":"out","text":"Source record: "}
+
+event: log
+data: {"seq":154,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: ColorManagement = 0"}
+
+event: log
+data: {"seq":155,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: ResetGUID = 0"}
+
+event: log
+data: {"seq":156,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: ProtoFlux = 0"}
+
+event: log
+data: {"seq":157,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: TEXTURE_QUALITY = 0"}
+
+event: log
+data: {"seq":158,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: TypeManagement = 0"}
+
+event: log
+data: {"seq":159,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: ALIGNER_FILTERING = 0"}
+
+event: log
+data: {"seq":160,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: PhotonDust = 0"}
+
+event: log
+data: {"seq":161,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: Awwdio = 0"}
+
+event: log
+data: {"seq":162,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: NetCore = 0"}
+
+event: log
+data: {"seq":163,"time":"2026-05-28T18:27:03.0381194+09:00","kind":"out","text":"FeatureFlag: RESONITE_LINK = 0"}
+
+event: log
+data: {"seq":164,"time":"2026-05-28T18:27:03.0518411+09:00","kind":"out","text":"Setting user agent to Resonite/2026.5.27.1300"}
+
+event: log
+data: {"seq":165,"time":"2026-05-28T18:27:03.0587144+09:00","kind":"out","text":"Connecting to SignalR (Initial Startup)..."}
+
+event: log
+data: {"seq":166,"time":"2026-05-28T18:27:03.2826944+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":167,"time":"2026-05-28T18:27:03.6169686+09:00","kind":"out","text":"Initializing SignalR: UserLogin: U-1NzqeqewOpM"}
+
+event: log
+data: {"seq":168,"time":"2026-05-28T18:27:03.6214925+09:00","kind":"out","text":"Setting user agent to Resonite/2026.5.27.1300"}
+
+event: log
+data: {"seq":169,"time":"2026-05-28T18:27:03.6219951+09:00","kind":"out","text":"Connecting to SignalR (UserLogin: U-1NzqeqewOpM)..."}
+
+event: log
+data: {"seq":170,"time":"2026-05-28T18:27:03.9576949+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LocomotionSettings"}
+
+event: log
+data: {"seq":171,"time":"2026-05-28T18:27:03.9576949+09:00","kind":"out","text":"BroadcastKey changed: U-1NzqeqewOpM:019e6de8-a616-7db1-a393-5a15b8844c85"}
+
+event: log
+data: {"seq":172,"time":"2026-05-28T18:27:03.9581998+09:00","kind":"out","text":"Updated:  -\u003e Userspace"}
+
+event: log
+data: {"seq":173,"time":"2026-05-28T18:27:03.9581998+09:00","kind":"out","text":"Updated:  -\u003e U-1NzqeqewOpM"}
+
+event: log
+data: {"seq":174,"time":"2026-05-28T18:27:03.9647345+09:00","kind":"out","text":"Created setting switch source: DeviceIDSettingSwitchSource"}
+
+event: log
+data: {"seq":175,"time":"2026-05-28T18:27:03.9662425+09:00","kind":"out","text":"Created setting switch source: VR_ActiveSetttingSwitchSource"}
+
+event: log
+data: {"seq":176,"time":"2026-05-28T18:27:03.972777+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
+
+event: log
+data: {"seq":177,"time":"2026-05-28T18:27:03.9732798+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: , Current: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, MutePersistence: StartUnmuted"}
+
+event: log
+data: {"seq":178,"time":"2026-05-28T18:27:03.9742852+09:00","kind":"out","text":"New setting type registered: FrooxEngine.SteamIntegrationSettings"}
+
+event: log
+data: {"seq":179,"time":"2026-05-28T18:27:03.9752904+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LeapMotionSettings"}
+
+event: log
+data: {"seq":180,"time":"2026-05-28T18:27:03.9757931+09:00","kind":"out","text":"New setting type registered: FrooxEngine.NamePlateSettings"}
+
+event: log
+data: {"seq":181,"time":"2026-05-28T18:27:03.9757931+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LocaleSettings"}
+
+event: log
+data: {"seq":182,"time":"2026-05-28T18:27:03.9757931+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LaserSettings"}
+
+event: log
+data: {"seq":183,"time":"2026-05-28T18:27:03.9762957+09:00","kind":"out","text":"New setting type registered: FrooxEngine.EditSettings"}
+
+event: log
+data: {"seq":184,"time":"2026-05-28T18:27:03.9762957+09:00","kind":"out","text":"New setting type registered: FrooxEngine.FavoritesSettings"}
+
+event: log
+data: {"seq":185,"time":"2026-05-28T18:27:03.9762957+09:00","kind":"out","text":"New setting type registered: FrooxEngine.VideoStreamingServicesSettings"}
+
+event: log
+data: {"seq":186,"time":"2026-05-28T18:27:03.9762957+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LegacyFeatureSettings"}
+
+event: log
+data: {"seq":187,"time":"2026-05-28T18:27:03.9762957+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RendererDecouplingSettings"}
+
+event: log
+data: {"seq":188,"time":"2026-05-28T18:27:03.9767995+09:00","kind":"out","text":"New setting type registered: FrooxEngine.PostProcessingSettings"}
+
+event: log
+data: {"seq":189,"time":"2026-05-28T18:27:03.9767995+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DesktopRenderSettings"}
+
+event: log
+data: {"seq":190,"time":"2026-05-28T18:27:03.9767995+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MovementSettings"}
+
+event: log
+data: {"seq":191,"time":"2026-05-28T18:27:03.9773011+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GrabbingSettings"}
+
+event: log
+data: {"seq":192,"time":"2026-05-28T18:27:03.9773011+09:00","kind":"out","text":"New setting type registered: FrooxEngine.EarmuffSettings"}
+
+event: log
+data: {"seq":193,"time":"2026-05-28T18:27:03.9778037+09:00","kind":"out","text":"New setting type registered: FrooxEngine.ResolutionSettings"}
+
+event: log
+data: {"seq":194,"time":"2026-05-28T18:27:03.9778037+09:00","kind":"out","text":"New setting type registered: FrooxEngine.RenderingQualitySettings"}
+
+event: log
+data: {"seq":195,"time":"2026-05-28T18:27:03.9778037+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GaussianSplatQualitySettings"}
+
+event: log
+data: {"seq":196,"time":"2026-05-28T18:27:03.9783064+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":197,"time":"2026-05-28T18:27:03.9788089+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":198,"time":"2026-05-28T18:27:03.9808223+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
+
+event: log
+data: {"seq":199,"time":"2026-05-28T18:27:03.981325+09:00","kind":"out","text":"New setting type registered: FrooxEngine.CursorSettings"}
+
+event: log
+data: {"seq":200,"time":"2026-05-28T18:27:03.9823303+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":201,"time":"2026-05-28T18:27:03.9823303+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":202,"time":"2026-05-28T18:27:03.9828329+09:00","kind":"out","text":"Local settings loaded"}
+
+event: log
+data: {"seq":203,"time":"2026-05-28T18:27:03.984341+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":204,"time":"2026-05-28T18:27:03.9848444+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":205,"time":"2026-05-28T18:27:04.0076674+09:00","kind":"out","text":"BOOTSTRAP: Setting up core UI"}
+
+event: log
+data: {"seq":206,"time":"2026-05-28T18:27:04.0081668+09:00","kind":"out","text":"BOOTSTRAP: Checking tutorial start. Force: False, Skip: False"}
+
+event: log
+data: {"seq":207,"time":"2026-05-28T18:27:04.0233868+09:00","kind":"out","text":"BOOTSTRAP: Starting platform update"}
+
+event: log
+data: {"seq":208,"time":"2026-05-28T18:27:04.0248979+09:00","kind":"out","text":"BOOTSTRAP: Bootstrap complete"}
+
+event: log
+data: {"seq":209,"time":"2026-05-28T18:27:05.2641963+09:00","kind":"out","text":"Connected to SignalR (UserLogin: U-1NzqeqewOpM)"}
+
+event: log
+data: {"seq":210,"time":"2026-05-28T18:27:05.2657124+09:00","kind":"out","text":"Initializing contacts"}
+
+event: log
+data: {"seq":211,"time":"2026-05-28T18:27:05.267221+09:00","kind":"out","text":"SIGNALR: InitializeContacts"}
+
+event: log
+data: {"seq":212,"time":"2026-05-28T18:27:05.2727496+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.Avatar"}
+
+event: log
+data: {"seq":213,"time":"2026-05-28T18:27:05.2732521+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.Keyboard"}
+
+event: log
+data: {"seq":214,"time":"2026-05-28T18:27:05.2737549+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.AudioPlayer"}
+
+event: log
+data: {"seq":215,"time":"2026-05-28T18:27:05.2737549+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.TextDisplay"}
+
+event: log
+data: {"seq":216,"time":"2026-05-28T18:27:05.2742577+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.NoticeDisplay"}
+
+event: log
+data: {"seq":217,"time":"2026-05-28T18:27:05.2742577+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.ColorDialog"}
+
+event: log
+data: {"seq":218,"time":"2026-05-28T18:27:05.2742577+09:00","kind":"out","text":"EngineSkyFrostInterface: OnLogin"}
+
+event: log
+data: {"seq":219,"time":"2026-05-28T18:27:05.2762681+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.DocumentDisplay"}
+
+event: log
+data: {"seq":220,"time":"2026-05-28T18:27:05.284814+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.WorldLoadingIndicator"}
+
+event: log
+data: {"seq":221,"time":"2026-05-28T18:27:05.2858619+09:00","kind":"out","text":"Loading Cloud Settings for U-1NzqeqewOpM"}
+
+event: log
+data: {"seq":222,"time":"2026-05-28T18:27:05.3000222+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.Home"}
+
+event: log
+data: {"seq":223,"time":"2026-05-28T18:27:05.3155836+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.VideoPlayer"}
+
+event: log
+data: {"seq":224,"time":"2026-05-28T18:27:05.3307457+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.UrlDisplay"}
+
+event: log
+data: {"seq":225,"time":"2026-05-28T18:27:05.3463438+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.ProgressBar"}
+
+event: log
+data: {"seq":226,"time":"2026-05-28T18:27:05.3617476+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.Camera"}
+
+event: log
+data: {"seq":227,"time":"2026-05-28T18:27:05.3617476+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.AudioStreamController"}
+
+event: log
+data: {"seq":228,"time":"2026-05-28T18:27:05.3770416+09:00","kind":"out","text":"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.NamePlate"}
+
+event: log
+data: {"seq":229,"time":"2026-05-28T18:27:05.6378774+09:00","kind":"out","text":"Status Initialized. Contact Count: 31"}
+
+event: log
+data: {"seq":230,"time":"2026-05-28T18:27:05.8411237+09:00","kind":"out","text":"Loading from URI: resdb:///9f0fef54e7884bce320f8c87b7ac248947bdd10074ead0734f7f338e50e34316.brson"}
+
+event: log
+data: {"seq":231,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"Loading object from record: "}
+
+event: log
+data: {"seq":232,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"Source record: "}
+
+event: log
+data: {"seq":233,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: ColorManagement = 0"}
+
+event: log
+data: {"seq":234,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: ResetGUID = 0"}
+
+event: log
+data: {"seq":235,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: ProtoFlux = 0"}
+
+event: log
+data: {"seq":236,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: TEXTURE_QUALITY = 0"}
+
+event: log
+data: {"seq":237,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: TypeManagement = 0"}
+
+event: log
+data: {"seq":238,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: ALIGNER_FILTERING = 0"}
+
+event: log
+data: {"seq":239,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: PhotonDust = 0"}
+
+event: log
+data: {"seq":240,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: Awwdio = 0"}
+
+event: log
+data: {"seq":241,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: NetCore = 0"}
+
+event: log
+data: {"seq":242,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"FeatureFlag: RESONITE_LINK = 0"}
+
+event: log
+data: {"seq":243,"time":"2026-05-28T18:27:06.2272167+09:00","kind":"out","text":"Type not found: FrooxEngine.WindowsSettings in assembly FrooxEngine"}
+
+event: log
+data: {"seq":244,"time":"2026-05-28T18:27:06.2272167+09:00","kind":"out","text":"Failed to decode type: [FrooxEngine]FrooxEngine.WindowsSettings"}
+
+event: log
+data: {"seq":245,"time":"2026-05-28T18:27:06.3144571+09:00","kind":"out","text":"Unsupported worker type, couldn't load: Type: , Typename: [FrooxEngine]FrooxEngine.WindowsSettings, LegacyTypes: False"}
+
+event: log
+data: {"seq":246,"time":"2026-05-28T18:27:06.3999254+09:00","kind":"out","text":"New setting type registered: FrooxEngine.PhotoCaptureSettings"}
+
+event: log
+data: {"seq":247,"time":"2026-05-28T18:27:06.4004301+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, Current: U-1NzqeqewOpM, MutePersistence: StartUnmuted"}
+
+event: log
+data: {"seq":248,"time":"2026-05-28T18:27:06.4004301+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DashSettings"}
+
+event: log
+data: {"seq":249,"time":"2026-05-28T18:27:06.4004301+09:00","kind":"out","text":"New setting type registered: FrooxEngine.FullBodyTrackingSettings"}
+
+event: log
+data: {"seq":250,"time":"2026-05-28T18:27:06.4009319+09:00","kind":"out","text":"New setting type registered: FrooxEngine.GamepadSettings"}
+
+event: log
+data: {"seq":251,"time":"2026-05-28T18:27:06.4009319+09:00","kind":"out","text":"New setting type registered: FrooxEngine.NotificationSettings"}
+
+event: log
+data: {"seq":252,"time":"2026-05-28T18:27:06.4009319+09:00","kind":"out","text":"New setting type registered: FrooxEngine.FacetAnchorsSettings"}
+
+event: log
+data: {"seq":253,"time":"2026-05-28T18:27:06.4014349+09:00","kind":"out","text":"New setting type registered: FrooxEngine.TrackingSmoothingSettings"}
+
+event: log
+data: {"seq":254,"time":"2026-05-28T18:27:06.4014349+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MouseSettings"}
+
+event: log
+data: {"seq":255,"time":"2026-05-28T18:27:06.4014349+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DesktopViewSettings"}
+
+event: log
+data: {"seq":256,"time":"2026-05-28T18:27:06.4014349+09:00","kind":"out","text":"New setting type registered: FrooxEngine.KeyboardLookSettings"}
+
+event: log
+data: {"seq":257,"time":"2026-05-28T18:27:06.4019372+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
+
+event: log
+data: {"seq":258,"time":"2026-05-28T18:27:06.4019372+09:00","kind":"out","text":"New setting type registered: FrooxEngine.InteractiveCameraAudioSettings"}
+
+event: log
+data: {"seq":259,"time":"2026-05-28T18:27:06.4019372+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":260,"time":"2026-05-28T18:27:06.4019372+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":261,"time":"2026-05-28T18:27:06.4029424+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
+
+event: log
+data: {"seq":262,"time":"2026-05-28T18:27:06.4029424+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":263,"time":"2026-05-28T18:27:06.4029424+09:00","kind":"out","text":"Cannot find a preferred device ID"}
+
+event: log
+data: {"seq":264,"time":"2026-05-28T18:27:06.4269181+09:00","kind":"out","text":"Cloud settings loaded"}
+
+event: log
+data: {"seq":265,"time":"2026-05-28T18:27:06.6130146+09:00","kind":"out","text":"SIGNALR: RequestStatus -  - Invisible: False"}
+
+event: log
+data: {"seq":266,"time":"2026-05-28T18:27:06.7675247+09:00","kind":"out","text":"Logged in successfully"}
+
+event: log
+data: {"seq":267,"time":"2026-05-28T18:27:06.7781297+09:00","kind":"out","text":"Opening world. URI's: "}
+
+event: log
+data: {"seq":268,"time":"2026-05-28T18:27:06.7989252+09:00","kind":"out","text":"NetworkInitStart"}
+
+event: log
+data: {"seq":269,"time":"2026-05-28T18:27:06.8125343+09:00","kind":"out","text":"LNL Listener for World  (Handle: 2. Focus: Background, State: Initializing, InitState: InitializingNetwork, FailState: None, FailReason: , IsDestroyed: False, IsAuthority: True, SyncTick: 1, StateVersion: 1, Time: 0, TimeSinceLastUpdate: 0.0326909, running on 0.0.0.0, port 53291"}
+
+event: log
+data: {"seq":270,"time":"2026-05-28T18:27:06.8261142+09:00","kind":"out","text":"LNL Listener for World  (Handle: 2. Focus: Background, State: Initializing, InitState: InitializingNetwork, FailState: None, FailReason: , IsDestroyed: False, IsAuthority: True, SyncTick: 1, StateVersion: 1, Time: 0, TimeSinceLastUpdate: 0.047106102, running on 192.168.11.2, port 53292"}
+
+event: log
+data: {"seq":271,"time":"2026-05-28T18:27:06.8266196+09:00","kind":"out","text":"LNL Listener for World  (Handle: 2. Focus: Background, State: Initializing, InitState: InitializingNetwork, FailState: None, FailReason: , IsDestroyed: False, IsAuthority: True, SyncTick: 1, StateVersion: 1, Time: 0, TimeSinceLastUpdate: 0.0475477, running on 192.168.1.10, port 53293"}
+
+event: log
+data: {"seq":272,"time":"2026-05-28T18:27:06.828643+09:00","kind":"out","text":"Starting running world: "}
+
+event: log
+data: {"seq":273,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated: 0001/01/01 0:00:00 -\u003e 2026/05/28 9:27:06"}
+
+event: log
+data: {"seq":274,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e S-019e6de8-b11c-7423-939f-d246f8d2d0ac"}
+
+event: log
+data: {"seq":275,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":276,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated: 0 -\u003e 5"}
+
+event: log
+data: {"seq":277,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e U-1NzqeqewOpM"}
+
+event: log
+data: {"seq":278,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e 019e6de8-ab31-7e3f-9ed4-31c01904f791"}
+
+event: log
+data: {"seq":279,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e MarkN_headless"}
+
+event: log
+data: {"seq":280,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":281,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":282,"time":"2026-05-28T18:27:06.8564171+09:00","kind":"out","text":"SendStatusToUser: U-1NzqeqewOpM. OnlineStatus: "}
+
+event: log
+data: {"seq":283,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"SIGNALR: BroadcastStatus - Contact status for U-1NzqeqewOpM."}
+
+event: log
+data: {"seq":284,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tUserSessionId: 019e6de8-ab31-7e3f-9ed4-31c01904f791."}
+
+event: log
+data: {"seq":285,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tType: Headless"}
+
+event: log
+data: {"seq":286,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tOutputDevice: "}
+
+event: log
+data: {"seq":287,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tIsMobile: False"}
+
+event: log
+data: {"seq":288,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tOnlineStatus: "}
+
+event: log
+data: {"seq":289,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tIsPresent: False"}
+
+event: log
+data: {"seq":290,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tLastPresenceTimestamp: "}
+
+event: log
+data: {"seq":291,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tLastStatusChange: 2026/05/28 9:27:05"}
+
+event: log
+data: {"seq":292,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tAppVersion: 2026.5.27.1300"}
+
+event: log
+data: {"seq":293,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tCompatibilityHash: "}
+
+event: log
+data: {"seq":294,"time":"2026-05-28T18:27:06.859724+09:00","kind":"out","text":"\tCurrentSessionIndex: 0 to SpecificContacts (U-1NzqeqewOpM)"}
+
+event: log
+data: {"seq":295,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"SIGNALR: BroadcastStatus - Contact status for U-1NzqeqewOpM."}
+
+event: log
+data: {"seq":296,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tUserSessionId: 019e6de8-ab31-7e3f-9ed4-31c01904f791."}
+
+event: log
+data: {"seq":297,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tType: Headless"}
+
+event: log
+data: {"seq":298,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tOutputDevice: "}
+
+event: log
+data: {"seq":299,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tIsMobile: False"}
+
+event: log
+data: {"seq":300,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tOnlineStatus: "}
+
+event: log
+data: {"seq":301,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tIsPresent: False"}
+
+event: log
+data: {"seq":302,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tLastPresenceTimestamp: "}
+
+event: log
+data: {"seq":303,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tLastStatusChange: 2026/05/28 9:27:06"}
+
+event: log
+data: {"seq":304,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tAppVersion: 2026.5.27.1300"}
+
+event: log
+data: {"seq":305,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tCompatibilityHash: "}
+
+event: log
+data: {"seq":306,"time":"2026-05-28T18:27:06.9394236+09:00","kind":"out","text":"\tCurrentSessionIndex: 0 to AllContacts"}
+
+event: log
+data: {"seq":307,"time":"2026-05-28T18:27:07.1277485+09:00","kind":"out","text":"SIGNALR: ListenOnKey - "}
+
+event: log
+data: {"seq":308,"time":"2026-05-28T18:27:07.1802398+09:00","kind":"out","text":"SIGNALR: ListenOnKey - U-1NcRSUNGgRU:019e6d18-1dc5-7ded-9bc5-d08e2407746b"}
+
+event: log
+data: {"seq":309,"time":"2026-05-28T18:27:08.5136019+09:00","kind":"out","text":"User Joined MarkN_headless World 0. Username: MarkN_headless, UserID: U-1NzqeqewOpM, AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":310,"time":"2026-05-28T18:27:08.5136019+09:00","kind":"out","text":"User Spawn MarkN_headless World 0. Username: MarkN_headless, UserID: U-1NzqeqewOpM, MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":311,"time":"2026-05-28T18:27:08.7543454+09:00","kind":"out","text":"Updated:  -\u003e MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":312,"time":"2026-05-28T18:27:08.7543454+09:00","kind":"out","text":"Updated:  -\u003e LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":313,"time":"2026-05-28T18:27:08.7543454+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":314,"time":"2026-05-28T18:27:08.7548486+09:00","kind":"out","text":"Updated: Private -\u003e LAN"}
+
+event: log
+data: {"seq":315,"time":"2026-05-28T18:27:08.7583667+09:00","kind":"out","text":"World running..."}
+
+event: log
+data: {"seq":316,"time":"2026-05-28T18:27:08.8807694+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":317,"time":"2026-05-28T18:28:01.9979795+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":318,"time":"2026-05-28T18:28:01.9984987+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":319,"time":"2026-05-28T18:28:28.844541+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":320,"time":"2026-05-28T18:28:31.8683779+09:00","kind":"cmd","text":"\u003e listbans"}
+
+event: log
+data: {"seq":321,"time":"2026-05-28T18:28:31.8835342+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0]\tUsername: BANIX\tUserID: U-1fr8EzEE4RM\tMachineIds: 9g8xi9yisqhtha3q5tfofq9ae9zkr4cqicco7sy8wrjwdzhac85y"}
+
+event: log
+data: {"seq":322,"time":"2026-05-28T18:28:31.8835342+09:00","kind":"out","text":"[1]\tUsername: alexlittle\tUserID: U-1gIgijkK2t6\tMachineIds: 16b1wc55ix5eyfo9nhpyngoiia4r74rc9qhmcyoqyyhxkxpr43my"}
+
+event: log
+data: {"seq":323,"time":"2026-05-28T18:29:10.8182266+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":324,"time":"2026-05-28T18:29:10.8182266+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":325,"time":"2026-05-28T18:29:10.8881525+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":326,"time":"2026-05-28T18:29:39.6768306+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":327,"time":"2026-05-28T18:29:39.6768306+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":328,"time":"2026-05-28T18:30:05.8879453+09:00","kind":"cmd","text":"\u003e worlds"}
+
+event: log
+data: {"seq":329,"time":"2026-05-28T18:30:05.8879453+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0] MRHC LAN Capture Session        Users: 1\tPresent: 0\tAccessLevel: LAN\tMaxUsers: 8"}
+
+event: log
+data: {"seq":330,"time":"2026-05-28T18:30:05.9714792+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":331,"time":"2026-05-28T18:30:06.0284156+09:00","kind":"cmd","text":"\u003e status"}
+
+event: log
+data: {"seq":332,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eName: MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":333,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"SessionID: S-019e6de8-b11c-7423-939f-d246f8d2d0ac"}
+
+event: log
+data: {"seq":334,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Current Users: 1"}
+
+event: log
+data: {"seq":335,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Present Users: 0"}
+
+event: log
+data: {"seq":336,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Max Users: 8"}
+
+event: log
+data: {"seq":337,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Uptime: 00:02:59.2609820"}
+
+event: log
+data: {"seq":338,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Access Level: LAN"}
+
+event: log
+data: {"seq":339,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Hidden from listing: True"}
+
+event: log
+data: {"seq":340,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Mobile Friendly: False"}
+
+event: log
+data: {"seq":341,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Description: LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":342,"time":"2026-05-28T18:30:06.0401272+09:00","kind":"out","text":"Tags: "}
+
+event: log
+data: {"seq":343,"time":"2026-05-28T18:30:06.0406298+09:00","kind":"out","text":"Users: MarkN_headless"}
+
+event: log
+data: {"seq":344,"time":"2026-05-28T18:30:06.0406298+09:00","kind":"out","text":"ResoniteLink: off"}
+
+event: log
+data: {"seq":345,"time":"2026-05-28T18:30:06.1222659+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":346,"time":"2026-05-28T18:30:06.1830972+09:00","kind":"cmd","text":"\u003e users"}
+
+event: log
+data: {"seq":347,"time":"2026-05-28T18:30:06.1944132+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMarkN_headless\tID: U-1NzqeqewOpM\tRole: Admin\tPresent: False\tPing: 0 ms\tFPS: 59.736412\tSilenced: False"}
+
+event: log
+data: {"seq":348,"time":"2026-05-28T18:30:06.2758676+09:00","kind":"cmd","text":"\u003e listbans"}
+
+event: log
+data: {"seq":349,"time":"2026-05-28T18:30:06.2857044+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0]\tUsername: BANIX\tUserID: U-1fr8EzEE4RM\tMachineIds: 9g8xi9yisqhtha3q5tfofq9ae9zkr4cqicco7sy8wrjwdzhac85y"}
+
+event: log
+data: {"seq":350,"time":"2026-05-28T18:30:06.2857044+09:00","kind":"out","text":"[1]\tUsername: alexlittle\tUserID: U-1gIgijkK2t6\tMachineIds: 16b1wc55ix5eyfo9nhpyngoiia4r74rc9qhmcyoqyyhxkxpr43my"}
+
+event: log
+data: {"seq":351,"time":"2026-05-28T18:30:06.3674471+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":352,"time":"2026-05-28T18:30:06.444827+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":353,"time":"2026-05-28T18:30:09.4615854+09:00","kind":"cmd","text":"\u003e listbans"}
+
+event: log
+data: {"seq":354,"time":"2026-05-28T18:30:09.4768983+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0]\tUsername: BANIX\tUserID: U-1fr8EzEE4RM\tMachineIds: 9g8xi9yisqhtha3q5tfofq9ae9zkr4cqicco7sy8wrjwdzhac85y"}
+
+event: log
+data: {"seq":355,"time":"2026-05-28T18:30:09.4768983+09:00","kind":"out","text":"[1]\tUsername: alexlittle\tUserID: U-1gIgijkK2t6\tMachineIds: 16b1wc55ix5eyfo9nhpyngoiia4r74rc9qhmcyoqyyhxkxpr43my"}
+
+event: log
+data: {"seq":356,"time":"2026-05-28T18:36:55.9107052+09:00","kind":"cmd","text":"\u003e removeFriend MarkN"}
+
+event: log
+data: {"seq":357,"time":"2026-05-28T18:36:55.9137656+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSIGNALR: UpdateContact - MarkN (U-MarkN) - Status: Ignored, Accepted: True, Migrated: False, CounterpartMigrated: True"}
+
+event: log
+data: {"seq":358,"time":"2026-05-28T18:36:56.210914+09:00","kind":"out","text":"U-MarkN has been removed from your contacts."}
+
+event: log
+data: {"seq":359,"time":"2026-05-28T18:37:00.9397667+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":360,"time":"2026-05-28T18:38:53.8917552+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":361,"time":"2026-05-28T18:38:53.9916228+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":362,"time":"2026-05-28T18:39:41.3958485+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":363,"time":"2026-05-28T18:39:49.5057183+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":364,"time":"2026-05-28T18:44:11.3420773+09:00","kind":"cmd","text":"\u003e help"}
+
+event: log
+data: {"seq":365,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003esaveConfig"}
+
+event: log
+data: {"seq":366,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSaves the current settings into the original config file"}
+
+event: log
+data: {"seq":367,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: saveconfig \u003cfilename\u003e (optional, will save in place without)"}
+
+event: log
+data: {"seq":368,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"login"}
+
+event: log
+data: {"seq":369,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tLogin to an account"}
+
+event: log
+data: {"seq":370,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: login \u003cusername/email\u003e \u003cpassword\u003e"}
+
+event: log
+data: {"seq":371,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"logout"}
+
+event: log
+data: {"seq":372,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tLog out from the current account"}
+
+event: log
+data: {"seq":373,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: logout "}
+
+event: log
+data: {"seq":374,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"message"}
+
+event: log
+data: {"seq":375,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tMessage user in friends list"}
+
+event: log
+data: {"seq":376,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: message \u003cfriend name\u003e \u003cmessage\u003e"}
+
+event: log
+data: {"seq":377,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"invite"}
+
+event: log
+data: {"seq":378,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tInvite a friend to the currently focused world"}
+
+event: log
+data: {"seq":379,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: invite \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":380,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"friendRequests"}
+
+event: log
+data: {"seq":381,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tLists all incoming friend requests"}
+
+event: log
+data: {"seq":382,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: friendrequests "}
+
+event: log
+data: {"seq":383,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"acceptFriendRequest"}
+
+event: log
+data: {"seq":384,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tAccepts a friend request"}
+
+event: log
+data: {"seq":385,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: acceptfriendrequest \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":386,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"sendFriendRequest"}
+
+event: log
+data: {"seq":387,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSends a contact request to the user"}
+
+event: log
+data: {"seq":388,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: sendfriendrequest \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":389,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"removeFriend"}
+
+event: log
+data: {"seq":390,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tRemoves someone from the contacts list"}
+
+event: log
+data: {"seq":391,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: removefriend \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":392,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"worlds"}
+
+event: log
+data: {"seq":393,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tLists all active worlds"}
+
+event: log
+data: {"seq":394,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: worlds "}
+
+event: log
+data: {"seq":395,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"focus"}
+
+event: log
+data: {"seq":396,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tFocus world"}
+
+event: log
+data: {"seq":397,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: focus \u003cworld name or number\u003e"}
+
+event: log
+data: {"seq":398,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"startWorldURL"}
+
+event: log
+data: {"seq":399,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tStart a new world from URL"}
+
+event: log
+data: {"seq":400,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: startworldurl \u003crecord URL\u003e"}
+
+event: log
+data: {"seq":401,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"startWorldTemplate"}
+
+event: log
+data: {"seq":402,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tStart a new world from template"}
+
+event: log
+data: {"seq":403,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: startworldtemplate \u003ctemplate name\u003e"}
+
+event: log
+data: {"seq":404,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"status"}
+
+event: log
+data: {"seq":405,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tShows the status of the current world"}
+
+event: log
+data: {"seq":406,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: status "}
+
+event: log
+data: {"seq":407,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"enableResoniteLink"}
+
+event: log
+data: {"seq":408,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tStarts ResoniteLink for current world"}
+
+event: log
+data: {"seq":409,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: enableresonitelink \u003cport number (0 for random)\u003e"}
+
+event: log
+data: {"seq":410,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"sessionUrl"}
+
+event: log
+data: {"seq":411,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tPrints the URL of the current session"}
+
+event: log
+data: {"seq":412,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: sessionurl "}
+
+event: log
+data: {"seq":413,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"sessionID"}
+
+event: log
+data: {"seq":414,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tPrints the ID of the current session"}
+
+event: log
+data: {"seq":415,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: sessionid "}
+
+event: log
+data: {"seq":416,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"copySessionURL"}
+
+event: log
+data: {"seq":417,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tCopies the URL of the current session to clipboard"}
+
+event: log
+data: {"seq":418,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: copysessionurl "}
+
+event: log
+data: {"seq":419,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"copySessionID"}
+
+event: log
+data: {"seq":420,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tCopies the ID of the current session to clipboard"}
+
+event: log
+data: {"seq":421,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: copysessionid "}
+
+event: log
+data: {"seq":422,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"users"}
+
+event: log
+data: {"seq":423,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tLists all users in the world"}
+
+event: log
+data: {"seq":424,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: users "}
+
+event: log
+data: {"seq":425,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"close"}
+
+event: log
+data: {"seq":426,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tCloses the currently focused world"}
+
+event: log
+data: {"seq":427,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: close "}
+
+event: log
+data: {"seq":428,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"save"}
+
+event: log
+data: {"seq":429,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSaves the currently focused world"}
+
+event: log
+data: {"seq":430,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: save "}
+
+event: log
+data: {"seq":431,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"restart"}
+
+event: log
+data: {"seq":432,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tRestarts the current world"}
+
+event: log
+data: {"seq":433,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: restart "}
+
+event: log
+data: {"seq":434,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"kick"}
+
+event: log
+data: {"seq":435,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tKicks given user from the session"}
+
+event: log
+data: {"seq":436,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: kick \u003cusername\u003e"}
+
+event: log
+data: {"seq":437,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"silence"}
+
+event: log
+data: {"seq":438,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSilences given user in the session"}
+
+event: log
+data: {"seq":439,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: silence \u003cusername\u003e"}
+
+event: log
+data: {"seq":440,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"unsilence"}
+
+event: log
+data: {"seq":441,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tRemoves silence from given user in the session"}
+
+event: log
+data: {"seq":442,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: unsilence \u003cusername\u003e"}
+
+event: log
+data: {"seq":443,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"ban"}
+
+event: log
+data: {"seq":444,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tBans the user from all sessions hosted by this server"}
+
+event: log
+data: {"seq":445,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: ban \u003cusername\u003e"}
+
+event: log
+data: {"seq":446,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"unban"}
+
+event: log
+data: {"seq":447,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tRemoves ban for user with given username"}
+
+event: log
+data: {"seq":448,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: unban \u003cusername\u003e"}
+
+event: log
+data: {"seq":449,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"listbans"}
+
+event: log
+data: {"seq":450,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tLists all active bans"}
+
+event: log
+data: {"seq":451,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: listbans "}
+
+event: log
+data: {"seq":452,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"banByName"}
+
+event: log
+data: {"seq":453,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tBans user with given username from all sessions hosted by this server"}
+
+event: log
+data: {"seq":454,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: banbyname \u003cusername\u003e"}
+
+event: log
+data: {"seq":455,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"unbanByName"}
+
+event: log
+data: {"seq":456,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUnbans user with the given username from all sessions hosted by this server"}
+
+event: log
+data: {"seq":457,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: unbanbyname \u003cusername\u003e"}
+
+event: log
+data: {"seq":458,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"banByID"}
+
+event: log
+data: {"seq":459,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tBans user with given User ID from all sessions hosted by this server"}
+
+event: log
+data: {"seq":460,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: banbyid \u003cuser ID\u003e"}
+
+event: log
+data: {"seq":461,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"unbanByID"}
+
+event: log
+data: {"seq":462,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUnbans user with given User ID from all sessions hosted by this server"}
+
+event: log
+data: {"seq":463,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: unbanbyid \u003cuser ID\u003e"}
+
+event: log
+data: {"seq":464,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"respawn"}
+
+event: log
+data: {"seq":465,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tRespawns given user"}
+
+event: log
+data: {"seq":466,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: respawn \u003cusername\u003e"}
+
+event: log
+data: {"seq":467,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"role"}
+
+event: log
+data: {"seq":468,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tAssigns a role to given user"}
+
+event: log
+data: {"seq":469,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: role \u003cusername\u003e \u003crole\u003e"}
+
+event: log
+data: {"seq":470,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"name"}
+
+event: log
+data: {"seq":471,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets a new world name"}
+
+event: log
+data: {"seq":472,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: name \u003cnew name\u003e"}
+
+event: log
+data: {"seq":473,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"accessLevel"}
+
+event: log
+data: {"seq":474,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets a new world access level"}
+
+event: log
+data: {"seq":475,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: accesslevel \u003caccess level name\u003e"}
+
+event: log
+data: {"seq":476,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"hideFromListing"}
+
+event: log
+data: {"seq":477,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets whether the session should be hidden from listing or not"}
+
+event: log
+data: {"seq":478,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: hidefromlisting \u003ctrue/false\u003e"}
+
+event: log
+data: {"seq":479,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"description"}
+
+event: log
+data: {"seq":480,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets a new world description"}
+
+event: log
+data: {"seq":481,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: description \u003cnew description\u003e"}
+
+event: log
+data: {"seq":482,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"maxUsers"}
+
+event: log
+data: {"seq":483,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets user limit"}
+
+event: log
+data: {"seq":484,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: maxusers \u003cmax users\u003e"}
+
+event: log
+data: {"seq":485,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"awayKickInterval"}
+
+event: log
+data: {"seq":486,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets the away kick interval"}
+
+event: log
+data: {"seq":487,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: awaykickinterval \u003cinterval in minutes\u003e"}
+
+event: log
+data: {"seq":488,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"import"}
+
+event: log
+data: {"seq":489,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tImport an asset into the focused world"}
+
+event: log
+data: {"seq":490,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: import \u003cfile path or URL\u003e"}
+
+event: log
+data: {"seq":491,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"importMinecraft"}
+
+event: log
+data: {"seq":492,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tImport a Minecraft world. Requires Mineways to be installed."}
+
+event: log
+data: {"seq":493,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: importminecraft \u003cfolder containing Minecraft world with the level.dat file\u003e"}
+
+event: log
+data: {"seq":494,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"dynamicImpulse"}
+
+event: log
+data: {"seq":495,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag to the scene root"}
+
+event: log
+data: {"seq":496,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: dynamicimpulse \u003ctag\u003e"}
+
+event: log
+data: {"seq":497,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"dynamicImpulseString"}
+
+event: log
+data: {"seq":498,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag and string value to the scene root"}
+
+event: log
+data: {"seq":499,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: dynamicimpulsestring \u003ctag\u003e \u003cvalue\u003e"}
+
+event: log
+data: {"seq":500,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"dynamicImpulseInt"}
+
+event: log
+data: {"seq":501,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag and integer value to the scene root"}
+
+event: log
+data: {"seq":502,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: dynamicimpulseint \u003ctag\u003e \u003cvalue\u003e"}
+
+event: log
+data: {"seq":503,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"dynamicImpulseFloat"}
+
+event: log
+data: {"seq":504,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag and float value to the scene root"}
+
+event: log
+data: {"seq":505,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: dynamicimpulsefloat \u003ctag\u003e \u003cvalue\u003e"}
+
+event: log
+data: {"seq":506,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"spawn"}
+
+event: log
+data: {"seq":507,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSpawns an item from a record URL into the world's root"}
+
+event: log
+data: {"seq":508,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: spawn \u003curl\u003e \u003cactive\u003e \u003cpersistent\u003e"}
+
+event: log
+data: {"seq":509,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"gc"}
+
+event: log
+data: {"seq":510,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tForces full garbage collection"}
+
+event: log
+data: {"seq":511,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: gc "}
+
+event: log
+data: {"seq":512,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"crash"}
+
+event: log
+data: {"seq":513,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tForces instant crash. Mostly for debugging purposes"}
+
+event: log
+data: {"seq":514,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: crash "}
+
+event: log
+data: {"seq":515,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"debugWorldState"}
+
+event: log
+data: {"seq":516,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tPrints out diagnostic information for all worlds which can be used for debugging purposes"}
+
+event: log
+data: {"seq":517,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: debugworldstate "}
+
+event: log
+data: {"seq":518,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"version"}
+
+event: log
+data: {"seq":519,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tPrints the current version of the headless. Can be used to assist with bug reporting."}
+
+event: log
+data: {"seq":520,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: version "}
+
+event: log
+data: {"seq":521,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"shutdown"}
+
+event: log
+data: {"seq":522,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tShuts down the headless client"}
+
+event: log
+data: {"seq":523,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: shutdown "}
+
+event: log
+data: {"seq":524,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"tickRate"}
+
+event: log
+data: {"seq":525,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSets the maximum simulation rate for the servers"}
+
+event: log
+data: {"seq":526,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: tickrate \u003cticks per second\u003e"}
+
+event: log
+data: {"seq":527,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"log"}
+
+event: log
+data: {"seq":528,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tSwitches the interactive shell to logging output. Press enter again to restore interactive."}
+
+event: log
+data: {"seq":529,"time":"2026-05-28T18:44:11.3425795+09:00","kind":"out","text":"\tUsage: log "}
+
+event: log
+data: {"seq":530,"time":"2026-05-28T18:44:13.3597304+09:00","kind":"cmd","text":"\u003e friendRequests"}
+
+event: log
+data: {"seq":531,"time":"2026-05-28T18:44:15.37678+09:00","kind":"cmd","text":"\u003e contactrequests"}
+
+event: log
+data: {"seq":532,"time":"2026-05-28T18:44:15.37678+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eUnknown command"}
+
+event: log
+data: {"seq":533,"time":"2026-05-28T18:44:17.3968233+09:00","kind":"cmd","text":"\u003e pendingrequests"}
+
+event: log
+data: {"seq":534,"time":"2026-05-28T18:44:17.3968233+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eUnknown command"}
+
+event: log
+data: {"seq":535,"time":"2026-05-28T18:44:19.4201794+09:00","kind":"cmd","text":"\u003e incomingrequests"}
+
+event: log
+data: {"seq":536,"time":"2026-05-28T18:44:19.4201794+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eUnknown command"}
+
+event: log
+data: {"seq":537,"time":"2026-05-28T18:44:21.4363757+09:00","kind":"cmd","text":"\u003e contacts"}
+
+event: log
+data: {"seq":538,"time":"2026-05-28T18:44:21.4363757+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eUnknown command"}
+
+event: log
+data: {"seq":539,"time":"2026-05-28T18:44:23.463286+09:00","kind":"cmd","text":"\u003e listcontacts"}
+
+event: log
+data: {"seq":540,"time":"2026-05-28T18:44:23.463286+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eUnknown command"}
+
+event: log
+data: {"seq":541,"time":"2026-05-28T18:44:25.4884647+09:00","kind":"cmd","text":"\u003e listfriends"}
+
+event: log
+data: {"seq":542,"time":"2026-05-28T18:44:25.4884647+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eUnknown command"}
+
+event: log
+data: {"seq":543,"time":"2026-05-28T18:44:27.5092128+09:00","kind":"cmd","text":"\u003e acceptFriendRequest MarkN"}
+
+event: log
+data: {"seq":544,"time":"2026-05-28T18:44:27.5100142+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eThere's no friend request from this user"}
+
+event: log
+data: {"seq":545,"time":"2026-05-28T18:44:29.5314694+09:00","kind":"cmd","text":"\u003e sendFriendRequest MarkN"}
+
+event: log
+data: {"seq":546,"time":"2026-05-28T18:44:29.5319715+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSIGNALR: UpdateContact - MarkN (U-MarkN) - Status: Accepted, Accepted: True, Migrated: False, CounterpartMigrated: True"}
+
+event: log
+data: {"seq":547,"time":"2026-05-28T18:44:29.8164999+09:00","kind":"out","text":"Contact request sent to U-MarkN."}
+
+event: log
+data: {"seq":548,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"cmd","text":"\u003e help"}
+
+event: log
+data: {"seq":549,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"MRHC LAN Capture Session\u003esaveConfig"}
+
+event: log
+data: {"seq":550,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSaves the current settings into the original config file"}
+
+event: log
+data: {"seq":551,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: saveconfig \u003cfilename\u003e (optional, will save in place without)"}
+
+event: log
+data: {"seq":552,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"login"}
+
+event: log
+data: {"seq":553,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tLogin to an account"}
+
+event: log
+data: {"seq":554,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: login \u003cusername/email\u003e \u003cpassword\u003e"}
+
+event: log
+data: {"seq":555,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"logout"}
+
+event: log
+data: {"seq":556,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tLog out from the current account"}
+
+event: log
+data: {"seq":557,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: logout "}
+
+event: log
+data: {"seq":558,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"message"}
+
+event: log
+data: {"seq":559,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tMessage user in friends list"}
+
+event: log
+data: {"seq":560,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: message \u003cfriend name\u003e \u003cmessage\u003e"}
+
+event: log
+data: {"seq":561,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"invite"}
+
+event: log
+data: {"seq":562,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tInvite a friend to the currently focused world"}
+
+event: log
+data: {"seq":563,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: invite \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":564,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"friendRequests"}
+
+event: log
+data: {"seq":565,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tLists all incoming friend requests"}
+
+event: log
+data: {"seq":566,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: friendrequests "}
+
+event: log
+data: {"seq":567,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"acceptFriendRequest"}
+
+event: log
+data: {"seq":568,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tAccepts a friend request"}
+
+event: log
+data: {"seq":569,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: acceptfriendrequest \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":570,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"sendFriendRequest"}
+
+event: log
+data: {"seq":571,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSends a contact request to the user"}
+
+event: log
+data: {"seq":572,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: sendfriendrequest \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":573,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"removeFriend"}
+
+event: log
+data: {"seq":574,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tRemoves someone from the contacts list"}
+
+event: log
+data: {"seq":575,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: removefriend \u003cfriend name\u003e"}
+
+event: log
+data: {"seq":576,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"worlds"}
+
+event: log
+data: {"seq":577,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tLists all active worlds"}
+
+event: log
+data: {"seq":578,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: worlds "}
+
+event: log
+data: {"seq":579,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"focus"}
+
+event: log
+data: {"seq":580,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tFocus world"}
+
+event: log
+data: {"seq":581,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: focus \u003cworld name or number\u003e"}
+
+event: log
+data: {"seq":582,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"startWorldURL"}
+
+event: log
+data: {"seq":583,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tStart a new world from URL"}
+
+event: log
+data: {"seq":584,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: startworldurl \u003crecord URL\u003e"}
+
+event: log
+data: {"seq":585,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"startWorldTemplate"}
+
+event: log
+data: {"seq":586,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tStart a new world from template"}
+
+event: log
+data: {"seq":587,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: startworldtemplate \u003ctemplate name\u003e"}
+
+event: log
+data: {"seq":588,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"status"}
+
+event: log
+data: {"seq":589,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tShows the status of the current world"}
+
+event: log
+data: {"seq":590,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: status "}
+
+event: log
+data: {"seq":591,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"enableResoniteLink"}
+
+event: log
+data: {"seq":592,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tStarts ResoniteLink for current world"}
+
+event: log
+data: {"seq":593,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: enableresonitelink \u003cport number (0 for random)\u003e"}
+
+event: log
+data: {"seq":594,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"sessionUrl"}
+
+event: log
+data: {"seq":595,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tPrints the URL of the current session"}
+
+event: log
+data: {"seq":596,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: sessionurl "}
+
+event: log
+data: {"seq":597,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"sessionID"}
+
+event: log
+data: {"seq":598,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tPrints the ID of the current session"}
+
+event: log
+data: {"seq":599,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: sessionid "}
+
+event: log
+data: {"seq":600,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"copySessionURL"}
+
+event: log
+data: {"seq":601,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tCopies the URL of the current session to clipboard"}
+
+event: log
+data: {"seq":602,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: copysessionurl "}
+
+event: log
+data: {"seq":603,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"copySessionID"}
+
+event: log
+data: {"seq":604,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tCopies the ID of the current session to clipboard"}
+
+event: log
+data: {"seq":605,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: copysessionid "}
+
+event: log
+data: {"seq":606,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"users"}
+
+event: log
+data: {"seq":607,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tLists all users in the world"}
+
+event: log
+data: {"seq":608,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: users "}
+
+event: log
+data: {"seq":609,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"close"}
+
+event: log
+data: {"seq":610,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tCloses the currently focused world"}
+
+event: log
+data: {"seq":611,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: close "}
+
+event: log
+data: {"seq":612,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"save"}
+
+event: log
+data: {"seq":613,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSaves the currently focused world"}
+
+event: log
+data: {"seq":614,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: save "}
+
+event: log
+data: {"seq":615,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"restart"}
+
+event: log
+data: {"seq":616,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tRestarts the current world"}
+
+event: log
+data: {"seq":617,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: restart "}
+
+event: log
+data: {"seq":618,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"kick"}
+
+event: log
+data: {"seq":619,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tKicks given user from the session"}
+
+event: log
+data: {"seq":620,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: kick \u003cusername\u003e"}
+
+event: log
+data: {"seq":621,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"silence"}
+
+event: log
+data: {"seq":622,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSilences given user in the session"}
+
+event: log
+data: {"seq":623,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: silence \u003cusername\u003e"}
+
+event: log
+data: {"seq":624,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"unsilence"}
+
+event: log
+data: {"seq":625,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tRemoves silence from given user in the session"}
+
+event: log
+data: {"seq":626,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: unsilence \u003cusername\u003e"}
+
+event: log
+data: {"seq":627,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"ban"}
+
+event: log
+data: {"seq":628,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tBans the user from all sessions hosted by this server"}
+
+event: log
+data: {"seq":629,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: ban \u003cusername\u003e"}
+
+event: log
+data: {"seq":630,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"unban"}
+
+event: log
+data: {"seq":631,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tRemoves ban for user with given username"}
+
+event: log
+data: {"seq":632,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: unban \u003cusername\u003e"}
+
+event: log
+data: {"seq":633,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"listbans"}
+
+event: log
+data: {"seq":634,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tLists all active bans"}
+
+event: log
+data: {"seq":635,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: listbans "}
+
+event: log
+data: {"seq":636,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"banByName"}
+
+event: log
+data: {"seq":637,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tBans user with given username from all sessions hosted by this server"}
+
+event: log
+data: {"seq":638,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: banbyname \u003cusername\u003e"}
+
+event: log
+data: {"seq":639,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"unbanByName"}
+
+event: log
+data: {"seq":640,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUnbans user with the given username from all sessions hosted by this server"}
+
+event: log
+data: {"seq":641,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: unbanbyname \u003cusername\u003e"}
+
+event: log
+data: {"seq":642,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"banByID"}
+
+event: log
+data: {"seq":643,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tBans user with given User ID from all sessions hosted by this server"}
+
+event: log
+data: {"seq":644,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: banbyid \u003cuser ID\u003e"}
+
+event: log
+data: {"seq":645,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"unbanByID"}
+
+event: log
+data: {"seq":646,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUnbans user with given User ID from all sessions hosted by this server"}
+
+event: log
+data: {"seq":647,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: unbanbyid \u003cuser ID\u003e"}
+
+event: log
+data: {"seq":648,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"respawn"}
+
+event: log
+data: {"seq":649,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tRespawns given user"}
+
+event: log
+data: {"seq":650,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: respawn \u003cusername\u003e"}
+
+event: log
+data: {"seq":651,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"role"}
+
+event: log
+data: {"seq":652,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tAssigns a role to given user"}
+
+event: log
+data: {"seq":653,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: role \u003cusername\u003e \u003crole\u003e"}
+
+event: log
+data: {"seq":654,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"name"}
+
+event: log
+data: {"seq":655,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets a new world name"}
+
+event: log
+data: {"seq":656,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: name \u003cnew name\u003e"}
+
+event: log
+data: {"seq":657,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"accessLevel"}
+
+event: log
+data: {"seq":658,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets a new world access level"}
+
+event: log
+data: {"seq":659,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: accesslevel \u003caccess level name\u003e"}
+
+event: log
+data: {"seq":660,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"hideFromListing"}
+
+event: log
+data: {"seq":661,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets whether the session should be hidden from listing or not"}
+
+event: log
+data: {"seq":662,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: hidefromlisting \u003ctrue/false\u003e"}
+
+event: log
+data: {"seq":663,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"description"}
+
+event: log
+data: {"seq":664,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets a new world description"}
+
+event: log
+data: {"seq":665,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: description \u003cnew description\u003e"}
+
+event: log
+data: {"seq":666,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"maxUsers"}
+
+event: log
+data: {"seq":667,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets user limit"}
+
+event: log
+data: {"seq":668,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: maxusers \u003cmax users\u003e"}
+
+event: log
+data: {"seq":669,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"awayKickInterval"}
+
+event: log
+data: {"seq":670,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets the away kick interval"}
+
+event: log
+data: {"seq":671,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: awaykickinterval \u003cinterval in minutes\u003e"}
+
+event: log
+data: {"seq":672,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"import"}
+
+event: log
+data: {"seq":673,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tImport an asset into the focused world"}
+
+event: log
+data: {"seq":674,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: import \u003cfile path or URL\u003e"}
+
+event: log
+data: {"seq":675,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"importMinecraft"}
+
+event: log
+data: {"seq":676,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tImport a Minecraft world. Requires Mineways to be installed."}
+
+event: log
+data: {"seq":677,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: importminecraft \u003cfolder containing Minecraft world with the level.dat file\u003e"}
+
+event: log
+data: {"seq":678,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"dynamicImpulse"}
+
+event: log
+data: {"seq":679,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag to the scene root"}
+
+event: log
+data: {"seq":680,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: dynamicimpulse \u003ctag\u003e"}
+
+event: log
+data: {"seq":681,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"dynamicImpulseString"}
+
+event: log
+data: {"seq":682,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag and string value to the scene root"}
+
+event: log
+data: {"seq":683,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: dynamicimpulsestring \u003ctag\u003e \u003cvalue\u003e"}
+
+event: log
+data: {"seq":684,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"dynamicImpulseInt"}
+
+event: log
+data: {"seq":685,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag and integer value to the scene root"}
+
+event: log
+data: {"seq":686,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: dynamicimpulseint \u003ctag\u003e \u003cvalue\u003e"}
+
+event: log
+data: {"seq":687,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"dynamicImpulseFloat"}
+
+event: log
+data: {"seq":688,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSends a dynamic impulse with given tag and float value to the scene root"}
+
+event: log
+data: {"seq":689,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: dynamicimpulsefloat \u003ctag\u003e \u003cvalue\u003e"}
+
+event: log
+data: {"seq":690,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"spawn"}
+
+event: log
+data: {"seq":691,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSpawns an item from a record URL into the world's root"}
+
+event: log
+data: {"seq":692,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: spawn \u003curl\u003e \u003cactive\u003e \u003cpersistent\u003e"}
+
+event: log
+data: {"seq":693,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"gc"}
+
+event: log
+data: {"seq":694,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tForces full garbage collection"}
+
+event: log
+data: {"seq":695,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: gc "}
+
+event: log
+data: {"seq":696,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"crash"}
+
+event: log
+data: {"seq":697,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tForces instant crash. Mostly for debugging purposes"}
+
+event: log
+data: {"seq":698,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: crash "}
+
+event: log
+data: {"seq":699,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"debugWorldState"}
+
+event: log
+data: {"seq":700,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tPrints out diagnostic information for all worlds which can be used for debugging purposes"}
+
+event: log
+data: {"seq":701,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: debugworldstate "}
+
+event: log
+data: {"seq":702,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"version"}
+
+event: log
+data: {"seq":703,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tPrints the current version of the headless. Can be used to assist with bug reporting."}
+
+event: log
+data: {"seq":704,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: version "}
+
+event: log
+data: {"seq":705,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"shutdown"}
+
+event: log
+data: {"seq":706,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tShuts down the headless client"}
+
+event: log
+data: {"seq":707,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: shutdown "}
+
+event: log
+data: {"seq":708,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"tickRate"}
+
+event: log
+data: {"seq":709,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSets the maximum simulation rate for the servers"}
+
+event: log
+data: {"seq":710,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: tickrate \u003cticks per second\u003e"}
+
+event: log
+data: {"seq":711,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"log"}
+
+event: log
+data: {"seq":712,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tSwitches the interactive shell to logging output. Press enter again to restore interactive."}
+
+event: log
+data: {"seq":713,"time":"2026-05-28T18:45:15.2075974+09:00","kind":"out","text":"\tUsage: log "}
+
+event: log
+data: {"seq":714,"time":"2026-05-28T18:46:05.562404+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":715,"time":"2026-05-28T18:46:06.1126036+09:00","kind":"cmd","text":"\u003e hideFromListing false"}
+
+event: log
+data: {"seq":716,"time":"2026-05-28T18:46:06.1159943+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eWorld MRHC LAN Capture Session will now show in listing"}
+
+event: log
+data: {"seq":717,"time":"2026-05-28T18:46:08.137038+09:00","kind":"cmd","text":"\u003e focus 0"}
+
+event: log
+data: {"seq":718,"time":"2026-05-28T18:46:08.2014756+09:00","kind":"cmd","text":"\u003e status"}
+
+event: log
+data: {"seq":719,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eName: MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":720,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"SessionID: S-019e6de8-b11c-7423-939f-d246f8d2d0ac"}
+
+event: log
+data: {"seq":721,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Current Users: 1"}
+
+event: log
+data: {"seq":722,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Present Users: 0"}
+
+event: log
+data: {"seq":723,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Max Users: 8"}
+
+event: log
+data: {"seq":724,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Uptime: 00:19:01.4333904"}
+
+event: log
+data: {"seq":725,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Access Level: LAN"}
+
+event: log
+data: {"seq":726,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Hidden from listing: False"}
+
+event: log
+data: {"seq":727,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Mobile Friendly: False"}
+
+event: log
+data: {"seq":728,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Description: LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":729,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Tags: "}
+
+event: log
+data: {"seq":730,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"Users: MarkN_headless"}
+
+event: log
+data: {"seq":731,"time":"2026-05-28T18:46:08.2125923+09:00","kind":"out","text":"ResoniteLink: off"}
+
+event: log
+data: {"seq":732,"time":"2026-05-28T18:47:11.385493+09:00","kind":"err","text":"E0528 18:47:11.383976 25956 init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU."}
+
+event: log
+data: {"seq":733,"time":"2026-05-28T18:47:11.3859595+09:00","kind":"err","text":"E0528 18:47:11.385492 25956 init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU."}
+
+event: log
+data: {"seq":734,"time":"2026-05-28T18:47:11.3859595+09:00","kind":"err","text":"E0528 18:47:11.385958 25956 init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU."}
+
+event: log
+data: {"seq":735,"time":"2026-05-28T18:48:20.1162247+09:00","kind":"cmd","text":"\u003e users"}
+
+event: log
+data: {"seq":736,"time":"2026-05-28T18:48:20.1472377+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMarkN_headless\tID: U-1NzqeqewOpM\tRole: Admin\tPresent: False\tPing: 0 ms\tFPS: 59.857086\tSilenced: False"}
+
+event: log
+data: {"seq":737,"time":"2026-05-28T18:48:20.1472377+09:00","kind":"out","text":"MarkN\tID: U-MarkN\tRole: Builder\tPresent: True\tPing: 0 ms\tFPS: 59.976788\tSilenced: False"}
+
+event: log
+data: {"seq":738,"time":"2026-05-28T18:48:23.1335918+09:00","kind":"cmd","text":"\u003e role \"MarkN\" Builder"}
+
+event: log
+data: {"seq":739,"time":"2026-05-28T18:48:23.1366124+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMarkN now has role Builder!"}
+
+event: log
+data: {"seq":740,"time":"2026-05-28T18:48:25.1513344+09:00","kind":"cmd","text":"\u003e role \"MarkN\" Moderator"}
+
+event: log
+data: {"seq":741,"time":"2026-05-28T18:48:25.1548655+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMarkN now has role Moderator!"}
+
+event: log
+data: {"seq":742,"time":"2026-05-28T18:48:27.1729816+09:00","kind":"cmd","text":"\u003e role \"MarkN\" Guest"}
+
+event: log
+data: {"seq":743,"time":"2026-05-28T18:48:27.1760095+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMarkN now has role Guest!"}
+
+event: log
+data: {"seq":744,"time":"2026-05-28T18:48:29.1910033+09:00","kind":"cmd","text":"\u003e role \"MarkN\" Spectator"}
+
+event: log
+data: {"seq":745,"time":"2026-05-28T18:48:29.1935254+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMarkN now has role Spectator!"}
+
+event: log
+data: {"seq":746,"time":"2026-05-28T18:48:31.2065882+09:00","kind":"cmd","text":"\u003e role \"MarkN\" Admin"}
+
+event: log
+data: {"seq":747,"time":"2026-05-28T18:48:31.2105677+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMarkN now has role Admin!"}
+
+event: log
+data: {"seq":748,"time":"2026-05-28T18:48:33.2273391+09:00","kind":"cmd","text":"\u003e silence \"MarkN\""}
+
+event: log
+data: {"seq":749,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSilence: True for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin. Changing User: "}
+
+event: log
+data: {"seq":750,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":""}
+
+event: log
+data: {"seq":751,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at System.Environment.get_StackTrace()"}
+
+event: log
+data: {"seq":752,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at Elements.Core.UniLog.Log(String message, Boolean stackTrace) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Elements.Core/UniLog.cs:line 36"}
+
+event: log
+data: {"seq":753,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.User.Silence_OnValueChange(SyncField`1 syncField) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/User.cs:line 1139"}
+
+event: log
+data: {"seq":754,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.User.set_IsSilenced(Boolean value) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/User.cs:line 527"}
+
+event: log
+data: {"seq":755,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.Headless.HeadlessCommands.\u003c\u003ec.\u003cSetupCommonCommands\u003eb__0_24(User u, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/HeadlessCommands.cs:line 471"}
+
+event: log
+data: {"seq":756,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.Headless.UserCommand.\u003c\u003ec__DisplayClass0_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/UserCommand.cs:line 46"}
+
+event: log
+data: {"seq":757,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass22_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 50"}
+
+event: log
+data: {"seq":758,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass23_0.\u003c\u003cInvoke\u003eb__0\u003ed.MoveNext() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 77"}
+
+event: log
+data: {"seq":759,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.ExecutionContextCallback(Object s)"}
+
+event: log
+data: {"seq":760,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)"}
+
+event: log
+data: {"seq":761,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext(Thread threadPoolThread)"}
+
+event: log
+data: {"seq":762,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext()"}
+
+event: log
+data: {"seq":763,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.NextUpdate.\u003c\u003ec__DisplayClass3_0.\u003cOnCompleted\u003eb__0(Object u) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/NextUpdate.cs:line 39"}
+
+event: log
+data: {"seq":764,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteAsyncQueue(SpinQueue`1 queue) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 402"}
+
+event: log
+data: {"seq":765,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteWorldQueue(Double deltaTime) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 369"}
+
+event: log
+data: {"seq":766,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.World.RefreshStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1780"}
+
+event: log
+data: {"seq":767,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.World.Refresh() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1428"}
+
+event: log
+data: {"seq":768,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 616"}
+
+event: log
+data: {"seq":769,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 417"}
+
+event: log
+data: {"seq":770,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.Engine.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1598"}
+
+event: log
+data: {"seq":771,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.Engine.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1359"}
+
+event: log
+data: {"seq":772,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at FrooxEngine.StandaloneFrooxEngineRunner.UpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine/StandaloneFrooxEngineRunner.cs:line 205"}
+
+event: log
+data: {"seq":773,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"   at System.Threading.Thread.StartCallback()"}
+
+event: log
+data: {"seq":774,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"MarkN silenced!"}
+
+event: log
+data: {"seq":775,"time":"2026-05-28T18:48:35.2478241+09:00","kind":"cmd","text":"\u003e unsilence \"MarkN\""}
+
+event: log
+data: {"seq":776,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSilence: False for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin. Changing User: User ID2E00 (Alloc: 0) - UserName: MarkN_headless, UserId: U-1NzqeqewOpM, MachineId: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, Role: Admin"}
+
+event: log
+data: {"seq":777,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":""}
+
+event: log
+data: {"seq":778,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at System.Environment.get_StackTrace()"}
+
+event: log
+data: {"seq":779,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at Elements.Core.UniLog.Log(String message, Boolean stackTrace) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Elements.Core/UniLog.cs:line 36"}
+
+event: log
+data: {"seq":780,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.User.Silence_OnValueChange(SyncField`1 syncField) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/User.cs:line 1139"}
+
+event: log
+data: {"seq":781,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.User.set_IsSilenced(Boolean value) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/User.cs:line 527"}
+
+event: log
+data: {"seq":782,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.Headless.HeadlessCommands.\u003c\u003ec.\u003cSetupCommonCommands\u003eb__0_25(User u, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/HeadlessCommands.cs:line 481"}
+
+event: log
+data: {"seq":783,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.Headless.UserCommand.\u003c\u003ec__DisplayClass0_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/UserCommand.cs:line 46"}
+
+event: log
+data: {"seq":784,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass22_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 50"}
+
+event: log
+data: {"seq":785,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass23_0.\u003c\u003cInvoke\u003eb__0\u003ed.MoveNext() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 77"}
+
+event: log
+data: {"seq":786,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.ExecutionContextCallback(Object s)"}
+
+event: log
+data: {"seq":787,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)"}
+
+event: log
+data: {"seq":788,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext(Thread threadPoolThread)"}
+
+event: log
+data: {"seq":789,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext()"}
+
+event: log
+data: {"seq":790,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.NextUpdate.\u003c\u003ec__DisplayClass3_0.\u003cOnCompleted\u003eb__0(Object u) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/NextUpdate.cs:line 39"}
+
+event: log
+data: {"seq":791,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteAsyncQueue(SpinQueue`1 queue) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 402"}
+
+event: log
+data: {"seq":792,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteWorldQueue(Double deltaTime) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 369"}
+
+event: log
+data: {"seq":793,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.World.RefreshStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1780"}
+
+event: log
+data: {"seq":794,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.World.Refresh() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1428"}
+
+event: log
+data: {"seq":795,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 616"}
+
+event: log
+data: {"seq":796,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 417"}
+
+event: log
+data: {"seq":797,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.Engine.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1598"}
+
+event: log
+data: {"seq":798,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.Engine.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1359"}
+
+event: log
+data: {"seq":799,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at FrooxEngine.StandaloneFrooxEngineRunner.UpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine/StandaloneFrooxEngineRunner.cs:line 205"}
+
+event: log
+data: {"seq":800,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"   at System.Threading.Thread.StartCallback()"}
+
+event: log
+data: {"seq":801,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"MarkN unsilenced!"}
+
+event: log
+data: {"seq":802,"time":"2026-05-28T18:48:37.2716222+09:00","kind":"cmd","text":"\u003e respawn \"MarkN\""}
+
+event: log
+data: {"seq":803,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eDestroying User: User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin"}
+
+event: log
+data: {"seq":804,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"Currently updating user: User ID2E00 (Alloc: 0) - UserName: MarkN_headless, UserId: U-1NzqeqewOpM, MachineId: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, Role: Admin"}
+
+event: log
+data: {"seq":805,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":""}
+
+event: log
+data: {"seq":806,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at System.Environment.get_StackTrace()"}
+
+event: log
+data: {"seq":807,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at Elements.Core.UniLog.Log(String message, Boolean stackTrace) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Elements.Core/UniLog.cs:line 36"}
+
+event: log
+data: {"seq":808,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.UserRoot.Slot_OnPrepareDestroy(Slot slot) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Components/Users/UserRoot.cs:line 1183"}
+
+event: log
+data: {"seq":809,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Slot.PrepareDestruction() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Base Classes/Slot.cs:line 1063"}
+
+event: log
+data: {"seq":810,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.World.OnSlotRemoved(SyncBagBase`2 bag, RefID key, Slot slot) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 2353"}
+
+event: log
+data: {"seq":811,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.SyncBagBase`2.ElementRemoved(K key, T element) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Sync Members/SyncBagBase.cs:line 332"}
+
+event: log
+data: {"seq":812,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.SyncBagBase`2.InternalRemove(K key, Boolean sync, Boolean change) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Sync Members/SyncBagBase.cs:line 286"}
+
+event: log
+data: {"seq":813,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.SyncBagBase`2.Remove(K key) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Sync Members/SyncBagBase.cs:line 84"}
+
+event: log
+data: {"seq":814,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.World.InternalRemoveSlot(RefID key) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 2331"}
+
+event: log
+data: {"seq":815,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.World.RemoveSlot(Slot slot) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 2280"}
+
+event: log
+data: {"seq":816,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Slot.DestroySelf() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Base Classes/Slot.cs:line 1056"}
+
+event: log
+data: {"seq":817,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Slot.Destroy(Boolean sendDestroyingEvent) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Base Classes/Slot.cs:line 841"}
+
+event: log
+data: {"seq":818,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Slot.Destroy() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Base Classes/Slot.cs:line 815"}
+
+event: log
+data: {"seq":819,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Headless.HeadlessCommands.\u003c\u003ec.\u003cSetupCommonCommands\u003eb__0_33(User u, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/HeadlessCommands.cs:line 676"}
+
+event: log
+data: {"seq":820,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Headless.UserCommand.\u003c\u003ec__DisplayClass0_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/UserCommand.cs:line 46"}
+
+event: log
+data: {"seq":821,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass22_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 50"}
+
+event: log
+data: {"seq":822,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass23_0.\u003c\u003cInvoke\u003eb__0\u003ed.MoveNext() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 77"}
+
+event: log
+data: {"seq":823,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.ExecutionContextCallback(Object s)"}
+
+event: log
+data: {"seq":824,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)"}
+
+event: log
+data: {"seq":825,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext(Thread threadPoolThread)"}
+
+event: log
+data: {"seq":826,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext()"}
+
+event: log
+data: {"seq":827,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.NextUpdate.\u003c\u003ec__DisplayClass3_0.\u003cOnCompleted\u003eb__0(Object u) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/NextUpdate.cs:line 39"}
+
+event: log
+data: {"seq":828,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteAsyncQueue(SpinQueue`1 queue) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 402"}
+
+event: log
+data: {"seq":829,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteWorldQueue(Double deltaTime) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 369"}
+
+event: log
+data: {"seq":830,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.World.RefreshStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1780"}
+
+event: log
+data: {"seq":831,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.World.Refresh() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1428"}
+
+event: log
+data: {"seq":832,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 616"}
+
+event: log
+data: {"seq":833,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 417"}
+
+event: log
+data: {"seq":834,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Engine.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1598"}
+
+event: log
+data: {"seq":835,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.Engine.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1359"}
+
+event: log
+data: {"seq":836,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at FrooxEngine.StandaloneFrooxEngineRunner.UpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine/StandaloneFrooxEngineRunner.cs:line 205"}
+
+event: log
+data: {"seq":837,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"   at System.Threading.Thread.StartCallback()"}
+
+event: log
+data: {"seq":838,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"MarkN respawned!"}
+
+event: log
+data: {"seq":839,"time":"2026-05-28T18:48:39.2920616+09:00","kind":"cmd","text":"\u003e invite \"MarkN\""}
+
+event: log
+data: {"seq":840,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eUpdated: 0001/01/01 0:00:00 -\u003e 2026/05/28 9:27:06"}
+
+event: log
+data: {"seq":841,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated:  -\u003e MRHC LAN Capture Session"}
+
+event: log
+data: {"seq":842,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated:  -\u003e LAN data capture for MRHC structured driver"}
+
+event: log
+data: {"seq":843,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated:  -\u003e S-019e6de8-b11c-7423-939f-d246f8d2d0ac"}
+
+event: log
+data: {"seq":844,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated: Private -\u003e LAN"}
+
+event: log
+data: {"seq":845,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":846,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated: 0 -\u003e 5"}
+
+event: log
+data: {"seq":847,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated:  -\u003e U-1NzqeqewOpM"}
+
+event: log
+data: {"seq":848,"time":"2026-05-28T18:48:39.7881084+09:00","kind":"out","text":"Updated:  -\u003e 019e6de8-ab31-7e3f-9ed4-31c01904f791"}
+
+event: log
+data: {"seq":849,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated:  -\u003e MarkN_headless"}
+
+event: log
+data: {"seq":850,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+
+event: log
+data: {"seq":851,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated: False -\u003e True"}
+
+event: log
+data: {"seq":852,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated:  -\u003e https://thumbnails.resonite.com/019e6dfb-c3fe-798e-930b-7f74cea084be.webp"}
+
+event: log
+data: {"seq":853,"time":"2026-05-28T18:48:39.7911245+09:00","kind":"out","text":"SIGNALR: SendMessage - Id: MSG-019e6dfc-6bec-79bf-a7df-f712acefe54e, OwnerId: U-1NzqeqewOpM, RecipientId: U-MarkN, SenderId: U-1NzqeqewOpM, Type: SessionInvite"}
+
+event: log
+data: {"seq":854,"time":"2026-05-28T18:48:40.0494892+09:00","kind":"out","text":"Invite sent!"}
+
+event: log
+data: {"seq":855,"time":"2026-05-28T18:48:41.3116169+09:00","kind":"cmd","text":"\u003e message \"MarkN\" \"MRHC e2e test message\""}
+
+event: log
+data: {"seq":856,"time":"2026-05-28T18:48:41.312222+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSIGNALR: SendMessage - Id: MSG-019e6dfc-71e0-7064-bc76-ad571b6ee4bb, OwnerId: U-1NzqeqewOpM, RecipientId: U-MarkN, SenderId: U-1NzqeqewOpM, Type: Text"}
+
+event: log
+data: {"seq":857,"time":"2026-05-28T18:48:41.5575332+09:00","kind":"out","text":"Message sent!"}
+
+: ping
+
+event: log
+data: {"seq":858,"time":"2026-05-28T18:48:43.3350494+09:00","kind":"cmd","text":"\u003e friendrequests"}
+
+event: log
+data: {"seq":859,"time":"2026-05-28T18:48:45.3528672+09:00","kind":"cmd","text":"\u003e kick \"MarkN\""}
+
+event: log
+data: {"seq":860,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eKickRequest: KickAndRevokeInvite for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin. Changing User: , ScheduledForValidation: True"}
+
+event: log
+data: {"seq":861,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":""}
+
+event: log
+data: {"seq":862,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at System.Environment.get_StackTrace()"}
+
+event: log
+data: {"seq":863,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at Elements.Core.UniLog.Log(String message, Boolean stackTrace) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Elements.Core/UniLog.cs:line 36"}
+
+event: log
+data: {"seq":864,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.User.KickRequest_OnValueChange(SyncField`1 syncField) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/User.cs:line 1212"}
+
+event: log
+data: {"seq":865,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.SyncField`1.ValueChanged() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Sync Members/SyncField.cs:line 141"}
+
+event: log
+data: {"seq":866,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.SyncField`1.InternalSetValue(T\u0026 value, Boolean sync, Boolean change) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Data Model/Sync Members/SyncField.cs:line 113"}
+
+event: log
+data: {"seq":867,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.User.Kick(KickRequestState kickType) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/User.cs:line 1172"}
+
+event: log
+data: {"seq":868,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.Headless.HeadlessCommands.\u003c\u003ec.\u003cSetupCommonCommands\u003eb__0_23(User u, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/HeadlessCommands.cs:line 461"}
+
+event: log
+data: {"seq":869,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.Headless.UserCommand.\u003c\u003ec__DisplayClass0_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/UserCommand.cs:line 46"}
+
+event: log
+data: {"seq":870,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass22_0.\u003c.ctor\u003eb__0(World world, List`1 args) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 50"}
+
+event: log
+data: {"seq":871,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.Headless.WorldCommand.\u003c\u003ec__DisplayClass23_0.\u003c\u003cInvoke\u003eb__0\u003ed.MoveNext() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/Headless/Commands/WorldCommand.cs:line 77"}
+
+event: log
+data: {"seq":872,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.ExecutionContextCallback(Object s)"}
+
+event: log
+data: {"seq":873,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)"}
+
+event: log
+data: {"seq":874,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext(Thread threadPoolThread)"}
+
+event: log
+data: {"seq":875,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.AsyncStateMachineBox`1.MoveNext()"}
+
+event: log
+data: {"seq":876,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.NextUpdate.\u003c\u003ec__DisplayClass3_0.\u003cOnCompleted\u003eb__0(Object u) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/NextUpdate.cs:line 39"}
+
+event: log
+data: {"seq":877,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteAsyncQueue(SpinQueue`1 queue) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 402"}
+
+event: log
+data: {"seq":878,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.CoroutineManager.ExecuteWorldQueue(Double deltaTime) in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Coroutines/CouroutineManager.cs:line 369"}
+
+event: log
+data: {"seq":879,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.World.RefreshStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1780"}
+
+event: log
+data: {"seq":880,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.World.Refresh() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/World.cs:line 1428"}
+
+event: log
+data: {"seq":881,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 616"}
+
+event: log
+data: {"seq":882,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.WorldManager.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/WorldManager.cs:line 417"}
+
+event: log
+data: {"seq":883,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.Engine.UpdateStep() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1598"}
+
+event: log
+data: {"seq":884,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.Engine.RunUpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine.cs:line 1359"}
+
+event: log
+data: {"seq":885,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at FrooxEngine.StandaloneFrooxEngineRunner.UpdateLoop() in /home/runner/work/FrooxEngine/FrooxEngine/FrooxEngine/FrooxEngine/Engine/StandaloneFrooxEngineRunner.cs:line 205"}
+
+event: log
+data: {"seq":886,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"   at System.Threading.Thread.StartCallback()"}
+
+event: log
+data: {"seq":887,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"MarkN kicked!"}
+

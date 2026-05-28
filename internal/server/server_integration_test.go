@@ -174,17 +174,7 @@ func TestServer_ListBans_Empty(t *testing.T) {
 	}
 }
 
-func TestServer_FriendRequests_Empty(t *testing.T) {
-	ts, key := newTestServer(t)
-	var body okEnv[[]string]
-	code := getJSON(t, ts.URL+"/api/v1/friendrequests?apiKey="+key, &body)
-	if code != http.StatusOK {
-		t.Fatalf("status=%d body=%+v", code, body)
-	}
-	if !body.OK || len(body.Data) != 0 {
-		t.Fatalf("expected empty requests, got %+v", body)
-	}
-}
+// NOTE: TestServer_FriendRequests_Empty は撤去（エンドポイント撤去に伴う・docs参照）
 
 // --- 認証・エラーマッピング ---
 

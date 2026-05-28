@@ -204,32 +204,8 @@ func TestParseListBans(t *testing.T) {
 	}
 }
 
-func TestParseFriendRequests(t *testing.T) {
-	got := ParseFriendRequests([]string{"alice", " bob ", "", "carol"})
-	want := []string{"alice", "bob", "carol"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("friendrequests parse mismatch\n got=%+v\nwant=%+v", got, want)
-	}
-}
-
-// 回帰テスト (Phase 6 レビューで発見): ambient ログを混ぜても
-// ユーザー名のみが返ること。
-func TestParseFriendRequestsFiltersAmbient(t *testing.T) {
-	input := []string{
-		"BOOTSTRAP: Running userspace bootstrap",
-		"alice",
-		"User Joined Userspace. Username: bob, UserID: ...",
-		"Updated: A -> B",
-		"carol",
-		"[0] World A Users: 1",
-		"MRHC>Renamed>dave",
-	}
-	got := ParseFriendRequests(input)
-	want := []string{"alice", "carol", "dave"} // dave は prompt 剥がし後
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("ambient フィルタが不十分: got=%v want=%v", got, want)
-	}
-}
+// NOTE: ParseFriendRequests テスト群は撤去（parser.go の同関数撤去に伴う）。
+// 詳細理由は parser.go の同名 NOTE 参照。
 
 func TestStripLineLeadingPrompts(t *testing.T) {
 	cases := []struct {

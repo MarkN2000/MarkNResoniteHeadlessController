@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
@@ -54,7 +55,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/status", s.requireAuth(s.handleSessionStatus))
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/users", s.requireAuth(s.handleSessionUsers))
 	mux.HandleFunc("GET /api/v1/listbans", s.requireAuth(s.handleListBans))
-	mux.HandleFunc("GET /api/v1/friendrequests", s.requireAuth(s.handleFriendRequests))
+	// NOTE: /api/v1/friendrequests は撤去 (2026-05-28 LAN実機検証で「pending entry の
+	// 実書式採取が原理的に不可能」と判明したため)。詳細: parser.go の同名 NOTE 参照。
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
@@ -145,13 +147,22 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
+	// cmd は URL query / JSON body / form-urlencoded body の何れも受理する。
+	// 互換性のため広く受ける（curl --data-urlencode はデフォルトで form-urlencoded を送るため）。
 	cmd := r.URL.Query().Get("cmd")
 	if cmd == "" && r.Method == http.MethodPost {
-		var body struct {
-			Cmd string `json:"cmd"`
+		ct := r.Header.Get("Content-Type")
+		if strings.HasPrefix(ct, "application/json") {
+			var body struct {
+				Cmd string `json:"cmd"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			cmd = body.Cmd
+		} else {
+			// application/x-www-form-urlencoded など
+			_ = r.ParseForm()
+			cmd = r.FormValue("cmd")
 		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		cmd = body.Cmd
 	}
 	if cmd == "" {
 		writeErr(w, http.StatusBadRequest, "bad_request", "cmd がありません")
@@ -239,15 +250,7 @@ func (s *Server) handleListBans(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, headless.ParseListBans(lines))
 }
 
-// handleFriendRequests: GET /api/v1/friendrequests → []string （focus 不要・グローバル）
-func (s *Server) handleFriendRequests(w http.ResponseWriter, r *http.Request) {
-	lines, err := s.driver.Exec(r.Context(), "friendrequests")
-	if err != nil {
-		writeExecErr(w, err)
-		return
-	}
-	writeOK(w, headless.ParseFriendRequests(lines))
-}
+// NOTE: handleFriendRequests は撤去（parser.ParseFriendRequests と同じ理由・docs参照）
 
 // parseSessionIdx は /api/v1/sessions/{idx}/... のパスパラメータを int に変換する。
 func parseSessionIdx(r *http.Request) (int, error) {

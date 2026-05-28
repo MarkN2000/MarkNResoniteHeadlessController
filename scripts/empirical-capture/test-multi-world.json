@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
-  "comment": "MRHC 構造化Driver 実機採取用：複数ワールド・Private・非ログイン（必要ならloginCredential/loginPasswordを追加）",
+  "comment": "MRHC empirical capture (multi-world / Private / no-login). Add loginCredential/loginPassword if needed. ASCII only to avoid PS5.1 mojibake.",
   "universeId": null,
   "tickRate": 60.0,
   "maxConcurrentAssetTransfers": 64,
