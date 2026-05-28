@@ -16,6 +16,8 @@ web/.vite/
 mrhc.config.json
 /data/
 *.log
+# 実機採取fixtureはパーサテストの土台なので明示的に許可
+!scripts/empirical-capture/fixtures/**
 
 # --- OS / エディタ ---
 .DS_Store

@@ -23,13 +23,32 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed web/index.html
 var webFS embed.FS
+
+// logSink: empirical-capture helper. If -logfile is set, every published line is
+// written verbatim here. This bypasses SSE's per-client drop behavior so capture
+// is reliable on Windows where curl + SSE proved lossy.
+var (
+	logSink   *os.File
+	logSinkMu sync.Mutex
+)
+
+func writeLogSink(line string) {
+	if logSink == nil {
+		return
+	}
+	logSinkMu.Lock()
+	defer logSinkMu.Unlock()
+	fmt.Fprintln(logSink, line)
+}
 
 // broadcaster fans out log lines to all connected SSE clients and keeps a
 // small history so a freshly connected browser sees recent context.
@@ -62,6 +81,7 @@ func (b *broadcaster) unsubscribe(ch chan string) {
 
 func (b *broadcaster) publish(line string) {
 	line = strings.ReplaceAll(line, "\r", "")
+	writeLogSink(line)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.history = append(b.history, line)
@@ -80,8 +100,17 @@ func main() {
 	addr := flag.String("addr", ":8099", "HTTP listen address")
 	name := flag.String("cmd", "", "subprocess command to launch")
 	dir := flag.String("dir", "", "working directory for the subprocess (e.g. the Headless folder)")
+	logfile := flag.String("logfile", "", "if set, write every published line verbatim to this file (empirical capture)")
 	flag.Parse()
 	args := flag.Args()
+
+	if *logfile != "" {
+		f, err := os.Create(*logfile)
+		if err != nil {
+			log.Fatalf("open logfile: %v", err)
+		}
+		logSink = f
+	}
 
 	if *name == "" {
 		log.Fatal("usage: poc -cmd <command> [-addr :8099] [-- <args...>]")
@@ -166,8 +195,28 @@ func main() {
 			}
 		}
 	})
+	// /quit: empirical-capture helper — let the script gracefully end the PoC so the
+	// SSE connection closes naturally and curl flushes its file buffer on exit.
+	mux.HandleFunc("/quit", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		go func() {
+			time.Sleep(150 * time.Millisecond)
+			if logSink != nil {
+				logSinkMu.Lock()
+				_ = logSink.Sync()
+				_ = logSink.Close()
+				logSinkMu.Unlock()
+			}
+			os.Exit(0)
+		}()
+	})
 	mux.HandleFunc("/command", func(w http.ResponseWriter, r *http.Request) {
+		// Accept cmd from either query string or POST form body.
 		c := r.URL.Query().Get("cmd")
+		if c == "" {
+			_ = r.ParseForm()
+			c = r.FormValue("cmd")
+		}
 		if c == "" {
 			http.Error(w, "missing cmd", http.StatusBadRequest)
 			return

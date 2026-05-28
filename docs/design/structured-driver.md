@@ -1,0 +1,222 @@
+# 構造化 Console Driver — 詳細設計
+
+> ステータス: **2026-05-28 Windows 実機採取で妥当性検証済**（多ワールド・各コマンド網羅）。承認後に実装着手。
+> 親設計: [docs/DESIGN.md](../DESIGN.md) §5 ドメインモデル
+> ドメイン事実: [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
+> 実機採取fixture: [scripts/empirical-capture/fixtures/2026-05-28-windows-multiworld.log](../../scripts/empirical-capture/fixtures/2026-05-28-windows-multiworld.log)
+
+## 1. 目的・スコープ
+
+公式 Resonite ヘッドレスの stdout/stdin を介して **構造化コマンドの送信＋応答取得＋パース** を行い、ダッシュボードに `worlds` / `status` / `users` / `listbans` / `friendrequests` などの**構造化データ**を供給する。**ライブログ配信は維持**したまま（現行の log SSE と両立）。
+
+スコープ外: 起動/停止のライフサイクル（既存 `Driver.Start/Stop`）／プロセスI/Oの低層（既存 `readPipe`／encoding）。これらは現行のまま利用する。
+
+## 2. 配置と既存実装との関係
+
+```
+internal/headless/
+  driver.go            … 既存：Start/Stop/log配信/SendCommand(fire-and-forget)
+  executor.go [新規]   … 構造化実行（直列キュー＋応答コレクタ＋完了検出）
+  parser.go   [新規]   … コマンド毎のパース関数（プロンプト接頭辞除去後に適用）
+  worlds_service.go [新規] … List() / ForEach() — 巡回の共通化
+  hub.go               … 既存：汎用ブロードキャスタ
+```
+- 既存 `Driver` の `logHub`（ライブ配信）はそのまま利用。
+- `readPipe` を拡張し、**「全行を logHub に push」と並行して「アクティブな応答コレクタにも push」**する。コレクタ未設定時は無効。
+- `Executor` が `Driver` を内包（または同オブジェクトに合流）し、構造化APIを提供する。
+
+## 3. コアモデル
+
+### 3.1 直列キュー（mutex）
+構造化コマンドは**1つずつ排他実行**。複数の同時要求はキューで順番待ち。理由：ヘッドレス側が stdin を逐次処理するため、こちら側で直列化するのが最も単純で正しい（並行送信のメリットはほぼ無い）。
+
+### 3.2 ライブログ配信は独立・常時
+全 stdout 行は実行中であっても `logHub` に流れ続け、SSE 経由でブラウザのログビューに即反映される。**構造化実行は UI 操作をブロックしない**。
+
+### 3.3 応答コレクタ
+構造化実行中だけ有効な「応答収集バッファ」を活性化し、コマンド送信後の出力行を蓄積。完了検出で確定し、プロンプト接頭辞を除去してパーサへ渡す。
+
+## 4. 完了検出（案C': 汎用プロンプト末尾検出）
+
+### 4.1 動機
+応答時間は **コマンド種別**（即時〜30秒以上）と **負荷**（賑わう世界はラグる）で大きく変動するため、**固定 settle や固定 timeout だけでは不適**。プロンプト `<world>>` は「次入力待ち」の**確定シグナル**で timing/負荷に非依存。
+
+### 4.2 疑似コード
+```
+fn Exec(cmd):
+    sendBytes = encode(cmd + "\n")
+    acquire(mu)
+    set activeCollector = new()
+    write(stdin, sendBytes)
+    started_at = now
+    last_change = now
+    loop:
+        // 読み足し（短い待機）
+        chunk = readChunk(timeout=20ms)
+        if chunk:
+            activeCollector.append(chunk)
+            last_change = now
+        pending = activeCollector.bytesAfterLastNewline()
+        if pending ends with ">" AND (now - last_change) >= 50ms:
+            break            // 完了
+        if (now - started_at) >= cmdMaxTimeout:
+            break            // タイムアウト（フラグ付き）
+    clear activeCollector
+    release(mu)
+    lines = collectedLines (with prompt prefix stripped from first line)
+    return lines, timeoutFlag
+```
+
+### 4.3 cmd 毎の最大 timeout（既定）
+- `worlds`/`status`/`users`/`listbans`/`friendrequests`/`accesslevel`/`role`/`invite`/`kick`/`ban`/`name`/`maxusers` … **3〜5 秒**
+- `focus` … **2 秒**
+- `startworldurl` … **60 秒**
+- 上記は設定可能（config 経由で上書き可）
+
+### 4.4 ambient（無関係ログ）の扱い
+応答収集中も ambient 行（入退室等）は届きうるが：
+- 改行付きで `pending` には現れない → **完了検出を乱さない**
+- 収集行に混じるが、**パーサが該当行（正規表現に一致するもの）のみ拾う**ので無視される
+
+### 4.5 エッジケース
+| ケース | 対処 |
+|---|---|
+| 改行が来ない長行 | timeout で切上げ＋ログ |
+| プロンプトが来ない（コマンドがプロンプトに戻らない） | timeout で切上げ |
+| `focus`/`name` でプロンプト自体が変わる | 「世界名」を見ず「`>` で安定」の汎用判定なので問題なし（**実機検証済**） |
+| 起動直後の "Unknown command" | 構造化コマンドは **ready 後のみ**実行（呼び出し側でゲート） |
+| 確認窓中に ambient が入り pending が変わる | プロンプトは再出現するので少し遅れて再検出されるだけ |
+| 応答行末尾が一瞬 `>` で見える誤検出 | ~50ms の安定確認で回避（応答行は通常改行付きで pending にならない） |
+| **silent 成功（出力なし）コマンド**（`name`/`maxusers`/`focus`/空 `listbans`/空 `friendrequests`） | プロンプト末尾検出が即発火 → **応答=空行リスト**として返す（実機検証済） |
+| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | 応答待ちせず連射した場合のみ発生。**直列キュー設計が構造的に防止**（実機で再現確認） |
+
+## 5. プロンプト接頭辞除去（案X）
+
+実機観測: 応答の最初の行は `<world>>[0] ...` のように **プロンプトが連結**される（プロンプトに改行が無い）。
+
+**ルール**: 応答の最初の行に限り、**行頭から最初の `>` まで（その `>` を含む）を除去**。`<world>>` プロンプトに `>` が含まれることはレア（世界名に `>` を含むのは想定外）。
+
+世界名の追跡は不要（generic に剥がすだけ）。これによりパーサは `^\[` 等の **`^` アンカー正規表現**を素直に書ける。
+
+## 6. 原子的グループ
+
+`focus` は**サーバー全体で共有の状態**。「`focus 2; status`」のような複数手順は、**同じ排他ロックを保持して連続実行**する（他の構造化コマンドが間に割り込まない）。
+
+```go
+err := executor.ExecGroup(ctx, func(tx Tx) error {
+    if _, err := tx.Exec("focus 2"); err != nil { return err }
+    lines, err := tx.Exec("status")
+    if err != nil { return err }
+    parsed := parseStatus(lines)
+    // ...
+    return nil
+})
+```
+
+## 7. WorldsService（巡回の共通化）
+
+```go
+type WorldsService interface {
+    List(ctx) ([]World, error)        // worlds 一発 → 構造化
+    ForEach(ctx, fn func(w World, s Scope) error) error  // 各worldをfocus→fn を原子的に
+}
+```
+- `List()` の合計人数で **userZero 判定**（focus 巡回不要）
+- 事前アクション・セッション変更・各world のユーザー一覧取得は `ForEach` を共用
+
+## 8. パーサ（コマンド毎）
+
+| コマンド | 戻り値の主フィールド |
+|---|---|
+| `worlds`         | `[]World{Index, Name, Users, Present, AccessLevel, MaxUsers}` |
+| `status`         | `Status{Name, SessionID, CurrentUsers, PresentUsers, MaxUsers, Uptime, AccessLevel, HiddenFromListing, MobileFriendly, Description, Tags, Users}` |
+| `users`          | `[]User{Name, ID, Role, Present, PingMs, FPS, Silenced}` |
+| `listbans`       | `[]Ban{Index, Username, UserID, MachineIDs}` |
+| `friendrequests` | `[]string`（ユーザー名一覧） |
+
+- 正規表現は `docs/resonite-domain-facts.md` を出典。
+- 応答行は**プロンプト接頭辞除去後**に適用（`^` アンカー使用可）。
+- ambient/無関係行は正規表現に当たらず自然に無視。
+- **2026-05-28 実機採取での修正点**：
+  - `status` パーサは **`ResoniteLink` Key を追加**（旧コードに無い）
+  - `users` パーサは **`id` 空文字を許容**（旧 `\S+` → `[^\s]*` 等）
+  - その他は旧 regex がそのまま通用（採取で再確認）
+
+## 9. Go 型・インターフェース（概略）
+
+```go
+type ExecOption func(*execConfig)
+type execConfig struct {
+    MaxTimeout       time.Duration
+    SettleConfirm    time.Duration // 既定 50ms
+    ReadChunkTimeout time.Duration // 既定 20ms
+}
+
+type Executor interface {
+    Exec(ctx context.Context, cmd string, opts ...ExecOption) ([]string, error)
+    ExecGroup(ctx context.Context, fn func(tx Tx) error) error
+    // ライブログ購読は既存 Driver.SubscribeLog を継続利用
+}
+
+type Tx interface {
+    Exec(cmd string, opts ...ExecOption) ([]string, error)
+}
+
+type WorldsService interface {
+    List(ctx context.Context) ([]World, error)
+    ForEach(ctx context.Context, fn func(w World, s Scope) error) error
+}
+
+type Scope interface { // ForEach の fn 内で使う
+    Exec(cmd string, opts ...ExecOption) ([]string, error) // 既に focus 済み
+    World() World
+}
+```
+
+## 10. エラー処理・タイムアウト
+
+- `Exec` は (lines, err) を返す。err = nil で成功、timeout/EOF/送信失敗で非 nil。
+- timeout 時は**収集できた行を含めて**返す（部分パースが可能なように）。呼び出し側は err を見て扱いを決める。
+- ヘッドレスが ready でない時の `Exec` 呼び出しは `ErrNotReady` を返す。
+- 同期：context キャンセル時は実行を放棄して err 返す（ロックは確実に解放）。
+
+## 11. テスト戦略
+
+- **Executor 単体**: 偽 stdin/stdout（バイト列スクリプト）で:
+  - 完了検出（プロンプト末尾＋安定窓）
+  - 直列化（同時2リクエストで排他確認）
+  - 原子的グループ（grouped command 中に他リクエストが割り込まないこと）
+  - timeout / readChunk / settle 各境界
+- **Parser 単体**: 2026-05-28 実機採取fixture（`scripts/empirical-capture/fixtures/2026-05-28-windows-multiworld.log`）から抽出した worlds/status/users/accesslevel/Unknown command の実行ブロックを入力に期待構造体と比較。プロンプト接頭辞の有無、silent成功(空応答)、空ID も両方テスト。
+- **統合**: `poc/fakehl` を拡張して worlds/status/users 風の応答を返せるようにし、Executor→WorldsService→ハンドラまで通す。
+- **e2e（任意）**: 実 Resonite ヘッドレスを使った任意検証（ユーザーの 24/7 機で）。
+
+## 12. 将来性: HeadlessBackend 抽象（軽量）
+
+今は stock+stdout 1経路だが、将来 Crystite/mod系API へ拡張可能なよう、**通信境界に薄いインターフェース**を置く：
+
+```go
+// 命名と境界だけ意識（今は1実装のみ）
+type HeadlessBackend interface {
+    Status() Status
+    Subscribe(...) (chan ..., ...)
+    Execute(cmd) ([]string, error)
+    // ...
+}
+```
+今は実装1本だが、`adapter/headless/stdout/` 等のディレクトリ命名で**将来 `adapter/headless/grpc/` を足せる**形にしておく。**今回は実装しない**（命名と境界のみ）。
+
+## 13. 受け入れ基準
+
+- ✅ 直列性: 同時2リクエストが排他されて応答が混ざらない（test）
+- ✅ 完了検出: settle のみではなくプロンプト末尾で確定（test）
+- ✅ ライブログ非阻害: 構造化実行中も `logHub` は流れる（test）
+- ✅ 原子的グループ: focus 変更中に他リクエストが割り込まない（test）
+- ✅ パース: 旧書式の代表サンプルに対し期待構造体を返す（test）
+- ✅ timeout: 過大時は部分結果＋err を返す（test）
+
+## 14. 未決・後追い
+
+- 実フィクスチャ（status/users/listbans/friendrequests）の採取は**後追い**（パース不一致が出た時点で）。
+- HeadlessBackend 抽象の**他実装は未定**（Crystite/mod は採用見送り）。
+- 設定での timeout/settle 上書きは v1.x のどこかで設定UIから可能にする（今は config に書ける程度）。

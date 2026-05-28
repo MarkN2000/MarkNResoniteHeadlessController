@@ -48,7 +48,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 | `listbans` | BAN一覧 | `[0]     Username: xxxx UserID: U-xxxx   MachineIds: xxxx` |
 | `friendrequests` | 受信フレンド申請一覧 | ユーザー名のリスト（**書式要実機確認**） |
 
-**`status` のKey一覧**: `Name`, `SessionID`, `Current Users`, `Present Users`, `Max Users`, `Uptime`, `Access Level`, `Hidden from listing`(bool), `Mobile Friendly`(bool), `Description`, `Tags`(カンマ区切り), `Users`(カンマ区切り)。
+**`status` のKey一覧（2026-05-28 Windows Beta 2026.5.27.1300 実機採取で再検証）**: `Name`, `SessionID`, `Current Users`, `Present Users`, `Max Users`, `Uptime`, `Access Level`, `Hidden from listing`(bool), `Mobile Friendly`(bool), `Description`, `Tags`(カンマ区切り), `Users`(カンマ区切り), **`ResoniteLink`** ⭐**NEW（旧コードに無い・要追加）**。
 
 ### 操作系（write）
 
@@ -64,11 +64,13 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 | `unban <userId>` | BAN解除（**userIdは引用符なし**） | — |
 | `acceptfriendrequest "<username>"` | フレンド申請承認 | — |
 | `message "<username>" "<text>"` | **個別DM送信**（※セッション全体ブロードキャストではない） | — |
-| `name "<newName>"` | フォーカス中セッション名変更 | — |
-| `maxusers <n>` | 最大人数変更 | — |
+| `name "<newName>"` | フォーカス中セッション名変更 | **silent（出力なし）・新プロンプトが新名に変化**で識別 |
+| `maxusers <n>` | 最大人数変更 | **silent（出力なし）** |
 | `startworldurl "<url>"` | URLから新規セッション開始（プロンプトまで待機） | — |
 | `save` / `close` / `restart` | フォーカス中セッションの保存/閉じ/再起動 | — |
-| `shutdown` | ヘッドレス全体の正常終了 | — |
+| `shutdown` | ヘッドレス全体の正常終了 | `Exiting. Save Homes: <bool>` 以降の終了ログ多数 |
+
+> ⭐ **silent成功（出力なし）コマンドの存在**（2026-05-28 採取）: `name`/`maxusers`/`focus`/空の `listbans`/空の `friendrequests` などは**応答行をまったく返さず、次のプロンプトのみ出る**。構造化Driver の完了検出は「プロンプト末尾＋安定窓」なので silent でも問題なく検出できる（応答=空行リスト）。パーサ側は空応答=成功として扱う。
 
 > 💡 **「チャット予告」アクションの実体**: Resoniteヘッドレスには「セッション全員へのチャット一斉送信」コマンドが見当たらず、現行は **`users`で全員を列挙 → 各人へ `message "<user>" "<msg>"`** を送るループで実現。新実装の `chatWarning` も同方式になる見込み（要実機確認）。
 
@@ -99,7 +101,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 # worlds（API側 headlessParsers.ts:39）
 /^\[(?<index>\d+)\]\s+(?<name>.+?)\s+Users:\s+(?<users>\d+)[\s\t]+Present:\s+(?<present>\d+)[\s\t]+AccessLevel:\s+(?<access>\S+)[\s\t]+MaxUsers:\s+(?<max>\d+)/i
 
-# users（serverRoutes.ts:444）
+# users（serverRoutes.ts:444。⚠️ idは空文字あり=`\S+`では取れないので `(?:\S+)?` 等で修正要）
 /^(?<name>\S+)\s+ID:\s+(?<id>\S+)\s+Role:\s+(?<role>\S+)\s+Present:\s+(?<present>True|False)\s+Ping:\s+(?<ping>[0-9.]+)\s+ms\s+FPS:\s+(?<fps>[0-9.]+)\s+Silenced:\s+(?<silenced>True|False)$/i
 
 # status / worlds詳細（Key: Value 行）
@@ -169,6 +171,25 @@ Go PoCで本物のヘッドレスに対して検証した事実：
 - ⚠️ **起動直後の最初の1コマンドが `Unknown command` になる事象を観測**（同コマンドの2回目は正常）。エンジンが完全に応答可能になる前の入力が無視/誤処理される可能性 → v1では **readiness合図（"Engine Ready!"/"World running..."）を待ってからコマンド受付**、または初回にダミー改行を送る等を検討。
 - **`shutdown`**: `Exiting. Save Homes: False` → 設定保存 → 公開セッションは `BroadcastSessionEnded ... to Public` で閉じ → プロセスは**正常終了(exit 0)**。停止時に `UniLog.Log` 由来のスタックトレースが出るが**エラーではない**（RequestShutdown記録ログ）。
 - **無config起動はワールドが公開(Private→Anyone・public listing)になる** → v1は必ずconfigで適切なaccessLevelを設定。
+
+### Windows実機・複数ワールド・コマンド網羅採取（2026-05-28, Beta 2026.5.27.1300, .NET 10.0.8）
+
+`scripts/empirical-capture/` のスクリプトで以下を採取（fixture: `scripts/empirical-capture/fixtures/2026-05-28-windows-multiworld.log`）：
+
+- **複数ワールド起動**（test-multi-world.json で `MRHC Test World A/B` 各 Grid プリセット・Private）
+- 採取コマンド: `worlds` / `focus 0` / `status` / `users` / `focus 1` / `status` / `users` / `name "Renamed"` / `worlds` / `accesslevel LAN` / `maxusers 8` / `listbans` / `friendrequests` / `dummycommand`（不明）/ `shutdown`
+
+**検証された出力書式**（旧コードregexと突合）：
+- `worlds`: `[<idx>] <name padded with spaces>\tUsers: N\tPresent: N\tAccessLevel: <L>\tMaxUsers: N` — name の右側に空白パディング＋TAB区切り。**旧 regex `\s+` で吸収可能**
+- `users`: `<Name>\tID: <id>\tRole: <r>\tPresent: <b>\tPing: N ms\tFPS: <f>\tSilenced: <b>` — **ID は無アカウント時 空文字**（旧 regex `\S+` だと空にマッチしない → 修正要）
+- `status`: 13行、**新たに `ResoniteLink: off` を末尾に出力**（旧 Key 一覧に無いので追加要）
+- `accesslevel <L>`: `World <name> now has access level <L>` — 旧 regex で OK
+- `Unknown command`: 不明コマンドで 1 行
+
+**プロンプト挙動の実機確認**：
+- 形式: `<world_name>>`（例 `MRHC Test World A>`, `Renamed>`）
+- **改行なし**で次の出力行に連結（前から既知）
+- ⭐ **プロンプト累積**: 応答ゼロの silent コマンドを**待たずに連射**すると、次に何か出力する行に**プロンプトが N 個連続して現れる**（例 `Renamed>Renamed>Renamed>Renamed>Unknown command`）。これは「応答待ちしない」場合のみ起こる現象で、**構造化Driver は直列＋待機なので発生しない**。
 
 ### Windows実機・文字コード（要対応）
 - **Windows実機**: Resoniteヘッドレスは既定パス `C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` に存在（開発PCで確認）。Steamライブラリ: `C:/Program Files (x86)/Steam` と `D:/SteamLibrary`。

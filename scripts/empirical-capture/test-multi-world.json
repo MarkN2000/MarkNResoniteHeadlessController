@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
+  "comment": "MRHC 構造化Driver 実機採取用：複数ワールド・Private・非ログイン（必要ならloginCredential/loginPasswordを追加）",
+  "universeId": null,
+  "tickRate": 60.0,
+  "maxConcurrentAssetTransfers": 64,
+  "usernameOverride": null,
+  "loginCredential": null,
+  "loginPassword": null,
+  "startWorlds": [
+    {
+      "isEnabled": true,
+      "sessionName": "MRHC Test World A",
+      "description": "empirical capture",
+      "maxUsers": 4,
+      "accessLevel": "Private",
+      "hideFromPublicListing": true,
+      "mobileFriendly": false,
+      "loadWorldPresetName": "Grid",
+      "keepOriginalRoles": false,
+      "autoRecover": false,
+      "saveOnExit": false
+    },
+    {
+      "isEnabled": true,
+      "sessionName": "MRHC Test World B",
+      "description": "empirical capture",
+      "maxUsers": 4,
+      "accessLevel": "Private",
+      "hideFromPublicListing": true,
+      "mobileFriendly": false,
+      "loadWorldPresetName": "Grid",
+      "keepOriginalRoles": false,
+      "autoRecover": false,
+      "saveOnExit": false
+    }
+  ]
+}

@@ -99,6 +99,8 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 
 ## 5. ドメインモデル
 
+> 構造化実行（コマンド/応答）・WorldsService の**詳細設計**: [docs/design/structured-driver.md](design/structured-driver.md)
+
 ### 5.1 Console Driver（プロセスI/O）
 - 起動: `ProcessLauncher.Launch(configPath)`（OS差を抽象化）。
 - **コマンドは直列化**: Resoniteのstdin/stdoutは1本なので、コマンドをキューに積み**1件ずつ実行**。同時実行しない。
