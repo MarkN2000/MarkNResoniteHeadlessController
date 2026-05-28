@@ -74,7 +74,8 @@ fn Exec(cmd):
 ```
 
 ### 4.3 cmd 毎の最大 timeout（既定）
-- `worlds`/`status`/`users`/`listbans`/`friendrequests`/`accesslevel`/`role`/`invite`/`kick`/`ban`/`name`/`maxusers` … **3〜5 秒**
+- `worlds`/`status`/`users`/`listbans`/`accesslevel`/`role`/`invite`/`kick`/`ban`/`name`/`maxusers` … **3〜5 秒**
+  - ※ `friendrequests` は仕様問題で撤去済 → 詳細は `internal/headless/parser.go` の NOTE 参照
 - `focus` … **2 秒**
 - `startworldurl` … **60 秒**
 - 上記は設定可能（config 経由で上書き可）
@@ -94,7 +95,7 @@ fn Exec(cmd):
 | 確認窓中に ambient が入り pending が変わる | プロンプトは再出現するので少し遅れて再検出されるだけ |
 | 応答行末尾が一瞬 `>` で見える誤検出 | ~50ms の安定確認で回避（応答行は通常改行付きで pending にならない） |
 | **silent 成功（出力なし）コマンド**（`name`/`maxusers`/`focus`/空 `listbans`/空 `friendrequests`） | プロンプト末尾検出が即発火 → **応答=空行リスト**として返す（実機検証済） |
-| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | (a) Exec 内連射: 直列キューが防止。(b) **ExecGroup 内の連続 Exec**: silent 系後の prompt が lineBuf に残るため発生 → **stripPromptPrefix が `^([^>]*>)+` で全プロンプト剥がし**で対応（§5） |
+| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | (a) Exec 内連射: 直列キューが防止。(b) **ExecGroup 内の連続 Exec**: silent 系後の prompt が lineBuf に残るため発生 → **`stripLineLeadingPrompts` (per-line) が `^([^>]*>)+` で全プロンプト剥がし**で対応（§5） |
 | **Exec 実行中にヘッドレスプロセスが死亡** | `readPipe` 終了 → コレクタへの新規追加停止 → `readChunk` が空継続 → cmdMaxTimeout で切上げ → `ErrProcessGone` を返す（既存 Wait goroutine が ready フラグを落とすので、以降の Exec は `ErrNotReady`） |
 
 ## 5. プロンプト接頭辞除去（案X 拡張版）
@@ -131,7 +132,7 @@ ExecGroup 内では前コマンドの prompt が次コマンドの応答に必�
 
 ### 既知の限界
 構造化コマンドの応答1行目に `>` が含まれる場合、過剰に剥がす可能性がある。
-現在対応するコマンド（worlds/status/users/listbans/friendrequests/accesslevel/Unknown）の
+現在対応するコマンド（worlds/status/users/listbans/accesslevel/Unknown）の
 1行目はいずれも `>` を含まないため実害なし。世界名等に `>` を含めるエッジケースは
 ドキュメント明記の限界として受容する。
 
@@ -169,7 +170,7 @@ type WorldsService interface {
 | `status`         | `Status{Name, SessionID, CurrentUsers, PresentUsers, MaxUsers, Uptime, AccessLevel, HiddenFromListing, MobileFriendly, Description, Tags, Users}` |
 | `users`          | `[]User{Name, ID, Role, Present, PingMs, FPS, Silenced}` |
 | `listbans`       | `[]Ban{Index, Username, UserID, MachineIDs}` |
-| `friendrequests` | `[]string`（ユーザー名一覧） |
+| ~~`friendrequests`~~ | **撤去済** (parser.go の NOTE 参照) |
 
 - 正規表現は `docs/resonite-domain-facts.md` を出典。
 - 各 parser は **`stripLineLeadingPrompts` を per-line で適用してから regex 照合**（Phase 6 e2e で発見）。
@@ -276,6 +277,7 @@ type HeadlessBackend interface {
 
 ## 14. 未決・後追い
 
-- 実フィクスチャ（status/users/listbans/friendrequests）の採取は**後追い**（パース不一致が出た時点で）。
+- 実フィクスチャ（status/users/listbans）は **2026-05-28 LAN+login 実機採取済** (`scripts/empirical-capture/fixtures/2026-05-28-lan-login/` 参照)。
+- friendrequests は実書式採取不可で撤去済。将来第三者からの pending request を採取できた時点で再実装。
 - HeadlessBackend 抽象の**他実装は未定**（Crystite/mod は採用見送り）。
 - 設定での timeout/settle 上書きは v1.x のどこかで設定UIから可能にする（今は config に書ける程度）。

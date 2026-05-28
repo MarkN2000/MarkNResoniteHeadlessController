@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -323,5 +324,51 @@ func TestServer_RawCommand_StillWorks(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+// 2026-05-28 改: /command の cmd を URL query / JSON body / form-urlencoded body の
+// 3 経路で受理することを確認（curl --data-urlencode 互換）
+func TestServer_RawCommand_AcceptsThreeBodyForms(t *testing.T) {
+	ts, key := newTestServer(t)
+	cases := []struct {
+		name        string
+		url         string
+		contentType string
+		body        string
+	}{
+		{"URL_query", ts.URL + "/api/v1/command?apiKey=" + key + "&cmd=worlds", "", ""},
+		{"JSON_body", ts.URL + "/api/v1/command?apiKey=" + key, "application/json", `{"cmd":"worlds"}`},
+		{"form_urlencoded_body", ts.URL + "/api/v1/command?apiKey=" + key, "application/x-www-form-urlencoded", "cmd=worlds"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var resp *http.Response
+			var err error
+			if tc.body == "" {
+				resp, err = http.Post(tc.url, "", nil)
+			} else {
+				resp, err = http.Post(tc.url, tc.contentType, strings.NewReader(tc.body))
+			}
+			if err != nil {
+				t.Fatalf("POST: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("expected 200, got %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+func TestServer_RawCommand_MissingCmd(t *testing.T) {
+	ts, key := newTestServer(t)
+	resp, err := http.Post(ts.URL+"/api/v1/command?apiKey="+key, "", nil)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing cmd, got %d", resp.StatusCode)
 	}
 }
