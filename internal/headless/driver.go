@@ -343,7 +343,12 @@ func (d *Driver) Stop() error {
 	return nil
 }
 
-// SendCommand はヘッドレスのstdinへコマンドを送る。
+// SendCommand はヘッドレスのstdinへコマンドを送る（fire-and-forget）。
+//
+// 並行性: execMu を取得することで、構造化 Exec/ExecGroup と stdin への書き込みを
+// 直列化する。これがないと、構造化 Exec の応答収集ウィンドウ内に SendCommand の
+// 出力が混入し、構造化レスポンスが壊れる。
+// 待機時間はせいぜい走行中の Exec が終わるまで（既定 5s）。
 func (d *Driver) SendCommand(command string) error {
 	d.mu.Lock()
 	stdin := d.stdin
@@ -352,6 +357,11 @@ func (d *Driver) SendCommand(command string) error {
 	if stdin == nil || (state != StateRunning && state != StateStarting) {
 		return ErrNotRunning
 	}
+
+	// 構造化 Exec との混入を防ぐため execMu を取得
+	d.execMu.Lock()
+	defer d.execMu.Unlock()
+
 	d.publishLog("cmd", "> "+command)
 	payload := command + "\n"
 	if d.enc != nil { // 非UTF-8（Windowsコードページ等）へエンコードして送信

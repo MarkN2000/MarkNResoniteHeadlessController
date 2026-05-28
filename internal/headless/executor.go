@@ -139,10 +139,16 @@ func (c *respCollector) waitComplete(ctx context.Context, cfg execConfig) ([]str
 		if err := ctx.Err(); err != nil {
 			return c.snapshot(), ErrCanceled
 		}
-		// 2. プロセス死亡
+		// 2. プロセス死亡 + pending tail スナップショット (ロック内で値コピー)
 		c.mu.Lock()
 		gone := c.gone
-		pending := c.pendingTail
+		// pendingTail の slice header をコピーするとロック外で更新されうるため、
+		// 必要な値 (末尾バイトと長さ) だけをロック内で抽出する。
+		pendingLen := len(c.pendingTail)
+		var pendingLast byte
+		if pendingLen > 0 {
+			pendingLast = c.pendingTail[pendingLen-1]
+		}
 		lastChange := c.lastChange
 		c.mu.Unlock()
 		if gone != nil {
@@ -153,7 +159,7 @@ func (c *respCollector) waitComplete(ctx context.Context, cfg execConfig) ([]str
 			return c.snapshot(), ErrTimeout
 		}
 		// 4. プロンプト末尾検出 + 安定窓
-		if n := len(pending); n > 0 && pending[n-1] == '>' {
+		if pendingLen > 0 && pendingLast == '>' {
 			stable := time.Since(lastChange)
 			if stable >= cfg.SettleConfirm {
 				return c.snapshot(), nil
