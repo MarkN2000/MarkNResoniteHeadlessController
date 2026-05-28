@@ -254,6 +254,73 @@ func TestServer_SessionStatus_Concurrent(t *testing.T) {
 	}
 }
 
+// --- writeExecErr のエラーマッピング確認（Phase 7 前レビューで追加）---
+
+func TestServer_ExecError_NotReady_After_Stop(t *testing.T) {
+	// driver を停止 → /sessions が 409 (ErrNotReady→409 Conflict)
+	ts, key := newTestServer(t)
+
+	// stop 経由でヘッドレスを止める（cleanup より先に明示停止）
+	resp, err := http.Post(ts.URL+"/api/v1/stop?apiKey="+key, "", nil)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	resp.Body.Close()
+
+	// state=stopped まで待つ
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		r, err := http.Get(ts.URL + "/api/v1/status?apiKey=" + key)
+		if err != nil {
+			break
+		}
+		var b struct {
+			Data struct {
+				State string `json:"state"`
+			} `json:"data"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		r.Body.Close()
+		if b.Data.State == "stopped" {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// /sessions → 409
+	r, err := http.Get(ts.URL + "/api/v1/sessions?apiKey=" + key)
+	if err != nil {
+		t.Fatalf("GET /sessions: %v", err)
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 (ErrNotReady), got %d", r.StatusCode)
+	}
+}
+
+func TestServer_ExecError_Timeout(t *testing.T) {
+	// fakehl の hang コマンドで stdin 処理を停止 → 後続 /sessions は timeout (504)
+	ts, key := newTestServer(t)
+
+	// raw /command で hang を送る（fakehl は main goroutine が time.Sleep 1h でブロック）
+	r, err := http.Post(ts.URL+"/api/v1/command?apiKey="+key+"&cmd=hang", "", nil)
+	if err != nil {
+		t.Fatalf("send hang: %v", err)
+	}
+	r.Body.Close()
+	time.Sleep(150 * time.Millisecond) // hang が始まるまで少し待つ
+
+	// /sessions は Exec("worlds") を呼ぶが、fakehl が応答しない → MaxTimeout 5s で 504
+	r2, err := http.Get(ts.URL + "/api/v1/sessions?apiKey=" + key)
+	if err != nil {
+		t.Fatalf("GET /sessions: %v", err)
+	}
+	defer r2.Body.Close()
+	if r2.StatusCode != http.StatusGatewayTimeout {
+		t.Fatalf("expected 504 (ErrTimeout), got %d", r2.StatusCode)
+	}
+}
+
 // --- raw /command は変更なし（既存仕様の回帰確認）---
 
 func TestServer_RawCommand_StillWorks(t *testing.T) {

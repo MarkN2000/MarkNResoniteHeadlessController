@@ -212,25 +212,43 @@ func TestParseFriendRequests(t *testing.T) {
 	}
 }
 
-func TestStripPromptPrefix(t *testing.T) {
+// 回帰テスト (Phase 6 レビューで発見): ambient ログを混ぜても
+// ユーザー名のみが返ること。
+func TestParseFriendRequestsFiltersAmbient(t *testing.T) {
+	input := []string{
+		"BOOTSTRAP: Running userspace bootstrap",
+		"alice",
+		"User Joined Userspace. Username: bob, UserID: ...",
+		"Updated: A -> B",
+		"carol",
+		"[0] World A Users: 1",
+		"MRHC>Renamed>dave",
+	}
+	got := ParseFriendRequests(input)
+	want := []string{"alice", "carol", "dave"} // dave は prompt 剥がし後
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ambient フィルタが不十分: got=%v want=%v", got, want)
+	}
+}
+
+func TestStripLineLeadingPrompts(t *testing.T) {
 	cases := []struct {
 		name string
-		in   []string
-		want []string
+		in   string
+		want string
 	}{
-		{"empty", nil, nil},
-		{"no prompt", []string{"hello", "world"}, []string{"hello", "world"}},
-		{"single prompt", []string{"MRHC Test World A>[0] something", "next"}, []string{"[0] something", "next"}},
-		{"only prompt", []string{"Renamed>"}, []string{""}},
-		{"strip first only", []string{"A>line1", "B>line2"}, []string{"line1", "B>line2"}},
-		// 連続プロンプト累積（ExecGroup の連続 silent コマンド後など）
-		{"two prompts", []string{"Fake World 0>Fake World 1>Name: X", "SessionID: Y"}, []string{"Name: X", "SessionID: Y"}},
-		{"four prompts", []string{"R>R>R>R>Unknown command"}, []string{"Unknown command"}},
+		{"empty", "", ""},
+		{"no prompt", "hello", "hello"},
+		{"single prompt", "MRHC Test World A>[0] something", "[0] something"},
+		{"only prompt", "Renamed>", ""},
+		{"two prompts", "Fake World 0>Fake World 1>Name: X", "Name: X"},
+		{"four prompts", "R>R>R>R>Unknown command", "Unknown command"},
+		{"prompt-like fragments in content (over-strip is harmless)", "Updated: A -> B", " B"},
 	}
 	for _, c := range cases {
-		got := stripPromptPrefix(c.in)
-		if !reflect.DeepEqual(got, c.want) {
-			t.Errorf("%s: got=%v want=%v", c.name, got, c.want)
+		got := stripLineLeadingPrompts(c.in)
+		if got != c.want {
+			t.Errorf("%s: got=%q want=%q", c.name, got, c.want)
 		}
 	}
 }

@@ -468,6 +468,7 @@ func (d *Driver) execLocked(ctx context.Context, cmd string, opts ...ExecOption)
 		return nil, fmt.Errorf("send failed: %w", err)
 	}
 
-	lines, err := c.waitComplete(ctx, cfg)
-	return stripPromptPrefix(lines), err
+	// 注: prompt-prefix 剥がしは parser 側 (stripLineLeadingPrompts) で per-line に行う。
+	// Driver は raw lines を返す（ambient と応答が混在し得る性質に合わせて parser 責任に統一）。
+	return c.waitComplete(ctx, cfg)
 }

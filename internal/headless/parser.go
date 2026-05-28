@@ -165,16 +165,59 @@ func ParseListBans(lines []string) []BanEntry {
 
 // ParseFriendRequests は friendrequests コマンドの応答行からユーザー名一覧を構築する。
 // 出力はユーザー名1人/行（プロンプト/空行は除外）。空リストは []string{} を返す。
+//
+// 注意: collector は Exec 中の ambient ログも全て捕えるため、生の trim だけでは
+// ambient 行を「友達申請」として誤取込みする。次の対策で防ぐ：
+//   - "safe-strip": 行頭の prompt prefix のみ剥がす（prompt-like = prefix に `:`等を含まない）
+//     → "Updated: A -> B" のような ambient は剥がさず保持
+//   - isLikelyUsername でユーザー名らしくない行を除外（`:` `\t` `>` `[` `]` 含む / 長すぎる / 空）
 func ParseFriendRequests(lines []string) []string {
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
-		t := strings.TrimSpace(line)
-		if t == "" {
+		t := safeStripLeadingPrompts(strings.TrimSpace(line))
+		t = strings.TrimSpace(t)
+		if !isLikelyUsername(t) {
 			continue
 		}
 		out = append(out, t)
 	}
 	return out
+}
+
+// safeStripLeadingPrompts は行頭の prompt prefix を「保守的に」剥がす。
+// "Renamed>Renamed>dave" のような prompt accumulation は剥がすが、
+// "Updated: A -> B" のような ambient 行（'>' 前に prompt-like でない文字を含む）は剥がさない。
+//
+// 判定基準: 次の '>' までの prefix が `:` `\t` `[` `]` を含まなければ "prompt-like"。
+// promptlike なら剥がして残りで再判定（多段プロンプトに対応）。
+func safeStripLeadingPrompts(s string) string {
+	for {
+		i := strings.IndexByte(s, '>')
+		if i < 0 {
+			return s
+		}
+		prefix := s[:i]
+		if strings.ContainsAny(prefix, ":\t[]") {
+			return s // prompt-like でない → ここで停止
+		}
+		s = s[i+1:]
+	}
+}
+
+// isLikelyUsername は Resonite ユーザー名らしさを「ambient 行でないか」の観点で判定する。
+// Resonite ambient ログ行は典型的に ':' (key:value), '\t' (tabular), '[' (indexed),
+// '>' (prompt 残骸) を含む。ユーザー名はこれらを含まない。長さも 64 字までを想定。
+// 控えめな heuristic（誤陰性より誤陽性回避を優先）。
+func isLikelyUsername(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if r == ':' || r == '\t' || r == '>' || r == '[' || r == ']' {
+			return false
+		}
+	}
+	return true
 }
 
 // --- ヘルパ ---
@@ -207,40 +250,19 @@ func warnUnknownStatusKey(key string) {
 //
 // 必要な理由: Driver の collector は Exec 中に流れる全ての stdout 行を捕える
 // （ambient/起動ログ含む）。そのため応答行は collector の任意の位置に現れ得る。
-// stripPromptPrefix（lines[0] のみ）では不足で、応答らしい行が ambient と
-// glue したパターン（例: "World A>[0] foo  Users: 1 ..."）を全行で剥がす必要がある。
+// per-line で「<X>><Y>>...」形式の prompt accumulation を剥がすことで、
+// ambient と混在する応答行も parser regex で正しく抽出できる。
 //
 // 注意: ambient 行に '>' が含まれると過剰に剥がすが、その場合は parser regex に
 // 一致しないため最終結果に影響しない（無害な over-strip）。
+//
+// 設計判断: 旧 stripPromptPrefix（lines[0] のみ剥がし）は Phase 6 e2e で
+// ambient 介在ケースに対応できないことが判明したため撤去し、本関数に一本化。
+// Driver/Executor は Exec の戻り値を raw のまま返す（パーサ側責任で正規化）。
 func stripLineLeadingPrompts(line string) string {
 	loc := leadingPromptsRe.FindStringIndex(line)
 	if loc == nil {
 		return line
 	}
 	return line[loc[1]:]
-}
-
-// stripPromptPrefix は応答の先頭行に限り、行頭の「連続プロンプト」を全て除去する。
-// 案X（拡張）：プロンプト `<world>>` を generic に剥がし、パーサが `^` アンカー
-// regex を使える状態にする。
-//
-// 単一プロンプト例:    "Fake World 0>[0] World A …" → "[0] World A …"
-// 連続プロンプト例:    "Fake World 0>Fake World 1>Name: …" → "Name: …"
-//   ※ ExecGroup で silent 系コマンドの直後に次コマンドが続くと、
-//     前コマンドの prompt が lineBuf に残ったまま次の出力が連結するため。
-//
-// lines を mutate せず新しい slice を返す。
-func stripPromptPrefix(lines []string) []string {
-	if len(lines) == 0 {
-		return lines
-	}
-	first := lines[0]
-	loc := leadingPromptsRe.FindStringIndex(first)
-	if loc == nil {
-		return lines
-	}
-	out := make([]string, len(lines))
-	copy(out, lines)
-	out[0] = first[loc[1]:]
-	return out
 }

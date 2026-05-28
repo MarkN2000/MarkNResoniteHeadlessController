@@ -58,6 +58,9 @@ var (
 	ErrCanceled    = errors.New("headless: canceled")
 )
 
+// markGone(nil) で使う sentinel。allocate 回避のため package var で保持。
+var errCleanExit = errors.New("clean exit")
+
 // respCollector は実行中の応答収集バッファ。
 // readPipe（生産者）と Exec の waitComplete（消費者）が共有する。
 type respCollector struct {
@@ -103,7 +106,7 @@ func (c *respCollector) markGone(err error) {
 	c.mu.Lock()
 	if c.gone == nil {
 		if err == nil {
-			err = errors.New("clean exit")
+			err = errCleanExit
 		}
 		c.gone = err
 	}
