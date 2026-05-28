@@ -9,21 +9,27 @@
 
 公式 Resonite ヘッドレスの stdout/stdin を介して **構造化コマンドの送信＋応答取得＋パース** を行い、ダッシュボードに `worlds` / `status` / `users` / `listbans` / `friendrequests` などの**構造化データ**を供給する。**ライブログ配信は維持**したまま（現行の log SSE と両立）。
 
-スコープ外: 起動/停止のライフサイクル（既存 `Driver.Start/Stop`）／プロセスI/Oの低層（既存 `readPipe`／encoding）。これらは現行のまま利用する。
+スコープ外:
+- **ライフサイクル**: 起動/停止（既存 `Driver.Start/Stop`）／プロセスI/Oの低層（既存 `readPipe`／encoding）はそのまま利用。
+- ⚠️ **終了系コマンド（`shutdown` / `restart` / `close`）は Exec の対象外**。理由：Exec はプロンプト復帰を完了シグナルにするが、これらはプロセス（or 当該世界）が消えてプロンプトが返らないため必ず timeout になる。`shutdown` は既存 `Driver.Stop()`（fire-and-forget＋プロセス終了監視）に任せる。`restart`/`close` は今後ハンドリング設計時に明示的に「Exec ではない経路」で扱う。
 
 ## 2. 配置と既存実装との関係
 
 ```
 internal/headless/
   driver.go            … 既存：Start/Stop/log配信/SendCommand(fire-and-forget)
-  executor.go [新規]   … 構造化実行（直列キュー＋応答コレクタ＋完了検出）
+                        + 構造化APIメソッド（Exec/ExecGroup）を合流
+  executor.go [新規]   … 構造化実行ロジック（直列キュー＋応答コレクタ＋完了検出）
+                        ※ Driver 本体にメソッドを生やすが、ロジックの実体は別ファイル
   parser.go   [新規]   … コマンド毎のパース関数（プロンプト接頭辞除去後に適用）
   worlds_service.go [新規] … List() / ForEach() — 巡回の共通化
   hub.go               … 既存：汎用ブロードキャスタ
 ```
+- **方針確定（A）**: `Driver` に Exec/ExecGroup メソッドを**合流**（別オブジェクトに分離しない）。
+  - 理由：pipe/Wait/readPipe/状態（ready/exit/encoding）を1箇所で持つほうがシンプル。状態二重管理を避ける。
+  - テスト性は内部ロジックを `executor.go` に切り出すことで担保（Driver は薄いラッパー）。
 - 既存 `Driver` の `logHub`（ライブ配信）はそのまま利用。
-- `readPipe` を拡張し、**「全行を logHub に push」と並行して「アクティブな応答コレクタにも push」**する。コレクタ未設定時は無効。
-- `Executor` が `Driver` を内包（または同オブジェクトに合流）し、構造化APIを提供する。
+- `readPipe` を拡張し、**「全行を logHub に push」と並行して「アクティブな応答コレクタにも push」**する。コレクタは Exec の入口で set → 出口で unset、`sync/atomic` か mutex で安全に。直列キューにより同時にactiveなコレクタは1つだけ。
 
 ## 3. コアモデル
 
@@ -75,7 +81,7 @@ fn Exec(cmd):
 
 ### 4.4 ambient（無関係ログ）の扱い
 応答収集中も ambient 行（入退室等）は届きうるが：
-- 改行付きで `pending` には現れない → **完了検出を乱さない**
+- ambient 行は**必ず `\n` で終わる**ので、`pending`（最後の `\n` より後ろ）には含まれない → **完了検出を構造的に乱さない**（行末に `>` を含む ambient があっても無問題）
 - 収集行に混じるが、**パーサが該当行（正規表現に一致するもの）のみ拾う**ので無視される
 
 ### 4.5 エッジケース
@@ -89,6 +95,7 @@ fn Exec(cmd):
 | 応答行末尾が一瞬 `>` で見える誤検出 | ~50ms の安定確認で回避（応答行は通常改行付きで pending にならない） |
 | **silent 成功（出力なし）コマンド**（`name`/`maxusers`/`focus`/空 `listbans`/空 `friendrequests`） | プロンプト末尾検出が即発火 → **応答=空行リスト**として返す（実機検証済） |
 | **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | 応答待ちせず連射した場合のみ発生。**直列キュー設計が構造的に防止**（実機で再現確認） |
+| **Exec 実行中にヘッドレスプロセスが死亡** | `readPipe` 終了 → コレクタへの新規追加停止 → `readChunk` が空継続 → cmdMaxTimeout で切上げ → `ErrProcessGone` を返す（既存 Wait goroutine が ready フラグを落とすので、以降の Exec は `ErrNotReady`） |
 
 ## 5. プロンプト接頭辞除去（案X）
 
@@ -141,6 +148,10 @@ type WorldsService interface {
   - `status` パーサは **`ResoniteLink` Key を追加**（旧コードに無い）
   - `users` パーサは **`id` 空文字を許容**（旧 `\S+` → `[^\s]*` 等）
   - その他は旧 regex がそのまま通用（採取で再確認）
+- **未知Keyへの寛容性（将来のバージョン変化への耐性）**:
+  - `status` パーサは「`<key>: <value>` を全て収集し、**知っている Key だけ構造体に写す**」方針。未知Keyは warning ログを 1 回だけ出して握る（毎回出さない＝spam防止）。これにより新Key追加で**パースが落ちない**。
+  - `worlds` / `users` 等の表形式は regex が当たらない行を**無視**するだけで耐性あり（ResoniteLink追加でも壊れなかった実例）。
+  - 既知Key全部が一斉に書式変わった場合は明示的な不一致として扱う（フィクスチャの差分で検知）。
 
 ## 9. Go 型・インターフェース（概略）
 
@@ -177,8 +188,12 @@ type Scope interface { // ForEach の fn 内で使う
 
 - `Exec` は (lines, err) を返す。err = nil で成功、timeout/EOF/送信失敗で非 nil。
 - timeout 時は**収集できた行を含めて**返す（部分パースが可能なように）。呼び出し側は err を見て扱いを決める。
-- ヘッドレスが ready でない時の `Exec` 呼び出しは `ErrNotReady` を返す。
-- 同期：context キャンセル時は実行を放棄して err 返す（ロックは確実に解放）。
+- 標準的なエラー区分（センチネル）:
+  - `ErrNotReady`: ヘッドレスが ready でない時の Exec 呼び出し
+  - `ErrTimeout`: cmdMaxTimeout 超過（lines は部分結果）
+  - `ErrProcessGone`: Exec 実行中にプロセスが死亡（lines は部分結果）
+  - `ErrCanceled`: ctx.Done() による中断
+- 同期：context キャンセル時は実行を放棄して err 返す。**ロックは必ず `defer Unlock()` で解放**。
 
 ## 11. テスト戦略
 
