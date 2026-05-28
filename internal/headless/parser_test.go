@@ -240,6 +240,24 @@ func TestParseFriendRequests_PromptGluedFirstLine(t *testing.T) {
 	}
 }
 
+// 2026-05-28 実機採取で確証 (MARKNPC_SUB2 アカウント、手動 stdin で friendrequests 実行)。
+// 実際の format: 1 username/行のプレーンテキスト。usernames はハイフン・アンダースコア
+// を含み得る。我々の Driver.Exec で取得すると先頭行に prompt が glue する。
+// ユーザー名は匿名化済（実際は別の Resonite アカウント名 4 件）。
+func TestParseFriendRequests_RealFormatEmpirical(t *testing.T) {
+	input := []string{
+		"MARKNPC_SUB2 World 0>alice",   // prompt-glued 先頭行
+		"bob_user",                      // 通常行 (underscore)
+		"carol-dash",                    // ハイフン含む
+		"dave2024",                      // 数字含む
+	}
+	got := ParseFriendRequests(input)
+	want := []string{"alice", "bob_user", "carol-dash", "dave2024"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("実機 format 互換性失敗: got=%v want=%v", got, want)
+	}
+}
+
 func TestParseFriendRequests_AmbientNotOverStripped(t *testing.T) {
 	// "Updated: A -> B" のような ambient は safeStripLeadingPrompts が剥がさない
 	// → ambient 文字列のまま残るが、明らかにユーザー名でない形なので UI 側で
