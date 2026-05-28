@@ -5,10 +5,12 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
@@ -19,6 +21,7 @@ type Server struct {
 	cfg     *config.Config
 	cfgPath string
 	driver  *headless.Driver
+	worlds  headless.WorldsService
 	auth    *authManager
 	webFS   fs.FS
 }
@@ -28,6 +31,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, webFS fs.F
 		cfg:     cfg,
 		cfgPath: cfgPath,
 		driver:  driver,
+		worlds:  headless.NewWorldsService(driver),
 		auth:    newAuthManager(cfg),
 		webFS:   webFS,
 	}
@@ -36,16 +40,26 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, webFS fs.F
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	// 既存（プロセスライフサイクル・raw コマンド・SSE）
 	mux.HandleFunc("POST /api/v1/login", s.handleLogin)
 	mux.HandleFunc("POST /api/v1/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/v1/status", s.requireAuth(s.handleStatus))
 	mux.HandleFunc("/api/v1/start", s.requireAuth(s.handleStart))     // GET/POST両対応
 	mux.HandleFunc("/api/v1/stop", s.requireAuth(s.handleStop))       // GET/POST両対応
-	mux.HandleFunc("/api/v1/command", s.requireAuth(s.handleCommand)) // GET/POST両対応
+	mux.HandleFunc("/api/v1/command", s.requireAuth(s.handleCommand)) // raw fire-and-forget
 	mux.HandleFunc("GET /api/v1/events", s.requireAuth(s.handleEvents))
 
-	// フロントエンド（埋め込み静的資産）
-	mux.Handle("/", http.FileServerFS(s.webFS))
+	// 構造化API（Phase 4: Exec/WorldsService を介して構造化データを返す）
+	mux.HandleFunc("GET /api/v1/sessions", s.requireAuth(s.handleSessions))
+	mux.HandleFunc("GET /api/v1/sessions/{idx}/status", s.requireAuth(s.handleSessionStatus))
+	mux.HandleFunc("GET /api/v1/sessions/{idx}/users", s.requireAuth(s.handleSessionUsers))
+	mux.HandleFunc("GET /api/v1/listbans", s.requireAuth(s.handleListBans))
+	mux.HandleFunc("GET /api/v1/friendrequests", s.requireAuth(s.handleFriendRequests))
+
+	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
+	if s.webFS != nil {
+		mux.Handle("/", http.FileServerFS(s.webFS))
+	}
 	return mux
 }
 
@@ -148,6 +162,121 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]any{"sent": cmd})
+}
+
+// --- 構造化APIハンドラ（Phase 4） ---
+
+// handleSessions: GET /api/v1/sessions → []World （worlds 一覧）
+func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
+	worlds, err := s.worlds.List(r.Context())
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, worlds)
+}
+
+// handleSessionStatus: GET /api/v1/sessions/{idx}/status → WorldStatus
+// 内部で ExecGroup により focus → status を原子的に実行（他リクエストの割込防止）。
+func (s *Server) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
+	idx, err := parseSessionIdx(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	var got headless.WorldStatus
+	err = s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
+		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+			return e
+		}
+		lines, e := tx.Exec("status")
+		if e != nil {
+			return e
+		}
+		got = headless.ParseStatus(lines)
+		return nil
+	})
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, got)
+}
+
+// handleSessionUsers: GET /api/v1/sessions/{idx}/users → []UserInfo
+func (s *Server) handleSessionUsers(w http.ResponseWriter, r *http.Request) {
+	idx, err := parseSessionIdx(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	var got []headless.UserInfo
+	err = s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
+		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+			return e
+		}
+		lines, e := tx.Exec("users")
+		if e != nil {
+			return e
+		}
+		got = headless.ParseUsers(lines)
+		return nil
+	})
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, got)
+}
+
+// handleListBans: GET /api/v1/listbans → []BanEntry （focus 不要・グローバル）
+func (s *Server) handleListBans(w http.ResponseWriter, r *http.Request) {
+	lines, err := s.driver.Exec(r.Context(), "listbans")
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, headless.ParseListBans(lines))
+}
+
+// handleFriendRequests: GET /api/v1/friendrequests → []string （focus 不要・グローバル）
+func (s *Server) handleFriendRequests(w http.ResponseWriter, r *http.Request) {
+	lines, err := s.driver.Exec(r.Context(), "friendrequests")
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, headless.ParseFriendRequests(lines))
+}
+
+// parseSessionIdx は /api/v1/sessions/{idx}/... のパスパラメータを int に変換する。
+func parseSessionIdx(r *http.Request) (int, error) {
+	v := r.PathValue("idx")
+	idx, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("不正なセッションindex: %q", v)
+	}
+	if idx < 0 {
+		return 0, fmt.Errorf("セッションindexが負: %d", idx)
+	}
+	return idx, nil
+}
+
+// writeExecErr は headless パッケージのセンチネルエラーを HTTP ステータスにマップする。
+// 部分結果（lines）は呼び出し側で扱う設計なので、ここでは err のみで分岐する。
+func writeExecErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, headless.ErrNotReady):
+		writeErr(w, http.StatusConflict, "not_ready", "ヘッドレスが起動中/停止中で構造化コマンドを受け付けられません")
+	case errors.Is(err, headless.ErrTimeout):
+		writeErr(w, http.StatusGatewayTimeout, "timeout", err.Error())
+	case errors.Is(err, headless.ErrProcessGone):
+		writeErr(w, http.StatusGone, "process_gone", err.Error())
+	case errors.Is(err, headless.ErrCanceled):
+		writeErr(w, 499, "canceled", "リクエストがキャンセルされました") // 499 Client Closed Request (nginx 互換)
+	default:
+		writeErr(w, http.StatusInternalServerError, "internal", err.Error())
+	}
 }
 
 // --- SSE ---
