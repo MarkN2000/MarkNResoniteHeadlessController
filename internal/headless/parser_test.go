@@ -1,0 +1,190 @@
+package headless
+
+import (
+	"reflect"
+	"testing"
+)
+
+// テストデータは scripts/empirical-capture/fixtures/2026-05-28-windows-multiworld.log の
+// 該当ブロックを抽出したもの（プロンプト接頭辞は除去済の前提）。
+
+func TestParseWorlds(t *testing.T) {
+	// 実機採取（2026-05-28 Windows Beta 2026.5.27.1300, 2ワールド・Private）
+	input := []string{
+		"[0] MRHC Test World A               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
+		"[1] MRHC Test World B               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
+	}
+	got := ParseWorlds(input)
+	want := []World{
+		{Index: 0, Name: "MRHC Test World A", Users: 1, Present: 0, AccessLevel: "Private", MaxUsers: 4},
+		{Index: 1, Name: "MRHC Test World B", Users: 1, Present: 0, AccessLevel: "Private", MaxUsers: 4},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("worlds parse mismatch\n got=%+v\nwant=%+v", got, want)
+	}
+}
+
+func TestParseWorldsIgnoresNoise(t *testing.T) {
+	// パーサは正規表現に当たらない行を自然に無視する
+	input := []string{
+		"this is ambient",
+		"[0] World A               Users: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 16",
+		"random log line",
+	}
+	got := ParseWorlds(input)
+	if len(got) != 1 {
+		t.Fatalf("ambient行は無視されるべき: got %d entries", len(got))
+	}
+	if got[0].Name != "World A" || got[0].Users != 2 || got[0].MaxUsers != 16 {
+		t.Fatalf("parse mismatch: %+v", got[0])
+	}
+}
+
+func TestParseStatus(t *testing.T) {
+	// 実機採取（2026-05-28 Windows） focus 0 → status
+	input := []string{
+		"Name: MRHC Test World A",
+		"SessionID: S-019e6cb1-6670-7f47-aaea-4f4fe830df12",
+		"Current Users: 1",
+		"Present Users: 0",
+		"Max Users: 4",
+		"Uptime: 00:00:21.4205512",
+		"Access Level: Private",
+		"Hidden from listing: True",
+		"Mobile Friendly: False",
+		"Description: empirical capture",
+		"Tags: ",
+		"Users: MARKNPC_MAIN",
+		"ResoniteLink: off",
+	}
+	got := ParseStatus(input)
+	want := WorldStatus{
+		Name:              "MRHC Test World A",
+		SessionID:         "S-019e6cb1-6670-7f47-aaea-4f4fe830df12",
+		CurrentUsers:      1,
+		PresentUsers:      0,
+		MaxUsers:          4,
+		Uptime:            "00:00:21.4205512",
+		AccessLevel:       "Private",
+		HiddenFromListing: true,
+		MobileFriendly:    false,
+		Description:       "empirical capture",
+		Tags:              nil,
+		Users:             []string{"MARKNPC_MAIN"},
+		ResoniteLink:      "off",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("status parse mismatch\n got=%+v\nwant=%+v", got, want)
+	}
+}
+
+func TestParseStatusUnknownKeyTolerated(t *testing.T) {
+	// 未知Keyが混じってもパース全体は落ちず、既知部分は埋まる
+	input := []string{
+		"Name: hello",
+		"FutureKey: some-value",
+		"Current Users: 3",
+	}
+	got := ParseStatus(input)
+	if got.Name != "hello" || got.CurrentUsers != 3 {
+		t.Fatalf("既知Keyのパースは継続すべき: %+v", got)
+	}
+}
+
+func TestParseStatusMultiUsersAndTags(t *testing.T) {
+	input := []string{
+		"Tags: alpha, beta, gamma",
+		"Users: alice, bob , carol",
+	}
+	got := ParseStatus(input)
+	wantTags := []string{"alpha", "beta", "gamma"}
+	wantUsers := []string{"alice", "bob", "carol"}
+	if !reflect.DeepEqual(got.Tags, wantTags) {
+		t.Fatalf("tags: got=%v want=%v", got.Tags, wantTags)
+	}
+	if !reflect.DeepEqual(got.Users, wantUsers) {
+		t.Fatalf("users: got=%v want=%v", got.Users, wantUsers)
+	}
+}
+
+func TestParseUsers(t *testing.T) {
+	// 実機採取（2026-05-28 Windows）ID は空文字（ヘッドレス自身ユーザー）
+	input := []string{
+		"MARKNPC_MAIN\tID: \tRole: Admin\tPresent: False\tPing: 0 ms\tFPS: 59.65997\tSilenced: False",
+	}
+	got := ParseUsers(input)
+	want := []UserInfo{
+		{Name: "MARKNPC_MAIN", ID: "", Role: "Admin", Present: false, PingMs: 0, FPS: 59.65997, Silenced: false},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("users parse mismatch\n got=%+v\nwant=%+v", got, want)
+	}
+}
+
+func TestParseUsersWithID(t *testing.T) {
+	// 実アカウントユーザー（ID あり）の想定
+	input := []string{
+		"alice\tID: U-alice-1234\tRole: Builder\tPresent: True\tPing: 42 ms\tFPS: 90.0\tSilenced: False",
+		"bob with space\tID: U-bob-xyz\tRole: Guest\tPresent: True\tPing: 100 ms\tFPS: 60.5\tSilenced: True",
+	}
+	got := ParseUsers(input)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 users, got %d", len(got))
+	}
+	if got[0].Name != "alice" || got[0].ID != "U-alice-1234" || got[0].PingMs != 42 || got[0].FPS != 90.0 || got[0].Present != true {
+		t.Fatalf("alice mismatch: %+v", got[0])
+	}
+	// 名前に空白を含むケース（TAB区切りで対応可能）
+	if got[1].Name != "bob with space" || !got[1].Silenced {
+		t.Fatalf("bob with space mismatch: %+v", got[1])
+	}
+}
+
+func TestParseListBansEmpty(t *testing.T) {
+	got := ParseListBans([]string{})
+	if len(got) != 0 {
+		t.Fatalf("空入力は空 slice: %v", got)
+	}
+}
+
+func TestParseListBans(t *testing.T) {
+	// 旧コード書式（実機未確認だが旧 regex 互換性を回帰テスト）
+	input := []string{
+		"[0]     Username: alice UserID: U-alice-1234   MachineIds: m1 m2",
+	}
+	got := ParseListBans(input)
+	want := []BanEntry{
+		{Index: 0, Username: "alice", UserID: "U-alice-1234", MachineIDs: []string{"m1", "m2"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("listbans parse mismatch\n got=%+v\nwant=%+v", got, want)
+	}
+}
+
+func TestParseFriendRequests(t *testing.T) {
+	got := ParseFriendRequests([]string{"alice", " bob ", "", "carol"})
+	want := []string{"alice", "bob", "carol"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("friendrequests parse mismatch\n got=%+v\nwant=%+v", got, want)
+	}
+}
+
+func TestStripPromptPrefix(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"empty", nil, nil},
+		{"no prompt", []string{"hello", "world"}, []string{"hello", "world"}},
+		{"single prompt", []string{"MRHC Test World A>[0] something", "next"}, []string{"[0] something", "next"}},
+		{"only prompt", []string{"Renamed>"}, []string{""}},
+		{"strip first only", []string{"A>line1", "B>line2"}, []string{"line1", "B>line2"}},
+	}
+	for _, c := range cases {
+		got := stripPromptPrefix(c.in)
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: got=%v want=%v", c.name, got, c.want)
+		}
+	}
+}
