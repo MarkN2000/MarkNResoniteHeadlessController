@@ -6,8 +6,8 @@
 package headless
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/text/encoding"
@@ -75,6 +76,12 @@ type Driver struct {
 	started  time.Time
 	ready    bool
 	stopping bool
+
+	// 構造化コマンド実行（案C'）の同期プリミティブ。詳細: docs/design/structured-driver.md
+	//   - execMu: Exec の直列キュー（コマンド1個ずつ排他）／ExecGroup は同 mu を保持
+	//   - activeCollector: 実行中の応答収集バッファ（読み手は readPipe、待ち手は waitComplete）
+	execMu          sync.Mutex
+	activeCollector atomic.Pointer[respCollector]
 }
 
 // NewDriver は文字コード enc（nil=UTF-8パススルー）でドライバを生成する。
@@ -181,15 +188,41 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 	return nil
 }
 
+// readPipe は子プロセスの stdout/stderr をチャンク読みしながら行に分解する。
+// 設計（案C'）: 構造化実行中は activeCollector に対し、
+//   - '\n' 確定毎に appendLine（decode 済テキスト）
+//   - チャンク処理後の lineBuf（未確定 raw バイト＝プロンプト候補）を updateTail
+// で通知する。これにより waitComplete が「プロンプト末尾 + 安定窓」で完了検出できる。
+// stdout のみコレクタに流す（stderr の '>' はプロンプトと混同しないため）。
 func (d *Driver) readPipe(r io.Reader, kind string) {
-	br := bufio.NewReaderSize(r, 64*1024)
+	buf := make([]byte, 4096)
+	var lineBuf []byte
 	for {
-		raw, err := br.ReadBytes('\n')
-		if len(raw) > 0 {
-			text := d.decodeLine(raw)
-			d.publishLog(kind, text)
+		n, err := r.Read(buf)
+		if n > 0 {
+			for _, b := range buf[:n] {
+				switch b {
+				case '\n':
+					text := d.decodeLine(lineBuf)
+					d.publishLog(kind, text)
+					if kind == "out" {
+						d.maybeReady(text)
+						if c := d.activeCollector.Load(); c != nil {
+							c.appendLine(text)
+						}
+					}
+					lineBuf = lineBuf[:0]
+				case '\r':
+					// 行終端の前段。decodeLine 側でも吸収されるが、ここで落とすほうがシンプル。
+				default:
+					lineBuf = append(lineBuf, b)
+				}
+			}
+			// チャンク処理後の lineBuf は「次の '\n' まで未確定の bytes」＝プロンプト候補
 			if kind == "out" {
-				d.maybeReady(text)
+				if c := d.activeCollector.Load(); c != nil {
+					c.updateTail(lineBuf)
+				}
 			}
 		}
 		if err != nil {
@@ -237,6 +270,10 @@ func (d *Driver) maybeReady(text string) {
 func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	wg.Wait() // 全パイプをdrainしてから reap（Waitがパイプを閉じる前に読み切る＝末尾行の取りこぼし防止）
 	err := cmd.Wait()
+	// 実行中の Exec があればプロセス死亡を通知（waitComplete が ErrProcessGone を返す）
+	if c := d.activeCollector.Load(); c != nil {
+		c.markGone(fmt.Errorf("process exited: %w", err))
+	}
 	d.mu.Lock()
 	wasStopping := d.stopping
 	d.cmd = nil
@@ -325,3 +362,93 @@ func (d *Driver) SubscribeStatus(buf int) (chan Status, Status) {
 }
 
 func (d *Driver) UnsubscribeStatus(ch chan Status) { d.statusHub.unsubscribe(ch) }
+
+// --- 構造化コマンド実行（案C'） ---
+// 詳細: docs/design/structured-driver.md
+//   - Exec: 1コマンドを送って応答行を構造化用に返す（直列キュー）
+//   - ExecGroup: 同 mu を保持したまま複数 Exec を連続実行（focus→status 等の原子的グループ）
+//
+// ⚠️ 終了系コマンド（shutdown/restart/close）は Exec の対象外：
+//    プロンプトが返らず必ず timeout になる。shutdown は Driver.Stop() を使うこと。
+
+// Tx は ExecGroup の fn 内で使う Exec ハンドル。execMu は ExecGroup 側で保持済。
+type Tx interface {
+	Exec(cmd string, opts ...ExecOption) ([]string, error)
+}
+
+type txImpl struct {
+	d   *Driver
+	ctx context.Context
+}
+
+func (t *txImpl) Exec(cmd string, opts ...ExecOption) ([]string, error) {
+	return t.d.execLocked(t.ctx, cmd, opts...)
+}
+
+// Exec は 1 コマンドを送って応答を構造化用に返す。execMu で直列化される。
+// 戻り値は「プロンプト接頭辞除去済」の行リスト。timeout 等のエラー時も部分結果を含む。
+func (d *Driver) Exec(ctx context.Context, cmd string, opts ...ExecOption) ([]string, error) {
+	if err := d.checkReady(); err != nil {
+		return nil, err
+	}
+	d.execMu.Lock()
+	defer d.execMu.Unlock()
+	return d.execLocked(ctx, cmd, opts...)
+}
+
+// ExecGroup は fn 内で行われる Exec を「他の Exec から割込まれない」原子的なグループとして実行する。
+// 例: focus N → status を確実に同じワールドで取る。
+func (d *Driver) ExecGroup(ctx context.Context, fn func(tx Tx) error) error {
+	if err := d.checkReady(); err != nil {
+		return err
+	}
+	d.execMu.Lock()
+	defer d.execMu.Unlock()
+	return fn(&txImpl{d: d, ctx: ctx})
+}
+
+// checkReady は Driver が構造化コマンドを受け付けられるかを確認する。
+func (d *Driver) checkReady() error {
+	d.mu.Lock()
+	stdin := d.stdin
+	ready := d.ready
+	state := d.state
+	d.mu.Unlock()
+	if stdin == nil || !ready || state != StateRunning {
+		return ErrNotReady
+	}
+	return nil
+}
+
+// execLocked は execMu を保持している前提で 1 コマンドを実行する。
+// Exec / ExecGroup 経由でのみ呼ばれる（execMu 取得は呼び出し側責務）。
+func (d *Driver) execLocked(ctx context.Context, cmd string, opts ...ExecOption) ([]string, error) {
+	cfg := defaultExecConfig()
+	for _, o := range opts {
+		o(&cfg)
+	}
+	d.mu.Lock()
+	stdin := d.stdin
+	d.mu.Unlock()
+	if stdin == nil {
+		return nil, ErrNotReady
+	}
+
+	c := newRespCollector()
+	d.activeCollector.Store(c)
+	defer d.activeCollector.Store(nil)
+
+	d.publishLog("cmd", "> "+cmd)
+	payload := cmd + "\n"
+	if d.enc != nil {
+		if out, _, e := transform.String(d.enc.NewEncoder(), payload); e == nil {
+			payload = out
+		}
+	}
+	if _, err := io.WriteString(stdin, payload); err != nil {
+		return nil, fmt.Errorf("send failed: %w", err)
+	}
+
+	lines, err := c.waitComplete(ctx, cfg)
+	return stripPromptPrefix(lines), err
+}
