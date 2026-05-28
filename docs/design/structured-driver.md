@@ -94,16 +94,46 @@ fn Exec(cmd):
 | 確認窓中に ambient が入り pending が変わる | プロンプトは再出現するので少し遅れて再検出されるだけ |
 | 応答行末尾が一瞬 `>` で見える誤検出 | ~50ms の安定確認で回避（応答行は通常改行付きで pending にならない） |
 | **silent 成功（出力なし）コマンド**（`name`/`maxusers`/`focus`/空 `listbans`/空 `friendrequests`） | プロンプト末尾検出が即発火 → **応答=空行リスト**として返す（実機検証済） |
-| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | 応答待ちせず連射した場合のみ発生。**直列キュー設計が構造的に防止**（実機で再現確認） |
+| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | (a) Exec 内連射: 直列キューが防止。(b) **ExecGroup 内の連続 Exec**: silent 系後の prompt が lineBuf に残るため発生 → **stripPromptPrefix が `^([^>]*>)+` で全プロンプト剥がし**で対応（§5） |
 | **Exec 実行中にヘッドレスプロセスが死亡** | `readPipe` 終了 → コレクタへの新規追加停止 → `readChunk` が空継続 → cmdMaxTimeout で切上げ → `ErrProcessGone` を返す（既存 Wait goroutine が ready フラグを落とすので、以降の Exec は `ErrNotReady`） |
 
-## 5. プロンプト接頭辞除去（案X）
+## 5. プロンプト接頭辞除去（案X 拡張版）
 
 実機観測: 応答の最初の行は `<world>>[0] ...` のように **プロンプトが連結**される（プロンプトに改行が無い）。
 
-**ルール**: 応答の最初の行に限り、**行頭から最初の `>` まで（その `>` を含む）を除去**。`<world>>` プロンプトに `>` が含まれることはレア（世界名に `>` を含むのは想定外）。
+**ルール**: 応答の最初の行に限り、**行頭の連続プロンプトを全て除去**する。
+正規表現: `^([^>]*>)+`
+
+```
+単一: "Fake World 0>[0] World A …"              → "[0] World A …"
+連続: "Fake World 0>Fake World 1>Name: …"        → "Name: …"
+4連:  "R>R>R>R>Unknown command"                 → "Unknown command"
+```
 
 世界名の追跡は不要（generic に剥がすだけ）。これによりパーサは `^\[` 等の **`^` アンカー正規表現**を素直に書ける。
+
+### なぜ連続プロンプトが起きるか（実装上の事実）
+
+設計の「直列キューでプロンプト累積を防ぐ」は **単一 Exec の内側では正しい**が、
+`ExecGroup` で **silent 系コマンド（focus/name 等）が連続する**と、
+前コマンドの prompt が readPipe の `lineBuf` に「`\n` 未確定の状態」で残り、
+次コマンドの最初の応答行に連結される。例:
+
+```
+[focus 1 完了時点] lineBuf = "Fake World 1>" （未確定）
+[status 開始]
+[status の Name 行が来る] lineBuf = "Fake World 1>Name: Fake World 1\n"
+[行確定] → collector.appendLine("Fake World 1>Name: Fake World 1")
+```
+
+ExecGroup 内では前コマンドの prompt が次コマンドの応答に必ず連結するため、
+パーサ側で「行頭の連続プロンプト」を **すべて剥がす**のが正解。
+
+### 既知の限界
+構造化コマンドの応答1行目に `>` が含まれる場合、過剰に剥がす可能性がある。
+現在対応するコマンド（worlds/status/users/listbans/friendrequests/accesslevel/Unknown）の
+1行目はいずれも `>` を含まないため実害なし。世界名等に `>` を含めるエッジケースは
+ドキュメント明記の限界として受容する。
 
 ## 6. 原子的グループ
 

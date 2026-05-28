@@ -28,6 +28,17 @@ var (
 
 	// listbans: `[<idx>] Username: U UserID: U-... MachineIds: ...`
 	listbansLineRe = regexp.MustCompile(`^\[(\d+)\]\s+Username:\s+(\S+)\s+UserID:\s+(U-[A-Za-z0-9_-]+)\s+MachineIds:\s+(.*)$`)
+
+	// leadingPromptsRe: 行頭の「連続プロンプト」をまとめて剥がす（案X拡張）。
+	// 実機観測: 構造化コマンド前に「前回コマンドの後で出たプロンプト」が
+	// 改行なしで lineBuf に残るため、新コマンドの最初の行は
+	//   <prompt1>><prompt2>><content>
+	// のように 1 個以上のプロンプトが連結することがある（特に ExecGroup で
+	// silent コマンドを連続させた場合）。連続する「[^>]*>」をまとめて剥がす。
+	// 注意: 構造化コマンドの応答1行目に '>' が含まれるとき過剰に剥がす可能性が
+	// あるが、現在対応するコマンドの1行目は '>' を含まない（worlds=[…]、
+	// status=Name:、users=ユーザー名 など）ため実害なし。
+	leadingPromptsRe = regexp.MustCompile(`^([^>]*>)+`)
 )
 
 // statusUnknownKeysWarned: status の未知 Key を「初回1回だけ」警告するため。
@@ -187,20 +198,27 @@ func warnUnknownStatusKey(key string) {
 	log.Printf("[structured-driver] status の未知Key %q を観測 (無視。Resoniteのバージョン変更で増えた可能性)", key)
 }
 
-// stripPromptPrefix は応答の先頭行に限り「行頭から最初の '>' まで（その '>' を含む）」を除去する。
-// 案X：プロンプト `<world>>` を generic に剥がし、パーサが `^` アンカー regex を使える状態にする。
+// stripPromptPrefix は応答の先頭行に限り、行頭の「連続プロンプト」を全て除去する。
+// 案X（拡張）：プロンプト `<world>>` を generic に剥がし、パーサが `^` アンカー
+// regex を使える状態にする。
+//
+// 単一プロンプト例:    "Fake World 0>[0] World A …" → "[0] World A …"
+// 連続プロンプト例:    "Fake World 0>Fake World 1>Name: …" → "Name: …"
+//   ※ ExecGroup で silent 系コマンドの直後に次コマンドが続くと、
+//     前コマンドの prompt が lineBuf に残ったまま次の出力が連結するため。
+//
 // lines を mutate せず新しい slice を返す。
 func stripPromptPrefix(lines []string) []string {
 	if len(lines) == 0 {
 		return lines
 	}
 	first := lines[0]
-	idx := strings.IndexByte(first, '>')
-	if idx < 0 {
+	loc := leadingPromptsRe.FindStringIndex(first)
+	if loc == nil {
 		return lines
 	}
 	out := make([]string, len(lines))
 	copy(out, lines)
-	out[0] = first[idx+1:]
+	out[0] = first[loc[1]:]
 	return out
 }

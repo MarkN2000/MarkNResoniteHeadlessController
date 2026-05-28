@@ -180,6 +180,9 @@ func TestStripPromptPrefix(t *testing.T) {
 		{"single prompt", []string{"MRHC Test World A>[0] something", "next"}, []string{"[0] something", "next"}},
 		{"only prompt", []string{"Renamed>"}, []string{""}},
 		{"strip first only", []string{"A>line1", "B>line2"}, []string{"line1", "B>line2"}},
+		// 連続プロンプト累積（ExecGroup の連続 silent コマンド後など）
+		{"two prompts", []string{"Fake World 0>Fake World 1>Name: X", "SessionID: Y"}, []string{"Name: X", "SessionID: Y"}},
+		{"four prompts", []string{"R>R>R>R>Unknown command"}, []string{"Unknown command"}},
 	}
 	for _, c := range cases {
 		got := stripPromptPrefix(c.in)
