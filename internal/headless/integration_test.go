@@ -168,13 +168,12 @@ func TestIntegration_Exec_UnknownCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Exec unknown: %v", err)
 	}
-	// Driver は raw lines を返す（prompt prefix 付き）。parser 同様 per-line で剥がして検証。
+	// Driver が完了時の実プロンプトを剥がすので lines は綺麗（prompt prefix 無し）。
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d: %v", len(lines), lines)
 	}
-	cleaned := stripLineLeadingPrompts(lines[0])
-	if cleaned != "Unknown command" {
-		t.Fatalf("expected 'Unknown command' after strip, got %q (raw=%q)", cleaned, lines[0])
+	if lines[0] != "Unknown command" {
+		t.Fatalf("expected 'Unknown command', got %q", lines[0])
 	}
 }
 

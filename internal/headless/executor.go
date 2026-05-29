@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -68,7 +69,8 @@ type respCollector struct {
 	lines       []string // 改行で確定した行（decode 済）
 	pendingTail []byte   // 最後の '\n' 以降の raw バイト（プロンプト検出用）
 	lastChange  time.Time
-	gone        error // プロセス死亡時に設定される
+	gone        error  // プロセス死亡時に設定される
+	donePrompt  []byte // 完了検出時の pendingTail（＝実プロンプトの生バイト）。未検出は nil
 }
 
 func newRespCollector() *respCollector {
@@ -122,6 +124,45 @@ func (c *respCollector) snapshot() []string {
 	return out
 }
 
+// capturePrompt は完了検出時の pendingTail を「検出プロンプト」として保存する。
+// 行ベースのコンソールでは前コマンドの末尾プロンプトが応答1行目の先頭に
+// 改行なしでグルーされるため、これを使って正確に剥がせる（stripExactPrompt）。
+func (c *respCollector) capturePrompt() {
+	c.mu.Lock()
+	c.donePrompt = append([]byte(nil), c.pendingTail...)
+	c.mu.Unlock()
+}
+
+// prompt は検出済みプロンプトの生バイトコピーを返す（未検出なら nil）。
+func (c *respCollector) prompt() []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.donePrompt) == 0 {
+		return nil
+	}
+	return append([]byte(nil), c.donePrompt...)
+}
+
+// stripExactPrompt は各行頭から検出プロンプト prompt の連続を取り除く。
+// プロンプトは「前コマンド末尾のプロンプト」が応答1行目の先頭にグルーされ、
+// ExecGroup で silent コマンドを連続させると複数個連結し得る（例: "P>P>Name: ..."）。
+// リテラルに一致する分だけ剥がすので、応答値に含まれる '>'（リッチテキスト/<br> 等）や
+// セッション名に含まれる ':' に影響しない（旧来の貪欲ヒューリスティックを置換）。
+// prompt が空（＝未検出。timeout 等）なら何もしない。
+func stripExactPrompt(lines []string, prompt string) []string {
+	if prompt == "" {
+		return lines
+	}
+	out := make([]string, len(lines))
+	for i, ln := range lines {
+		for strings.HasPrefix(ln, prompt) {
+			ln = ln[len(prompt):]
+		}
+		out[i] = ln
+	}
+	return out
+}
+
 // waitComplete はプロンプト末尾検出（案C'）でコマンド完了を待つ。
 // 戻り値の lines は常に部分結果を含む（timeout/プロセス死亡時でも収集済の行は返す）。
 //
@@ -162,6 +203,7 @@ func (c *respCollector) waitComplete(ctx context.Context, cfg execConfig) ([]str
 		if pendingLen > 0 && pendingLast == '>' {
 			stable := time.Since(lastChange)
 			if stable >= cfg.SettleConfirm {
+				c.capturePrompt() // 完了時の pendingTail = 実プロンプトを保存（剥がし用）
 				return c.snapshot(), nil
 			}
 			// 安定窓まで待つ（変化が無ければ次ループで確定）

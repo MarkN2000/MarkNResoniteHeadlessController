@@ -8,11 +8,9 @@ import (
 	"sync"
 )
 
-// 各構造化コマンドの応答パーサ。入力 lines は Executor 側で各行 \r\n trim 済
-// （既存 decodeLine の仕様）。プロンプト接頭辞は parser 側で per-line に
-// stripLineLeadingPrompts で剥がす（collector が ambient + 応答行を捕える
-// 性質上、応答行は任意位置に現れ得るため）。
-// ambient/無関係行は regex に当たらず自然に無視される。
+// 各構造化コマンドの応答パーサ。入力 lines は Executor 側で「行頭の実プロンプト」
+// （stripExactPrompt）も剥がし済みの綺麗な行。各パーサは Key:Value / 行 regex に
+// 当てるだけの純粋関数。ambient/無関係行は regex に当たらず自然に無視される。
 //
 // === 既知の理論的限界（実害低）===
 //   - splitCommaList で `status.Users`/`Tags` を分割: ユーザー名/タグに ',' を
@@ -22,8 +20,6 @@ import (
 //     極めて稀。Resonite UI で `>` で終わる名前を作るのは通常想定外。
 //   - `worldsLineRe` の `(.+?)` 名前: name に "Users:" 含むと誤分割。
 //     名前に「 Users: 」というスペース＋コロン列を入れるのは想定外で実用上問題なし。
-//   - `stripLineLeadingPrompts` の `^([^>]*>)+`: ambient 行に '>' があると過剰
-//     剥がしになる。しかし剥がした結果は parser regex に当たらず無視されるため無害。
 
 var (
 	// worlds: `[<idx>] <name padded>\tUsers: N\tPresent: N\tAccessLevel: L\tMaxUsers: N`
@@ -40,17 +36,6 @@ var (
 
 	// listbans: `[<idx>] Username: U UserID: U-... MachineIds: ...`
 	listbansLineRe = regexp.MustCompile(`^\[(\d+)\]\s+Username:\s+(\S+)\s+UserID:\s+(U-[A-Za-z0-9_-]+)\s+MachineIds:\s+(.*)$`)
-
-	// leadingPromptsRe: 行頭の「連続プロンプト」をまとめて剥がす（案X拡張）。
-	// 実機観測: 構造化コマンド前に「前回コマンドの後で出たプロンプト」が
-	// 改行なしで lineBuf に残るため、新コマンドの最初の行は
-	//   <prompt1>><prompt2>><content>
-	// のように 1 個以上のプロンプトが連結することがある（特に ExecGroup で
-	// silent コマンドを連続させた場合）。連続する「[^>]*>」をまとめて剥がす。
-	// 注意: 構造化コマンドの応答1行目に '>' が含まれるとき過剰に剥がす可能性が
-	// あるが、現在対応するコマンドの1行目は '>' を含まない（worlds=[…]、
-	// status=Name:、users=ユーザー名 など）ため実害なし。
-	leadingPromptsRe = regexp.MustCompile(`^([^>]*>)+`)
 )
 
 // statusUnknownKeysWarned: status の未知 Key を「初回1回だけ」警告するため。
@@ -61,8 +46,7 @@ var statusUnknownKeysWarned sync.Map
 func ParseWorlds(lines []string) []World {
 	out := make([]World, 0, len(lines))
 	for _, line := range lines {
-		cleaned := stripLineLeadingPrompts(line)
-		m := worldsLineRe.FindStringSubmatch(cleaned)
+		m := worldsLineRe.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
@@ -88,8 +72,7 @@ func ParseWorlds(lines []string) []World {
 func ParseStatus(lines []string) WorldStatus {
 	var s WorldStatus
 	for _, line := range lines {
-		cleaned := stripLineLeadingPrompts(line)
-		m := statusKVRe.FindStringSubmatch(cleaned)
+		m := statusKVRe.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
@@ -133,8 +116,7 @@ func ParseStatus(lines []string) WorldStatus {
 func ParseUsers(lines []string) []UserInfo {
 	out := make([]UserInfo, 0, len(lines))
 	for _, line := range lines {
-		cleaned := stripLineLeadingPrompts(line)
-		m := usersLineRe.FindStringSubmatch(cleaned)
+		m := usersLineRe.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
@@ -158,8 +140,7 @@ func ParseUsers(lines []string) []UserInfo {
 func ParseListBans(lines []string) []BanEntry {
 	out := make([]BanEntry, 0, len(lines))
 	for _, line := range lines {
-		cleaned := stripLineLeadingPrompts(line)
-		m := listbansLineRe.FindStringSubmatch(cleaned)
+		m := listbansLineRe.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
@@ -182,10 +163,8 @@ func ParseListBans(lines []string) []BanEntry {
 //   - 空行 / プロンプトで終わる行 ('>') を除外
 //   - 残りを「pending friend request の username」として返す
 //
-// 我々の Go 実装は collector が prompt-glue 行を捕えるため、行頭の連続プロンプト
-// 接頭辞を **保守的に** (safeStripLeadingPrompts) 剥がしてから判定する。
-// この strip は「次の '>' までの prefix に `:` `\t` `[` `]` を含む行 (ambient っぽい)
-// は剥がさない」ので、`Updated: A -> B` 等の ambient は誤剥がしされない。
+// 行頭のプロンプト接頭辞は Driver 側 (stripExactPrompt) が剥がし済みなので、
+// ここでは trim + 空行/プロンプト('>'終端)除外だけを行う。
 //
 // === 既知の限界 ===
 // v1 と同じ限界を継承:
@@ -198,37 +177,16 @@ func ParseListBans(lines []string) []BanEntry {
 func ParseFriendRequests(lines []string) []string {
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
-		t := strings.TrimSpace(safeStripLeadingPrompts(strings.TrimSpace(line)))
+		t := strings.TrimSpace(line)
 		if t == "" {
 			continue
 		}
 		if strings.HasSuffix(t, ">") {
-			continue // プロンプトのみの行 (v1 と同じフィルタ)
+			continue // プロンプトのみの行（念のための保険。通常は Driver が剥がし済）
 		}
 		out = append(out, t)
 	}
 	return out
-}
-
-// safeStripLeadingPrompts は行頭の prompt prefix を「保守的に」剥がす。
-// "Renamed>Renamed>alice" のような prompt accumulation は剥がすが、
-// "Updated: A -> B" のような ambient 行 ('>' 前に `:` `\t` `[` `]` を含む) は剥がさない。
-// → ambient を誤剥がしして「username らしき何か」に化けるのを防ぐ。
-//
-// 判定基準: 次の '>' までの prefix が `:` `\t` `[` `]` を含まなければ "prompt-like"
-// として剥がす。promptlike なら剥がして残りで再判定 (多段プロンプト対応)。
-func safeStripLeadingPrompts(s string) string {
-	for {
-		i := strings.IndexByte(s, '>')
-		if i < 0 {
-			return s
-		}
-		prefix := s[:i]
-		if strings.ContainsAny(prefix, ":\t[]") {
-			return s // prompt-like でない → ここで停止
-		}
-		s = s[i+1:]
-	}
 }
 
 // --- ヘルパ ---
@@ -254,26 +212,4 @@ func warnUnknownStatusKey(key string) {
 		return // 既に警告済
 	}
 	log.Printf("[structured-driver] status の未知Key %q を観測 (無視。Resoniteのバージョン変更で増えた可能性)", key)
-}
-
-// stripLineLeadingPrompts は単一行の先頭にある「連続プロンプト」を除去する。
-// 各パーサが per-line で呼ぶ。
-//
-// 必要な理由: Driver の collector は Exec 中に流れる全ての stdout 行を捕える
-// （ambient/起動ログ含む）。そのため応答行は collector の任意の位置に現れ得る。
-// per-line で「<X>><Y>>...」形式の prompt accumulation を剥がすことで、
-// ambient と混在する応答行も parser regex で正しく抽出できる。
-//
-// 注意: ambient 行に '>' が含まれると過剰に剥がすが、その場合は parser regex に
-// 一致しないため最終結果に影響しない（無害な over-strip）。
-//
-// 設計判断: 旧 stripPromptPrefix（lines[0] のみ剥がし）は Phase 6 e2e で
-// ambient 介在ケースに対応できないことが判明したため撤去し、本関数に一本化。
-// Driver/Executor は Exec の戻り値を raw のまま返す（パーサ側責任で正規化）。
-func stripLineLeadingPrompts(line string) string {
-	loc := leadingPromptsRe.FindStringIndex(line)
-	if loc == nil {
-		return line
-	}
-	return line[loc[1]:]
 }

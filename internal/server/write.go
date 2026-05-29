@@ -164,7 +164,8 @@ func (s *Server) handleSessionMessage(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &body) || !requireField(w, "user", body.User) || !requireField(w, "message", body.Message) {
 		return
 	}
-	s.execSession(w, r, idx, fmt.Sprintf("message %s %s", headless.QuoteArg(body.User), headless.QuoteArg(body.Message)))
+	// user は識別子なので QuoteArg、message 本文はリッチテキスト/改行可なので QuoteRichText。
+	s.execSession(w, r, idx, fmt.Sprintf("message %s %s", headless.QuoteArg(body.User), headless.QuoteRichText(body.Message)))
 }
 
 // handleSessionAccessLevel: accesslevel <Level>（引用なしトークン）
@@ -218,7 +219,7 @@ func (s *Server) handleSessionName(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &body) || !requireField(w, "name", body.Name) {
 		return
 	}
-	s.execSession(w, r, idx, "name "+headless.QuoteArg(body.Name))
+	s.execSession(w, r, idx, "name "+headless.QuoteRichText(body.Name))
 }
 
 // handleSessionDescription: description "<text>"（空文字許容）
@@ -233,7 +234,7 @@ func (s *Server) handleSessionDescription(w http.ResponseWriter, r *http.Request
 	if !decodeBody(w, r, &body) {
 		return
 	}
-	s.execSession(w, r, idx, "description "+headless.QuoteArg(body.Description))
+	s.execSession(w, r, idx, "description "+headless.QuoteRichText(body.Description))
 }
 
 // handleSessionHideFromListing: hideFromListing <bool>

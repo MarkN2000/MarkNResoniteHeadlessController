@@ -134,7 +134,9 @@ POST /api/v1/bans/unban             {"userId":"..."}                       → u
 - **enum（accesslevel/role）はサーバーで値リスト検証しない**（サニタイズのみ。値の権威は Resonite、UI が正値を提供）。
   UI ドロップダウン用の値: accesslevel=`{Private, LAN, Contacts, ContactsPlus, RegisteredUsers, Anyone}`（v1 実コードで確認）、role=`{Admin, Builder, Moderator, Guest, Spectator}`
 - **maxUsers は正の整数のみ検証**（恣意的な上限は設けない＝Resonite の制限を推測しない）。name/description も恣意的な長さ上限なし
-- **文字列サニタイズ（必須・全文字列引数）**: 生 `\r`/`\n` は送らない（injection 防止）。実改行→ `\n` エスケープ、埋め込み `"`→ `\"`（未検証なら strip）、その他制御文字は除去。文字列引数は `"..."` で囲む（enum/数値/bool は囲まない）
+- **文字列サニタイズ（必須・全文字列引数）**: 生 `\r`/`\n` は送らない（injection 防止）。ユーザーの `\`/`"` は strip、その他制御文字は除去、文字列引数は `"..."` で囲む（enum/数値/bool は囲まない）。`<`/`>`/`=`/`/` は保持（リッチテキスト）。
+  - **2系統の改行処理（実機確定 2026-05-30）**: `QuoteArg`（user/role/url/template）は実改行→リテラル `\n`。`QuoteRichText`（**name/description/message**）は実改行→ **`<br>`**（Resonite リッチテキストが `<br>` を改行レンダリング・ASCII で Shift_JIS 可。実機確認済）。
+  - **status 読み取り注意**: name/description にリッチテキスト（`<color>`/`<s>`/`<br>` 等＝`>` を含む）やセッション名に `:` が入っても、Driver の `stripExactPrompt`（検出した実プロンプトをリテラル剥がし）で正しく読み戻せる（旧 `^([^>]*>)+` 貪欲剥がしは値の `>` を過剰除去するため撤去）。
 
 ### 2.5 操作結果の扱い（重要・実機制約）
 Resonite の write 出力は **コマンドごとにバラバラで信頼できない**:

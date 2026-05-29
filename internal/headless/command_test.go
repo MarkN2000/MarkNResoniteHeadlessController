@@ -74,6 +74,41 @@ func TestQuoteArg_Empty(t *testing.T) {
 	}
 }
 
+// QuoteRichText: 実改行 → <br>（リッチテキスト表示フィールド用）。
+func TestQuoteRichText_NewlineToBr(t *testing.T) {
+	got := QuoteRichText("1行目\n2行目")
+	if got != `"1行目<br>2行目"` {
+		t.Fatalf("LF should become <br>: %q", got)
+	}
+	if strings.ContainsAny(got, "\n\r") {
+		t.Fatalf("raw newline leaked: %q", got)
+	}
+}
+
+// CRLF は単一の <br> に畳まれる。
+func TestQuoteRichText_CRLFToSingleBr(t *testing.T) {
+	if got := QuoteRichText("a\r\nb"); got != `"a<br>b"` {
+		t.Fatalf("CRLF should collapse to single <br>: %q", got)
+	}
+}
+
+// リッチテキストタグ（<color=red>/<s>）はそのまま保持される。
+func TestQuoteRichText_PreservesRichTags(t *testing.T) {
+	in := "<color=red>赤</color> <s>取消</s>"
+	got := QuoteRichText(in)
+	if got != `"`+in+`"` {
+		t.Fatalf("rich tags should be preserved: %q", got)
+	}
+}
+
+// strip（\ と "）と制御除去は QuoteArg と同じく効く（注入防止は維持）。
+func TestQuoteRichText_StillStripsDangerous(t *testing.T) {
+	got := QuoteRichText("a\"b\\c\x00d")
+	if got != `"abcd"` {
+		t.Fatalf("backslash/quote/control should be stripped: %q", got)
+	}
+}
+
 func TestSanitizeToken_Valid(t *testing.T) {
 	ok := []string{"LAN", "Private", "ContactsPlus", "RegisteredUsers", "U-1NzqeqewOpM", "abc_def-123"}
 	for _, s := range ok {

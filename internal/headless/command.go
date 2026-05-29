@@ -21,20 +21,18 @@ var ErrInvalidToken = errors.New("headless: 不正なトークン（[A-Za-z0-9_-
 // unban の userId（U-xxxx 形式）はすべてこの範囲に収まる。空白・記号・制御文字は不許可。
 var tokenRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
-// QuoteArg は自由文字列引数を Resonite コンソールへ安全に渡せる形へ無害化し、
-// ダブルクォートで囲んで返す。
+// quote は自由文字列引数を Resonite コンソールへ安全に渡せる形へ無害化し、
+// ダブルクォートで囲んで返す共通実装。newlineRepl は実改行(LF)の置換先。
 //
-// 規則（エスケープ解釈は実機未検証のため保守的に strip 優先）:
-//   - ユーザー由来の `\` と `"` は除去（strip）。エスケープ（`\"`）に頼らないことで、
+// 規則（実機確認済み 2026-05-30）:
+//   - ユーザー由来の `\` と `"` は除去（strip）。エスケープに頼らないことで、
 //     末尾バックスラッシュによるクォート破壊やコマンド注入を構造的に防ぐ。
-//   - 実改行（LF）は 2 文字エスケープ `\n` に変換（我々が出力するので注入にならない）。
-//     ※ ユーザーの `\` は先に除去済みなので、ここで入る `\` は我々の `\n` のみ。
-//   - CR は除去（`\r\n` は上の LF 変換 + CR 除去で単一の `\n` になる）。
+//   - 実改行（LF）は newlineRepl に置換（生改行は送らない＝行ベースのコンソールで注入されない）。
+//   - CR は除去（`\r\n` は LF 側で 1 回だけ置換される）。
 //   - その他の制御文字（< 0x20 / DEL 0x7f）は除去。
+//   - `<` `>` `=` `/` 等はそのまま（Resonite のリッチテキスト指定を維持）。
 //   - 最後に "..." で囲む。
-//
-// 実機でコンソールのエスケープ規則が判明したら（検証バッチ項目1）方針を見直す。
-func QuoteArg(s string) string {
+func quote(s, newlineRepl string) string {
 	var b strings.Builder
 	b.WriteByte('"')
 	for _, r := range s {
@@ -42,7 +40,7 @@ func QuoteArg(s string) string {
 		case r == '\\' || r == '"':
 			// strip（注入・クォート破壊防止）
 		case r == '\n':
-			b.WriteString(`\n`) // 実改行 → 2 文字エスケープ
+			b.WriteString(newlineRepl)
 		case r == '\r':
 			// drop
 		case r < 0x20 || r == 0x7f:
@@ -54,6 +52,17 @@ func QuoteArg(s string) string {
 	b.WriteByte('"')
 	return b.String()
 }
+
+// QuoteArg は一般の文字列引数（user/role/url/template）を無害化＋引用する。
+// 実改行はリテラル `\n`（2文字）にエスケープする（これらのフィールドは複数行表示を
+// 想定しないため。万一改行が来ても安全に1コマンドへ収める安全網）。
+func QuoteArg(s string) string { return quote(s, `\n`) }
+
+// QuoteRichText はリッチテキスト表示フィールド（name/description/message）用。
+// 実改行を `<br>` に変換する。Resonite のリッチテキストが `<br>` を改行として
+// レンダリングすることを実機確認済み（2026-05-30）。ASCII なので Shift_JIS
+// コンソールも通る。生改行は送らないため注入にはならない。
+func QuoteRichText(s string) string { return quote(s, "<br>") }
 
 // SanitizeToken は引用符を付けない単一トークン引数を検証し、問題なければそのまま返す。
 // `^[A-Za-z0-9_-]+$` 以外は ErrInvalidToken を返す（呼び出し側で 400 にマップ）。

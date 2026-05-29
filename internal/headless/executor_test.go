@@ -178,7 +178,7 @@ func TestWaitComplete_StableWindow(t *testing.T) {
 	go func() {
 		time.Sleep(5 * time.Millisecond)
 		c.updateTail([]byte("World>"))
-		time.Sleep(15 * time.Millisecond)            // < SettleConfirm
+		time.Sleep(15 * time.Millisecond) // < SettleConfirm
 		c.appendLine("late ambient line that arrives during settle")
 		c.updateTail([]byte("World>")) // 再度プロンプト → 安定窓やり直し
 	}()
@@ -193,5 +193,32 @@ func TestWaitComplete_StableWindow(t *testing.T) {
 	}
 	if len(got) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(got))
+	}
+}
+
+// stripExactPrompt: 検出した実プロンプトを行頭から正確に剥がす。
+// 旧来の貪欲ヒューリスティックと違い、値の '>'（リッチテキスト/<br>）や名前の ':' に影響しない。
+func TestStripExactPrompt(t *testing.T) {
+	cases := []struct {
+		name   string
+		prompt string
+		in     []string
+		want   []string
+	}{
+		{"empty prompt no-op", "", []string{"World A>x"}, []string{"World A>x"}},
+		{"single prompt", "World A>", []string{"World A>[0] foo"}, []string{"[0] foo"}},
+		{"accumulated prompts", "World A>", []string{"World A>World A>Name: X"}, []string{"Name: X"}},
+		{"no prefix unchanged", "World A>", []string{"SessionID: S-1"}, []string{"SessionID: S-1"}},
+		// 名前に ':' を含むプロンプトでもリテラルに剥がせる（colon-heuristic では壊れたケース）
+		{"colon in prompt name", "Event: Party>", []string{"Event: Party>Event: Party>Name: foo"}, []string{"Name: foo"}},
+		// 値に '>'（リッチテキスト/<br>）が含まれても保持される
+		{"rich text > in value preserved", "World A>", []string{"World A>Name: <color=red>赤</color><br>x"}, []string{"Name: <color=red>赤</color><br>x"}},
+		{"ambient unaffected", "World A>", []string{"World running...", "World A>[0] foo"}, []string{"World running...", "[0] foo"}},
+	}
+	for _, c := range cases {
+		got := stripExactPrompt(c.in, c.prompt)
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: got=%v want=%v", c.name, got, c.want)
+		}
 	}
 }

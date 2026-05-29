@@ -88,6 +88,10 @@ type Driver struct {
 	//   - activeCollector: 実行中の応答収集バッファ（読み手は readPipe、待ち手は waitComplete）
 	execMu          sync.Mutex
 	activeCollector atomic.Pointer[respCollector]
+	// lastPrompt は直前コマンド完了時の検出プロンプト（＝次コマンド応答の「先頭グルー」）。
+	// focus はプロンプトを変えるため、応答先頭のグルーは「直前コマンドのプロンプト」になる。
+	// execMu 保持中（execLocked 内）でのみアクセスする。
+	lastPrompt string
 }
 
 // NewDriver は文字コード enc（nil=UTF-8パススルー）でドライバを生成する。
@@ -485,7 +489,17 @@ func (d *Driver) execLocked(ctx context.Context, cmd string, opts ...ExecOption)
 		return nil, fmt.Errorf("send failed: %w", err)
 	}
 
-	// 注: prompt-prefix 剥がしは parser 側 (stripLineLeadingPrompts) で per-line に行う。
-	// Driver は raw lines を返す（ambient と応答が混在し得る性質に合わせて parser 責任に統一）。
-	return c.waitComplete(ctx, cfg)
+	// prompt-prefix 剥がしは Driver 側で行う（検出した「実プロンプト」をリテラルに剥がす）。
+	// 応答先頭のグルーは「直前コマンド完了時のプロンプト」(d.lastPrompt)＝focus 変更時は
+	// <旧><新> の連結になるため、それを剥がす。さらに念のため今回のプロンプトも剥がす。
+	// 値の '>'（リッチテキスト/<br>）やセッション名の ':' には影響しない（貪欲ヒューリスティック廃止）。
+	// ambient 行は parser regex が自然に無視。
+	lines, err := c.waitComplete(ctx, cfg)
+	cur := d.decodeLine(c.prompt())
+	lines = stripExactPrompt(lines, d.lastPrompt)
+	lines = stripExactPrompt(lines, cur)
+	if cur != "" {
+		d.lastPrompt = cur
+	}
+	return lines, err
 }

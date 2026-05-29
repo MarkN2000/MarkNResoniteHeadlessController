@@ -24,46 +24,60 @@ func TestParseWorlds(t *testing.T) {
 	}
 }
 
-// 回帰テスト (Phase 6 で発見): collector が boot/ambient ログを大量に捕えていて、
-// 応答行が末尾にあり、かつ第1応答行に prompt prefix が付くケースで、
-// 旧 stripPromptPrefix（lines[0]のみ）では World 0 が消失していた。
-// per-line の stripLineLeadingPrompts で両 world が取れることを確認する。
-func TestParseWorldsHandlesAmbientPlusPromptPrefix(t *testing.T) {
+// ambient ログが混在しても応答行が取れること（プロンプト剥がしは Driver 済の前提で、
+// パーサは ambient を regex 非一致で無視する責務のみ）。
+func TestParseWorldsHandlesAmbient(t *testing.T) {
 	input := []string{
 		"BOOTSTRAP: Running userspace bootstrap",
 		"User Joined Userspace. Username: MARKNPC_MAIN, UserID: ...",
 		"Loading from URI: local://...",
 		"Updated: 0001/01/01 0:00:00 -> 2026/05/28 8:19:20",
 		"World running...",
-		"MRHC Test World B>[0] MRHC Test World A               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
+		"[0] MRHC Test World A               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
 		"[1] MRHC Test World B               Users: 1\tPresent: 0\tAccessLevel: Private\tMaxUsers: 4",
 	}
 	got := ParseWorlds(input)
 	if len(got) != 2 {
-		t.Fatalf("ambient+prompt の混在で 2 worlds 取れるべき: got %d - %+v", len(got), got)
+		t.Fatalf("ambient 混在で 2 worlds 取れるべき: got %d - %+v", len(got), got)
 	}
 	if got[0].Name != "MRHC Test World A" || got[0].Index != 0 {
-		t.Fatalf("World 0 が prompt prefix で消失: %+v", got[0])
+		t.Fatalf("World 0 mismatch: %+v", got[0])
 	}
 	if got[1].Name != "MRHC Test World B" || got[1].Index != 1 {
 		t.Fatalf("World 1 mismatch: %+v", got[1])
 	}
 }
 
-func TestParseStatusHandlesAmbientPlusPromptPrefix(t *testing.T) {
-	// status 応答の Name 行が prompt prefix glue を含むケース
+func TestParseStatusHandlesAmbient(t *testing.T) {
 	input := []string{
 		"Some ambient log line during status response",
-		"MRHC Test World A>Name: MRHC Test World A",
+		"Name: MRHC Test World A",
 		"SessionID: S-test-1234",
 		"Current Users: 1",
 	}
 	got := ParseStatus(input)
 	if got.Name != "MRHC Test World A" {
-		t.Fatalf("prompt-prefixed Name 行が parse されるべき: %+v", got)
+		t.Fatalf("Name 行が parse されるべき: %+v", got)
 	}
 	if got.SessionID != "S-test-1234" || got.CurrentUsers != 1 {
 		t.Fatalf("通常行も parse されるべき: %+v", got)
+	}
+}
+
+// リッチテキスト（'>' を含む）/ ':' を含む名前でも status が正しく parse されること。
+// 旧来の貪欲プロンプト剥がしのバグ回帰防止（Driver が実プロンプトを剥がした後の綺麗な行を想定）。
+func TestParseStatusRichTextValues(t *testing.T) {
+	input := []string{
+		"Name: 日本語 <color=red>赤</color> <s>取消</s>",
+		"Description: 1行目<br>2行目 <color=#3399ff>青</color>",
+		"Access Level: Private",
+	}
+	got := ParseStatus(input)
+	if got.Name != "日本語 <color=red>赤</color> <s>取消</s>" {
+		t.Fatalf("rich text を含む Name が壊れた: %q", got.Name)
+	}
+	if got.Description != "1行目<br>2行目 <color=#3399ff>青</color>" {
+		t.Fatalf("rich text を含む Description が壊れた: %q", got.Description)
 	}
 }
 
@@ -231,25 +245,16 @@ func TestParseFriendRequests_PromptOnlyLineExcluded(t *testing.T) {
 	}
 }
 
-func TestParseFriendRequests_PromptGluedFirstLine(t *testing.T) {
-	// 我々の collector が捕える prompt-glue を safeStripLeadingPrompts で剥がす
-	got := ParseFriendRequests([]string{"MRHC>alice", "bob", "Renamed>Renamed>carol"})
-	want := []string{"alice", "bob", "carol"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("got=%v want=%v", got, want)
-	}
-}
-
 // 2026-05-28 実機採取で確証 (MARKNPC_SUB2 アカウント、手動 stdin で friendrequests 実行)。
 // 実際の format: 1 username/行のプレーンテキスト。usernames はハイフン・アンダースコア
-// を含み得る。我々の Driver.Exec で取得すると先頭行に prompt が glue する。
-// ユーザー名は匿名化済（実際は別の Resonite アカウント名 4 件）。
+// を含み得る。先頭行の prompt-glue は Driver(stripExactPrompt) が剥がす前提で、ここでは
+// 綺麗な行を渡す。ユーザー名は匿名化済（実際は別の Resonite アカウント名 4 件）。
 func TestParseFriendRequests_RealFormatEmpirical(t *testing.T) {
 	input := []string{
-		"MARKNPC_SUB2 World 0>alice",   // prompt-glued 先頭行
-		"bob_user",                      // 通常行 (underscore)
-		"carol-dash",                    // ハイフン含む
-		"dave2024",                      // 数字含む
+		"alice",      // 先頭行（Driver が prompt 剥がし済の想定）
+		"bob_user",   // underscore
+		"carol-dash", // ハイフン含む
+		"dave2024",   // 数字含む
 	}
 	got := ParseFriendRequests(input)
 	want := []string{"alice", "bob_user", "carol-dash", "dave2024"}
@@ -282,24 +287,6 @@ func TestParseFriendRequests_AmbientNotOverStripped(t *testing.T) {
 	}
 }
 
-func TestStripLineLeadingPrompts(t *testing.T) {
-	cases := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{"empty", "", ""},
-		{"no prompt", "hello", "hello"},
-		{"single prompt", "MRHC Test World A>[0] something", "[0] something"},
-		{"only prompt", "Renamed>", ""},
-		{"two prompts", "Fake World 0>Fake World 1>Name: X", "Name: X"},
-		{"four prompts", "R>R>R>R>Unknown command", "Unknown command"},
-		{"prompt-like fragments in content (over-strip is harmless)", "Updated: A -> B", " B"},
-	}
-	for _, c := range cases {
-		got := stripLineLeadingPrompts(c.in)
-		if got != c.want {
-			t.Errorf("%s: got=%q want=%q", c.name, got, c.want)
-		}
-	}
-}
+// 注: 旧 stripLineLeadingPrompts/safeStripLeadingPrompts は廃止。
+// プロンプト剥がしは Driver 側 stripExactPrompt が担い、その単体テストは
+// executor_test.go の TestStripExactPrompt にある（'>' を含む値・':' を含む名前も両立）。
