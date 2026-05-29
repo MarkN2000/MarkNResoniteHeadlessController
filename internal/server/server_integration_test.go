@@ -1,11 +1,12 @@
 package server
 
 // HTTP レベル統合テスト: poc/fakehl を実プロセスとして起動し、
-// Server (httptest) 経由で 5 つの構造化API + 認証 + エラーマッピング を検証する。
+// Server (httptest) 経由で 構造化API + 認証(Bearer) + メソッド/エラーマッピング を検証する。
 
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
@@ -47,12 +50,18 @@ func exeSuffix() string {
 	return ""
 }
 
+const testPassword = "test-pass"
+
 // newTestServer は fakehl 起動済みの Server を httptest.Server で公開する。
-// 認証は APIKey 経由（クエリ ?apiKey=...）でテストする（cookie 経路は別途）。
-func newTestServer(t *testing.T) (ts *httptest.Server, apiKey string) {
+// 認証は Bearer パスワード（testPassword）でテストする（cookie 経路は auth_test.go）。
+func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 	t.Helper()
-	apiKey = "test-key"
-	cfg := &config.Config{APIKey: apiKey}
+	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
+	cfg := &config.Config{
+		Version:           config.SchemaVersion,
+		AdminPasswordHash: string(hash),
+		SessionSecret:     "integration-test-secret",
+	}
 
 	drv := headless.NewDriver(nil) // UTF-8 passthrough
 	if err := drv.Start(fakehlPath, ""); err != nil {
@@ -87,23 +96,44 @@ func newTestServer(t *testing.T) (ts *httptest.Server, apiKey string) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	})
-	return ts, apiKey
+	return ts, testPassword
 }
 
-// getJSON は GET → JSON decode → status を返す。
-func getJSON(t *testing.T, url string, target any) int {
+// authGet は Bearer 認証付き GET → JSON decode → status を返す。
+func authGet(t *testing.T, url, pw string, target any) int {
 	t.Helper()
-	resp, err := http.Get(url)
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	req.Header.Set("Authorization", "Bearer "+pw)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
 	defer resp.Body.Close()
 	if target != nil {
 		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-			t.Fatalf("decode: %v body status=%d", err, resp.StatusCode)
+			t.Fatalf("decode: %v status=%d", err, resp.StatusCode)
 		}
 	}
 	return resp.StatusCode
+}
+
+// authPost は Bearer 認証付き POST を行う（呼び出し側で Body.Close する）。
+func authPost(t *testing.T, url, pw, contentType, body string) *http.Response {
+	t.Helper()
+	var r io.Reader
+	if body != "" {
+		r = strings.NewReader(body)
+	}
+	req, _ := http.NewRequest(http.MethodPost, url, r)
+	req.Header.Set("Authorization", "Bearer "+pw)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", url, err)
+	}
+	return resp
 }
 
 // 共通レスポンス形 {ok, data}
@@ -119,9 +149,9 @@ type okEnv[T any] struct {
 // --- 構造化API: 取得系 5 つ ---
 
 func TestServer_Sessions_List(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	var body okEnv[[]headless.World]
-	code := getJSON(t, ts.URL+"/api/v1/sessions?apiKey="+key, &body)
+	code := authGet(t, ts.URL+"/api/v1/sessions", pw, &body)
 	if code != http.StatusOK {
 		t.Fatalf("status=%d body=%+v", code, body)
 	}
@@ -134,9 +164,9 @@ func TestServer_Sessions_List(t *testing.T) {
 }
 
 func TestServer_SessionStatus(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	var body okEnv[headless.WorldStatus]
-	code := getJSON(t, ts.URL+"/api/v1/sessions/1/status?apiKey="+key, &body)
+	code := authGet(t, ts.URL+"/api/v1/sessions/1/status", pw, &body)
 	if code != http.StatusOK {
 		t.Fatalf("status=%d body=%+v", code, body)
 	}
@@ -149,9 +179,9 @@ func TestServer_SessionStatus(t *testing.T) {
 }
 
 func TestServer_SessionUsers(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	var body okEnv[[]headless.UserInfo]
-	code := getJSON(t, ts.URL+"/api/v1/sessions/0/users?apiKey="+key, &body)
+	code := authGet(t, ts.URL+"/api/v1/sessions/0/users", pw, &body)
 	if code != http.StatusOK {
 		t.Fatalf("status=%d body=%+v", code, body)
 	}
@@ -164,9 +194,9 @@ func TestServer_SessionUsers(t *testing.T) {
 }
 
 func TestServer_ListBans_Empty(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	var body okEnv[[]headless.BanEntry]
-	code := getJSON(t, ts.URL+"/api/v1/listbans?apiKey="+key, &body)
+	code := authGet(t, ts.URL+"/api/v1/listbans", pw, &body)
 	if code != http.StatusOK {
 		t.Fatalf("status=%d body=%+v", code, body)
 	}
@@ -176,9 +206,9 @@ func TestServer_ListBans_Empty(t *testing.T) {
 }
 
 func TestServer_FriendRequests_Empty(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	var body okEnv[[]string]
-	code := getJSON(t, ts.URL+"/api/v1/friendrequests?apiKey="+key, &body)
+	code := authGet(t, ts.URL+"/api/v1/friendrequests", pw, &body)
 	if code != http.StatusOK {
 		t.Fatalf("status=%d body=%+v", code, body)
 	}
@@ -187,11 +217,11 @@ func TestServer_FriendRequests_Empty(t *testing.T) {
 	}
 }
 
-// --- 認証・エラーマッピング ---
+// --- 認証・メソッド・エラーマッピング ---
 
 func TestServer_Sessions_RequiresAuth(t *testing.T) {
 	ts, _ := newTestServer(t)
-	resp, err := http.Get(ts.URL + "/api/v1/sessions") // apiKey 無し
+	resp, err := http.Get(ts.URL + "/api/v1/sessions") // 認証ヘッダ無し
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -201,30 +231,50 @@ func TestServer_Sessions_RequiresAuth(t *testing.T) {
 	}
 }
 
-func TestServer_SessionStatus_BadIdx(t *testing.T) {
-	ts, key := newTestServer(t)
-	resp, err := http.Get(ts.URL + "/api/v1/sessions/notanumber/status?apiKey=" + key)
+// /start は POST 限定 → GET は 405（誤発火防止）。
+func TestServer_Start_GetRejected(t *testing.T) {
+	ts, pw := newTestServer(t)
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/start", nil)
+	req.Header.Set("Authorization", "Bearer "+pw)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", resp.StatusCode)
+	}
+}
+
+// config 空での起動は 400 config_required（無config起動は公開化するため不可）。
+func TestServer_Start_RequiresConfig(t *testing.T) {
+	ts, pw := newTestServer(t)
+	resp := authPost(t, ts.URL+"/api/v1/start", pw, "application/json", `{"config":""}`)
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+	var body okEnv[any]
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	if body.OK || body.Error.Code != "config_required" {
+		t.Fatalf("expected code=config_required, got %+v", body)
+	}
+}
+
+func TestServer_SessionStatus_BadIdx(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code := authGet(t, ts.URL+"/api/v1/sessions/notanumber/status", pw, nil)
+	if code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", code)
 	}
 }
 
 func TestServer_SessionStatus_NegativeIdx(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	// 負の index も 400 が望ましい（パス自体は通る／ハンドラで検証）。
-	// ただしGo 1.22+ の path patterns では "{idx}" は "-1" を含む文字列に
-	// マッチするので、ハンドラの strconv.Atoi で受けて検証する。
-	resp, err := http.Get(ts.URL + "/api/v1/sessions/-1/status?apiKey=" + key)
-	if err != nil {
-		t.Fatalf("GET: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	code := authGet(t, ts.URL+"/api/v1/sessions/-1/status", pw, nil)
+	if code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", code)
 	}
 }
 
@@ -232,8 +282,7 @@ func TestServer_SessionStatus_NegativeIdx(t *testing.T) {
 
 func TestServer_SessionStatus_Concurrent(t *testing.T) {
 	// 2 並行 /sessions/0/status と /sessions/1/status が混ざらず結果を返すこと。
-	// （内部の ExecGroup + execMu で直列化されるはず）
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	type pair struct {
 		idx  int
 		body okEnv[headless.WorldStatus]
@@ -242,7 +291,7 @@ func TestServer_SessionStatus_Concurrent(t *testing.T) {
 	for _, i := range []int{0, 1} {
 		go func(i int) {
 			var b okEnv[headless.WorldStatus]
-			_ = getJSON(t, fmt.Sprintf("%s/api/v1/sessions/%d/status?apiKey=%s", ts.URL, i, key), &b)
+			_ = authGet(t, fmt.Sprintf("%s/api/v1/sessions/%d/status", ts.URL, i), pw, &b)
 			resCh <- pair{i, b}
 		}(i)
 	}
@@ -255,123 +304,81 @@ func TestServer_SessionStatus_Concurrent(t *testing.T) {
 	}
 }
 
-// --- writeExecErr のエラーマッピング確認（Phase 7 前レビューで追加）---
+// --- writeExecErr のエラーマッピング ---
 
 func TestServer_ExecError_NotReady_After_Stop(t *testing.T) {
 	// driver を停止 → /sessions が 409 (ErrNotReady→409 Conflict)
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 
-	// stop 経由でヘッドレスを止める（cleanup より先に明示停止）
-	resp, err := http.Post(ts.URL+"/api/v1/stop?apiKey="+key, "", nil)
-	if err != nil {
-		t.Fatalf("stop: %v", err)
-	}
+	// stop（POST）でヘッドレスを止める
+	resp := authPost(t, ts.URL+"/api/v1/stop", pw, "", "")
 	resp.Body.Close()
 
 	// state=stopped まで待つ
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		r, err := http.Get(ts.URL + "/api/v1/status?apiKey=" + key)
-		if err != nil {
-			break
-		}
-		var b struct {
-			Data struct {
-				State string `json:"state"`
-			} `json:"data"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&b)
-		r.Body.Close()
-		if b.Data.State == "stopped" {
+		var b okEnv[headless.Status]
+		_ = authGet(t, ts.URL+"/api/v1/status", pw, &b)
+		if b.Data.State == headless.StateStopped {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 
 	// /sessions → 409
-	r, err := http.Get(ts.URL + "/api/v1/sessions?apiKey=" + key)
-	if err != nil {
-		t.Fatalf("GET /sessions: %v", err)
-	}
-	defer r.Body.Close()
-	if r.StatusCode != http.StatusConflict {
-		t.Fatalf("expected 409 (ErrNotReady), got %d", r.StatusCode)
+	var sb okEnv[[]headless.World]
+	code := authGet(t, ts.URL+"/api/v1/sessions", pw, &sb)
+	if code != http.StatusConflict {
+		t.Fatalf("expected 409 (ErrNotReady), got %d", code)
 	}
 }
 
 func TestServer_ExecError_Timeout(t *testing.T) {
 	// fakehl の hang コマンドで stdin 処理を停止 → 後続 /sessions は timeout
 	// (writeExecErr 2区分化: NotReady以外は 500 + code=timeout)
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 
-	r, err := http.Post(ts.URL+"/api/v1/command?apiKey="+key+"&cmd=hang", "", nil)
-	if err != nil {
-		t.Fatalf("send hang: %v", err)
-	}
+	r := authPost(t, ts.URL+"/api/v1/command?cmd=hang", pw, "", "")
 	r.Body.Close()
 	time.Sleep(150 * time.Millisecond)
 
-	r2, err := http.Get(ts.URL + "/api/v1/sessions?apiKey=" + key)
-	if err != nil {
-		t.Fatalf("GET /sessions: %v", err)
+	var body okEnv[[]headless.World]
+	code := authGet(t, ts.URL+"/api/v1/sessions", pw, &body)
+	if code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", code)
 	}
-	defer r2.Body.Close()
-	if r2.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", r2.StatusCode)
-	}
-	// error code が "timeout" であること
-	var body struct {
-		OK    bool `json:"ok"`
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	_ = json.NewDecoder(r2.Body).Decode(&body)
 	if body.OK || body.Error.Code != "timeout" {
 		t.Fatalf("expected code=timeout, got %+v", body)
 	}
 }
 
-// --- raw /command は変更なし（既存仕様の回帰確認）---
+// --- raw /command（POST限定）---
 
 func TestServer_RawCommand_StillWorks(t *testing.T) {
-	ts, key := newTestServer(t)
-	// raw /command は SendCommand 経由（fire-and-forget・応答取らず）
-	resp, err := http.Post(ts.URL+"/api/v1/command?apiKey="+key+"&cmd=worlds", "", nil)
-	if err != nil {
-		t.Fatalf("POST: %v", err)
-	}
+	ts, pw := newTestServer(t)
+	resp := authPost(t, ts.URL+"/api/v1/command?cmd=worlds", pw, "", "")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 }
 
-// /command の cmd を URL query / JSON body の 2 経路で受理することを確認。
-// form-urlencoded body は対応外（呼び出し側は URL query を使う）。
+// cmd を URL query / JSON body の 2 経路で受理（どちらも POST）。
+// form-urlencoded body は対応外。
 func TestServer_RawCommand_AcceptsTwoBodyForms(t *testing.T) {
-	ts, key := newTestServer(t)
+	ts, pw := newTestServer(t)
 	cases := []struct {
 		name        string
 		url         string
 		contentType string
 		body        string
 	}{
-		{"URL_query", ts.URL + "/api/v1/command?apiKey=" + key + "&cmd=worlds", "", ""},
-		{"JSON_body", ts.URL + "/api/v1/command?apiKey=" + key, "application/json", `{"cmd":"worlds"}`},
+		{"URL_query", ts.URL + "/api/v1/command?cmd=worlds", "", ""},
+		{"JSON_body", ts.URL + "/api/v1/command", "application/json", `{"cmd":"worlds"}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var resp *http.Response
-			var err error
-			if tc.body == "" {
-				resp, err = http.Post(tc.url, "", nil)
-			} else {
-				resp, err = http.Post(tc.url, tc.contentType, strings.NewReader(tc.body))
-			}
-			if err != nil {
-				t.Fatalf("POST: %v", err)
-			}
+			resp := authPost(t, tc.url, pw, tc.contentType, tc.body)
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
 				t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -382,15 +389,8 @@ func TestServer_RawCommand_AcceptsTwoBodyForms(t *testing.T) {
 
 // form-urlencoded body は対応外であることを明示的に確認 (400 が返る)
 func TestServer_RawCommand_FormBodyRejected(t *testing.T) {
-	ts, key := newTestServer(t)
-	resp, err := http.Post(
-		ts.URL+"/api/v1/command?apiKey="+key,
-		"application/x-www-form-urlencoded",
-		strings.NewReader("cmd=worlds"),
-	)
-	if err != nil {
-		t.Fatalf("POST: %v", err)
-	}
+	ts, pw := newTestServer(t)
+	resp := authPost(t, ts.URL+"/api/v1/command", pw, "application/x-www-form-urlencoded", "cmd=worlds")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 (form-urlencoded is not supported), got %d", resp.StatusCode)
@@ -398,11 +398,8 @@ func TestServer_RawCommand_FormBodyRejected(t *testing.T) {
 }
 
 func TestServer_RawCommand_MissingCmd(t *testing.T) {
-	ts, key := newTestServer(t)
-	resp, err := http.Post(ts.URL+"/api/v1/command?apiKey="+key, "", nil)
-	if err != nil {
-		t.Fatalf("POST: %v", err)
-	}
+	ts, pw := newTestServer(t)
+	resp := authPost(t, ts.URL+"/api/v1/command", pw, "", "")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for missing cmd, got %d", resp.StatusCode)

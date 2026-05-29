@@ -2,8 +2,9 @@
 // usage:
 //   gen-test-config <password> <resonitePath> <outpath>
 //
-// 出力: outpath に 0600 で書き込む。APIキー/SessionSecret はランダム生成し
-// 標準出力に key=value で印字する（呼び出し元スクリプトが拾う）。
+// 出力: outpath に 0600 で書き込む。SessionSecret はランダム生成する。
+// 認証は Bearer パスワード（呼び出し元が <password> を保持して使う）。
+// 標準出力に CONFIG=<path> を印字する（呼び出し元スクリプトが拾う）。
 package main
 
 import (
@@ -16,10 +17,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// cfg は internal/config.Config の e2e 用サブセット（SchemaVersion=1 / 既定TTL=720h=30日）。
 type cfg struct {
+	Version           int    `json:"version"`
 	AdminPasswordHash string `json:"adminPasswordHash"`
-	APIKey            string `json:"apiKey"`
 	SessionSecret     string `json:"sessionSecret"`
+	SessionTTLHours   int    `json:"sessionTtlHours,omitempty"`
 	Port              int    `json:"port"`
 	ResoniteHeadless  string `json:"resoniteHeadlessPath,omitempty"`
 }
@@ -37,13 +40,13 @@ func main() {
 	if err != nil {
 		fail("bcrypt: %v", err)
 	}
-	apiKey := randomB64(32)
 	secret := randomB64(32)
 
 	c := cfg{
+		Version:           1,
 		AdminPasswordHash: string(hash),
-		APIKey:            apiKey,
 		SessionSecret:     secret,
+		SessionTTLHours:   720,
 		Port:              8080,
 		ResoniteHeadless:  resPath,
 	}
@@ -55,7 +58,6 @@ func main() {
 		fail("write %s: %v", out, err)
 	}
 	// 呼び出し元が拾うため標準出力に key=value 形式で印字
-	fmt.Printf("APIKEY=%s\n", apiKey)
 	fmt.Printf("CONFIG=%s\n", out)
 }
 

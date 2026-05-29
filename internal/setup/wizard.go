@@ -17,7 +17,7 @@ import (
 )
 
 // RunWizard は最小限の設定（管理パスワード・ポート）を対話で受け取り、
-// APIキー・セッション秘密を自動生成して cfgPath に保存する。
+// セッション秘密を自動生成して cfgPath に保存する。
 // 残りの設定（Resoniteパス・セッション定義など）はログイン後のWeb UIで行う。
 func RunWizard(cfgPath string) error {
 	in := bufio.NewReader(os.Stdin)
@@ -38,19 +38,16 @@ func RunWizard(cfgPath string) error {
 	port := promptPort(in, 8080)
 	headlessPath := promptHeadlessPath(in)
 
-	apiKey, err := config.RandomSecret(24)
-	if err != nil {
-		return err
-	}
 	secret, err := config.RandomSecret(32)
 	if err != nil {
 		return err
 	}
 
 	cfg := &config.Config{
+		Version:           config.SchemaVersion,
 		AdminPasswordHash: string(hash),
-		APIKey:            apiKey,
 		SessionSecret:     secret,
+		SessionTTLHours:   config.DefaultSessionTTLHours,
 		Port:              port,
 		ResoniteHeadless:  headlessPath,
 	}
@@ -59,7 +56,42 @@ func RunWizard(cfgPath string) error {
 	}
 
 	fmt.Printf("\n設定を保存しました: %s\n", cfgPath)
-	fmt.Printf("APIキー（スクリプト/ワールド内操作用・後でUIから再生成可）:\n  %s\n", apiKey)
+	return nil
+}
+
+// ResetPassword は既存設定の管理パスワードを再設定する（旧パスワード不要）。
+// 実機のコマンドラインから `mrhc reset-password` で呼ばれる想定。
+// 物理/SSHアクセス＝認可とみなし、パスワード忘れ時の復旧手段とする。
+// adminPasswordHash が変わるため、署名鍵が変わり既存の全セッションが自動的に無効化される。
+func ResetPassword(cfgPath string) error {
+	cfg, err := config.LoadFrom(cfgPath)
+	if err != nil {
+		return fmt.Errorf("設定の読み込みに失敗: %w", err)
+	}
+	in := bufio.NewReader(os.Stdin)
+	tty := term.IsTerminal(int(os.Stdin.Fd()))
+
+	fmt.Println("=== MRHC パスワード再設定 ===")
+	fmt.Println("新しい管理パスワードを設定します。")
+
+	pw, err := readPasswordTwice(in, tty)
+	if err != nil {
+		return err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	cfg.AdminPasswordHash = string(hash)
+	if cfg.SessionSecret == "" { // 旧config救済: 署名に必須なので無ければ生成
+		if s, e := config.RandomSecret(32); e == nil {
+			cfg.SessionSecret = s
+		}
+	}
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		return err
+	}
+	fmt.Println("\nパスワードを再設定しました。既存のログインセッションは全て無効になりました。")
 	return nil
 }
 

@@ -17,7 +17,7 @@ v1（Node + Svelte）を網羅監査した結果、Phase 7 当初仕様に **Con
 
 ```
 Pre-Phase 7 (バックエンド完成):
-  - 認証改修: APIKey 撤去 / password を Bearer / stateless HMAC cookie (90日)
+  - 認証改修: APIKey 撤去 / password を Bearer / stateless HMAC cookie (30日)
   - Config schema: version, SessionTTLHours 追加
   - Config CRUD API (一覧/読/書/削除/生成/last-used)
   - write API (~20 endpoints) + sessions/start (新規セッション)
@@ -57,13 +57,13 @@ Phase 9 (Resonite / Steam 統合):
 
 ### 2.1 認証改修
 - **APIKey 撤去**: password を Bearer トークンとして送る（HTTP リクエスト操作用）。秘密は 1 つに統一
-- **stateless HMAC cookie**: SessionSecret で署名、TTL 90 日。サーバー側セッション状態を持たない
+- **stateless HMAC cookie**: SessionSecret×adminPasswordHash で署名鍵を導出、絶対失効 30 日。サーバー側セッション状態を持たない（パスワード変更で全トークン無効化）。CLI `mrhc reset-password` で旧PW不要の再設定可
 - ブラウザ GUI = cookie、外部 HTTP 操作 = `Authorization: Bearer <password>`
 - ログアウト = cookie 失効（クライアント側破棄）
 
 ### 2.2 Config schema 改修
 - `version` フィールド追加（mrhc.config.json のスキーマ版管理）
-- `SessionTTLHours` 追加（既定 90 日 = 2160h）
+- `SessionTTLHours` 追加（既定 30 日 = 720h）/ `Version`（SchemaVersion=1）追加
 
 ### 2.3 Headless Config CRUD API（v1 同等・作り直し）
 ```
@@ -224,7 +224,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 ### 3.6 状態とフロー
 - **ログイン**: シンプルカード（ロゴ + password input + ボタン）、失敗はカード内赤表示、連続失敗 10 回ロック
 - **初回セットアップ**: CLI 対話のまま（Web wizard なし）。セットアップ完了後は auto-continue
-- **セッション期限**: cookie 90 日
+- **セッション期限**: cookie 30 日（絶対失効）
 - **危険操作**（kick/ban/強制停止/close）: 確認モーダル
 - **トースト通知**: 操作完了/失敗
 

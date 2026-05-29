@@ -1,10 +1,12 @@
 package server
 
 import (
-	"crypto/rand"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,15 +17,32 @@ import (
 )
 
 const sessionCookie = "mrhc_session"
-const sessionTTL = 24 * time.Hour
 
-// authManager は人間向けのセッション（Cookie）と、スクリプト向けのAPIキー認証を扱う。
+// tokenVersion はセッショントークンのフォーマット版（将来変更用）。
+const tokenVersion = "v1"
+
+// authManager は人間向けセッション（stateless HMAC Cookie）と、
+// スクリプト向け Bearer パスワード認証を扱う。
+//
+// stateless 設計（サーバー側にセッション状態を持たない）:
+//   - 署名鍵 = HMAC-SHA256(SessionSecret, adminPasswordHash) を導出。
+//     パスワード変更で adminPasswordHash が変われば署名鍵も変わり、
+//     既存トークンが全て無効化される（= 全端末ログアウト）。
+//   - トークン = "v1.<expiryUnix>.<sig>"（絶対失効。既定30日）。
+//   - 検証は署名再計算 + 定数時間比較 + 期限チェックのみ。
+//
+// ⚠️ signingKey は cfg.SessionSecret / cfg.AdminPasswordHash を lock 無しで読む。
+// 現状これらを実行時に書き換える経路は無い（パスワード再設定は別プロセスの CLI）。
+// 将来 UI からのパスワード変更を実装する際は cfg アクセスの同期が必要。
 type authManager struct {
 	cfg       *config.Config
 	mu        sync.Mutex
-	sessions  map[string]time.Time // token -> 失効時刻
-	failures  int                  // 連続ログイン失敗回数
-	lockUntil time.Time            // ロックアウト解除時刻
+	failures  int       // 連続ログイン失敗回数
+	lockUntil time.Time // ロックアウト解除時刻
+}
+
+func newAuthManager(cfg *config.Config) *authManager {
+	return &authManager{cfg: cfg}
 }
 
 // loginLocked はログインがレート制限でロック中かを返す。
@@ -52,61 +71,64 @@ func (a *authManager) recordLoginResult(ok bool) {
 	}
 }
 
-func newAuthManager(cfg *config.Config) *authManager {
-	return &authManager{cfg: cfg, sessions: make(map[string]time.Time)}
-}
-
 func (a *authManager) checkPassword(pw string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(a.cfg.AdminPasswordHash), []byte(pw)) == nil
 }
 
-func (a *authManager) newSession() string {
-	b := make([]byte, 32)
-	_, _ = rand.Read(b)
-	tok := base64.RawURLEncoding.EncodeToString(b)
-	a.mu.Lock()
-	a.sessions[tok] = time.Now().Add(sessionTTL)
-	a.mu.Unlock()
-	return tok
+// signingKey はトークン署名鍵を導出する。
+// SessionSecret を鍵、adminPasswordHash をメッセージとした HMAC。
+// → パスワード変更で adminPasswordHash が変わると署名鍵も変わり、既存トークンが全無効化される。
+func (a *authManager) signingKey() []byte {
+	mac := hmac.New(sha256.New, []byte(a.cfg.SessionSecret))
+	mac.Write([]byte(a.cfg.AdminPasswordHash))
+	return mac.Sum(nil)
 }
 
-func (a *authManager) validSession(tok string) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	exp, ok := a.sessions[tok]
-	if !ok {
+// sign は payload に対する base64url 署名（HMAC-SHA256）を返す。
+func (a *authManager) sign(payload string) string {
+	mac := hmac.New(sha256.New, a.signingKey())
+	mac.Write([]byte(payload))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// issueToken は新しいセッショントークンを発行する（絶対失効 = now + SessionTTL）。
+func (a *authManager) issueToken() string {
+	exp := time.Now().Add(a.cfg.SessionTTL()).Unix()
+	payload := tokenVersion + "." + strconv.FormatInt(exp, 10)
+	return payload + "." + a.sign(payload)
+}
+
+// verifyToken はトークンの署名と有効期限を検証する（サーバー状態は参照しない）。
+func (a *authManager) verifyToken(tok string) bool {
+	parts := strings.Split(tok, ".")
+	if len(parts) != 3 {
 		return false
 	}
-	if time.Now().After(exp) {
-		delete(a.sessions, tok)
+	ver, expStr, sig := parts[0], parts[1], parts[2]
+	if ver != tokenVersion {
 		return false
 	}
-	return true
-}
-
-func (a *authManager) dropSession(tok string) {
-	a.mu.Lock()
-	delete(a.sessions, tok)
-	a.mu.Unlock()
-}
-
-func (a *authManager) validAPIKey(key string) bool {
-	if key == "" || a.cfg.APIKey == "" {
+	want := a.sign(ver + "." + expStr)
+	// 定数時間比較（タイミング攻撃対策）
+	if subtle.ConstantTimeCompare([]byte(sig), []byte(want)) != 1 {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(key), []byte(a.cfg.APIKey)) == 1
+	exp, err := strconv.ParseInt(expStr, 10, 64)
+	if err != nil {
+		return false
+	}
+	return time.Now().Unix() < exp
 }
 
-// authorized は Cookieセッション or APIキー（ヘッダ優先・クエリも許容）で認証可否を返す。
+// authorized は Cookie セッション or Bearer パスワードで認証可否を返す。
 func (s *Server) authorized(r *http.Request) bool {
-	if c, err := r.Cookie(sessionCookie); err == nil && s.auth.validSession(c.Value) {
+	if c, err := r.Cookie(sessionCookie); err == nil && s.auth.verifyToken(c.Value) {
 		return true
 	}
-	key := bearerToken(r)
-	if key == "" {
-		key = r.URL.Query().Get("apiKey")
+	if pw := bearerToken(r); pw != "" {
+		return s.auth.checkPassword(pw)
 	}
-	return s.auth.validAPIKey(key)
+	return false
 }
 
 func (s *Server) requireAuth(h http.HandlerFunc) http.HandlerFunc {

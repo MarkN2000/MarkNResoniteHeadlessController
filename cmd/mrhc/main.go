@@ -41,6 +41,17 @@ func main() {
 	}
 	cfgPath := filepath.Join(dir, config.FileName)
 
+	// サブコマンド: reset-password （旧PW不要・実機での復旧手段）
+	if flag.Arg(0) == "reset-password" {
+		if !config.FileExists(cfgPath) {
+			log.Fatalf("設定ファイルがありません: %s（先に通常起動して初回セットアップを完了してください）", cfgPath)
+		}
+		if err := setup.ResetPassword(cfgPath); err != nil {
+			log.Fatalf("パスワード再設定に失敗: %v", err)
+		}
+		return
+	}
+
 	if !config.FileExists(cfgPath) {
 		if err := setup.RunWizard(cfgPath); err != nil {
 			log.Fatalf("セットアップに失敗しました: %v", err)
@@ -79,7 +90,9 @@ func main() {
 			os.Exit(1)
 		}()
 		_ = driver.Stop()
-		waitForStopped(driver, 75*time.Second)
+		// driver.Stop() の force-kill 猶予(180s)より少し長く待つ（先に MRHC が
+		// 終了して子プロセスが残るのを防ぐ）。
+		waitForStopped(driver, 185*time.Second)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

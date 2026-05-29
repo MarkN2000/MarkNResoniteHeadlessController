@@ -7,21 +7,40 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"os"
+	"time"
 )
 
 // FileName は設定ファイル名。データディレクトリ直下に置く。
 const FileName = "mrhc.config.json"
 
+// SchemaVersion は mrhc.config.json のスキーマ版。新規生成時に書き込む。
+// 将来フィールド構造が変わった際のマイグレーション判定に使う。
+const SchemaVersion = 1
+
+// DefaultSessionTTLHours はセッション（Cookie）の既定有効期間（30日）。
+// stateless HMAC トークンの絶対失効時刻に使う。設計: internal/server/auth.go
+const DefaultSessionTTLHours = 720
+
 // Config はアプリ全体の設定。秘密情報を含むため保存時はパーミッション 0600。
 type Config struct {
-	AdminPasswordHash string `json:"adminPasswordHash"`          // bcryptハッシュ
-	APIKey            string `json:"apiKey"`                     // スクリプト/ワールド内操作用（再生成可）
-	SessionSecret     string `json:"sessionSecret"`              // セッションCookie署名用（自動生成）
-	Port              int    `json:"port"`                       // HTTP待受ポート
-	ResoniteHeadless  string `json:"resoniteHeadlessPath,omitempty"`  // Resonite.exe / Resonite.dll
-	HeadlessConfigDir string `json:"headlessConfigDir,omitempty"`     // ヘッドレスconfig格納先
-	Encoding          string `json:"encoding,omitempty"`              // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
-	// 後続でHeadlessCredentials / Restart / Steam / AllowedCidrs などを追加
+	Version           int    `json:"version"`                        // スキーマ版（SchemaVersion）
+	AdminPasswordHash string `json:"adminPasswordHash"`              // bcryptハッシュ
+	SessionSecret     string `json:"sessionSecret"`                  // セッションCookie署名用（自動生成）
+	SessionTTLHours   int    `json:"sessionTtlHours,omitempty"`      // セッション有効期間（時間。空/0=既定720h=30日）
+	Port              int    `json:"port"`                           // HTTP待受ポート
+	ResoniteHeadless  string `json:"resoniteHeadlessPath,omitempty"` // Resonite.exe / Resonite.dll
+	HeadlessConfigDir string `json:"headlessConfigDir,omitempty"`    // ヘッドレスconfig格納先
+	Encoding          string `json:"encoding,omitempty"`             // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
+	// 後続でHeadlessCredentials / Restart / Steam などを追加
+}
+
+// SessionTTL はセッション有効期間を返す。未設定（0以下）なら既定30日。
+func (c *Config) SessionTTL() time.Duration {
+	h := c.SessionTTLHours
+	if h <= 0 {
+		h = DefaultSessionTTLHours
+	}
+	return time.Duration(h) * time.Hour
 }
 
 // FileExists は設定ファイルの有無を返す。

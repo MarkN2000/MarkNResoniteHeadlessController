@@ -310,7 +310,10 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	}
 }
 
-// Stop は shutdown を送り、猶予後に強制終了する。
+// Stop は shutdown を送り、猶予（180秒）後に強制終了する。
+// ワールド保存に数分かかる場合があるため即 kill せず長めの猶予を取る。
+// （v1 は 60s SIGTERM / 70s SIGKILL の段階式。Windows は SIGTERM 相当が無いため
+//  単段の force-kill とし、その分猶予を長くした。設計: phase-7-spec レビュー 2026-05-29）
 func (d *Driver) Stop() error {
 	d.mu.Lock()
 	if d.state == StateStopped || d.cmd == nil {
@@ -329,7 +332,7 @@ func (d *Driver) Stop() error {
 	}
 
 	go func() {
-		timer := time.NewTimer(60 * time.Second)
+		timer := time.NewTimer(180 * time.Second)
 		defer timer.Stop()
 		<-timer.C
 		d.mu.Lock()

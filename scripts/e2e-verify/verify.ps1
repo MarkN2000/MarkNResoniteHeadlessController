@@ -4,7 +4,7 @@
 #   1. mrhc.exe と gen-test-config をビルド (web/dist は既存前提)
 #   2. 一時 dataDir に mrhc.config.json を生成
 #   3. mrhc を起動 (バックグラウンド)
-#   4. /api/v1/login で認証 → cookie 取得 (or APIKey 使用)
+#   4. 認証は Authorization: Bearer <password>（APIKey は廃止）
 #   5. /api/v1/start で headless 起動 (test-multi-world.json)
 #   6. 構造化API を順に叩いて JSON を保存
 #   7. cleanup: shutdown → mrhc 停止
@@ -44,10 +44,10 @@ if (-not $?) { Write-Output "BUILD FAIL"; exit 1 }
 $dataDir = Join-Path $runDir "data"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 $cfgPath = Join-Path $dataDir "mrhc.config.json"
-$genOut = & "$repo\bin\gen-test-config.exe" $Password $ResoniteExe $cfgPath
-$apiKey = ($genOut | Where-Object { $_ -like "APIKEY=*" }) -replace "APIKEY=",""
+& "$repo\bin\gen-test-config.exe" $Password $ResoniteExe $cfgPath | Out-Null
 Write-Output "config: $cfgPath"
-Write-Output "apiKey: $($apiKey.Substring(0,12))... (truncated)"
+# 認証は Bearer パスワード（gen-test-config が config に bcrypt ハッシュを保存済）
+$authHeaders = @{ Authorization = "Bearer $Password" }
 
 # mrhc 起動
 Write-Output "=== launch mrhc ==="
@@ -62,7 +62,7 @@ $ready = $false
 $deadline = (Get-Date).AddSeconds(15)
 while ((Get-Date) -lt $deadline) {
     try {
-        $r = Invoke-WebRequest "$base/api/v1/status?apiKey=$apiKey" -UseBasicParsing -ErrorAction Stop
+        $r = Invoke-WebRequest "$base/api/v1/status" -Headers $authHeaders -UseBasicParsing -ErrorAction Stop
         if ($r.StatusCode -eq 200) { $ready = $true; break }
     } catch { }
     Start-Sleep -Milliseconds 300
@@ -78,11 +78,11 @@ Write-Output "mrhc up"
 # helper: GET → JSON ファイル保存
 function Save-Get {
     param([string]$Path, [string]$FileName)
-    $url = "$base$Path" + $(if ($Path.Contains("?")) { "&" } else { "?" }) + "apiKey=$apiKey"
+    $url = "$base$Path"
     $outFile = Join-Path $runDir $FileName
     Write-Output ">>> GET $Path"
     try {
-        $r = Invoke-WebRequest $url -UseBasicParsing -ErrorAction Stop
+        $r = Invoke-WebRequest $url -Headers $authHeaders -UseBasicParsing -ErrorAction Stop
         $r.Content | Out-File -FilePath $outFile -Encoding utf8 -NoNewline
         Write-Output "  status=$($r.StatusCode) bytes=$($r.RawContentLength) saved=$outFile"
     } catch {
@@ -95,11 +95,11 @@ function Save-Get {
 # helper: POST (form encoded)
 function Save-Post {
     param([string]$Path, [hashtable]$Body, [string]$FileName)
-    $url = "$base$Path" + $(if ($Path.Contains("?")) { "&" } else { "?" }) + "apiKey=$apiKey"
+    $url = "$base$Path"
     $outFile = Join-Path $runDir $FileName
     Write-Output ">>> POST $Path  body=$($Body | ConvertTo-Json -Compress)"
     try {
-        $r = Invoke-WebRequest $url -Method POST -Body ($Body | ConvertTo-Json) -ContentType "application/json" -UseBasicParsing -ErrorAction Stop
+        $r = Invoke-WebRequest $url -Method POST -Headers $authHeaders -Body ($Body | ConvertTo-Json) -ContentType "application/json" -UseBasicParsing -ErrorAction Stop
         $r.Content | Out-File -FilePath $outFile -Encoding utf8 -NoNewline
         Write-Output "  status=$($r.StatusCode) saved=$outFile"
     } catch {
@@ -115,7 +115,7 @@ $ready = $false
 $deadline = (Get-Date).AddSeconds(180)
 while ((Get-Date) -lt $deadline) {
     try {
-        $r = Invoke-WebRequest "$base/api/v1/status?apiKey=$apiKey" -UseBasicParsing -ErrorAction Stop
+        $r = Invoke-WebRequest "$base/api/v1/status" -Headers $authHeaders -UseBasicParsing -ErrorAction Stop
         $j = $r.Content | ConvertFrom-Json
         if ($j.data.ready) { $ready = $true; break }
     } catch { }
@@ -147,7 +147,7 @@ Save-Post "/api/v1/stop" @{} "90-stop.json"
 $deadline = (Get-Date).AddSeconds(90)
 while ((Get-Date) -lt $deadline) {
     try {
-        $r = Invoke-WebRequest "$base/api/v1/status?apiKey=$apiKey" -UseBasicParsing -ErrorAction Stop
+        $r = Invoke-WebRequest "$base/api/v1/status" -Headers $authHeaders -UseBasicParsing -ErrorAction Stop
         $j = $r.Content | ConvertFrom-Json
         if ($j.data.state -eq "stopped") { break }
     } catch { break }

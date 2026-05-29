@@ -1,6 +1,7 @@
 // Package server はHTTP/SSE層。単一の公開APIをWeb UIもスクリプトも共用する。
-// 認証は2経路（人間=Cookie+SameSite / スクリプト=APIキー）。長時間操作
-// （start/stop）は即「受付」を返し、進捗・状態はSSEで配信する。
+// 認証は2経路（人間=stateless HMAC Cookie / スクリプト=Bearer パスワード）。
+// 状態変更系（start/stop/command）は POST 限定。長時間操作（start/stop）は
+// 即「受付」を返し、進捗・状態はSSEで配信する。
 package server
 
 import (
@@ -11,6 +12,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
@@ -44,9 +46,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/login", s.handleLogin)
 	mux.HandleFunc("POST /api/v1/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/v1/status", s.requireAuth(s.handleStatus))
-	mux.HandleFunc("/api/v1/start", s.requireAuth(s.handleStart))     // GET/POST両対応
-	mux.HandleFunc("/api/v1/stop", s.requireAuth(s.handleStop))       // GET/POST両対応
-	mux.HandleFunc("/api/v1/command", s.requireAuth(s.handleCommand)) // raw fire-and-forget
+	mux.HandleFunc("POST /api/v1/start", s.requireAuth(s.handleStart))     // 状態変更=POST限定
+	mux.HandleFunc("POST /api/v1/stop", s.requireAuth(s.handleStop))       // 状態変更=POST限定
+	mux.HandleFunc("POST /api/v1/command", s.requireAuth(s.handleCommand)) // 副作用あり=POST限定
 	mux.HandleFunc("GET /api/v1/events", s.requireAuth(s.handleEvents))
 
 	// 構造化API（Phase 4: Exec/WorldsService を介して構造化データを返す）
@@ -100,22 +102,23 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "invalid_password", "パスワードが違います")
 		return
 	}
-	tok := s.auth.newSession()
+	tok := s.auth.issueToken()
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    tok,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   int(sessionTTL.Seconds()),
+		Secure:   r.TLS != nil, // HTTPS提供時のみ Secure（平文LAN httpでは付けない＝cookieが送られなくなるため）
+		MaxAge:   int(s.cfg.SessionTTL().Seconds()),
 	})
 	writeOK(w, map[string]any{"loggedIn": true})
 }
 
+// handleLogout は Cookie をクリアする。stateless 設計のためサーバー側に
+// 失効させる状態は無く、このブラウザの Cookie 削除のみ（他端末は失効しない）。
+// 全端末の失効が必要なときはパスワード変更で署名鍵を変える。
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		s.auth.dropSession(c.Value)
-	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1})
 	writeOK(w, map[string]any{"loggedIn": false})
 }
@@ -129,6 +132,12 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		Config string `json:"config"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	if strings.TrimSpace(body.Config) == "" {
+		// 無config起動はワールドが公開(Anyone)になり危険なため不可。
+		writeErr(w, http.StatusBadRequest, "config_required",
+			"起動するコンフィグを指定してください（無config起動はワールドが公開になるため不可）")
+		return
+	}
 	if err := s.driver.Start(s.cfg.ResoniteHeadless, body.Config); err != nil {
 		writeErr(w, http.StatusConflict, "start_failed", err.Error())
 		return
@@ -145,10 +154,10 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
-	// cmd は URL query または JSON body で受理。
+	// POST限定。cmd は URL query または JSON body で受理。
 	// form-urlencoded body は対応外（必要なら呼び出し側で URL query を使う）。
 	cmd := r.URL.Query().Get("cmd")
-	if cmd == "" && r.Method == http.MethodPost {
+	if cmd == "" {
 		var body struct {
 			Cmd string `json:"cmd"`
 		}
