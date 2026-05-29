@@ -11,7 +11,7 @@ Resonite Headless Controller を、要件からゼロ再定義して作り直す
 
 - **目的**: Resoniteヘッドレスサーバーを、LAN内のブラウザ／スクリプトから操作・管理する。
 - **利用者**: Resoniteコミュニティの知人数名。各自が自宅サーバーに導入する（＝**配布とセットアップの容易さが最重要**）。
-- **運用形態**: **24時間常時稼働**。Windows / Linux を**対等にサポート**。MRHC自体は**手動起動**（PC起動時の自動起動は対象外）。
+- **運用形態**: **24時間常時稼働**。Windows / Linux（**ARM Linux 含む**）を**対等にサポート**。MRHC自体は**手動起動**（PC起動時の自動起動は対象外）。
 - **設計原則**: SOLID、関数型寄りで副作用を局所化、高凝集・低結合。「Resonite/外部ツールの事実」と「OS差」を専用層に閉じ込める。
 
 ---
@@ -50,11 +50,11 @@ Resonite Headless Controller を、要件からゼロ再定義して作り直す
 ## 3. 非機能要件
 
 - **配布**: ランタイム不要の単一実行ファイル（`mrhc` / `mrhc.exe`）。フロント静的資産は `embed.FS` で同梱。インストール=DLして実行。
-- **クロスプラットフォーム**: Windows / Linux 対等。OS差（パス・文字コード・プロセス起動・steamcmd所在）は**プラットフォーム抽象層**に隔離。起動は Win=`Resonite.exe` / Linux=`dotnet Resonite.dll`（同一.NETアプリ）。
-- **前提ランタイム**: MRHC自体は単一Goバイナリで**ランタイム不要**。ヘッドレスは.NET 10で動くが、**Resoniteが自前のランタイムを同梱**（`<install>/dotnet-runtime/dotnet`、実機確認済）するため**別途の.NET導入は不要**。Linux起動はこの同梱dotnetで `dotnet Resonite.dll`。
+- **クロスプラットフォーム**: **Windows (x64) / Linux (x64・ARM64)** を対等にサポート。ARM Linux は Resonite が ARM で動作する環境（SBC・ARMサーバー等）向け。MRHC本体は **CGO 不要の純 Go** のため `GOARCH=arm64` のクロスビルドで対応。⚠️ ただしARMは「ビルドだけ」では完結しない: **(1) Resonite同梱dotnetはx64でARMでは使えず、システムに.NET 10ランタイムが別途必要** **(2) SteamCMDがARM非対応のため入手/更新はDepotDownloaderに統一**（§5.7）。OS/arch差（パス・文字コード・プロセス起動・dotnet所在・Resonite入手手段）は**プラットフォーム抽象層**に隔離。起動は Win=`Resonite.exe` / Linux=`dotnet Resonite.dll`（同一.NETアプリ）。
+- **前提ランタイム**: MRHC自体は単一Goバイナリで**ランタイム不要**。ヘッドレスは.NET 10で動く。**x86(Win/Linux)はResoniteが自前のランタイムを同梱**（`<install>/dotnet-runtime/dotnet`、実機確認済）するため**別途の.NET導入は不要**。⚠️ **ARM64は同梱dotnetがx64で使えないため、システムに.NET 10ランタイムが別途必要**（MRHCは同梱dotnetの実体アーキを確認し、不一致なら`~/.dotnet`→PATHの`dotnet`にフォールバック）。Linux起動は使用可能なdotnetで `dotnet Resonite.dll`。
 - **セキュリティ（LAN前提で右サイズ）**: §7参照。
 - **時刻（タイムゾーン）**: スケジュール再起動の毎日/毎週/日時は**サーバーのローカル時刻**で判定する。UIには適用タイムゾーンを明示する（「何時に再起動されるか」の事故防止）。
-- **秘密情報の扱い**: 管理パスワードは**ハッシュ保存**。一方、Resoniteアカウント/Steamのパスワードは子プロセス（ヘッドレス・steamcmd）へ渡すため**復元可能な形で保存せざるを得ない**。よって防御は「**設定ファイルのパーミッション制限（Linuxは0600相当）＋LAN前提**」とする。
+- **秘密情報の扱い**: 管理パスワードは**ハッシュ保存**。一方、Resoniteアカウント/Steamのパスワードは子プロセス（ヘッドレス・DepotDownloader）へ渡すため**復元可能な形で保存せざるを得ない**。よって防御は「**設定ファイルのパーミッション制限（Linuxは0600相当）＋LAN前提**」とする。
 - **i18n**: 日本語 / 英語。メッセージカタログ外部化で言語追加容易（react-i18next）。
 - **レスポンシブ**: モバイルファースト（Tailwindブレークポイント）。スマホからの簡易操作を想定。
 - **デザイン**: Mantineのテーマシステムで配色を一元管理（light/dark・レスポンシブ部品）。管理ダッシュボード向けに表/フォーム/モーダル等が揃う。
@@ -87,7 +87,8 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 プラットフォーム抽象層 (★OS差を隔離)
   ├─ ProcessLauncher  … Win: `Resonite.exe -HeadlessConfig <f>` / Linux: `<install>/dotnet-runtime/dotnet Resonite.dll -HeadlessConfig <f>`(dotnetはResonite同梱・別途.NET不要)。cwd=`Headless/`。両者とも同一の.NETアプリ
   ├─ Encoding         … Win: ロケール(Shift_JIS等) / Linux: UTF-8
-  └─ Paths            … steamcmd・Resoniteインストール先の検出。Win:`C:/Program Files (x86)/Steam/.../Resonite/Headless/Resonite.exe` / Linux:`~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`(Flatpak版`~/.var/app/com.valvesoftware.Steam/...`も候補)
+  ├─ Paths            … Resoniteインストール先・DepotDownloader・.NETの検出。Win:`C:/Program Files (x86)/Steam/.../Resonite/Headless/Resonite.exe` / Linux:`~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`(Flatpak版`~/.var/app/com.valvesoftware.Steam/...`も候補)
+  └─ Steam(DepotDownloader) … Resoniteの入手・更新(全OS統一・ARM対応)。steamcmdは廃止。詳細は§5.7
 ```
 
 ### 並行モデル（Goの要点）
@@ -156,12 +157,15 @@ type PreRestartAction interface {
   - (任意・設定ON時) **ヘッドレスを自動再起動**。**クラッシュループ保護**（短時間にN回以上落ちる場合は自動復帰を止めて通知）。
 - 復帰対象は**ヘッドレス**であり、MRHC自身ではない（MRHCは手動起動）。
 
-### 5.7 Steam更新（Could・後段機能）
-- Resoniteヘッドレスは**Steam(headlessブランチ)経由でのみ**更新可能。更新手段は実質steamcmd（公式は **DepotDownloader** も代替案内＝.NET製で、ヘッドレスの.NET10前提を流用できる）。
-- **都度実行のみ**: 「更新」操作で `steamcmd +force_install_dir <dir> +login <user> <pass> +app_update <appid> -beta headless -betapassword <code> validate +quit` を実行。最新なら no-op。**更新有無の事前チェック(VDF/buildid)は持たない**（旧来の複雑さを排除）。出力はSSEでライブ表示。実行前に(稼働中なら)ヘッドレス停止→完了後に再起動（§7の非同期）。
-- **Steam Guard(2FA)＝UIで入力（再実行方式）**: steamcmdがGuardコードを要求したのを検知 → SSE `update` を `guard-required` 状態にしてUIにコード入力欄 → `POST /steam/guard-code` で受領 → `+login user pass <code>` で**即再実行**。**端末操作不要・ブラウザで完結**。
-- **sentryキャッシュ**: 一度成功するとsteamcmdが信頼ファイルを保存し普段はコード不要。**steamcmdの設定/sentryディレクトリを永続化**し再認証頻度を最小化。
-- ⚠️ TOTPの共有シークレットは保存しない（2FA無効化のため）。`+force_install_dir` は `+login` より前（[`resonite-domain-facts.md`](./resonite-domain-facts.md)）。
+### 5.7 Resoniteの入手・更新（DepotDownloaderに統一・Could/後段機能）
+> ⚠️ **方針転換（2026-05-29）**: 旧計画のsteamcmdは**ARM Linux非対応**のため廃止。**全OSでDepotDownloader（.NET製・ARM64ネイティブ）に統一**。詳細は[`resonite-domain-facts.md`](./resonite-domain-facts.md)§4 と メモリ`arm-support-plan`。
+- Resoniteヘッドレスは**Steam(headlessブランチ)経由でのみ**入手・更新可能。手段は **DepotDownloader**（self-contained配布があり.NET不要。MRHCが実行OS/archに合う版を自動DL＋SHA検証）。
+- **入手＝更新は同一コマンドで冪等（差分DLで再開可）**: `DepotDownloader -app 2519830 -branch headless -branchpassword <code> -username <u> -remember-password -dir <install>`。**更新有無の事前チェック(VDF/buildid)は持たない**（旧来の複雑さを排除）。出力はSSEでライブ表示。実行前に(稼働中なら)ヘッドレス停止→完了後に再起動（§7の非同期）。
+- ⚠️ **取得後 `chmod -R +x <install>` が必須**（DepotDownloaderは実行権を付けない）。
+- **2系統のアカウントを分離**: A=DL用Steamアカウント（DepotDownloaderが使う） / B=Resoniteアカウント（configの`loginCredential`＝bot身元。別物）。本節はA。
+- **A(Steam)のv1方針＝予備アカウント・Steam Guardオフを推奨**: user+password(stdin)+betaコードで**完全無人DL**。パスワードは**stdin投入**（`-password`引数はps露出のため不可）。`-remember-password`でトークン保持（保存先は.NET IsolatedStorage＝MRHC管理外）。
+- **Guardオン時の2FA入力UI（プロンプト検出→`POST /steam/guard-code`→stdin投入）は将来拡張**（DepotDownloaderの2FA系プロンプトは全て `ReadLine` ＝stdinで対応可）。
+- ⚠️ パスワードは**ASCII限定・64文字以内**（Steam仕様）。betaコードは`/headlessCode`でResonite botから取得（変動しうる＝編集可に）。TOTPの共有シークレットは保存しない。
 
 ---
 
@@ -221,7 +225,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 
 ### ビルド
 - フロント: `vite build` → 静的成果物を Go の `embed.FS` に取り込み。
-- バックエンド: `go build`（`GOOS`/`GOARCH` で Win/Linux クロスビルド）。CI（GitHub Actions）で両OSバイナリを生成。
+- バックエンド: `go build`（`GOOS`/`GOARCH` で **`windows/amd64`・`linux/amd64`・`linux/arm64`（ARM Linux）の3ターゲット**をクロスビルド。CGO 不要の純 Go なので環境変数の切替だけで可）。CI（GitHub Actions: `.github/workflows/release.yml` のビルドマトリクス）で生成。
 
 ### CLIセットアップウィザード（Win/Linux完全共通）
 - 初回起動でconfig無しを検知 → 同一バイナリが対話プロンプト表示。
@@ -230,7 +234,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 
 ### 運用メモ
 - MRHC自体は**手動起動**（PC起動時の自動起動は対象外）。ヘッドレスのクラッシュ自動復帰は §5.6。
-- **steamcmd はベースセットアップに含めない**（Steam機能を使う時だけ取得／手動。旧来の起動時自動DLの重さを回避）。
+- **DepotDownloader はベースセットアップに含めない**（Steam機能＝Resonite入手/更新を使う時だけMRHCが遅延DL。旧来の起動時自動DLの重さを回避。steamcmdはARM非対応のため廃止）。
 - **MRHC自己更新=Lv1**: UIに現バージョン表示＋**GitHubの最新リリースをチェックして「新版あり＋DLリンク」**を通知。差し替えは手動（新バイナリ上書き→MRHC再起動。設定・状態は別ファイルなので保持される）。自己置換(Lv2)は将来の任意拡張。
 - **ファイアウォール/ポート開放**の注意を案内（友人が繋がらない時の典型原因）。
 

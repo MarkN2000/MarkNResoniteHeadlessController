@@ -132,18 +132,49 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 ---
 
-## 4. SteamCMD（更新まわり）
+## 4. Resoniteの入手・更新（DepotDownloader）
 
-> v1方針では「更新実行＋ログ表示のみ」に簡素化し、buildid事前チェック機構は廃止予定。ただし更新実行の呼び出し事実は以下を踏襲。
+> ⚠️ **方針転換（2026-05-29）**: 旧実装は **SteamCMD** を使っていたが、**SteamCMDはARM Linux非対応**（x86バイナリのみ。box64エミュは重く脆い）。**ARM64でもネイティブに動くDepotDownloader（.NET製・SteamRE製）に全OSで統一**する。SteamCMD固有の知識（`force_install_dir`順序・VDF/buildid事前チェック・appcache削除）は**廃止**。下記は新方針の事実。出典: Resonite公式Wiki `Headless_server_software/ARM`・`/Setup`、`SteamRE/DepotDownloader`（ソース実読 master≒v3.4.0）。詳細は[[arm-support-plan]]（メモリ）。
 
-- **App**: Resonite `appId=2519830`、`branch=headless`
-- **更新実行**: `+force_install_dir <dir> +login <u> <p> [+set_steam_guard_file <f>] +app_update 2519830 [-beta headless -betapassword <code>] validate +quit`
-- ⚠️ **`+force_install_dir` は必ず `+login` より前**（順序ミスで `please use force_install_dir before logon!`）
-- **Steam Guard**: `+login <u> <p> <guardCode>` の3引数目。検出キーワード `steam guard` / `two-factor code`
-- **エラーキーワード**: `invalid password`, `no subscription`, `no licenses`, `rate limit exceeded`, `failed to install`, `failed to set beta` 等
-- 実行: `spawn(steamcmdPath, args, { cwd: dirname, windowsHide: true })`、既定タイムアウト5分
-- （事前チェックを残す場合のみ）`+app_status` のローカルbuildid と `+app_info_print` のVDF `depots.branches.<branch>.buildid` を比較。`appcache/appinfo.vdf` を事前削除して古いキャッシュ回避。
-- Windows既定パス候補: `C:/steamcmd/steamcmd.exe`, `C:/Program Files (x86)/Steam/steamcmd/steamcmd.exe`。Resonite既定: `C:/Program Files (x86)/Steam/steamapps/common/Resonite`。**Linuxは別パス → 抽象化必須**
+### 4.1 入手・更新コマンド
+- **App**: Resonite `appId=2519830`、**branch=`headless`**（非公開ベータ。要beta password）
+- **取得/更新（同一コマンドで冪等。差分DLで再開可）**:
+  `DepotDownloader -app 2519830 -branch headless -branchpassword <code> -username <u> -remember-password -dir <install>`
+- ⚠️ **フラグ表記**: `-branch`/`-branchpassword` が**新名（公式・推奨）**。`-beta`/`-betapassword` は**別名エイリアス**（Resonite Wikiの旧表記）。両方有効だが台帳・コードは `-branch` 系で統一。
+- ⚠️ **実行権限**: DepotDownloaderはDLファイルに実行権を**付けない** → Linux/ARM/macOSは取得後 **`chmod -R +x <install>` が必須**（定番のハマり。yt-dlp等の外部ツールも巻き込む）。
+- **対象指定**: `-os <windows|linux|macos>` / `-osarch <arch>`（既定は実行中OS/arch）。
+- **再開**: install dir内 `.DepotDownloader/staging/` に途中状態を持ち、再実行で差分再開。
+
+### 4.2 beta password の入手（運用知識）
+- Resonite内で **Resonite bot に `/headlessCode`** を送ると headless beta コードが得られる。
+- 取得には **Resoniteサポーター（Patreon等 Discoverer 以上）** であること。**コードは変動しうる**（config側は編集可にする）。
+
+### 4.3 認証の挙動（DepotDownloaderソース実読で確定）
+- **2系統のアカウントを混同しない**: **A=DL用Steamアカウント**（DepotDownloaderが使う） / **B=Resoniteアカウント**（ヘッドレスのbot身元＝configの`loginCredential`。別物）。本節はすべて**A（Steam）**の話。
+- **パイプstdin対応**（`Program.cs:347-366`）: `-username`あり`-password`無し＋`Console.IsInputRedirected`（＝子プロセスのパイプ）なら `Console.ReadLine()` で読む。→ **MRHCはパスワードをstdin投入できる**（`-password`引数はps露出のため使わない）。
+- **プロンプト文言（verbatim・検出regex用）**:
+  - パスワード: `Enter account password for "<user>": `（改行なし `Write` ＝末尾断片で出る）
+  - 2FA(アプリ): `Please enter your 2 factor auth code from your authenticator app: `
+  - 2FA(メール): `Please enter the authentication code sent to your email address: `
+  - Guard検知: `This account is protected by Steam Guard.`
+  - ⚠️ 罠: `-remember-password` 指定漏れでトークン保存済みだと `Account "<u>" has stored credentials. Did you forget to specify -remember-password?` を出しつつ**PW再要求** → MRHCは常に `-remember-password` を付ける。
+- **v1方針**: A用Steamは **予備アカウント・Steam Guardオフを推奨** → user+password(stdin)+betaコードで**完全無人DL**。Guardオン時の2FA入力UIは将来拡張（プロンプトは全て `ReadLine` なので将来もstdinで対応可）。
+- **トークン保存**（`AccountSettingsStore.cs`）: `-remember-password` の更新トークン/GuardDataは **.NET IsolatedStorage**（OS/ユーザー/アセンブリ依存の場所）に `account.config` を圧縮保存。**保存先指定フラグは無い**。→「同一OSユーザー・同一DDバイナリで実行する限り有効」前提（消えても再ログインで復帰）。
+- ⚠️ **パスワード制約**: **ASCII限定・最大64文字**（Steam仕様。`password.All(char.IsAscii)`）→ セットアップで注意喚起。
+
+### 4.4 終了コード・進捗・主要メッセージ（ソース実読）
+- **終了コード**: 成功=`0` / 失敗=`1`（`Main` は `async Task<int>`。-app欠落/フラグ不正/ログイン失敗/DL例外すべて1）。失敗時の例外型 `ContentDownloaderException`。
+- **進捗（行単位・CR上書きでない）**: `{0,6:#00.00}% {1}`（例 ` 12.34% <path>`）→ 既存の行単位stdout読みにそのまま乗る。
+- **マイルストーン**: `Using app branch: '<b>'.` / `Downloading depot <id>` / `Pre-allocating <path>` / `Validating <path>` / `Depot <id> - Downloaded <n> bytes` / `Total downloaded: <n> bytes (<m> bytes uncompressed) from <k> depots`
+- **失敗の例**: `App <id> (<name>) is not available from this account.` / `Couldn't find any depots to download for app <id>` / `Error: Password was invalid for branch <b> (or the branch does not exist)`
+
+### 4.5 配布物・パス
+- **DepotDownloader本体**: GitHubリリースに **self-contained 配布あり**（`DepotDownloader-linux-arm64.zip` / `-linux-x64` / `-windows-x64` / `-macos-arm64` 等、各~32MBで**.NET同梱＝別途.NET不要**）。小さい `DepotDownloader-framework.zip`(~2.7MB) は.NET必須なので**使わない**。→ MRHCが実行OS/archに合うself-contained版を自動DL（バージョン固定＋SHA-256検証）。
+- **Resonite既定パス**: Win=`C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` / Linux=`~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`（Flatpak版 `~/.var/app/com.valvesoftware.Steam/...` も候補）。**Linuxは別パス → 抽象化必須**。
+
+### 4.6 ⚠️ ARMの.NETランタイム（重要な非対称）
+- **x86 Windows/Linux**: Resoniteが **dotnet-runtime を同梱**（`<install>/dotnet-runtime/dotnet`、実機確認済）→ 別途.NET不要。
+- **ARM64**: 同梱dotnetは **x64で使えない** → **システムに .NET 10 ランタイムが別途必要**（公式ARM Wiki前提）。MRHCは起動時、同梱dotnetの実体アーキを確認し、不一致なら `~/.dotnet`→PATHの `dotnet` にフォールバックする（[[arm-support-plan]] Phase2）。
 
 ---
 

@@ -1,0 +1,67 @@
+name: release
+
+# タグ push（v*）でリリース資産をビルド・添付。手動実行(workflow_dispatch)でも全ターゲットをビルドして
+# アーティファクトとして確認できる。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # リリース作成・資産アップロードに必要
+
+jobs:
+  build:
+    name: build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: windows, goarch: amd64, ext: '.exe' }
+          - { goos: linux,   goarch: amd64, ext: ''     }
+          - { goos: linux,   goarch: arm64, ext: ''     } # ARM Linux（Resonite が ARM で動く環境向け）
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- フロントエンド（web/dist を生成 → Go が embed.FS で同梱する。go build より前に必須）---
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      # --- バックエンド（CGO 不要の純 Go。GOOS/GOARCH を変えるだけでクロスビルド可）---
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build binary
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          out="mrhc-${GOOS}-${GOARCH}${{ matrix.ext }}"
+          go build -trimpath -ldflags="-s -w" -o "dist/${out}" ./cmd/mrhc
+          echo "ARTIFACT=dist/${out}" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mrhc-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ env.ARTIFACT }}
+          if-no-files-found: error
+
+      # タグ push のときだけ GitHub Release に資産を添付
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARTIFACT }}
