@@ -282,7 +282,9 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	s.execGlobal(w, r, cmd, headless.WithTimeout(startTimeout))
 }
 
-// handleBanUnban: unban <userId>（listbans の ID。引用なしトークン）
+// handleBanUnban: unbanByID <userId>（listbans の UserID。引用なしトークン）
+// ※ 実機検証(2026-05-30)で確定: 素の unban は usage が <username> なので userId では効かない。
+// listbans が返すのは UserID なので ID 指定の unbanByID <user ID> を使う。
 func (s *Server) handleBanUnban(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		UserID string `json:"userId"`
@@ -295,5 +297,5 @@ func (s *Server) handleBanUnban(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_value", "userId: "+err.Error())
 		return
 	}
-	s.execGlobal(w, r, "unban "+id)
+	s.execGlobal(w, r, "unbanByID "+id)
 }

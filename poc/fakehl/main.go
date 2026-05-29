@@ -216,7 +216,7 @@ func handleCommand(s *state, line string) {
 		setSilenced(s.users, strings.Trim(rest, `" `), false)
 	case "respawn", "invite", "message", "role", "description",
 		"save", "restart", "close",
-		"acceptfriendrequest", "sendfriendrequest", "removefriend", "unban":
+		"acceptfriendrequest", "sendfriendrequest", "removefriend", "unban", "unbanbyid":
 		// 受理してプロンプトのみ（状態変更は再現しない）
 	case "hidefromlisting":
 		// 受理のみ

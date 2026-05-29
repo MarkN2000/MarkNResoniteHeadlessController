@@ -64,7 +64,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 | `ban "<username>"` | BAN（実機未検証） | — |
 | `silence "<username>"` / `unsilence "<username>"` | ミュート/解除 | **複数行**：`Silence: True/False for User ID... - UserName: X, UserId: U-X, MachineId: ..., Role: Y. Changing User: ...` + **UniLog stack trace** ⚠️ノイジー |
 | `respawn "<username>"` | リスポーン | **複数行**：`Destroying User: User ID... - UserName: X, ...` + UniLog stack trace ⚠️ノイジー |
-| `unban <userId>` | BAN解除（**userIdは引用符なし**） | 実機未検証 |
+| `unban <username>` / `unbanByID <userId>` / `unbanByName <username>` | BAN解除 | ✅実機確定(2026-05-30 help): 素の `unban` の usage は **`<username>`**（旧記載「unban <userId>」は誤り）。ID で解除するなら **`unbanByID <userId>`**。MRHC の `/bans/unban` は listbans の UserID を使うので `unbanByID` を採用。`ban "<username>"` 成功時は `<name> banned!`（在席ユーザー対象・複数行+UniLog stack 混じり） |
 | `acceptfriendrequest "<username>"` | フレンド申請承認 | 失敗時: `There's no friend request from this user` ✅実機確定 / 成功書式は未確定 |
 | `sendFriendRequest "<username>"` | フレンド申請送信 | `Contact request sent to <userId>.` ✅実機確定 |
 | `removeFriend "<username>"` | フレンド削除 | `<userId> has been removed from your contacts.` ✅実機確定 |

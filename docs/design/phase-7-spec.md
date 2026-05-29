@@ -127,7 +127,7 @@ POST /api/v1/sessions/start  {"mode":"url","url":"..."}                     → 
 POST /api/v1/friendrequests/accept  {"user":"..."}                         → acceptfriendrequest "<user>"
 POST /api/v1/friends/add            {"user":"..."}                         → sendFriendRequest "<user>"
 POST /api/v1/friends/remove         {"user":"..."}                         → removeFriend "<user>"
-POST /api/v1/bans/unban             {"userId":"..."}                       → unban <userId>（listbans の ID）
+POST /api/v1/bans/unban             {"userId":"..."}                       → unbanByID <userId>（listbans の UserID。素の unban は username 用・実機確定2026-05-30）
 ```
 
 **引数の扱い**
