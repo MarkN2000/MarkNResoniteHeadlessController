@@ -218,7 +218,7 @@ event: log
 data: {"seq":72,"time":"2026-05-28T18:27:01.5912314+09:00","kind":"out","text":"\t"}
 
 event: log
-data: {"seq":73,"time":"2026-05-28T18:27:01.5972665+09:00","kind":"out","text":"MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":73,"time":"2026-05-28T18:27:01.5972665+09:00","kind":"out","text":"MachineID: redacted-machine-id"}
 
 event: log
 data: {"seq":74,"time":"2026-05-28T18:27:01.5972665+09:00","kind":"out","text":"Loading LiteDB database. Version: 1"}
@@ -410,7 +410,7 @@ event: log
 data: {"seq":136,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated:  -\u003e MARKNPC_MAIN"}
 
 event: log
-data: {"seq":137,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":137,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated:  -\u003e redacted-machine-id"}
 
 event: log
 data: {"seq":138,"time":"2026-05-28T18:27:02.7073031+09:00","kind":"out","text":"Updated: False -\u003e True"}
@@ -434,7 +434,7 @@ event: log
 data: {"seq":144,"time":"2026-05-28T18:27:02.8813377+09:00","kind":"out","text":"New setting type registered: FrooxEngine.UserRestrictionsSettings"}
 
 event: log
-data: {"seq":145,"time":"2026-05-28T18:27:02.8878723+09:00","kind":"out","text":"User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":145,"time":"2026-05-28T18:27:02.8878723+09:00","kind":"out","text":"User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id"}
 
 event: log
 data: {"seq":146,"time":"2026-05-28T18:27:02.8959149+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MediaPrivacySettings"}
@@ -449,7 +449,7 @@ event: log
 data: {"seq":149,"time":"2026-05-28T18:27:02.976697+09:00","kind":"out","text":"Loading local settings"}
 
 event: log
-data: {"seq":150,"time":"2026-05-28T18:27:03.0067464+09:00","kind":"out","text":"Loading from URI: local://uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o/6G2eAfxre3OTzFY5EuWqFg.lz4bson"}
+data: {"seq":150,"time":"2026-05-28T18:27:03.0067464+09:00","kind":"out","text":"Loading from URI: local://redacted-machine-id/6G2eAfxre3OTzFY5EuWqFg.lz4bson"}
 
 event: log
 data: {"seq":151,"time":"2026-05-28T18:27:03.0229235+09:00","kind":"out","text":"Initializing SignalR: Initial Startup"}
@@ -530,7 +530,7 @@ event: log
 data: {"seq":176,"time":"2026-05-28T18:27:03.972777+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
 
 event: log
-data: {"seq":177,"time":"2026-05-28T18:27:03.9732798+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: , Current: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, MutePersistence: StartUnmuted"}
+data: {"seq":177,"time":"2026-05-28T18:27:03.9732798+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: , Current: M-redacted-machine-id, MutePersistence: StartUnmuted"}
 
 event: log
 data: {"seq":178,"time":"2026-05-28T18:27:03.9742852+09:00","kind":"out","text":"New setting type registered: FrooxEngine.SteamIntegrationSettings"}
@@ -689,7 +689,7 @@ event: log
 data: {"seq":229,"time":"2026-05-28T18:27:05.6378774+09:00","kind":"out","text":"Status Initialized. Contact Count: 31"}
 
 event: log
-data: {"seq":230,"time":"2026-05-28T18:27:05.8411237+09:00","kind":"out","text":"Loading from URI: resdb:///9f0fef54e7884bce320f8c87b7ac248947bdd10074ead0734f7f338e50e34316.brson"}
+data: {"seq":230,"time":"2026-05-28T18:27:05.8411237+09:00","kind":"out","text":"Loading from URI: resdb:///redacted-machine-id.brson"}
 
 event: log
 data: {"seq":231,"time":"2026-05-28T18:27:06.2267136+09:00","kind":"out","text":"Loading object from record: "}
@@ -740,7 +740,7 @@ event: log
 data: {"seq":246,"time":"2026-05-28T18:27:06.3999254+09:00","kind":"out","text":"New setting type registered: FrooxEngine.PhotoCaptureSettings"}
 
 event: log
-data: {"seq":247,"time":"2026-05-28T18:27:06.4004301+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, Current: U-1NzqeqewOpM, MutePersistence: StartUnmuted"}
+data: {"seq":247,"time":"2026-05-28T18:27:06.4004301+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: M-redacted-machine-id, Current: U-1NzqeqewOpM, MutePersistence: StartUnmuted"}
 
 event: log
 data: {"seq":248,"time":"2026-05-28T18:27:06.4004301+09:00","kind":"out","text":"New setting type registered: FrooxEngine.DashSettings"}
@@ -839,7 +839,7 @@ event: log
 data: {"seq":279,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e MarkN_headless"}
 
 event: log
-data: {"seq":280,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":280,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated:  -\u003e redacted-machine-id"}
 
 event: log
 data: {"seq":281,"time":"2026-05-28T18:27:06.8296485+09:00","kind":"out","text":"Updated: False -\u003e True"}
@@ -926,10 +926,10 @@ event: log
 data: {"seq":308,"time":"2026-05-28T18:27:07.1802398+09:00","kind":"out","text":"SIGNALR: ListenOnKey - U-1NcRSUNGgRU:019e6d18-1dc5-7ded-9bc5-d08e2407746b"}
 
 event: log
-data: {"seq":309,"time":"2026-05-28T18:27:08.5136019+09:00","kind":"out","text":"User Joined MarkN_headless World 0. Username: MarkN_headless, UserID: U-1NzqeqewOpM, AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":309,"time":"2026-05-28T18:27:08.5136019+09:00","kind":"out","text":"User Joined MarkN_headless World 0. Username: MarkN_headless, UserID: U-1NzqeqewOpM, AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id"}
 
 event: log
-data: {"seq":310,"time":"2026-05-28T18:27:08.5136019+09:00","kind":"out","text":"User Spawn MarkN_headless World 0. Username: MarkN_headless, UserID: U-1NzqeqewOpM, MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":310,"time":"2026-05-28T18:27:08.5136019+09:00","kind":"out","text":"User Spawn MarkN_headless World 0. Username: MarkN_headless, UserID: U-1NzqeqewOpM, MachineID: redacted-machine-id"}
 
 event: log
 data: {"seq":311,"time":"2026-05-28T18:27:08.7543454+09:00","kind":"out","text":"Updated:  -\u003e MRHC LAN Capture Session"}
@@ -962,10 +962,10 @@ event: log
 data: {"seq":320,"time":"2026-05-28T18:28:31.8683779+09:00","kind":"cmd","text":"\u003e listbans"}
 
 event: log
-data: {"seq":321,"time":"2026-05-28T18:28:31.8835342+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0]\tUsername: BANIX\tUserID: U-1fr8EzEE4RM\tMachineIds: 9g8xi9yisqhtha3q5tfofq9ae9zkr4cqicco7sy8wrjwdzhac85y"}
+data: {"seq":321,"time":"2026-05-28T18:28:31.8835342+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0]\tUsername: bannedUserB\tUserID: U-redactedA\tMachineIds: redacted-machine-id"}
 
 event: log
-data: {"seq":322,"time":"2026-05-28T18:28:31.8835342+09:00","kind":"out","text":"[1]\tUsername: alexlittle\tUserID: U-1gIgijkK2t6\tMachineIds: 16b1wc55ix5eyfo9nhpyngoiia4r74rc9qhmcyoqyyhxkxpr43my"}
+data: {"seq":322,"time":"2026-05-28T18:28:31.8835342+09:00","kind":"out","text":"[1]\tUsername: bannedUserA\tUserID: U-redactedB\tMachineIds: redacted-machine-id"}
 
 event: log
 data: {"seq":323,"time":"2026-05-28T18:29:10.8182266+09:00","kind":"cmd","text":"\u003e worlds"}
@@ -1046,10 +1046,10 @@ event: log
 data: {"seq":348,"time":"2026-05-28T18:30:06.2758676+09:00","kind":"cmd","text":"\u003e listbans"}
 
 event: log
-data: {"seq":349,"time":"2026-05-28T18:30:06.2857044+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0]\tUsername: BANIX\tUserID: U-1fr8EzEE4RM\tMachineIds: 9g8xi9yisqhtha3q5tfofq9ae9zkr4cqicco7sy8wrjwdzhac85y"}
+data: {"seq":349,"time":"2026-05-28T18:30:06.2857044+09:00","kind":"out","text":"MRHC LAN Capture Session\u003e[0]\tUsername: bannedUserB\tUserID: U-redactedA\tMachineIds: redacted-machine-id"}
 
 event: log
-data: {"seq":350,"time":"2026-05-28T18:30:06.2857044+09:00","kind":"out","text":"[1]\tUsername: alexlittle\tUserID: U-1gIgijkK2t6\tMachineIds: 16b1wc55ix5eyfo9nhpyngoiia4r74rc9qhmcyoqyyhxkxpr43my"}
+data: {"seq":350,"time":"2026-05-28T18:30:06.2857044+09:00","kind":"out","text":"[1]\tUsername: bannedUserA\tUserID: U-redactedB\tMachineIds: redacted-machine-id"}
 
 event: log
 data: {"seq":351,"time":"2026-05-28T18:30:06.3674471+09:00","kind":"cmd","text":"\u003e friendrequests"}
@@ -1061,10 +1061,10 @@ event: log
 data: {"seq":353,"time":"2026-05-28T18:30:09.4615854+09:00","kind":"cmd","text":"\u003e listbans"}
 
 event: log
-data: {"seq":354,"time":"2026-05-28T18:30:09.4768983+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0]\tUsername: BANIX\tUserID: U-1fr8EzEE4RM\tMachineIds: 9g8xi9yisqhtha3q5tfofq9ae9zkr4cqicco7sy8wrjwdzhac85y"}
+data: {"seq":354,"time":"2026-05-28T18:30:09.4768983+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003e[0]\tUsername: bannedUserB\tUserID: U-redactedA\tMachineIds: redacted-machine-id"}
 
 event: log
-data: {"seq":355,"time":"2026-05-28T18:30:09.4768983+09:00","kind":"out","text":"[1]\tUsername: alexlittle\tUserID: U-1gIgijkK2t6\tMachineIds: 16b1wc55ix5eyfo9nhpyngoiia4r74rc9qhmcyoqyyhxkxpr43my"}
+data: {"seq":355,"time":"2026-05-28T18:30:09.4768983+09:00","kind":"out","text":"[1]\tUsername: bannedUserA\tUserID: U-redactedB\tMachineIds: redacted-machine-id"}
 
 event: log
 data: {"seq":356,"time":"2026-05-28T18:36:55.9107052+09:00","kind":"cmd","text":"\u003e removeFriend MarkN"}
@@ -2246,7 +2246,7 @@ event: log
 data: {"seq":748,"time":"2026-05-28T18:48:33.2273391+09:00","kind":"cmd","text":"\u003e silence \"MarkN\""}
 
 event: log
-data: {"seq":749,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSilence: True for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin. Changing User: "}
+data: {"seq":749,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSilence: True for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: redacted-machine-id, Role: Admin. Changing User: "}
 
 event: log
 data: {"seq":750,"time":"2026-05-28T18:48:33.2472511+09:00","kind":"out","text":""}
@@ -2327,7 +2327,7 @@ event: log
 data: {"seq":775,"time":"2026-05-28T18:48:35.2478241+09:00","kind":"cmd","text":"\u003e unsilence \"MarkN\""}
 
 event: log
-data: {"seq":776,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSilence: False for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin. Changing User: User ID2E00 (Alloc: 0) - UserName: MarkN_headless, UserId: U-1NzqeqewOpM, MachineId: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, Role: Admin"}
+data: {"seq":776,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eSilence: False for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: redacted-machine-id, Role: Admin. Changing User: User ID2E00 (Alloc: 0) - UserName: MarkN_headless, UserId: U-1NzqeqewOpM, MachineId: redacted-machine-id, Role: Admin"}
 
 event: log
 data: {"seq":777,"time":"2026-05-28T18:48:35.2511948+09:00","kind":"out","text":""}
@@ -2408,10 +2408,10 @@ event: log
 data: {"seq":802,"time":"2026-05-28T18:48:37.2716222+09:00","kind":"cmd","text":"\u003e respawn \"MarkN\""}
 
 event: log
-data: {"seq":803,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eDestroying User: User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin"}
+data: {"seq":803,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eDestroying User: User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: redacted-machine-id, Role: Admin"}
 
 event: log
-data: {"seq":804,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"Currently updating user: User ID2E00 (Alloc: 0) - UserName: MarkN_headless, UserId: U-1NzqeqewOpM, MachineId: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, Role: Admin"}
+data: {"seq":804,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":"Currently updating user: User ID2E00 (Alloc: 0) - UserName: MarkN_headless, UserId: U-1NzqeqewOpM, MachineId: redacted-machine-id, Role: Admin"}
 
 event: log
 data: {"seq":805,"time":"2026-05-28T18:48:37.2805886+09:00","kind":"out","text":""}
@@ -2549,7 +2549,7 @@ event: log
 data: {"seq":849,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated:  -\u003e MarkN_headless"}
 
 event: log
-data: {"seq":850,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":850,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated:  -\u003e redacted-machine-id"}
 
 event: log
 data: {"seq":851,"time":"2026-05-28T18:48:39.7886122+09:00","kind":"out","text":"Updated: False -\u003e True"}
@@ -2581,7 +2581,7 @@ event: log
 data: {"seq":859,"time":"2026-05-28T18:48:45.3528672+09:00","kind":"cmd","text":"\u003e kick \"MarkN\""}
 
 event: log
-data: {"seq":860,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eKickRequest: KickAndRevokeInvite for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: 4hrm8f711besg4uc5xnw96wqca9y6muodp1i65uan4kk9w54bdwo, Role: Admin. Changing User: , ScheduledForValidation: True"}
+data: {"seq":860,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":"MRHC LAN Capture Session\u003eMRHC LAN Capture Session\u003eKickRequest: KickAndRevokeInvite for User ID79D00 (Alloc: 1) - UserName: MarkN, UserId: U-MarkN, MachineId: redacted-machine-id, Role: Admin. Changing User: , ScheduledForValidation: True"}
 
 event: log
 data: {"seq":861,"time":"2026-05-28T18:48:45.3581495+09:00","kind":"out","text":""}

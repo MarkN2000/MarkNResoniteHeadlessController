@@ -71,7 +71,7 @@ New setting type registered: FrooxEngine.UserMetricsSettings
 Initializing LocalDB...
 Initializing Local Data
 	
-MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+MachineID: redacted-machine-id
 Loading LiteDB database. Version: 1
 	
 Configuring LiteDB database
@@ -134,7 +134,7 @@ Updated: 0001/01/01 0:00:00 -> 2026/05/28 3:47:05
 Updated: False -> True
 Updated: 0 -> 5
 Updated:  -> MARKNPC_MAIN
-Updated:  -> uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+Updated:  -> redacted-machine-id
 Updated: False -> True
 Running default bootstrap
 BOOTSTRAP: Running userspace bootstrap
@@ -142,7 +142,7 @@ BOOTSTRAP: Processing launch arguments
 BOOTSTRAP: Checking auto-login
 New setting type registered: FrooxEngine.CustomizationSettings
 New setting type registered: FrooxEngine.UserRestrictionsSettings
-User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id
 New setting type registered: FrooxEngine.MediaPrivacySettings
 Opening world. URI's: 
 NetworkInitStart
@@ -155,7 +155,7 @@ Updated:  -> S-019e6cb1-6670-7f47-aaea-4f4fe830df12
 Updated: False -> True
 Updated: 0 -> 5
 Updated:  -> MARKNPC_MAIN
-Updated:  -> uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+Updated:  -> redacted-machine-id
 Updated: False -> True
 BOOTSTRAP: Setting up settings
 Loading local settings
@@ -163,9 +163,9 @@ Initializing SignalR: Initial Startup
 Setting user agent to Resonite/2026.5.27.1300
 Connecting to SignalR (Initial Startup)...
 New setting type registered: FrooxEngine.LocaleSettings
-User Joined MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
-User Spawn MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
-Loading from URI: local://uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o/w7NZ42qg3UalB8mu_wIKvQ.lz4bson
+User Joined MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id
+User Spawn MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , MachineID: redacted-machine-id
+Loading from URI: local://redacted-machine-id/w7NZ42qg3UalB8mu_wIKvQ.lz4bson
 Loading object from record: 
 Source record: 
 FeatureFlag: ColorManagement = 0
@@ -181,7 +181,7 @@ New setting type registered: FrooxEngine.LocomotionSettings
 Created setting switch source: DeviceIDSettingSwitchSource
 Created setting switch source: VR_ActiveSetttingSwitchSource
 Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64
-VoiceSettings OnActivated. LastActivatedUserId: , Current: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, MutePersistence: StartUnmuted
+VoiceSettings OnActivated. LastActivatedUserId: , Current: M-redacted-machine-id, MutePersistence: StartUnmuted
 New setting type registered: FrooxEngine.SteamIntegrationSettings
 New setting type registered: FrooxEngine.LeapMotionSettings
 New setting type registered: FrooxEngine.NamePlateSettings
@@ -235,10 +235,10 @@ Updated:  -> S-019e6cb1-70fe-71c7-8a16-d9364fdaf5e3
 Updated: False -> True
 Updated: 0 -> 5
 Updated:  -> MARKNPC_MAIN
-Updated:  -> uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+Updated:  -> redacted-machine-id
 Updated: False -> True
-User Joined MARKNPC_MAIN World 1. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
-User Spawn MARKNPC_MAIN World 1. Username: MARKNPC_MAIN, UserID: , MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+User Joined MARKNPC_MAIN World 1. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id
+User Spawn MARKNPC_MAIN World 1. Username: MARKNPC_MAIN, UserID: , MachineID: redacted-machine-id
 World running...
 > worlds
 MRHC Test World B>[0] MRHC Test World A               Users: 1	Present: 0	AccessLevel: Private	MaxUsers: 4
@@ -297,7 +297,7 @@ Updated: 0001/01/01 0:00:00 -> 2026/05/28 3:48:27
 Updated: False -> True
 Updated: 0 -> 5
 Updated:  -> MARKNPC_MAIN
-Updated:  -> uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+Updated:  -> redacted-machine-id
 Updated: False -> True
 Source record: 
 FeatureFlag: ColorManagement = 0
@@ -305,8 +305,8 @@ FeatureFlag: ResetGUID = 0
 FeatureFlag: ProtoFlux = 0
 Adding legacy content PhotonDust loader
 Rebuild: 65.1957 ms, Nodes: 7, Groups: 2
-User Joined MARKNPC_MAIN World 2. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
-User Spawn MARKNPC_MAIN World 2. Username: MARKNPC_MAIN, UserID: , MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o
+User Joined MARKNPC_MAIN World 2. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id
+User Spawn MARKNPC_MAIN World 2. Username: MARKNPC_MAIN, UserID: , MachineID: redacted-machine-id
 Local Settings Saved
 Shutdown requested
 

@@ -218,7 +218,7 @@ event: log
 data: {"seq":72,"time":"2026-05-28T18:01:39.0991495+09:00","kind":"out","text":"\t"}
 
 event: log
-data: {"seq":73,"time":"2026-05-28T18:01:39.1051813+09:00","kind":"out","text":"MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":73,"time":"2026-05-28T18:01:39.1051813+09:00","kind":"out","text":"MachineID: redacted-machine-id"}
 
 event: log
 data: {"seq":74,"time":"2026-05-28T18:01:39.1051813+09:00","kind":"out","text":"Loading LiteDB database. Version: 1"}
@@ -410,7 +410,7 @@ event: log
 data: {"seq":136,"time":"2026-05-28T18:01:40.1610325+09:00","kind":"out","text":"Updated:  -\u003e MARKNPC_MAIN"}
 
 event: log
-data: {"seq":137,"time":"2026-05-28T18:01:40.1615351+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":137,"time":"2026-05-28T18:01:40.1615351+09:00","kind":"out","text":"Updated:  -\u003e redacted-machine-id"}
 
 event: log
 data: {"seq":138,"time":"2026-05-28T18:01:40.1615351+09:00","kind":"out","text":"Updated: False -\u003e True"}
@@ -434,7 +434,7 @@ event: log
 data: {"seq":144,"time":"2026-05-28T18:01:40.3363302+09:00","kind":"out","text":"New setting type registered: FrooxEngine.UserRestrictionsSettings"}
 
 event: log
-data: {"seq":145,"time":"2026-05-28T18:01:40.3428648+09:00","kind":"out","text":"User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":145,"time":"2026-05-28T18:01:40.3428648+09:00","kind":"out","text":"User Joined Userspace. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id"}
 
 event: log
 data: {"seq":146,"time":"2026-05-28T18:01:40.3509074+09:00","kind":"out","text":"New setting type registered: FrooxEngine.MediaPrivacySettings"}
@@ -473,7 +473,7 @@ event: log
 data: {"seq":157,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated:  -\u003e MARKNPC_MAIN"}
 
 event: log
-data: {"seq":158,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated:  -\u003e uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":158,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated:  -\u003e redacted-machine-id"}
 
 event: log
 data: {"seq":159,"time":"2026-05-28T18:01:40.4146417+09:00","kind":"out","text":"Updated: False -\u003e True"}
@@ -482,10 +482,10 @@ event: log
 data: {"seq":160,"time":"2026-05-28T18:01:40.8007738+09:00","kind":"out","text":"New setting type registered: FrooxEngine.LocaleSettings"}
 
 event: log
-data: {"seq":161,"time":"2026-05-28T18:01:42.0651437+09:00","kind":"out","text":"User Joined MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":161,"time":"2026-05-28T18:01:42.0651437+09:00","kind":"out","text":"User Joined MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , AllocID: 0, AllocIDstart: 1,  MachineID: redacted-machine-id"}
 
 event: log
-data: {"seq":162,"time":"2026-05-28T18:01:42.0651437+09:00","kind":"out","text":"User Spawn MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , MachineID: uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o"}
+data: {"seq":162,"time":"2026-05-28T18:01:42.0651437+09:00","kind":"out","text":"User Spawn MARKNPC_MAIN World 0. Username: MARKNPC_MAIN, UserID: , MachineID: redacted-machine-id"}
 
 event: log
 data: {"seq":163,"time":"2026-05-28T18:01:42.1066303+09:00","kind":"out","text":"BOOTSTRAP: Setting up settings"}
@@ -494,7 +494,7 @@ event: log
 data: {"seq":164,"time":"2026-05-28T18:01:42.1101409+09:00","kind":"out","text":"Loading local settings"}
 
 event: log
-data: {"seq":165,"time":"2026-05-28T18:01:42.151764+09:00","kind":"out","text":"Loading from URI: local://uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o/rm2eAQCskX2JSi8lHHfFDQ.lz4bson"}
+data: {"seq":165,"time":"2026-05-28T18:01:42.151764+09:00","kind":"out","text":"Loading from URI: local://redacted-machine-id/rm2eAQCskX2JSi8lHHfFDQ.lz4bson"}
 
 event: log
 data: {"seq":166,"time":"2026-05-28T18:01:42.1805933+09:00","kind":"out","text":"Loading object from record: "}
@@ -557,7 +557,7 @@ event: log
 data: {"seq":185,"time":"2026-05-28T18:01:42.9611869+09:00","kind":"out","text":"Awwdio configuration. SimulationFrameSize: Medium1024, OutputBufferSize: VeryLarge4096 MaxVoices: 64"}
 
 event: log
-data: {"seq":186,"time":"2026-05-28T18:01:42.9621923+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: , Current: M-uo3wetmg1tgg5w1u9znqey6963u349k3ab6sd6w3z557yq5ybn4o, MutePersistence: StartUnmuted"}
+data: {"seq":186,"time":"2026-05-28T18:01:42.9621923+09:00","kind":"out","text":"VoiceSettings OnActivated. LastActivatedUserId: , Current: M-redacted-machine-id, MutePersistence: StartUnmuted"}
 
 event: log
 data: {"seq":187,"time":"2026-05-28T18:01:42.9631976+09:00","kind":"out","text":"New setting type registered: FrooxEngine.SteamIntegrationSettings"}
