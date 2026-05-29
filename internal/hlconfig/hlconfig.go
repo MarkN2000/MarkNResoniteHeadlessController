@@ -173,10 +173,12 @@ func ResolveForLaunch(dir, name string, central Credentials, runDir string) (str
 	if err != nil {
 		return "", err
 	}
+	// all-or-nothing: config がアカウント未指定(loginCredential 空)のときだけ
+	// 中央アカウントを username+password まとめて注入する。loginCredential が
+	// 非空なら per-config アカウントとして config 自身の値をそのまま使う
+	// （password 空でも中央 password を混入させない＝別アカウントの組合せを防ぐ）。
 	if u, _ := m["loginCredential"].(string); u == "" {
 		m["loginCredential"] = central.Username
-	}
-	if p, _ := m["loginPassword"].(string); p == "" {
 		m["loginPassword"] = central.Password
 	}
 	m["$schema"] = schemaURL

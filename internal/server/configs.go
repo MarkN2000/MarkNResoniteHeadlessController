@@ -108,13 +108,19 @@ func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.credMu.Lock()
+	// 変更前を退避し、SaveTo 失敗時は in-memory を巻き戻してディスクとの整合を保つ。
+	oldU, oldP := s.cfg.HeadlessCredentials.Username, s.cfg.HeadlessCredentials.Password
 	s.cfg.HeadlessCredentials.Username = body.Username
 	if body.Password != "" {
 		s.cfg.HeadlessCredentials.Password = body.Password
 	}
+	saveErr := s.cfg.SaveTo(s.cfgPath)
+	if saveErr != nil {
+		s.cfg.HeadlessCredentials.Username = oldU
+		s.cfg.HeadlessCredentials.Password = oldP
+	}
 	uname := s.cfg.HeadlessCredentials.Username
 	hasPw := s.cfg.HeadlessCredentials.Password != ""
-	saveErr := s.cfg.SaveTo(s.cfgPath)
 	s.credMu.Unlock()
 	if saveErr != nil {
 		writeErr(w, http.StatusInternalServerError, "save_failed", saveErr.Error())

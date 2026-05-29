@@ -140,6 +140,31 @@ func TestResolveForLaunch_PerConfigOverride(t *testing.T) {
 	}
 }
 
+func TestResolveForLaunch_UsernameOnly_NoCentralPasswordMix(t *testing.T) {
+	// config が username だけ持ち password 空 → all-or-nothing なので
+	// 中央 password を混入させず、config の値（空）のまま（別アカウント組合せを防ぐ）。
+	dir := t.TempDir()
+	runDir := t.TempDir()
+	writeRawFile(t, dir, "cfg", map[string]any{
+		"loginCredential": "bot_account",
+		"loginPassword":   "",
+	})
+	central := Credentials{Username: "central@e.com", Password: "centralpw"}
+	out, err := ResolveForLaunch(dir, "cfg", central, runDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(out)
+	var m map[string]any
+	_ = json.Unmarshal(b, &m)
+	if m["loginCredential"] != "bot_account" {
+		t.Fatalf("per-config username should be kept: %v", m["loginCredential"])
+	}
+	if m["loginPassword"] != "" {
+		t.Fatalf("central password must NOT be mixed in: %v", m["loginPassword"])
+	}
+}
+
 func TestResolveForLaunch_NotFound(t *testing.T) {
 	_, err := ResolveForLaunch(t.TempDir(), "missing", Credentials{}, t.TempDir())
 	if !errors.Is(err, ErrNotFound) {
