@@ -18,6 +18,7 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/server"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/setup"
@@ -63,6 +64,12 @@ func main() {
 	cfg, err := config.LoadFrom(cfgPath)
 	if err != nil {
 		log.Fatalf("設定の読み込みに失敗しました: %v", err)
+	}
+
+	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する。
+	configDir := cfg.HeadlessConfigDirOrDefault(dir)
+	if err := hlconfig.EnsureDefault(configDir); err != nil {
+		log.Printf("デフォルトconfigの用意に失敗（続行します）: %v", err)
 	}
 
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))

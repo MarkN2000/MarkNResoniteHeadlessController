@@ -65,17 +65,26 @@ Phase 9 (Resonite / Steam 統合):
 - `version` フィールド追加（mrhc.config.json のスキーマ版管理）
 - `SessionTTLHours` 追加（既定 30 日 = 720h）/ `Version`（SchemaVersion=1）追加
 
-### 2.3 Headless Config CRUD API（v1 同等・作り直し）
+### 2.3 Headless Config CRUD API（Pre-7b・実装済み）
 ```
-GET    /api/v1/headless-configs            一覧
-GET    /api/v1/headless-configs/{name}     読み込み
-POST   /api/v1/headless-configs/{name}     保存（生成含む）
+GET    /api/v1/headless-configs            一覧（name + comment + worldCount）
+GET    /api/v1/headless-configs/{name}     読込（loginPassword は "" でマスク）
+PUT    /api/v1/headless-configs/{name}     保存（新規/上書き = upsert）
 DELETE /api/v1/headless-configs/{name}     削除
-GET    /api/v1/headless-configs/last-used  前回起動コンフィグ
+GET    /api/v1/headless-configs/last-used  前回起動 config 名
+GET    /api/v1/headless-credentials        中央既定アカウント {username, hasPassword}（password 非返却）
+PUT    /api/v1/headless-credentials        中央既定アカウント登録 {username, password}（password 空=既存保持）
 ```
-- 保存先 = ヘッドレスの Config ディレクトリ配下の `*.json`
-- 生成 = HeadlessConfig スキーマ準拠の JSON を programmatic に構築
-- 前回起動コンフィグ = 起動時に記録（runtime-state 相当）
+**設計（保存型・最小検証）**: 実装は `internal/hlconfig`（HTTP 非依存）+ `internal/server/configs.go`（薄い HTTP 層）。
+- **保存型**: フロントが完成 JSON を送り、バックエンドは name サニタイズ・最小検証（有効JSON + startWorlds が配列）・`$schema` 付与・0600 保存
+- **name サニタイズ**: `^[A-Za-z0-9_\-]{1,64}$`（`/`・`\`・`.` 不可＝パストラバーサル防止）【必須】
+- **保存先**: `headlessConfigDir`（既定固定 `{dataDir}/headless-configs`、Settings で上級者のみ変更）
+- **同梱デフォルト**: 起動時に config dir が空なら `default.json`（accessLevel=Private・1ワールド・creds 空）を自動生成（`EnsureDefault`）
+- **認証情報（起動時注入）**: config 自身の `loginCredential`/`loginPassword` が空なら、中央既定アカウント（`mrhc.config.json` の `headlessCredentials`）を注入。注入は**起動時**に行い、解決済み config を `{dataDir}/.run/{name}.json`（0600）へ生成して Resonite に渡す。保存済みファイルに password を焼き込まない（平文は中央設定 + 起動用一時のみ）
+- **読込マスク**: GET は `loginPassword=""`。PUT は password 空=既存保持・非空=per-config 上書き
+- **起動は config 名指定**: `POST /start {config: "<name>"}` → `headlessConfigDir` から解決。`driver.Start(headlessPath, launchPath, configLabel)` で Status には論理名を表示
+- **last-used**: 起動成功時に `{dataDir}/runtime-state.json` に記録
+- **同期**: credentials PUT（cfg 書込）と起動時読取の競合を `credMu sync.RWMutex` で防止
 
 ### 2.4 write API（RESTish / idx ベース + ExecGroup）
 

@@ -11,31 +11,46 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
 )
 
 type Server struct {
-	cfg     *config.Config
-	cfgPath string
-	driver  *headless.Driver
-	worlds  headless.WorldsService
-	auth    *authManager
-	webFS   fs.FS
+	cfg       *config.Config
+	cfgPath   string
+	dataDir   string // cfgPath のディレクトリ（runtime-state / .run / 既定configDir の基点）
+	configDir string // headless config 格納ディレクトリ（解決済み）
+	driver    *headless.Driver
+	worlds    headless.WorldsService
+	auth      *authManager
+	webFS     fs.FS
+
+	// credMu は cfg.HeadlessCredentials の更新(credentials PUT)と起動時読取の競合を防ぐ。
+	// auth は別フィールド（SessionSecret/AdminPasswordHash）しか読まないため対象外。
+	credMu sync.RWMutex
 }
 
 func New(cfg *config.Config, cfgPath string, driver *headless.Driver, webFS fs.FS) *Server {
+	dataDir := ""
+	if cfgPath != "" {
+		dataDir = filepath.Dir(cfgPath)
+	}
 	return &Server{
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		driver:  driver,
-		worlds:  headless.NewWorldsService(driver),
-		auth:    newAuthManager(cfg),
-		webFS:   webFS,
+		cfg:       cfg,
+		cfgPath:   cfgPath,
+		dataDir:   dataDir,
+		configDir: cfg.HeadlessConfigDirOrDefault(dataDir),
+		driver:    driver,
+		worlds:    headless.NewWorldsService(driver),
+		auth:      newAuthManager(cfg),
+		webFS:     webFS,
 	}
 }
 
@@ -57,6 +72,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/users", s.requireAuth(s.handleSessionUsers))
 	mux.HandleFunc("GET /api/v1/listbans", s.requireAuth(s.handleListBans))
 	mux.HandleFunc("GET /api/v1/friendrequests", s.requireAuth(s.handleFriendRequests))
+
+	// Headless Config CRUD（Pre-7b）。{name} ワイルドカードより literal の last-used が優先される。
+	mux.HandleFunc("GET /api/v1/headless-configs", s.requireAuth(s.handleConfigList))
+	mux.HandleFunc("GET /api/v1/headless-configs/last-used", s.requireAuth(s.handleConfigLastUsed))
+	mux.HandleFunc("GET /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigGet))
+	mux.HandleFunc("PUT /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigPut))
+	mux.HandleFunc("DELETE /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigDelete))
+	mux.HandleFunc("GET /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsGet))
+	mux.HandleFunc("PUT /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsPut))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
@@ -132,16 +156,39 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		Config string `json:"config"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	if strings.TrimSpace(body.Config) == "" {
+	name := strings.TrimSpace(body.Config)
+	if name == "" {
 		// 無config起動はワールドが公開(Anyone)になり危険なため不可。
 		writeErr(w, http.StatusBadRequest, "config_required",
-			"起動するコンフィグを指定してください（無config起動はワールドが公開になるため不可）")
+			"起動するコンフィグ名を指定してください（無config起動はワールドが公開になるため不可）")
 		return
 	}
-	if err := s.driver.Start(s.cfg.ResoniteHeadless, body.Config); err != nil {
+	if err := hlconfig.SanitizeName(name); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
+		return
+	}
+	// 起動時注入: config の creds が空なら中央アカウントを注入した一時 config を生成。
+	s.credMu.RLock()
+	central := hlconfig.Credentials{
+		Username: s.cfg.HeadlessCredentials.Username,
+		Password: s.cfg.HeadlessCredentials.Password,
+	}
+	s.credMu.RUnlock()
+	runDir := filepath.Join(s.dataDir, ".run")
+	launchPath, err := hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
+	if err != nil {
+		if errors.Is(err, hlconfig.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, "config_not_found", "指定のコンフィグが見つかりません")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
+		return
+	}
+	if err := s.driver.Start(s.cfg.ResoniteHeadless, launchPath, name); err != nil {
 		writeErr(w, http.StatusConflict, "start_failed", err.Error())
 		return
 	}
+	s.recordLastUsed(name)
 	writeOK(w, map[string]any{"accepted": true})
 }
 
@@ -279,6 +326,7 @@ func parseSessionIdx(r *http.Request) (int, error) {
 // 2区分:
 //   - ErrNotReady → 409 (UI は「起動してください」を出す)
 //   - その他 (Timeout/ProcessGone/Canceled/内部エラー) → 500 (UI は「失敗、再試行」)
+//
 // クライアント側で原因の細かい区別は不要と判断（複雑化を避ける）。
 // 必要なら error.code フィールドで内訳を返すので、UI 詳細表示は可能。
 func writeExecErr(w http.ResponseWriter, err error) {

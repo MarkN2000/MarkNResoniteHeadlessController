@@ -64,7 +64,7 @@ func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 	}
 
 	drv := headless.NewDriver(nil) // UTF-8 passthrough
-	if err := drv.Start(fakehlPath, ""); err != nil {
+	if err := drv.Start(fakehlPath, "", ""); err != nil {
 		t.Fatalf("start fakehl: %v", err)
 	}
 

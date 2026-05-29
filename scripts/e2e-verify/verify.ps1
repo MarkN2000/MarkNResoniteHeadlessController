@@ -107,8 +107,14 @@ function Save-Post {
     }
 }
 
-# headless 起動
-Save-Post "/api/v1/start" @{ config = $TestConfig } "01-start.json"
+# テスト config を headless config ディレクトリに配置し、名前で起動する（Pre-7b: start は名前指定）
+$cfgDir = Join-Path $dataDir "headless-configs"
+New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+Copy-Item -Path $TestConfig -Destination (Join-Path $cfgDir "e2e.json") -Force
+Write-Output "test config copied to: $(Join-Path $cfgDir 'e2e.json')"
+
+# headless 起動（config 名で指定。config 自身の creds が使われる）
+Save-Post "/api/v1/start" @{ config = "e2e" } "01-start.json"
 
 # Driver の State が Running になり Ready になるまで待つ
 $ready = $false

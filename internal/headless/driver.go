@@ -138,7 +138,9 @@ func (d *Driver) publishLog(kind, text string) {
 // --- ライフサイクル ---
 
 // Start はヘッドレスを起動する。headlessPath が空ならエラー。
-func (d *Driver) Start(headlessPath, configPath string) error {
+//   - configPath: Resonite に渡す -HeadlessConfig の実ファイルパス（起動時生成の一時ファイル等）
+//   - configLabel: Status().Config に表示する論理名（UI 表示用。一時パスを見せない）
+func (d *Driver) Start(headlessPath, configPath, configLabel string) error {
 	d.mu.Lock()
 	if d.state != StateStopped {
 		d.mu.Unlock()
@@ -176,7 +178,7 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 
 	d.cmd = cmd
 	d.stdin = stdin
-	d.cfgPath = configPath
+	d.cfgPath = configLabel
 	d.pid = cmd.Process.Pid
 	d.started = time.Now()
 	d.ready = false
@@ -184,7 +186,7 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 	d.setStateLocked(StateStarting)
 	d.mu.Unlock()
 
-	d.publishLog("sys", fmt.Sprintf("起動: pid=%d config=%q", cmd.Process.Pid, configPath))
+	d.publishLog("sys", fmt.Sprintf("起動: pid=%d config=%q", cmd.Process.Pid, configLabel))
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -198,6 +200,7 @@ func (d *Driver) Start(headlessPath, configPath string) error {
 // 設計（案C'）: 構造化実行中は activeCollector に対し、
 //   - '\n' 確定毎に appendLine（decode 済テキスト）
 //   - チャンク処理後の lineBuf（未確定 raw バイト＝プロンプト候補）を updateTail
+//
 // で通知する。これにより waitComplete が「プロンプト末尾 + 安定窓」で完了検出できる。
 // stdout のみコレクタに流す（stderr の '>' はプロンプトと混同しないため）。
 func (d *Driver) readPipe(r io.Reader, kind string) {
@@ -313,7 +316,8 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 // Stop は shutdown を送り、猶予（180秒）後に強制終了する。
 // ワールド保存に数分かかる場合があるため即 kill せず長めの猶予を取る。
 // （v1 は 60s SIGTERM / 70s SIGKILL の段階式。Windows は SIGTERM 相当が無いため
-//  単段の force-kill とし、その分猶予を長くした。設計: phase-7-spec レビュー 2026-05-29）
+//
+//	単段の force-kill とし、その分猶予を長くした。設計: phase-7-spec レビュー 2026-05-29）
 func (d *Driver) Stop() error {
 	d.mu.Lock()
 	if d.state == StateStopped || d.cmd == nil {

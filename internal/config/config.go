@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -23,15 +25,32 @@ const DefaultSessionTTLHours = 720
 
 // Config はアプリ全体の設定。秘密情報を含むため保存時はパーミッション 0600。
 type Config struct {
-	Version           int    `json:"version"`                        // スキーマ版（SchemaVersion）
-	AdminPasswordHash string `json:"adminPasswordHash"`              // bcryptハッシュ
-	SessionSecret     string `json:"sessionSecret"`                  // セッションCookie署名用（自動生成）
-	SessionTTLHours   int    `json:"sessionTtlHours,omitempty"`      // セッション有効期間（時間。空/0=既定720h=30日）
-	Port              int    `json:"port"`                           // HTTP待受ポート
-	ResoniteHeadless  string `json:"resoniteHeadlessPath,omitempty"` // Resonite.exe / Resonite.dll
-	HeadlessConfigDir string `json:"headlessConfigDir,omitempty"`    // ヘッドレスconfig格納先
-	Encoding          string `json:"encoding,omitempty"`             // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
-	// 後続でHeadlessCredentials / Restart / Steam などを追加
+	Version             int                 `json:"version"`                        // スキーマ版（SchemaVersion）
+	AdminPasswordHash   string              `json:"adminPasswordHash"`              // bcryptハッシュ
+	SessionSecret       string              `json:"sessionSecret"`                  // セッションCookie署名用（自動生成）
+	SessionTTLHours     int                 `json:"sessionTtlHours,omitempty"`      // セッション有効期間（時間。空/0=既定720h=30日）
+	Port                int                 `json:"port"`                           // HTTP待受ポート
+	ResoniteHeadless    string              `json:"resoniteHeadlessPath,omitempty"` // Resonite.exe / Resonite.dll
+	HeadlessConfigDir   string              `json:"headlessConfigDir,omitempty"`    // ヘッドレスconfig格納先（空=既定 {dataDir}/headless-configs）
+	HeadlessCredentials HeadlessCredentials `json:"headlessCredentials,omitempty"`  // 既定の Resonite アカウント（起動時に各 config へ注入）
+	Encoding            string              `json:"encoding,omitempty"`             // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
+	// 後続でRestart / Steam などを追加
+}
+
+// HeadlessCredentials は生成/起動する headless config に注入する既定の Resonite アカウント。
+// 起動時に config の loginCredential/loginPassword が空ならこれを注入する（per-config 指定があればそちらを優先）。
+type HeadlessCredentials struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+// HeadlessConfigDirOrDefault は headless config 保存ディレクトリを解決する。
+// 明示設定があればそれを、無ければ {dataDir}/headless-configs を返す。
+func (c *Config) HeadlessConfigDirOrDefault(dataDir string) string {
+	if strings.TrimSpace(c.HeadlessConfigDir) != "" {
+		return c.HeadlessConfigDir
+	}
+	return filepath.Join(dataDir, "headless-configs")
 }
 
 // SessionTTL はセッション有効期間を返す。未設定（0以下）なら既定30日。

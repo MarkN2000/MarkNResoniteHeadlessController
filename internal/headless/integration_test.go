@@ -52,7 +52,7 @@ func exeSuffix() string {
 func newFakeDriver(t *testing.T) *Driver {
 	t.Helper()
 	d := NewDriver(nil) // UTF-8 passthrough（fakehl は ASCII / UTF-8 出力）
-	if err := d.Start(fakehlPath, ""); err != nil {
+	if err := d.Start(fakehlPath, "", ""); err != nil {
 		t.Fatalf("start fakehl: %v", err)
 	}
 	t.Cleanup(func() {
