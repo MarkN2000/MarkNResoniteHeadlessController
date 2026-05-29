@@ -84,6 +84,8 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 > 💡 **操作は状態を持つ**: 多くの操作は「先に `focus <index>` してから対象セッションに対して実行」する前提。シーケンス管理が必要。
 
+> ✅ **Pre-7c write コマンド全照合済み（2026-05-30 実機 help）**: MRHC の write API 22 コマンド（kick/ban/silence/unsilence/respawn/invite/role/message/accesslevel/maxusers/name/description/hideFromListing/restart/save/close/startWorldURL/startWorldTemplate/acceptFriendRequest/sendFriendRequest/removeFriend/unbanByID）の**コマンド名・引数個数を help と突合し全一致**。`role <username> <role>`・`message <friend name> <message>` は2引数、`unbanByID <user ID>`・`unbanByName <username>`・素の `unban <username>`。⚠️ **`message`/`invite` は対象が「フレンド/コンタクト」である必要**（help: "Message user in friends list" / "Invite a friend"）。非フレンドには効かない → UI はコンタクトにのみ提示 or 失敗ハンドリング。
+
 > ⭐ **リッチテキスト & 改行（2026-05-30 実機確定）**: `name`/`description`/`message` は **Resonite リッチテキスト**（`<color=red>`/`<s>`/`<b>`/`<i>` 等）を解釈してレンダリングする（赤文字・取消線等を確認）。**改行は `<br>` で実現**（ASCII なので Shift_JIS コンソール可）。**生改行 `\n` はコンソールが行区切りにするため送れない**（MRHC は実改行→`<br>` に変換）。`\n`（2文字）はリテラル表示されるだけで改行にならない。
 > - **`status` 出力**: name/description は**リッチタグ込みのフル文字列**を返す。一方 `worlds` 出力とプロンプト表示は**リッチタグ除去版**（例 `<color=red>赤</color>` → `赤`）。
 > - **プロンプト**: フォーカス中ワールド名のリッチタグ除去版＋`>`。名前に `:` も含み得る。→ MRHC のプロンプト剥がしは「検出した実プロンプトをリテラル剥がし」で `:`・`>` 両対応（`stripExactPrompt`）。
