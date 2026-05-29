@@ -86,49 +86,55 @@ PUT    /api/v1/headless-credentials        中央既定アカウント登録 {us
 - **last-used**: 起動成功時に `{dataDir}/runtime-state.json` に記録
 - **同期**: credentials PUT（cfg 書込）と起動時読取の競合を `credMu sync.RWMutex` で防止
 
-### 2.4 write API（RESTish / idx ベース + ExecGroup）
+### 2.4 write API（idx は path、識別子/引数は body）
 
-**設計方針（モデル A 確定）**
-- URL に idx を持つ idx ベース。各操作は `ExecGroup(focus idx → cmd)` でアトミック実行
-- フォーカスは UI 表示・既定対象としてのみ扱い、API はフォーカス状態に依存しない（背景タスクと競合しない）
+**設計方針（モデル A 確定・2026-05-30 仕様レビューで詳細確定）**
+- idx は path、**ユーザー名等の識別子・引数は body**（任意文字列を安全に扱うため。path 埋め込みは廃止）
+- セッション操作=`ExecGroup(focus idx → cmd)`、グローバル操作=`Exec`（focus 不要）、start=`Exec`（長 timeout）
+- idx は**信頼**（focus 前の worlds 検証はしない。閉鎖時の index 繰り上がり誤爆は妥協＝狭い窓・read 系と同挙動）
 - POST のみ、全て認証必須、ボディは JSON
 
 ```
-# セッション内ユーザー操作（セッションモデレーション）
-POST /api/v1/sessions/{idx}/users/{user}/kick
-POST /api/v1/sessions/{idx}/users/{user}/ban
-POST /api/v1/sessions/{idx}/users/{user}/silence
-POST /api/v1/sessions/{idx}/users/{user}/unsilence
-POST /api/v1/sessions/{idx}/users/{user}/respawn
-POST /api/v1/sessions/{idx}/users/{user}/role        {"role":"Admin"}
-POST /api/v1/sessions/{idx}/users/{user}/message     {"message":"..."}   # 個別DM
+# セッション内ユーザー操作  — ExecGroup(focus idx → cmd)
+POST /api/v1/sessions/{idx}/kick            {"user":"..."}                  → kick "<user>"
+POST /api/v1/sessions/{idx}/ban             {"user":"..."}                  → ban "<user>"（在席）
+POST /api/v1/sessions/{idx}/silence         {"user":"..."}                  → silence "<user>"
+POST /api/v1/sessions/{idx}/unsilence       {"user":"..."}                  → unsilence "<user>"
+POST /api/v1/sessions/{idx}/respawn         {"user":"..."}                  → respawn "<user>"
+POST /api/v1/sessions/{idx}/role            {"user":"...","role":"Admin"}   → role "<user>" "<role>"
+POST /api/v1/sessions/{idx}/message         {"user":"...","message":"..."}  → message "<user>" "<text>"
+POST /api/v1/sessions/{idx}/invite          {"user":"..."}                  → invite "<user>"（フォーカス中へ）
 
-# セッション設定
-POST /api/v1/sessions/{idx}/accesslevel              {"level":"LAN"}
-POST /api/v1/sessions/{idx}/maxusers                 {"maxUsers":8}
-POST /api/v1/sessions/{idx}/name                     {"name":"..."}
-POST /api/v1/sessions/{idx}/description              {"description":"..."}
-POST /api/v1/sessions/{idx}/hidefromlisting          {"hide":true}
+# セッション設定  — ExecGroup(focus idx → cmd)
+POST /api/v1/sessions/{idx}/accesslevel     {"level":"LAN"}                 → accesslevel <Level>
+POST /api/v1/sessions/{idx}/maxusers        {"maxUsers":8}                  → maxusers <N>
+POST /api/v1/sessions/{idx}/name            {"name":"..."}                  → name "<name>"
+POST /api/v1/sessions/{idx}/description     {"description":"..."}           → description "<text>"
+POST /api/v1/sessions/{idx}/hidefromlisting {"hide":true}                   → hideFromListing <bool>
 
-# セッションライフサイクル
-POST /api/v1/sessions/{idx}/restart
-POST /api/v1/sessions/{idx}/save
-POST /api/v1/sessions/{idx}/close
+# セッションライフサイクル  — ExecGroup(focus idx → cmd)
+POST /api/v1/sessions/{idx}/restart                                         → restart
+POST /api/v1/sessions/{idx}/save                                           → save
+POST /api/v1/sessions/{idx}/close                                          → close
 
-# 新規セッション（ランタイム起動）
-POST /api/v1/sessions/start                          {"mode":"url","url":"..."}
-                                                     {"mode":"template","template":"..."}
-# url      → startworldurl "<url>"
-# template → startWorldTemplate <name>
-# search 方式は Phase 9（world-search→URL→start）
+# 新規セッション（稼働中に新ワールド）  — Exec（focus不要・timeout 60s）
+POST /api/v1/sessions/start  {"mode":"url","url":"..."}                     → startworldurl "<url>"
+                             {"mode":"template","template":"..."}          → startWorldTemplate "<name>"
+# ※ /start（プロセス起動）とは別物。search 方式は Phase 9
+# ※ template はテンプレ名に空白があり得るため QuoteArg で引用（決定C・引用可否は実機要検証）
 
-# Bans / Friends
-POST /api/v1/bans/{user}/unban
-POST /api/v1/friendrequests/{user}/accept
-POST /api/v1/friends/{user}/remove
-POST /api/v1/friends                                 {"user":"..."}   # 申請送信
-POST /api/v1/sessions/{idx}/invite                   {"user":"..."}   # フォーカス中へ招待
+# グローバル（フレンド/BAN）  — Exec（focus不要）
+POST /api/v1/friendrequests/accept  {"user":"..."}                         → acceptfriendrequest "<user>"
+POST /api/v1/friends/add            {"user":"..."}                         → sendFriendRequest "<user>"
+POST /api/v1/friends/remove         {"user":"..."}                         → removeFriend "<user>"
+POST /api/v1/bans/unban             {"userId":"..."}                       → unban <userId>（listbans の ID）
 ```
+
+**引数の扱い**
+- **enum（accesslevel/role）はサーバーで値リスト検証しない**（サニタイズのみ。値の権威は Resonite、UI が正値を提供）。
+  UI ドロップダウン用の値: accesslevel=`{Private, LAN, Contacts, ContactsPlus, RegisteredUsers, Anyone}`（v1 実コードで確認）、role=`{Admin, Builder, Moderator, Guest, Spectator}`
+- **maxUsers は正の整数のみ検証**（恣意的な上限は設けない＝Resonite の制限を推測しない）。name/description も恣意的な長さ上限なし
+- **文字列サニタイズ（必須・全文字列引数）**: 生 `\r`/`\n` は送らない（injection 防止）。実改行→ `\n` エスケープ、埋め込み `"`→ `\"`（未検証なら strip）、その他制御文字は除去。文字列引数は `"..."` で囲む（enum/数値/bool は囲まない）
 
 ### 2.5 操作結果の扱い（重要・実機制約）
 Resonite の write 出力は **コマンドごとにバラバラで信頼できない**:
@@ -137,7 +143,25 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - invite → 出力不確定
 - accesslevel/role → きれいな成功書式（パース可）
 
-→ **方針 A 確定**: ノイジー出力をパースせず、「プロンプト `>` 復帰＝コマンド完了＝成功扱い」。直後に該当データ（users / worlds 等）を再取得して**実状態で結果を見せる**。UI はトースト「実行しました」+ 再取得。
+→ **方針 A 確定**: ノイジー出力をパースせず、「プロンプト `>` 復帰＝コマンド完了＝成功扱い」。`{"executed":true}` を返す。直後に該当データ（users / worlds 等）を再取得して**実状態で結果を見せる**。UI はトースト「実行しました」+ 再取得。
+
+### 2.5.1 timeout / 実装方針
+- **timeout**: start 系=60s、restart=180s（暫定）、他=既定5s（`WithTimeout` で個別指定）。
+  ⚠️ restart が実機でプロンプトを返さない場合（driver.go の警告）、成功でも ErrTimeout→500 を誤報し、
+  かつ最大 180s 間 execMu を占有して他コマンドを止める。検証バッチ項目3で確認するまでの楽観実装。
+- **反復ハンドラは helper 集約**: 単一引数 session-user 操作（kick/ban/silence/unsilence/respawn/invite）は
+  `sessionUserOp` ファクトリ、引数なし lifecycle（restart/save/close）は `sessionCmdOp` ファクトリ、
+  グローバル単一引数（accept/add/remove）は `globalUserOp` ファクトリで生成。引数付き（role/message/
+  accesslevel/maxusers/name/description/hidefromlisting/start/unban）のみ個別実装
+- **fakehl 拡張は最小**: write コマンドを受理し最小限の状態変更（例: kick で users から削除）+ プロンプトのみ。**ノイジー出力は再現しない**
+- **エラー**: `writeExecErr` 流用（ErrNotReady→409 / その他→500）。空 user 等の入力検証は 400
+
+### 2.5.2 実機検証バッチ（楽観実装→後でまとめて検証）
+1. **コンソールのクォート/エスケープ規則**（`\n`/`\"`/`\\` を解釈するか）← 最優先・全文字列引数の土台
+2. ban のフォーカス要否（在席必要か）/ kick が `users` の表示名で効くか
+3. restart の所要時間（timeout 調整）/ `startWorldTemplate` の引数クォートと有効テンプレ名
+4. **セッション閉鎖時の index 繰り上がり有無**（idx 信頼の前提確認）
+5. invite/save/close/description の成功書式 / accesslevel の実有効値
 
 ### 2.6 その他の実機ドメイン制約（UI 設計に直結）
 - **セッション全体チャット一斉送信コマンドは存在しない**。`message` は個別 DM のみ。「全員へ告知」は `users` 列挙 → 各人へ `message` ループで実現（preRestartActions の chatMessage も同方式）。UI で「ブロードキャスト」と誤認させない

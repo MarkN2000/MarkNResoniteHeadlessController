@@ -6,6 +6,12 @@
 // (2026-05-28 Windows): multiple worlds, focus state, per-command response
 // formats, prompt without trailing newline, silent commands, Unknown command.
 //
+// write commands (Pre-7c) are mocked MINIMALLY: accept + return prompt. State
+// changes are limited to kick/ban (drop user), silence/unsilence (flag), and
+// startworld* (append world). Noisy real outputs (UniLog stack traces) are NOT
+// reproduced — the controller uses 方針A (prompt-return = success) so they don't
+// matter for tests. Commands are matched case-insensitively (real headless too).
+//
 // Default flags are tuned for integration tests (ambient OFF for deterministic
 // output). For PoC smoke testing with periodic ambient ticks, pass `-ambient=true`.
 package main
@@ -128,7 +134,7 @@ func handleCommand(s *state, line string) {
 		rest = parts[1]
 	}
 
-	switch cmd {
+	switch strings.ToLower(cmd) {
 	case "worlds":
 		for i, w := range s.worlds {
 			// name 30字幅にスペースパディングしてTAB区切り（実機と同形式）
@@ -200,6 +206,27 @@ func handleCommand(s *state, line string) {
 			fmt.Println(r)
 		}
 		// 空なら silent
+	// --- write 系（Pre-7c 最小モック）---
+	case "kick", "ban":
+		// 在席ユーザーを削除（最小の状態変更）。実機はノイジー出力だが再現しない。
+		s.users = removeUserByName(s.users, strings.Trim(rest, `" `))
+	case "silence":
+		setSilenced(s.users, strings.Trim(rest, `" `), true)
+	case "unsilence":
+		setSilenced(s.users, strings.Trim(rest, `" `), false)
+	case "respawn", "invite", "message", "role", "description",
+		"save", "restart", "close",
+		"acceptfriendrequest", "sendfriendrequest", "removefriend", "unban":
+		// 受理してプロンプトのみ（状態変更は再現しない）
+	case "hidefromlisting":
+		// 受理のみ
+	case "startworldurl", "startworldtemplate":
+		name := strings.Trim(rest, `" `)
+		if name == "" {
+			name = fmt.Sprintf("New World %d", len(s.worlds))
+		}
+		s.worlds = append(s.worlds, world{Name: name, Users: 1, Present: 0, AccessLevel: "Private", MaxUsers: 4})
+		// 実機はプロンプトまで待機するが、最小モックは即プロンプト。
 	case "hang":
 		// テスト用: 永久ブロック（プロンプトを返さない）→ Exec timeout / ProcessGone 検証
 		time.Sleep(time.Hour)
@@ -218,4 +245,24 @@ func boolPy(b bool) string {
 		return "True"
 	}
 	return "False"
+}
+
+// removeUserByName は指定名のユーザーを除いた新しいスライスを返す（kick/ban 用）。
+func removeUserByName(users []userRow, name string) []userRow {
+	out := make([]userRow, 0, len(users))
+	for _, u := range users {
+		if u.Name != name {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// setSilenced は指定名のユーザーの Silenced フラグを設定する（silence/unsilence 用）。
+func setSilenced(users []userRow, name string, v bool) {
+	for i := range users {
+		if users[i].Name == name {
+			users[i].Silenced = v
+		}
+	}
 }

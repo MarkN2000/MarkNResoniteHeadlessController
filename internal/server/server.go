@@ -82,6 +82,34 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsGet))
 	mux.HandleFunc("PUT /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsPut))
 
+	// write API（Pre-7c）。全 POST・認証必須・idx は path・引数は JSON body。
+	// セッション内ユーザー操作（focus idx → <cmd> "<user>"）
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/kick", s.requireAuth(s.sessionUserOp("kick")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/ban", s.requireAuth(s.sessionUserOp("ban")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/silence", s.requireAuth(s.sessionUserOp("silence")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/unsilence", s.requireAuth(s.sessionUserOp("unsilence")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/respawn", s.requireAuth(s.sessionUserOp("respawn")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/invite", s.requireAuth(s.sessionUserOp("invite")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/role", s.requireAuth(s.handleSessionRole))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/message", s.requireAuth(s.handleSessionMessage))
+	// セッション設定（focus idx → <cmd>）
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/accesslevel", s.requireAuth(s.handleSessionAccessLevel))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/maxusers", s.requireAuth(s.handleSessionMaxUsers))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/name", s.requireAuth(s.handleSessionName))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/description", s.requireAuth(s.handleSessionDescription))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/hidefromlisting", s.requireAuth(s.handleSessionHideFromListing))
+	// セッションライフサイクル（focus idx → <cmd>）
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/restart", s.requireAuth(s.sessionCmdOp("restart", headless.WithTimeout(restartTimeout))))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/save", s.requireAuth(s.sessionCmdOp("save")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/close", s.requireAuth(s.sessionCmdOp("close")))
+	// 新規セッション（focus 不要・長 timeout）。literal "start" は {idx} と段数が違うため衝突しない。
+	mux.HandleFunc("POST /api/v1/sessions/start", s.requireAuth(s.handleSessionStart))
+	// グローバル（フレンド/BAN・focus 不要）
+	mux.HandleFunc("POST /api/v1/friendrequests/accept", s.requireAuth(s.globalUserOp("acceptfriendrequest")))
+	mux.HandleFunc("POST /api/v1/friends/add", s.requireAuth(s.globalUserOp("sendFriendRequest")))
+	mux.HandleFunc("POST /api/v1/friends/remove", s.requireAuth(s.globalUserOp("removeFriend")))
+	mux.HandleFunc("POST /api/v1/bans/unban", s.requireAuth(s.handleBanUnban))
+
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
 		mux.Handle("/", http.FileServerFS(s.webFS))
