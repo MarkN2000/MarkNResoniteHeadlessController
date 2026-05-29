@@ -58,7 +58,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 | コマンド | 用途 | 成功時出力 |
 |---|---|---|
 | `invite "<username>"` | フレンドを招待 | 旧コード推測 `Invite sent!` — **実機未確定**（in-session 相手だと ambient のみ。実 friend に未join 状態への送信は未検証） |
-| `accesslevel <Private\|LAN\|Friends\|Anyone>` | アクセスレベル変更 | `World <name> now has access level <Level>` ✅ 実機確定 |
+| `accesslevel <Private\|LAN\|Contacts\|ContactsPlus\|RegisteredUsers\|Anyone>` | アクセスレベル変更（旧記載の "Friends" は誤り。値は v1 実コード由来。LAN/Private は 2026-05-30 実機往復確認） | `World <name> now has access level <Level>` ✅ 実機確定 |
 | `role "<username>" "<role>"` | ロール変更（Admin/Builder/Moderator/Guest/Spectator） | `<username> now has role <Role>!` ✅ 実機確定（全 5 role） |
 | `kick "<username>"` | キック | **複数行**：`KickRequest: KickAndRevokeInvite for User ID... - UserName: X, UserId: U-X, MachineId: ..., Role: Y. Changing User: , ScheduledForValidation: True` + **UniLog stack trace** ⚠️ノイジー |
 | `ban "<username>"` | BAN（実機未検証） | — |
