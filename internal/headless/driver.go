@@ -408,8 +408,10 @@ func (d *Driver) UnsubscribeStatus(ch chan Status) { d.statusHub.unsubscribe(ch)
 //   - Exec: 1コマンドを送って応答行を構造化用に返す（直列キュー）
 //   - ExecGroup: 同 mu を保持したまま複数 Exec を連続実行（focus→status 等の原子的グループ）
 //
-// ⚠️ 終了系コマンド（shutdown/restart/close）は Exec の対象外：
-//    プロンプトが返らず必ず timeout になる。shutdown は Driver.Stop() を使うこと。
+// ⚠️ shutdown は Exec の対象外：プロンプトが返らず必ず timeout になる → Driver.Stop() を使う。
+//    restart/save/close は実機検証(2026-05-30)で **プロンプトを返す**ことを確認済み
+//    （空ワールドで restart≈1s／save・close≈0.2s）。よって ExecGroup で実行可。
+//    ただし restart は重いワールドだと時間がかかり得るため呼び出し側で長めの timeout を指定する。
 
 // Tx は ExecGroup の fn 内で使う Exec ハンドル。execMu は ExecGroup 側で保持済。
 type Tx interface {

@@ -264,9 +264,9 @@ func TestParseFriendRequests_RealFormatEmpirical(t *testing.T) {
 }
 
 func TestParseFriendRequests_AmbientNotOverStripped(t *testing.T) {
-	// "Updated: A -> B" のような ambient は safeStripLeadingPrompts が剥がさない
-	// → ambient 文字列のまま残るが、明らかにユーザー名でない形なので UI 側で
-	//   見分け可能 (v1 と同じ挙動)
+	// ParseFriendRequests はプロンプト剥がしをせず（Driver の stripExactPrompt 済が前提）、
+	// "Updated: A -> B" のような ambient 行も '>' を含むが誤剥がしされずそのまま残る。
+	// → 明らかにユーザー名でない形で残るので UI 側で見分け可能 (v1 と同じ挙動)。
 	got := ParseFriendRequests([]string{
 		"Updated: 0001/01/01 0:00:00 -> 2026/05/28 8:19:20",
 		"alice",

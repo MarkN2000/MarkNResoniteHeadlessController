@@ -24,9 +24,8 @@ import (
 // startTimeout は新規ワールド開始（startworldurl/startWorldTemplate）の待ち時間。
 const startTimeout = 60 * time.Second
 
-// restartTimeout はセッション restart の待ち時間。restart は再生成中にプロンプトを
-// 返さない可能性があり（driver.go の警告）、その場合 ErrTimeout→500 を誤報し得る。
-// 実機検証（spec §2.5.2 項目3）までは長めに取って様子を見る楽観実装。
+// restartTimeout はセッション restart の待ち時間。実機検証(2026-05-30)で restart は
+// プロンプトを返すと確認済み（空ワールドで≈1s）。重いワールドの再生成に備えた余裕のある上限。
 const restartTimeout = 180 * time.Second
 
 // --- 実行 helper ---
