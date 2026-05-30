@@ -293,7 +293,8 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。自動 poll・Page Visibility・トーストは 7-7。**現状 status と users を別エンドポイントで取得（focus 2回）= 次に B1 で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）へ集約予定**。
 - **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
-- **残課題**: B1（上記の取得集約）／`maxUsers` 空入力ガード（`Number("")=0` で送られ得る）→ B1 と一緒に対応予定。
+- **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
+- **残課題（7-7で対応）**: **write失敗が現状無音**（`api.post` の `WriteResult{ok,error}` を呼び出し側が見ていない）。7-7のトースト導入時に `useAsyncAction`/各操作で `WriteResult` を拾い、失敗を通知する（M2/L4）。`getData` が 409(not ready) を区別しない点(L5)も同時に整理。
 
 ---
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Divider, Group, Stack, Switch } from "@mantine/core";
 import * as api from "../../api";
@@ -36,8 +36,14 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
   const apply = useAsyncAction(onChanged);
   const life = useAsyncAction(onChanged);
 
-  // refetch 後（status 差し替え）にローカル編集状態を権威値へ同期。
+  // フォームの再同期は「別セッションを表示したとき」のみ（sessionId が変化したとき）。
+  // 同一セッションの refetch（ユーザー操作後 / ⟳ / 将来の自動poll）では再同期せず、
+  // 未適用の編集を保持する（M1: 編集中に他操作で入力が消える問題の対策）。
+  // focus 切替・セッション再起動は sessionId が変わるため再同期される。
+  const syncedId = useRef<string | null>(null);
   useEffect(() => {
+    if (status.sessionId === syncedId.current) return;
+    syncedId.current = status.sessionId;
     setName(status.name);
     setLevel(status.accessLevel);
     setMaxUsers(status.maxUsers);

@@ -62,7 +62,8 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
         </Text>
       ) : (
         users.map((u, i) => (
-          <Fragment key={u.name + u.id}>
+          // L1: id は無アカウント時に空になり得るため、空なら名前+indexで一意化（同名匿名の衝突防止）。
+          <Fragment key={u.id || `${u.name}#${i}`}>
             {i > 0 && <Divider color="dark.5" />}
             <UserCard
               idx={idx}
@@ -164,7 +165,12 @@ function UserCard({
           <Text fw={600} truncate>
             {u.name}
           </Text>
-          {u.silenced && <Text size="sm">🔇</Text>}
+          {u.silenced && (
+            // L2: 絵文字アイコンに role/aria を付与（スクリーンリーダーで「ミュート中」と読む）。
+            <Text size="sm" role="img" aria-label={t("session.silenced")} title={t("session.silenced")}>
+              🔇
+            </Text>
+          )}
         </Group>
         <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
           <InspectorSelect

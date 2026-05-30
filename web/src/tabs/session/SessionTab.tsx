@@ -16,15 +16,19 @@ export function SessionTab({ idx }: { idx: number }) {
   const [status, setStatus] = useState<WorldStatus | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setLoading(true);
     // B1: status + users を1回の取得（focus 1回）で。一貫スナップショット。
     const d = await api.getSessionDetail(idx);
-    setStatus(d?.status ?? null);
-    setUsers(d?.users ?? []);
-    setError(d === null);
+    if (d) {
+      setStatus(d.status);
+      setUsers(d.users);
+    } else {
+      // M3: 取得失敗でも表示中データは消さない（初回 status=null のときだけエラー画面）。
+      // ユーザー向けの失敗通知は 7-7（トースト）で扱う。
+      console.warn("session detail refetch failed");
+    }
     setLoading(false);
   }, [idx]);
 
@@ -32,22 +36,20 @@ export function SessionTab({ idx }: { idx: number }) {
     void refetch();
   }, [refetch]);
 
-  if (loading && !status) {
+  // データが無いのは初回（または初回失敗）だけ。データがあれば refetch 失敗時も内容を表示し続ける。
+  if (!status) {
     return (
       <Center h="100%">
-        <Loader />
-      </Center>
-    );
-  }
-  if (error || !status) {
-    return (
-      <Center h="100%">
-        <Stack align="center" gap="sm">
-          <Text c="dimmed">{t("session.loadError")}</Text>
-          <Button onClick={() => void refetch()} loading={loading}>
-            {t("session.refresh")}
-          </Button>
-        </Stack>
+        {loading ? (
+          <Loader />
+        ) : (
+          <Stack align="center" gap="sm">
+            <Text c="dimmed">{t("session.loadError")}</Text>
+            <Button onClick={() => void refetch()} loading={loading}>
+              {t("session.refresh")}
+            </Button>
+          </Stack>
+        )}
       </Center>
     );
   }
