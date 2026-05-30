@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Box, Button, Divider, Group, Modal, Stack, Text, Textarea } from "@mantine/core";
 import * as api from "../../api";
 import type { UserInfo } from "../../api";
-import { InspectorButton, InspectorSelect } from "../../components/inspector";
+import { InspectorButton, InspectorCard, InspectorSelect } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 
@@ -52,16 +52,16 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
   const meta = confirm ? CONFIRM_META[confirm.kind] : null;
 
   return (
-    <Stack gap="xs">
-      <Text fw={700} size="sm" ta="center" c="dark.1">
-        {t("session.users")} ({users.length})
-      </Text>
-      {users.length === 0 ? (
-        <Text c="dimmed" size="sm" ta="center">
-          {t("session.noUsers")}
-        </Text>
-      ) : (
-        users.map((u, i) => (
+    <>
+      {/* セッション設定カードと同じヘッダ（グレー帯＋黄文字中央）で統一。2カラム時に左右で揃う。 */}
+      <InspectorCard title={`${t("session.users")} (${users.length})`}>
+        {users.length === 0 ? (
+          <Text c="dimmed" size="sm" ta="center">
+            {t("session.noUsers")}
+          </Text>
+        ) : (
+          <Stack gap="xs">
+            {users.map((u, i) => (
           // L1: id は無アカウント時に空になり得るため、空なら名前+indexで一意化（同名匿名の衝突防止）。
           <Fragment key={u.id || `${u.name}#${i}`}>
             {i > 0 && <Divider color="dark.5" />}
@@ -76,9 +76,11 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
               }}
               onRun={run}
             />
-          </Fragment>
-        ))
-      )}
+              </Fragment>
+            ))}
+          </Stack>
+        )}
+      </InspectorCard>
 
       <ConfirmModal
         opened={confirm !== null}
@@ -127,7 +129,7 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
           </Button>
         </Group>
       </Modal>
-    </Stack>
+    </>
   );
 }
 
