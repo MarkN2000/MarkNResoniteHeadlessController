@@ -109,6 +109,8 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
           mt={4}
           variant={dirty ? "filled" : "default"}
           color="brand"
+          // アクティブ(filled 水色)時は白だと読みにくいのでラベルを濃色に。
+          styles={dirty ? { label: { color: "var(--mantine-color-dark-9)" } } : undefined}
           disabled={!dirty}
           loading={apply.busy}
           onClick={doApply}
