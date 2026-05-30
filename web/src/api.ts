@@ -147,16 +147,8 @@ export async function getLastUsedConfig(): Promise<string> {
 
 // --- セッション（フォーカス中 idx）の取得 ---
 
-export async function getSessionStatus(idx: number): Promise<WorldStatus | null> {
-  return getData<WorldStatus>(`/sessions/${idx}/status`);
-}
-
-export async function getSessionUsers(idx: number): Promise<UserInfo[]> {
-  return (await getData<UserInfo[]>(`/sessions/${idx}/users`)) ?? [];
-}
-
 // status + users を1回の取得（ExecGroup(focus→status→users)）で返す（B1）。
-// 個別の getSessionStatus/getSessionUsers は部分再取得用に残置。
+// 個別取得が要れば backend の /sessions/{idx}/status・/users が使える（部分再取得は 7-7 で）。
 export interface SessionDetail {
   status: WorldStatus;
   users: UserInfo[];

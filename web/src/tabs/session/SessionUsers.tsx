@@ -6,6 +6,7 @@ import type { UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, InspectorSelect } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { useConfirm } from "../../hooks/useConfirm";
 
 interface Props {
   idx: number;
@@ -13,14 +14,17 @@ interface Props {
   onChanged: () => void; // 操作後の refetch（方針A）
 }
 
-// 確認が要る操作の種別と、その表示・危険度・実行 API の対応。
+// 確認が要るユーザー操作の種別と、その表示・危険度・実行 API を1か所にまとめる。
 type ConfirmKind = "kick" | "ban" | "respawn" | "silence" | "unsilence";
-const CONFIRM_META: Record<ConfirmKind, { titleKey: string; msgKey: string; danger: boolean }> = {
-  kick: { titleKey: "session.kick", msgKey: "session.confirmKick", danger: true },
-  ban: { titleKey: "session.ban", msgKey: "session.confirmBan", danger: true },
-  respawn: { titleKey: "session.respawn", msgKey: "session.confirmRespawn", danger: false },
-  silence: { titleKey: "session.silence", msgKey: "session.confirmSilence", danger: false },
-  unsilence: { titleKey: "session.unsilence", msgKey: "session.confirmUnsilence", danger: false },
+const CONFIRM_ACTIONS: Record<
+  ConfirmKind,
+  { titleKey: string; msgKey: string; danger: boolean; fn: (idx: number, user: string) => Promise<unknown> }
+> = {
+  kick: { titleKey: "session.kick", msgKey: "session.confirmKick", danger: true, fn: api.kickUser },
+  ban: { titleKey: "session.ban", msgKey: "session.confirmBan", danger: true, fn: api.banUser },
+  respawn: { titleKey: "session.respawn", msgKey: "session.confirmRespawn", danger: false, fn: api.respawnUser },
+  silence: { titleKey: "session.silence", msgKey: "session.confirmSilence", danger: false, fn: api.silenceUser },
+  unsilence: { titleKey: "session.unsilence", msgKey: "session.confirmUnsilence", danger: false, fn: api.unsilenceUser },
 };
 
 // ユーザー一覧（案B: 2行コンパクト）。
@@ -29,27 +33,24 @@ const CONFIRM_META: Record<ConfirmKind, { titleKey: string; msgKey: string; dang
 // 権限は選択した瞬間に即適用。respawn/silence/kick/ban は確認、message は入力モーダル。
 export function SessionUsers({ idx, users, onChanged }: Props) {
   const { t } = useTranslation();
-  const { busy, run } = useAsyncAction(onChanged);
-  const [confirm, setConfirm] = useState<null | { kind: ConfirmKind; user: string }>(null);
+  const { busy, run } = useAsyncAction(onChanged); // 権限の即適用・メッセージ送信用
+  const confirm = useConfirm();
   const [msgTo, setMsgTo] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
-  function execConfirm(kind: ConfirmKind, user: string): Promise<unknown> {
-    switch (kind) {
-      case "kick":
-        return api.kickUser(idx, user);
-      case "ban":
-        return api.banUser(idx, user);
-      case "respawn":
-        return api.respawnUser(idx, user);
-      case "silence":
-        return api.silenceUser(idx, user);
-      case "unsilence":
-        return api.unsilenceUser(idx, user);
-    }
-  }
-
-  const meta = confirm ? CONFIRM_META[confirm.kind] : null;
+  // 確認が要る操作（respawn/silence/kick/ban）を共通ダイアログに乗せる。
+  const askConfirm = (kind: ConfirmKind, user: string) => {
+    const a = CONFIRM_ACTIONS[kind];
+    confirm.ask({
+      title: t(a.titleKey),
+      message: t(a.msgKey, { user }),
+      danger: a.danger,
+      onConfirm: async () => {
+        await a.fn(idx, user);
+        onChanged();
+      },
+    });
+  };
 
   return (
     <>
@@ -62,20 +63,20 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
         ) : (
           <Stack gap="xs">
             {users.map((u, i) => (
-          // L1: id は無アカウント時に空になり得るため、空なら名前+indexで一意化（同名匿名の衝突防止）。
-          <Fragment key={u.id || `${u.name}#${i}`}>
-            {i > 0 && <Divider color="dark.5" />}
-            <UserCard
-              idx={idx}
-              u={u}
-              busy={busy}
-              onConfirm={(kind) => setConfirm({ kind, user: u.name })}
-              onMessage={() => {
-                setMsg("");
-                setMsgTo(u.name);
-              }}
-              onRun={run}
-            />
+              // L1: id は無アカウント時に空になり得るため、空なら名前+indexで一意化（同名匿名の衝突防止）。
+              <Fragment key={u.id || `${u.name}#${i}`}>
+                {i > 0 && <Divider color="dark.5" />}
+                <UserCard
+                  idx={idx}
+                  u={u}
+                  busy={busy}
+                  onConfirm={(kind) => askConfirm(kind, u.name)}
+                  onMessage={() => {
+                    setMsg("");
+                    setMsgTo(u.name);
+                  }}
+                  onRun={run}
+                />
               </Fragment>
             ))}
           </Stack>
@@ -83,18 +84,13 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
       </InspectorCard>
 
       <ConfirmModal
-        opened={confirm !== null}
-        title={meta ? t(meta.titleKey) : ""}
-        message={confirm && meta ? t(meta.msgKey, { user: confirm.user }) : ""}
-        danger={meta?.danger}
-        loading={busy}
-        onConfirm={() => {
-          if (!confirm) return;
-          const c = confirm;
-          setConfirm(null);
-          void run(() => execConfirm(c.kind, c.user));
-        }}
-        onClose={() => setConfirm(null)}
+        opened={confirm.request !== null}
+        title={confirm.request?.title ?? ""}
+        message={confirm.request?.message}
+        danger={confirm.request?.danger}
+        loading={confirm.busy}
+        onConfirm={() => void confirm.confirm()}
+        onClose={confirm.close}
       />
 
       <Modal

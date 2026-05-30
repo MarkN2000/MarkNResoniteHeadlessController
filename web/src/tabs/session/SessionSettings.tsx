@@ -15,6 +15,7 @@ import {
 } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { useConfirm } from "../../hooks/useConfirm";
 
 interface Props {
   idx: number;
@@ -32,14 +33,12 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
   const [maxUsers, setMaxUsers] = useState<number | string>(status.maxUsers);
   const [description, setDescription] = useState(status.description);
   const [hide, setHide] = useState(status.hiddenFromListing);
-  const [confirm, setConfirm] = useState<null | "save" | "restart" | "close">(null);
   const apply = useAsyncAction(onChanged);
-  const life = useAsyncAction(onChanged);
+  const confirm = useConfirm();
 
   // フォームの再同期は「別セッションを表示したとき」のみ（sessionId が変化したとき）。
   // 同一セッションの refetch（ユーザー操作後 / ⟳ / 将来の自動poll）では再同期せず、
-  // 未適用の編集を保持する（M1: 編集中に他操作で入力が消える問題の対策）。
-  // focus 切替・セッション再起動は sessionId が変わるため再同期される。
+  // 未適用の編集を保持する（M1）。focus 切替・セッション再起動は sessionId が変わるため再同期される。
   const syncedId = useRef<string | null>(null);
   useEffect(() => {
     if (status.sessionId === syncedId.current) return;
@@ -71,14 +70,17 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
     });
   }
 
-  async function doLifecycle(kind: "save" | "restart" | "close") {
-    await life.run(() => {
-      if (kind === "save") return api.saveSession(idx);
-      if (kind === "restart") return api.restartSession(idx);
-      return api.closeSession(idx);
+  // lifecycle 操作（保存/再起動/閉じる）は確認 → 実行 → 再取得。
+  const askLifecycle = (titleKey: string, msgKey: string, danger: boolean, op: () => Promise<unknown>) =>
+    confirm.ask({
+      title: t(titleKey),
+      message: t(msgKey),
+      danger,
+      onConfirm: async () => {
+        await op();
+        onChanged();
+      },
     });
-    setConfirm(null);
-  }
 
   return (
     <InspectorCard
@@ -102,14 +104,13 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
           <Switch checked={hide} onChange={(e) => setHide(e.currentTarget.checked)} />
         </FieldRow>
 
-        {/* 適用は主アクション（変更時のみ cyan filled で点灯）。severity ボタンとは別扱い。 */}
+        {/* 適用は主アクション（変更時のみ cyan filled で点灯）。アクティブ時は白だと読みにくいのでラベルを濃色に。 */}
         <Button
           fullWidth
           size="xs"
           mt={4}
           variant={dirty ? "filled" : "default"}
           color="brand"
-          // アクティブ(filled 水色)時は白だと読みにくいのでラベルを濃色に。
           styles={dirty ? { label: { color: "var(--mantine-color-dark-9)" } } : undefined}
           disabled={!dirty}
           loading={apply.busy}
@@ -119,43 +120,35 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
         </Button>
         <Divider my={2} color="dark.4" />
         <Group grow gap="xs">
-          <InspectorButton severity="neutral" onClick={() => setConfirm("save")}>
+          <InspectorButton
+            severity="neutral"
+            onClick={() => askLifecycle("session.save", "session.confirmSave", false, () => api.saveSession(idx))}
+          >
             {t("session.save")}
           </InspectorButton>
-          <InspectorButton severity="warning" onClick={() => setConfirm("restart")}>
+          <InspectorButton
+            severity="warning"
+            onClick={() => askLifecycle("session.restart", "session.confirmRestart", true, () => api.restartSession(idx))}
+          >
             {t("session.restart")}
           </InspectorButton>
-          <InspectorButton severity="danger" onClick={() => setConfirm("close")}>
+          <InspectorButton
+            severity="danger"
+            onClick={() => askLifecycle("session.close", "session.confirmClose", true, () => api.closeSession(idx))}
+          >
             {t("session.close")}
           </InspectorButton>
         </Group>
       </Stack>
 
       <ConfirmModal
-        opened={confirm === "save"}
-        title={t("session.save")}
-        message={t("session.confirmSave")}
-        loading={life.busy}
-        onConfirm={() => void doLifecycle("save")}
-        onClose={() => setConfirm(null)}
-      />
-      <ConfirmModal
-        opened={confirm === "restart"}
-        title={t("session.restart")}
-        message={t("session.confirmRestart")}
-        danger
-        loading={life.busy}
-        onConfirm={() => void doLifecycle("restart")}
-        onClose={() => setConfirm(null)}
-      />
-      <ConfirmModal
-        opened={confirm === "close"}
-        title={t("session.close")}
-        message={t("session.confirmClose")}
-        danger
-        loading={life.busy}
-        onConfirm={() => void doLifecycle("close")}
-        onClose={() => setConfirm(null)}
+        opened={confirm.request !== null}
+        title={confirm.request?.title ?? ""}
+        message={confirm.request?.message}
+        danger={confirm.request?.danger}
+        loading={confirm.busy}
+        onConfirm={() => void confirm.confirm()}
+        onClose={confirm.close}
       />
     </InspectorCard>
   );
