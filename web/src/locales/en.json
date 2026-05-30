@@ -23,5 +23,27 @@
     "running": "running",
     "stopping": "stopping"
   },
-  "langToggle": "日本語"
+  "tabs": {
+    "session": "Session",
+    "friends": "Friends",
+    "newSession": "New session",
+    "config": "Config",
+    "schedule": "Schedule",
+    "settings": "Settings",
+    "command": "Command"
+  },
+  "topbar": {
+    "forceStop": "Force stop",
+    "checkUpdate": "Check for updates (soon)",
+    "selectConfig": "Select config",
+    "noConfig": "Create one in the Config tab",
+    "noSession": "No session"
+  },
+  "placeholder": {
+    "comingSoon": "This tab will be built in a later step",
+    "startFirst": "Please start the headless first"
+  },
+  "menu": {
+    "language": "Language"
+  }
 }

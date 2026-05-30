@@ -1,200 +1,150 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Badge,
-  Button,
-  Center,
-  Group,
-  Paper,
-  PasswordInput,
-  ScrollArea,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
-import { setLanguage } from "./i18n";
+import { AppShell, Center, NavLink, Text } from "@mantine/core";
 import * as api from "./api";
-import type { Status, LogLine } from "./api";
+import type { ConfigSummary, LogLine, Status, World } from "./api";
+import { TABS, type TabId } from "./nav";
+import { SURFACE } from "./theme";
+import { Login } from "./components/Login";
+import { TopBar } from "./components/TopBar";
+import { CommandTab } from "./tabs/CommandTab";
+import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
 
 export default function App() {
-  const { t, i18n } = useTranslation();
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [pw, setPw] = useState("");
-  const [loginErr, setLoginErr] = useState("");
-  const [status, setStatus] = useState<Status | null>(null);
-  const [logs, setLogs] = useState<LogLine[]>([]);
-  const [cmd, setCmd] = useState("");
-  const esRef = useRef<EventSource | null>(null);
-  const seenSeq = useRef<Set<number>>(new Set());
-  const logEndRef = useRef<HTMLDivElement | null>(null);
 
-  // 初回: 既存セッションを確認
+  // 初回: 既存 Cookie セッションを確認
   useEffect(() => {
-    api.getStatus().then((s) => {
-      if (s) {
-        setStatus(s);
-        setAuthed(true);
-      } else {
-        setAuthed(false);
-      }
-    });
+    api.getStatus().then((s) => setAuthed(s !== null));
   }, []);
 
-  // 認証済みになったら SSE 接続
+  if (authed === null) {
+    return (
+      <Center h="100%">
+        <Text c="dimmed">…</Text>
+      </Center>
+    );
+  }
+  if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
+  return <Shell onLogout={() => setAuthed(false)} />;
+}
+
+function Shell({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<Status | null>(null);
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [sessions, setSessions] = useState<World[]>([]);
+  const [configs, setConfigs] = useState<ConfigSummary[]>([]);
+  const [selectedConfig, setSelectedConfig] = useState<string | null>(null);
+  const [focusedIdx, setFocusedIdx] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabId>("session");
+  const [navOpened, setNavOpened] = useState(false);
+  const seenSeq = useRef<Set<number>>(new Set());
+
+  const running = status?.state === "running";
+
+  // SSE（status + log）をシェル最上位で購読し、トップバーのモードとログを駆動。
   useEffect(() => {
-    if (authed !== true) return;
     const es = new EventSource("/api/v1/events");
-    esRef.current = es;
-    es.addEventListener("status", (e) => {
-      setStatus(JSON.parse((e as MessageEvent).data) as Status);
-    });
+    es.addEventListener("status", (e) => setStatus(JSON.parse((e as MessageEvent).data) as Status));
     es.addEventListener("log", (e) => {
       const line = JSON.parse((e as MessageEvent).data) as LogLine;
-      if (seenSeq.current.has(line.seq)) return; // seqで重複排除
+      if (seenSeq.current.has(line.seq)) return;
       seenSeq.current.add(line.seq);
       setLogs((prev) => {
         const next = [...prev, line];
         return next.length > 1000 ? next.slice(next.length - 1000) : next;
       });
     });
-    return () => {
-      es.close();
-      esRef.current = null;
-    };
-  }, [authed]);
+    return () => es.close();
+  }, []);
 
-  // ログ末尾へ自動スクロール
+  // 停止中トップバーの config 選択肢。
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "auto" });
-  }, [logs]);
+    Promise.all([api.getConfigs(), api.getLastUsedConfig()]).then(([cs, last]) => {
+      setConfigs(cs);
+      setSelectedConfig((cur) => cur ?? (cs.some((c) => c.name === last) ? last : cs[0]?.name ?? null));
+    });
+  }, []);
 
-  async function doLogin() {
-    setLoginErr("");
-    const r = await api.login(pw);
-    if (r.ok) {
-      setPw("");
-      seenSeq.current.clear();
-      setLogs([]);
-      setStatus(await api.getStatus());
-      setAuthed(true);
-    } else {
-      setLoginErr(r.status === 429 ? t("login.rateLimited") : t("login.error"));
-    }
+  const refreshSessions = useCallback(() => {
+    api.getSessions().then(setSessions);
+  }, []);
+
+  // 稼働開始でセッション取得、停止でクリア。
+  useEffect(() => {
+    if (running) refreshSessions();
+    else setSessions([]);
+  }, [running, refreshSessions]);
+
+  async function onStart() {
+    if (!selectedConfig) return;
+    const r = await api.start(selectedConfig);
+    if (!r.ok) console.warn("start failed:", r.status, r.error); // TODO(7-7): トースト表示
   }
 
-  async function doLogout() {
-    await api.logout();
-    esRef.current?.close();
-    setAuthed(false);
-    setStatus(null);
-    setLogs([]);
+  function renderTab() {
+    const def = TABS.find((tb) => tb.id === activeTab)!;
+    const stopped = (status?.state ?? "stopped") === "stopped";
+    if (!def.availableWhenStopped && stopped) return <StartPrompt />;
+    if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
+    return <TabPlaceholder titleKey={def.labelKey} />;
   }
-
-  function submitCmd(e: React.FormEvent) {
-    e.preventDefault();
-    const c = cmd.trim();
-    if (!c) return;
-    void api.sendCommand(c);
-    setCmd("");
-  }
-
-  function toggleLang() {
-    setLanguage(i18n.language === "ja" ? "en" : "ja");
-  }
-
-  if (authed === null) {
-    return <Center h="100%"><Text c="dimmed">…</Text></Center>;
-  }
-
-  if (!authed) {
-    return (
-      <Center h="100%" p="md">
-        <Paper w="100%" maw={380} p="lg" radius="md" withBorder>
-          <Group justify="space-between" mb="md">
-            <Title order={3}>{t("login.title")}</Title>
-            <Button variant="subtle" size="xs" onClick={toggleLang}>
-              {t("langToggle")}
-            </Button>
-          </Group>
-          <PasswordInput
-            value={pw}
-            onChange={(e) => setPw(e.currentTarget.value)}
-            onKeyDown={(e) => e.key === "Enter" && doLogin()}
-            placeholder={t("login.password")}
-            mb="sm"
-          />
-          <Button fullWidth onClick={doLogin}>
-            {t("login.submit")}
-          </Button>
-          {loginErr && (
-            <Text c="red" size="sm" mt="sm">
-              {loginErr}
-            </Text>
-          )}
-        </Paper>
-      </Center>
-    );
-  }
-
-  const st = status?.state ?? "stopped";
-  const badgeColor = st === "running" ? "green" : st === "stopped" ? "red" : "yellow";
-  const colorOf = (kind: string) =>
-    kind === "err" ? "red.4" : kind === "sys" ? "blue.4" : kind === "cmd" ? "green.4" : "gray.4";
 
   return (
-    <Stack h="100%" p="md" gap="xs" maw={960} mx="auto">
-      <Group>
-        <Badge color={badgeColor} size="lg" variant="light">
-          {t("state.label")}: {t(`state.${st}`)}
-          {status?.ready ? ` (${t("dashboard.ready")})` : ""}
-          {status?.pid ? ` · pid ${status.pid}` : ""}
-        </Badge>
-        <div style={{ flex: 1 }} />
-        <Button color="green" onClick={() => void api.start()}>
-          {t("dashboard.start")}
-        </Button>
-        <Button color="red" onClick={() => void api.stop()}>
-          {t("dashboard.stop")}
-        </Button>
-        <Button variant="default" onClick={toggleLang}>
-          {t("langToggle")}
-        </Button>
-        <Button variant="default" onClick={doLogout}>
-          {t("dashboard.logout")}
-        </Button>
-      </Group>
+    <AppShell
+      header={{ height: 56 }}
+      navbar={{ width: 220, breakpoint: "sm", collapsed: { mobile: !navOpened } }}
+      padding="md"
+      withBorder={false}
+    >
+      <AppShell.Header>
+        <TopBar
+          status={status}
+          sessions={sessions}
+          focusedIdx={focusedIdx}
+          onFocus={(idx) => setFocusedIdx(idx)}
+          onRefreshSessions={refreshSessions}
+          onStop={() => void api.stop()}
+          configs={configs}
+          selectedConfig={selectedConfig}
+          onSelectConfig={setSelectedConfig}
+          onStart={onStart}
+          onLogout={async () => {
+            await api.logout();
+            onLogout();
+          }}
+          navOpened={navOpened}
+          onToggleNav={() => setNavOpened((o) => !o)}
+        />
+      </AppShell.Header>
 
-      <ScrollArea style={{ flex: 1, minHeight: 0 }} bg="black" p="xs">
-        {logs.map((l) => (
-          <Text
-            key={l.seq}
-            ff="monospace"
-            size="xs"
-            c={colorOf(l.kind)}
-            style={{ whiteSpace: "pre-wrap", lineHeight: 1.4 }}
-          >
-            {l.text}
-          </Text>
-        ))}
-        <div ref={logEndRef} />
-      </ScrollArea>
+      <AppShell.Navbar p="xs" style={{ backgroundColor: SURFACE.sidebarBg }}>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <NavLink
+              key={tab.id}
+              active={isActive}
+              label={t(tab.labelKey)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setNavOpened(false);
+              }}
+              styles={{
+                root: { backgroundColor: isActive ? SURFACE.navActiveBg : "transparent" },
+                label: {
+                  // 選択=yellow(Hero) / 未選択=Light（パレット色は Mantine 変数で参照）
+                  color: isActive ? "var(--mantine-color-yellow-6)" : "var(--mantine-color-dark-0)",
+                  fontWeight: isActive ? 600 : 400,
+                },
+              }}
+            />
+          );
+        })}
+      </AppShell.Navbar>
 
-      <form onSubmit={submitCmd}>
-        <Group gap="xs">
-          <TextInput
-            style={{ flex: 1 }}
-            value={cmd}
-            onChange={(e) => setCmd(e.currentTarget.value)}
-            placeholder={t("dashboard.commandPlaceholder")}
-            ff="monospace"
-            autoComplete="off"
-          />
-          <Button type="submit" variant="default">
-            {t("dashboard.send")}
-          </Button>
-        </Group>
-      </form>
-    </Stack>
+      <AppShell.Main style={{ height: "100dvh" }}>{renderTab()}</AppShell.Main>
+    </AppShell>
   );
 }

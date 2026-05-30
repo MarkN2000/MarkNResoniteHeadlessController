@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **着手前 / 仕様確定**。v1 全機能監査（2026-05-29）を踏まえ、フェーズ計画・UI を全面再設計。
+> ステータス: **Phase 7-0 Foundation 実装済**（テーマ/AppShell/トップバー2モード/7タブ枠/SSE/配色/i18n/レスポンシブ。タブ中身は placeholder、次は 7-1 セッションタブ）。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。実装で確定した事項は §3.7。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -262,6 +262,21 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **セッション期限**: cookie 30 日（絶対失効）
 - **危険操作**（kick/ban/強制停止/close）: 確認モーダル
 - **トースト通知**: 操作完了/失敗
+
+### 3.7 Foundation (7-0) で確定した実装事項
+
+7-0（テーマ/AppShell/トップバー2モード/7タブ枠/SSE/プレースホルダ）の実装・反復で確定した決定。以降のタブ実装はこれに従う。
+
+- **ナビ = 状態ベース**（react-router 不採用）。タブ/ドリルダウンは React state、戻るボタン方式。backend の SPA フォールバック不要。
+- **配色の適用**（§3.5 の値の「配置」を確定。実装の単一情報源 = `web/src/theme.ts`）:
+  - **ボタン全般 = Mid (#2b2f35) 基準・縁取りなし**（Mantine `variant="default"`）。起動/ログイン等もこれ。Cyan は「主アクション色」ではなく**選択/リンク等の控えめなアクセント**に留める（ユーザー決定。Resonite シーンインスペクタ準拠）。
+  - **縁取りは TextInput/PasswordInput のみ**。エリア境界・Button・ActionIcon・Select の縁取りは撤去（`AppShell withBorder={false}` 等）。
+  - **サイドバー背景 = `#1a2a36`（dark cyan）**、**選択タブ = 文字 yellow(#f8f770) / 背景 `#2b2e26`（dark yellow）**、非選択タブ = 白(Light)。パレット外の暗色2色は `theme.ts` の `SURFACE` に集約。
+  - ロゴ = 白(Light)。状態ドット（稼働中トップバー）= running 緑 / 遷移中 黄。
+- **i18n** = ブラウザ言語の**自動判定**（`navigator.languages` を prefix 一致）＋**選択式スイッチャ**（ログイン Select・⋮ メニュー）。対応言語の単一情報源 = `LANGUAGES`（言語追加 = locale JSON + resources + 1行）。手動切替は localStorage に保存し自動判定より優先。
+- **フォーカス/セッション表示 = 2行**（上=セッション名〔長→自動縮小・`<br>`改行→折返し＋半分サイズ・行数 clamp で頭打ち〕／下=小さく `present/users/max · accessLevel`）。トップバーのフォーカスボタンとプルダウンで共用（`SessionTwoLine`）。§3.2 のモックアップの 🎯/1行表記はこの2行・状態ドット形に置換。
+- **モバイル**: 1行トップバーで操作要素（☰/起動/⋮）は `flex-shrink:0`、config Select が `min-width:0` で幅を吸収（起動ボタンの文字が見切れない）。
+- **開発支援**: `poc/fakehl` を MRHC の `-HeadlessConfig` で起動可能にし、その config の `startWorlds.sessionName` を世界名に使用 → 実機ヘッドレスなしで稼働中モード/セッション名の UI を確認できる（統合テストは configPath="" で従来通り＝無影響）。
 
 ---
 

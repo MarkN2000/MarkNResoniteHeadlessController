@@ -1,6 +1,9 @@
 // Command fakehl is a fake Resonite headless used for:
 //   - smoke-testing the PoC controller on machines without a real headless
 //   - integration testing the structured Console Driver (internal/headless)
+//   - serving as a MRHC stand-in headless for UI development: launched via MRHC's
+//     `-HeadlessConfig <path>`, it uses that config's startWorlds.sessionName as
+//     world names (no real Resonite needed to exercise the running-mode UI)
 //
 // It mimics the relevant behaviors observed in the empirical capture
 // (2026-05-28 Windows): multiple worlds, focus state, per-command response
@@ -18,6 +21,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -78,14 +82,64 @@ func newState(n int) *state {
 	return s
 }
 
+// newStateFromConfig は -HeadlessConfig が指す headless config を読み、enabled な
+// startWorlds の sessionName を世界名に使う。読めない/空なら fallback（"Fake World N"）。
+// MRHC 経由起動時に世界名を config に合わせるための簡易対応（UI 開発・確認用。
+// configPath="" の統合テストは fallback されるため挙動不変）。
+func newStateFromConfig(configPath string, fallbackCount int) *state {
+	names := worldNamesFromConfig(configPath)
+	if len(names) == 0 {
+		return newState(fallbackCount)
+	}
+	s := &state{focused: 0}
+	for _, n := range names {
+		s.worlds = append(s.worlds, world{Name: n, Users: 1, Present: 0, AccessLevel: "Private", MaxUsers: 4})
+	}
+	s.users = []userRow{
+		{Name: "FakeUser", ID: "", Role: "Admin", PingMs: 0, FPS: 60.0},
+	}
+	return s
+}
+
+// worldNamesFromConfig は headless config(JSON) の enabled な startWorlds.sessionName を返す。
+func worldNamesFromConfig(path string) []string {
+	if path == "" {
+		return nil
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var cfg struct {
+		StartWorlds []struct {
+			IsEnabled   bool   `json:"isEnabled"`
+			SessionName string `json:"sessionName"`
+		} `json:"startWorlds"`
+	}
+	if json.Unmarshal(b, &cfg) != nil {
+		return nil
+	}
+	var names []string
+	for _, w := range cfg.StartWorlds {
+		if w.IsEnabled && w.SessionName != "" {
+			names = append(names, w.SessionName)
+		}
+	}
+	return names
+}
+
 func main() {
 	ambient := flag.Bool("ambient", false, "emit ambient log lines (default OFF for tests; pass -ambient=true for PoC smoke)")
 	ambientInterval := flag.Duration("ambient-interval", 3*time.Second, "ambient log interval")
 	worldsCount := flag.Int("worlds", 2, "initial worlds count")
 	banner := flag.Bool("banner", true, "print startup banner / 'World running' lines")
+	// MRHC は実ヘッドレスを `-HeadlessConfig <path>` で起動する。fakehl を MRHC の
+	// スタンドイン（UI 開発・稼働中モードの確認用）として起動できるよう受理し、
+	// 指定時はその headless config の startWorlds.sessionName を世界名に使う。
+	headlessConfig := flag.String("HeadlessConfig", "", "headless config path; 指定時は startWorlds の sessionName を世界名に使う")
 	flag.Parse()
 
-	s := newState(*worldsCount)
+	s := newStateFromConfig(*headlessConfig, *worldsCount)
 
 	if *banner {
 		fmt.Println("Fake Headless starting...")

@@ -23,5 +23,27 @@
     "running": "稼働中",
     "stopping": "停止処理中"
   },
-  "langToggle": "English"
+  "tabs": {
+    "session": "セッション",
+    "friends": "フレンド",
+    "newSession": "新規セッション",
+    "config": "コンフィグ",
+    "schedule": "スケジュール",
+    "settings": "設定",
+    "command": "コマンド"
+  },
+  "topbar": {
+    "forceStop": "強制停止",
+    "checkUpdate": "更新を確認（準備中）",
+    "selectConfig": "コンフィグを選択",
+    "noConfig": "コンフィグタブで作成してください",
+    "noSession": "セッションなし"
+  },
+  "placeholder": {
+    "comingSoon": "このタブは次の段階で実装します",
+    "startFirst": "起動してください"
+  },
+  "menu": {
+    "language": "言語"
+  }
 }
