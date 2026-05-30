@@ -64,6 +64,14 @@ const logCapacity = 2000
 // 不正な出力でメモリ無限増を起こさないため。超過時は強制的に1行として切り出す。
 const maxLineBytes = 1 << 20 // 1 MiB
 
+// warmup は "World running" 検出後に送る捨てコマンド。起動直後の最初の1入力が
+// 無視/Unknown 化する実機癖を身代わりに吸収し、ユーザーの実コマンドを常に2番目の
+// 入力にするのが狙い。worlds は読み取り専用・必ず有効で、プロンプト復帰の確証にもなる。
+const (
+	warmupCommand = "worlds"
+	warmupTimeout = 5 * time.Second
+)
+
 // Driver は単一のヘッドレスプロセスを管理する。
 type Driver struct {
 	mu sync.Mutex
@@ -82,6 +90,9 @@ type Driver struct {
 	started  time.Time
 	ready    bool
 	stopping bool
+
+	// warmupStarted は "World running" 検出で warmup を一度だけ起動するためのガード（d.mu 保護）。
+	warmupStarted bool
 
 	// 構造化コマンド実行（案C'）の同期プリミティブ。詳細: docs/design/structured-driver.md
 	//   - execMu: Exec の直列キュー（コマンド1個ずつ排他）／ExecGroup は同 mu を保持
@@ -187,6 +198,7 @@ func (d *Driver) Start(headlessPath, configPath, configLabel string) error {
 	d.started = time.Now()
 	d.ready = false
 	d.stopping = false
+	d.warmupStarted = false
 	d.setStateLocked(StateStarting)
 	d.mu.Unlock()
 
@@ -274,22 +286,54 @@ func (d *Driver) decodeLine(raw []byte) string {
 	return string(decoded)
 }
 
-// maybeReady は readiness 合図（"World running" / "Engine Ready"）を検出して
-// 状態を Running に上げる。実機観測: 起動直後の最初のコマンドが Unknown command
-// になり得るため、UI側は Ready を待ってコマンドを送るとよい。
+// maybeReady は readiness 合図 "World running..." を検出したら一度だけ warmup を起動する。
+// "Engine Ready" は実機では World 起動・コンソール REPL 稼働の約3.6秒前に出るため、readiness
+// 信号には採用しない（起動直後の最初の1コマンドが無視/Unknown 化する原因だった）。
+// ready=true は warmup がプロンプト往復を確認（または縮退）した時点で初めて立てる。
 func (d *Driver) maybeReady(text string) {
-	if !strings.Contains(text, "World running") && !strings.Contains(text, "Engine Ready") {
+	if !strings.Contains(text, "World running") {
 		return
 	}
 	d.mu.Lock()
-	if !d.ready && d.state == StateStarting {
-		d.ready = true
-		d.setStateLocked(StateRunning)
+	if d.warmupStarted || d.state != StateStarting {
 		d.mu.Unlock()
-		d.publishLog("sys", "ヘッドレス準備完了（コマンド受付可）")
 		return
 	}
+	d.warmupStarted = true
 	d.mu.Unlock()
+	go d.warmup()
+}
+
+// warmup は "World running" 後に捨てコマンド(worlds)を1回送り、プロンプト復帰を待ってから
+// ready=true にする。狙いは「ユーザーの最初の実コマンドを必ず2番目の入力にする」こと
+// ＝起動直後の最初の1入力が無視/Unknown 化する実機癖を、この捨てコマンドが身代わりに吸収する。
+// 送信した時点で目的は達成されるため、プロンプト確認は ready を早く立てるための確証にすぎない。
+//   - 成功（プロンプト復帰）          → ready
+//   - timeout（REPL 未応答だが送信済み）→ 縮退して ready（前進優先。最悪でも信号精緻化のみと同等）
+//   - ErrProcessGone（起動中に死亡）   → ready にしない（waitExit が Stopped にする）
+//
+// 別 goroutine で走らせるのは必須: 応答を流す readPipe(out) を塞がないため。
+// 副次効果: ここで d.lastPrompt が埋まり、最初の実コマンドのプロンプト剥がしも正しく効く。
+func (d *Driver) warmup() {
+	d.execMu.Lock()
+	_, err := d.execLocked(context.Background(), warmupCommand, WithTimeout(warmupTimeout))
+	d.execMu.Unlock()
+	if errors.Is(err, ErrProcessGone) {
+		return
+	}
+	d.mu.Lock()
+	if d.state != StateStarting {
+		d.mu.Unlock()
+		return
+	}
+	d.ready = true
+	d.setStateLocked(StateRunning)
+	d.mu.Unlock()
+	if err == nil {
+		d.publishLog("sys", "ヘッドレス準備完了（コマンド受付可）")
+	} else {
+		d.publishLog("sys", "ヘッドレス準備完了（ウォームアップ未応答のため縮退）")
+	}
 }
 
 func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {

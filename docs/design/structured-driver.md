@@ -90,7 +90,7 @@ fn Exec(cmd):
 | 改行が来ない長行 | timeout で切上げ＋ログ |
 | プロンプトが来ない（コマンドがプロンプトに戻らない） | timeout で切上げ |
 | `focus`/`name` でプロンプト自体が変わる | 「世界名」を見ず「`>` で安定」の汎用判定なので問題なし（**実機検証済**） |
-| 起動直後の "Unknown command" | 構造化コマンドは **ready 後のみ**実行（呼び出し側でゲート） |
+| 起動直後の "Unknown command" | readiness は **"World running..." のみ**で判定（"Engine Ready" は REPL 稼働の約3.6秒前に出るため不採用）。検出後 **warmup（捨てコマンド `worlds`）でプロンプト復帰を確認してから ready=true**＝ユーザーの最初の実コマンドが常に2番目の入力になり、最初の1入力の無視/Unknown を身代わりに吸収する（driver.go `maybeReady`/`warmup`）。さらに構造化コマンドは ready 後のみ実行（呼び出し側でゲート） |
 | 確認窓中に ambient が入り pending が変わる | プロンプトは再出現するので少し遅れて再検出されるだけ |
 | 応答行末尾が一瞬 `>` で見える誤検出 | ~50ms の安定確認で回避（応答行は通常改行付きで pending にならない） |
 | **silent 成功（出力なし）コマンド**（`name`/`maxusers`/`focus`/空 `listbans`/空 `friendrequests`） | プロンプト末尾検出が即発火 → **応答=空行リスト**として返す（実機検証済） |

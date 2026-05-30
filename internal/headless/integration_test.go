@@ -116,6 +116,30 @@ func TestIntegration_Exec_Worlds(t *testing.T) {
 	}
 }
 
+// TestIntegration_WarmupRunsBeforeReady は ready になる前に warmup の捨てコマンド
+// (worlds) が「最初のコンソール入力」として送られていることを確認する。これにより
+// ユーザーの最初の実コマンドは常に2番目の入力となり、起動直後の最初の1入力が
+// 無視/Unknown 化する実機癖を身代わりに吸収できる。
+func TestIntegration_WarmupRunsBeforeReady(t *testing.T) {
+	d := newFakeDriver(t) // Ready==true まで待つ（＝warmup 確認後）
+
+	d.mu.Lock()
+	hist := append([]LogLine(nil), d.history...)
+	d.mu.Unlock()
+
+	want := "> " + warmupCommand
+	found := false
+	for _, ln := range hist {
+		if ln.Kind == "cmd" && ln.Text == want {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("warmup の %q が起動ログに見当たらない: %+v", want, hist)
+	}
+}
+
 func TestIntegration_Exec_Status(t *testing.T) {
 	d := newFakeDriver(t)
 	// 原子的グループで focus → status を実行（実際は分けても通る想定だが atomic がより安全）

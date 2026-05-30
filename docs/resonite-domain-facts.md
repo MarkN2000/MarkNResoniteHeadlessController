@@ -214,7 +214,7 @@ Go PoCで本物のヘッドレスに対して検証した事実：
 - **プロンプト**: フォーカス中セッション名＋`>`。例 `markn-linux-test World 0>`。**改行なしで次出力の行頭に連結**する。
 - **`worlds` 実出力（§3のregex一致を確認）**: `[0] markn-linux-test World 0        Users: 1\tPresent: 0\tAccessLevel: Anyone\tMaxUsers: 16`（区切りは空白＋タブ混在）。
 - **未知コマンド**: `Unknown command` を返す。
-- ⚠️ **起動直後の最初の1コマンドが `Unknown command` になる事象を観測**（同コマンドの2回目は正常）。エンジンが完全に応答可能になる前の入力が無視/誤処理される可能性 → v1では **readiness合図（"Engine Ready!"/"World running..."）を待ってからコマンド受付**、または初回にダミー改行を送る等を検討。
+- ⚠️ **起動直後の最初の1コマンドが `Unknown command` になる事象を観測**（同コマンドの2回目は正常）。エンジンが完全に応答可能になる前の入力が無視/誤処理される可能性。→ **v2 実装済(2026-05-30)**: readiness を **"World running..." のみ**で判定（`Engine Ready` は REPL 稼働の約3.6秒前に出るため不採用。Windows実測は下記 LAN セクション参照）し、検出後に **warmup（捨てコマンド `worlds`）でプロンプト復帰を確認してから ready=true** にする＝ユーザーの最初の実コマンドを常に2番目の入力にして身代わり吸収（`internal/headless/driver.go` の `maybeReady`/`warmup`）。
 - **`shutdown`**: `Exiting. Save Homes: False` → 設定保存 → 公開セッションは `BroadcastSessionEnded ... to Public` で閉じ → プロセスは**正常終了(exit 0)**。停止時に `UniLog.Log` 由来のスタックトレースが出るが**エラーではない**（RequestShutdown記録ログ）。
 - **無config起動はワールドが公開(Private→Anyone・public listing)になる** → v1は必ずconfigで適切なaccessLevelを設定。
 
@@ -229,6 +229,7 @@ fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
 4. **status.users カンマ区切り** — `MARKNPC_MAIN, MarkN_headless` 形式確定
 5. **write op 実書式採取**: role/silence/respawn/kick/message/removeFriend/sendFriendRequest/acceptFriendRequest（前節の表参照）
 6. **help コマンド完全取得** — 165 行のリファレンス（fixture: `02-logged-in/help-output.txt`）
+7. **起動 readiness タイミング（2026-05-30 再解析）** — `Engine Ready!` は `World running...` の **約3.6秒前**に出る（`01-lan-joined-anonymous/sse-raw.log`: seq127 `Engine Ready!` @18:01:39.438 → seq217 `World running...` @18:01:43.076）。`Engine Ready` 時点ではコンソール REPL/プロンプトが未稼働で、この間に送る初回コマンドが無視/Unknown 化し得る。→ v2 は readiness を **"World running..." のみ**で判定し、warmup（捨てコマンド `worlds`）でプロンプト復帰を確認してから ready=true にする（§7 冒頭の ⚠️ 項参照）
 
 **新発見コマンド**:
 - `help` ⭐ — authoritative リファレンス（usage 付き）
