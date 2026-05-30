@@ -101,8 +101,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/hidefromlisting", s.requireAuth(s.handleSessionHideFromListing))
 	// セッションライフサイクル（focus idx → <cmd>）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/restart", s.requireAuth(s.sessionCmdOp("restart", headless.WithTimeout(restartTimeout))))
-	mux.HandleFunc("POST /api/v1/sessions/{idx}/save", s.requireAuth(s.sessionCmdOp("save")))
-	mux.HandleFunc("POST /api/v1/sessions/{idx}/close", s.requireAuth(s.sessionCmdOp("close")))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/save", s.requireAuth(s.sessionCmdOp("save", headless.WithTimeout(saveTimeout))))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/close", s.requireAuth(s.sessionCmdOp("close", headless.WithTimeout(closeTimeout))))
 	// 新規セッション（focus 不要・長 timeout）。literal "start" は {idx} と段数が違うため衝突しない。
 	mux.HandleFunc("POST /api/v1/sessions/start", s.requireAuth(s.handleSessionStart))
 	// グローバル（フレンド/BAN・focus 不要）

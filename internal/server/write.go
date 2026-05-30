@@ -28,6 +28,17 @@ const startTimeout = 60 * time.Second
 // プロンプトを返すと確認済み（空ワールドで≈1s）。重いワールドの再生成に備えた余裕のある上限。
 const restartTimeout = 180 * time.Second
 
+// closeTimeout はセッション close の待ち時間。restart と同じ teardown 系の重さを伴うため
+// restartTimeout に揃える（空ワールドでは≈0.2s だが上限は余裕を持たせる）。
+const closeTimeout = restartTimeout
+
+// saveTimeout はセッション save の待ち時間。save は世界のシリアライズ＋クラウドへの
+// アセットアップロードを伴い、大規模ワールド×低速回線では数分かかり得る（Driver.Stop() が
+// 「保存に数分かかる場合がある」として 180s 猶予を取るのと同じ理由）。タイムアウトは
+// 上限（保険）であって待ち時間ではなく（プロンプト復帰で即返る）、プロセス死亡時は
+// ErrProcessGone で即中断されるため、固まった save を失敗と見なすまでの猶予として長めに取る。
+const saveTimeout = 600 * time.Second
+
 // --- 実行 helper ---
 
 // execSession は ExecGroup(focus idx → cmd) を実行し、方針A で結果を返す。
