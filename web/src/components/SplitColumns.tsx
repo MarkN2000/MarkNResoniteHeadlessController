@@ -11,7 +11,7 @@ export function SplitColumns({ left, right }: { left: ReactNode; right: ReactNod
   return (
     <Flex
       direction={{ base: "column", xl: "row" }}
-      gap={{ base: "md", xl: "lg" }}
+      gap={{ base: "xl", xl: "lg" }}
       justify="center"
       align={{ base: "center", xl: "flex-start" }}
     >
