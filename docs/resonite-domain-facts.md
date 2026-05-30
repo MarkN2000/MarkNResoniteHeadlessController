@@ -225,7 +225,7 @@ fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
 **実証された事実**:
 1. **ParseListBans 実機確定** — 実 BAN 2 件で書式確認（**TAB 区切り**で `[N]\tUsername:...\tUserID: U-...\tMachineIds: ...`）
 2. **ParseUsers 実機確定** — Guest+Admin 両 role、実 UserID `U-1NzqeqewOpM`、実 FPS 値
-3. **stripLineLeadingPrompts 実機確定** — **3 連プロンプト累積**（`MRHC LAN Capture Session>MRHC LAN Capture Session>MRHC LAN Capture Session>[0]...`）で per-line strip が機能
+3. **プロンプト累積（3連）実機確定** — `MRHC LAN Capture Session>MRHC LAN Capture Session>MRHC LAN Capture Session>[0]...` を観測。Driver の `stripExactPrompt`（検出プロンプトのリテラル剥がし）で除去
 4. **status.users カンマ区切り** — `MARKNPC_MAIN, MarkN_headless` 形式確定
 5. **write op 実書式採取**: role/silence/respawn/kick/message/removeFriend/sendFriendRequest/acceptFriendRequest（前節の表参照）
 6. **help コマンド完全取得** — 165 行のリファレンス（fixture: `02-logged-in/help-output.txt`）
@@ -251,7 +251,7 @@ fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
 - v1 (Node) の単純実装 `split + trim + filter('>')` が正解だったことを実機で確証
 
 **実装 (我々の Go)**:
-- `ParseFriendRequests` で v1 戦略 + prompt-glue 対応 (`safeStripLeadingPrompts`)
+- `ParseFriendRequests` は v1 戦略（split+trim、プロンプトのみ行は保険でスキップ）。prompt-glue は Driver の `stripExactPrompt` が事前除去
 - 我々のテスト環境 (MarkN_headless) では pending が 0 件で empty レスポンスのみ取れたが、
   user の別アカウント (MARKNPC_SUB2) で実 format を採取
 - 限界: boot ambient が多発する状況では ambient 行も含まれる可能性あり (v1 と同じ受容)

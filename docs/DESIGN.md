@@ -118,7 +118,7 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 
 ### 5.3 Output Parser
 - `worlds` / `status` / `users` / `listbans` / `friendRequests` を構造体へ。**正規表現と出力書式は [`resonite-domain-facts.md`](./resonite-domain-facts.md) を正とする**（出力書式は実機採取で確定）。
-- `friendRequests` は **v1 互換の単純実装**（split + trim + filter('>')）+ 我々の prompt-glue 対応 (safeStripLeadingPrompts)。実機 pending entry の書式は未採取だが、v1 production で動いていた手法を踏襲。boot 直後等の ambient 多発時はノイズ混入の可能性あり（v1 と同じ受容、godoc に明記）。
+- `friendRequests` は **v1 互換の単純実装**（split + trim、プロンプトのみ行は保険でスキップ）。prompt-glue は Driver の `stripExactPrompt` が事前除去。実機 pending entry の書式は未採取だが、v1 production で動いていた手法を踏襲。boot 直後等の ambient 多発時はノイズ混入の可能性あり（v1 と同じ受容、godoc に明記）。
 - 既知の脆さ（空白入りユーザー名等）は採取したフィクスチャで検証しながら堅牢化。実機検証済：[`scripts/empirical-capture/fixtures/2026-05-28-lan-login/`](../scripts/empirical-capture/fixtures/2026-05-28-lan-login/)。
 
 ### 5.4 Restart Orchestrator

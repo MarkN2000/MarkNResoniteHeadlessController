@@ -94,15 +94,16 @@ fn Exec(cmd):
 | 確認窓中に ambient が入り pending が変わる | プロンプトは再出現するので少し遅れて再検出されるだけ |
 | 応答行末尾が一瞬 `>` で見える誤検出 | ~50ms の安定確認で回避（応答行は通常改行付きで pending にならない） |
 | **silent 成功（出力なし）コマンド**（`name`/`maxusers`/`focus`/空 `listbans`/空 `friendrequests`） | プロンプト末尾検出が即発火 → **応答=空行リスト**として返す（実機検証済） |
-| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | (a) Exec 内連射: 直列キューが防止。(b) **ExecGroup 内の連続 Exec**: silent 系後の prompt が lineBuf に残るため発生 → **`stripLineLeadingPrompts` (per-line) が `^([^>]*>)+` で全プロンプト剥がし**で対応（§5） |
+| **プロンプト累積**（`Renamed>Renamed>Renamed>...`） | (a) Exec 内連射: 直列キューが防止。(b) **ExecGroup 内の連続 Exec**: silent 系後の prompt が lineBuf に残るため発生 → **Driver の `stripExactPrompt` が検出プロンプト（`lastPrompt`＋`cur`）をリテラル剥がし**で対応（§5） |
 | **Exec 実行中にヘッドレスプロセスが死亡** | `readPipe` 終了 → コレクタへの新規追加停止 → `readChunk` が空継続 → cmdMaxTimeout で切上げ → `ErrProcessGone` を返す（既存 Wait goroutine が ready フラグを落とすので、以降の Exec は `ErrNotReady`） |
 
-## 5. プロンプト接頭辞除去（案X 拡張版）
+## 5. プロンプト接頭辞除去（exact-literal 方式）
 
-実機観測: 応答の最初の行は `<world>>[0] ...` のように **プロンプトが連結**される（プロンプトに改行が無い）。
+実機観測: 応答行の先頭には `<world>>[0] ...` のように **直前のプロンプトが連結**される（プロンプトに改行が無い）。
 
-**ルール**: 応答の最初の行に限り、**行頭の連続プロンプトを全て除去**する。
-正規表現: `^([^>]*>)+`
+**ルール**: Driver（`execLocked`）が、検出した**実プロンプトをリテラル一致で**各行の行頭から剥がす（`stripExactPrompt`）。剥がす対象は次の2つ:
+- `lastPrompt`: **直前コマンド完了時のプロンプト**。`focus` でプロンプトが変わるため、応答先頭のグルーは「直前のプロンプト」になる（focus 変更時は `<旧><新>` の連結になり得る）。
+- `cur`: 今回コマンド完了時に検出したプロンプト。
 
 ```
 単一: "Fake World 0>[0] World A …"              → "[0] World A …"
@@ -110,7 +111,7 @@ fn Exec(cmd):
 4連:  "R>R>R>R>Unknown command"                 → "Unknown command"
 ```
 
-世界名の追跡は不要（generic に剥がすだけ）。これによりパーサは `^\[` 等の **`^` アンカー正規表現**を素直に書ける。
+リテラル一致なので、値に含まれる `>`（リッチテキスト `<br>`/`<color>` 等）やセッション名の `:` を**過剰に剥がさない**（旧 greedy `^([^>]*>)+` の問題を解消）。世界名の追跡も不要で、パーサは clean な行へ `^\[` 等の **`^` アンカー正規表現**を素直に書ける。
 
 ### なぜ連続プロンプトが起きるか（実装上の事実）
 
@@ -127,13 +128,13 @@ fn Exec(cmd):
 ```
 
 ExecGroup 内では前コマンドの prompt が次コマンドの応答に必ず連結するため、
-パーサ側で「行頭の連続プロンプト」を **すべて剥がす**のが正解。
+Driver が「行頭の連続プロンプト（`lastPrompt`＋`cur`）」を **リテラルですべて剥がす**のが正解（パーサには持たせない）。
 
 ### 既知の限界
-構造化コマンドの応答1行目に `>` が含まれる場合、過剰に剥がす可能性がある。
-現在対応するコマンド（worlds/status/users/listbans/friendrequests/accesslevel/Unknown）の
-1行目はいずれも `>` を含まないため実害なし。世界名等に `>` を含めるエッジケースは
-ドキュメント明記の限界として受容する。
+exact-literal 方式は「検出プロンプト**と完全一致する接頭辞**」のみ剥がすため、旧 greedy 方式の
+「値の `>` を過剰除去する」問題は解消済（リッチテキスト/セッション名の `:` も保全。実機検証済）。
+理論上は応答値がたまたま検出プロンプト文字列そのもので始まる場合のみ過剰剥がしになるが、
+実コマンドの応答書式では発生しない。
 
 ## 6. 原子的グループ
 
@@ -172,7 +173,7 @@ type WorldsService interface {
 | `friendrequests` | `[]string` (ユーザー名一覧、v1 互換実装。boot ambient 多発時はノイズ可) |
 
 - 正規表現は `docs/resonite-domain-facts.md` を出典。
-- 各 parser は **`stripLineLeadingPrompts` を per-line で適用してから regex 照合**（Phase 6 e2e で発見）。
+- プロンプト剥がしは **Driver（`stripExactPrompt`）が応答行を返す前に済ませる**ため、各 parser は clean な行へ regex 照合するだけ（per-line 剥がしを parser に持たせない）。
 - ambient/無関係行は正規表現に当たらず自然に無視。
 
 ### Phase 6 e2e で発覚した重要事実
@@ -185,9 +186,9 @@ Resonite 起動直後は boot output (BOOTSTRAP, SignalR, 各 world の Opening 
 
 旧設計の「lines[0] のみ stripPromptPrefix」では、ambient 末尾の応答行を
 strip できず、`^\[(\d+)\]` regex が当たらず World A が parser から消えていた。
-修正: parser は per-line で `stripLineLeadingPrompts` を適用 → ambient と
-混在しても応答行を正しく抽出できる。ambient 行に `>` があれば過剰剥がしに
-なるが、その行は parser regex に当たらず無害。
+当初は parser per-line 剥がし（greedy）で対処したが、値の `>` を過剰除去する問題があり、
+最終的に **Driver 側の exact-literal 剥がし（`stripExactPrompt`、§5）に集約**した。これで ambient
+混在でも応答行を正しく抽出でき、リッチテキスト/セッション名の記号も保全される。
 - **2026-05-28 実機採取での修正点**：
   - `status` パーサは **`ResoniteLink` Key を追加**（旧コードに無い）
   - `users` パーサは **`id` 空文字を許容**（旧 `\S+` → `[^\s]*` 等）

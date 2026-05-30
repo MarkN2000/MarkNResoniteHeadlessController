@@ -61,6 +61,6 @@
 旧 `stripPromptPrefix`（応答先頭行のみ剥がす）は、Driver の collector が boot ambient を
 大量に含むケースで、応答行が collector 末尾に位置し prompt prefix が付いていると
 World 0 が消える問題があった。
-→ parser を **per-line `stripLineLeadingPrompts`** に変更して解消（`parser.go`）。
-回帰テスト: `parser_test.go::TestParseWorldsHandlesAmbientPlusPromptPrefix`、
-`TestParseStatusHandlesAmbientPlusPromptPrefix`。
+→ 最終的に **Driver 側の exact-literal 剥がし（`stripExactPrompt`、`executor.go`/`driver.go`）に集約**して解消。
+回帰テスト: `parser_test.go::TestParseWorldsHandlesAmbient`、`TestParseStatusHandlesAmbient`、
+`executor_test.go::TestStripExactPrompt`。

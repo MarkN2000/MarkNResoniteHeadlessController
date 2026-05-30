@@ -280,7 +280,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - 構造化 Console Driver（executor.go 分離、案C'+案X）
 - ExecGroup（原子的グループ、focus 競合防止）
 - WorldsService.ForEach（巡回機構、事前アクション等で使用予定）/ List()（userZero 検知）
-- per-line `stripLineLeadingPrompts` / friendrequests 特化 `safeStripLeadingPrompts`
+- Driver 側 `stripExactPrompt`（検出プロンプトをリテラル剥がし。`lastPrompt`＋`cur`、全行適用）
 - ParseFriendRequests（v1 互換、実機 format で確証済）
 - Encoding 抽象（Win=Shift_JIS / Linux=UTF-8 実機確証済）
 - sentinel エラー（ErrNotReady/Timeout/ProcessGone/Canceled）
