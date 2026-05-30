@@ -45,10 +45,13 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
     setHide(status.hiddenFromListing);
   }, [status]);
 
+  // maxUsers は正の整数のみ有効（空欄は Number("")=0 になるため送らない）。
+  const muNum = Number(maxUsers);
+  const muValid = Number.isInteger(muNum) && muNum >= 1;
   const dirty =
     name !== status.name ||
     level !== status.accessLevel ||
-    Number(maxUsers) !== status.maxUsers ||
+    (muValid && muNum !== status.maxUsers) ||
     description !== status.description ||
     hide !== status.hiddenFromListing;
 
@@ -56,7 +59,7 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
     void apply.run(async () => {
       if (name !== status.name) await api.setSessionName(idx, name);
       if (level !== status.accessLevel) await api.setAccessLevel(idx, level);
-      if (Number(maxUsers) !== status.maxUsers) await api.setMaxUsers(idx, Number(maxUsers));
+      if (muValid && muNum !== status.maxUsers) await api.setMaxUsers(idx, muNum);
       if (description !== status.description) await api.setDescription(idx, description);
       if (hide !== status.hiddenFromListing) await api.setHideFromListing(idx, hide);
     });
@@ -84,7 +87,7 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
           <InspectorSelect data={[...api.ACCESS_LEVELS]} value={level} onChange={(v) => v && setLevel(v)} />
         </FieldRow>
         <FieldRow label={t("session.maxUsers")}>
-          <InspectorNumberInput value={maxUsers} onChange={setMaxUsers} min={1} />
+          <InspectorNumberInput value={maxUsers} onChange={setMaxUsers} min={1} allowNegative={false} />
         </FieldRow>
         <FieldRow label={t("session.description")} align="start">
           <InspectorTextarea value={description} onChange={(e) => setDescription(e.currentTarget.value)} />

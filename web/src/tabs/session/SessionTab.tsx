@@ -20,10 +20,11 @@ export function SessionTab({ idx }: { idx: number }) {
 
   const refetch = useCallback(async () => {
     setLoading(true);
-    const [st, us] = await Promise.all([api.getSessionStatus(idx), api.getSessionUsers(idx)]);
-    setStatus(st);
-    setUsers(us);
-    setError(st === null);
+    // B1: status + users を1回の取得（focus 1回）で。一貫スナップショット。
+    const d = await api.getSessionDetail(idx);
+    setStatus(d?.status ?? null);
+    setUsers(d?.users ?? []);
+    setError(d === null);
     setLoading(false);
   }, [idx]);
 

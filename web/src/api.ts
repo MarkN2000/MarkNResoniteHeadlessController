@@ -155,6 +155,16 @@ export async function getSessionUsers(idx: number): Promise<UserInfo[]> {
   return (await getData<UserInfo[]>(`/sessions/${idx}/users`)) ?? [];
 }
 
+// status + users を1回の取得（ExecGroup(focus→status→users)）で返す（B1）。
+// 個別の getSessionStatus/getSessionUsers は部分再取得用に残置。
+export interface SessionDetail {
+  status: WorldStatus;
+  users: UserInfo[];
+}
+export async function getSessionDetail(idx: number): Promise<SessionDetail | null> {
+  return getData<SessionDetail>(`/sessions/${idx}/detail`);
+}
+
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
 
 export interface WriteResult {

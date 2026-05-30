@@ -193,6 +193,27 @@ func TestServer_SessionUsers(t *testing.T) {
 	}
 }
 
+// sessionDetail は /detail のレスポンス data 部（status + users）。
+type sessionDetail struct {
+	Status headless.WorldStatus `json:"status"`
+	Users  []headless.UserInfo  `json:"users"`
+}
+
+func TestServer_SessionDetail(t *testing.T) {
+	ts, pw := newTestServer(t)
+	var body okEnv[sessionDetail]
+	code := authGet(t, ts.URL+"/api/v1/sessions/1/detail", pw, &body)
+	if code != http.StatusOK {
+		t.Fatalf("status=%d body=%+v", code, body)
+	}
+	if !body.OK || body.Data.Status.Name != "Fake World 1" {
+		t.Fatalf("status part: %+v", body.Data.Status)
+	}
+	if len(body.Data.Users) != 1 || body.Data.Users[0].Name != "FakeUser" {
+		t.Fatalf("users part: %+v", body.Data.Users)
+	}
+}
+
 func TestServer_ListBans_Empty(t *testing.T) {
 	ts, pw := newTestServer(t)
 	var body okEnv[[]headless.BanEntry]

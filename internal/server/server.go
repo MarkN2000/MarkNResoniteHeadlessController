@@ -70,6 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/sessions", s.requireAuth(s.handleSessions))
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/status", s.requireAuth(s.handleSessionStatus))
 	mux.HandleFunc("GET /api/v1/sessions/{idx}/users", s.requireAuth(s.handleSessionUsers))
+	mux.HandleFunc("GET /api/v1/sessions/{idx}/detail", s.requireAuth(s.handleSessionDetail))
 	mux.HandleFunc("GET /api/v1/listbans", s.requireAuth(s.handleListBans))
 	mux.HandleFunc("GET /api/v1/friendrequests", s.requireAuth(s.handleFriendRequests))
 
@@ -313,6 +314,45 @@ func (s *Server) handleSessionUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, got)
+}
+
+// sessionDetailResp は status と users を1回の取得で返すための封筒（B1）。
+type sessionDetailResp struct {
+	Status headless.WorldStatus `json:"status"`
+	Users  []headless.UserInfo  `json:"users"`
+}
+
+// handleSessionDetail: GET /api/v1/sessions/{idx}/detail → {status, users}
+// 1回の ExecGroup(focus → status → users) で取得し、focus 往復を1回に集約する。
+// status と users が同一フォーカス時点のスナップショットになる（仕様 §3.4）。
+func (s *Server) handleSessionDetail(w http.ResponseWriter, r *http.Request) {
+	idx, err := parseSessionIdx(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	var resp sessionDetailResp
+	err = s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
+		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+			return e
+		}
+		statusLines, e := tx.Exec("status")
+		if e != nil {
+			return e
+		}
+		resp.Status = headless.ParseStatus(statusLines)
+		userLines, e := tx.Exec("users")
+		if e != nil {
+			return e
+		}
+		resp.Users = headless.ParseUsers(userLines)
+		return nil
+	})
+	if err != nil {
+		writeExecErr(w, err)
+		return
+	}
+	writeOK(w, resp)
 }
 
 // handleListBans: GET /api/v1/listbans → []BanEntry （focus 不要・グローバル）
