@@ -9,6 +9,7 @@ import { Login } from "./components/Login";
 import { TopBar } from "./components/TopBar";
 import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
+import { SessionTab } from "./tabs/session/SessionTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -87,6 +88,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     const def = TABS.find((tb) => tb.id === activeTab)!;
     const stopped = (status?.state ?? "stopped") === "stopped";
     if (!def.availableWhenStopped && stopped) return <StartPrompt />;
+    if (activeTab === "session") return running ? <SessionTab idx={focusedIdx} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }

@@ -45,5 +45,46 @@
   },
   "menu": {
     "language": "言語"
+  },
+  "common": {
+    "cancel": "キャンセル",
+    "confirm": "実行"
+  },
+  "session": {
+    "settings": "セッション設定",
+    "refresh": "更新",
+    "name": "名前",
+    "accessLevel": "アクセスレベル",
+    "maxUsers": "最大人数",
+    "description": "説明",
+    "hideFromListing": "一覧から隠す",
+    "apply": "適用",
+    "save": "保存",
+    "restart": "再起動",
+    "close": "閉じる",
+    "users": "ユーザー",
+    "present": "在席",
+    "away": "離席",
+    "silenced": "ミュート中",
+    "role": "権限",
+    "respawn": "リスポーン",
+    "kick": "キック",
+    "ban": "BAN",
+    "silence": "ミュート",
+    "unsilence": "ミュート解除",
+    "message": "メッセージ",
+    "send": "送信",
+    "messageTo": "{{user}} へメッセージ",
+    "messagePlaceholder": "メッセージを入力",
+    "noUsers": "ユーザーがいません",
+    "loadError": "セッション情報の取得に失敗しました",
+    "confirmKick": "{{user}} をキックしますか？",
+    "confirmBan": "{{user}} をBANしますか？",
+    "confirmRespawn": "{{user}} をリスポーンしますか？",
+    "confirmSilence": "{{user}} をミュートしますか？",
+    "confirmUnsilence": "{{user}} のミュートを解除しますか？",
+    "confirmRestart": "このセッションを再起動しますか？",
+    "confirmClose": "このセッションを閉じますか？",
+    "confirmSave": "このセッションを保存しますか？"
   }
 }

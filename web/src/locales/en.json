@@ -45,5 +45,46 @@
   },
   "menu": {
     "language": "Language"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "session": {
+    "settings": "Session settings",
+    "refresh": "Refresh",
+    "name": "Name",
+    "accessLevel": "Access level",
+    "maxUsers": "Max users",
+    "description": "Description",
+    "hideFromListing": "Hide from listing",
+    "apply": "Apply",
+    "save": "Save",
+    "restart": "Restart",
+    "close": "Close",
+    "users": "Users",
+    "present": "Present",
+    "away": "Away",
+    "silenced": "Silenced",
+    "role": "Role",
+    "respawn": "Respawn",
+    "kick": "Kick",
+    "ban": "Ban",
+    "silence": "Silence",
+    "unsilence": "Unsilence",
+    "message": "Message",
+    "send": "Send",
+    "messageTo": "Message to {{user}}",
+    "messagePlaceholder": "Type a message",
+    "noUsers": "No users",
+    "loadError": "Failed to load session info",
+    "confirmKick": "Kick {{user}}?",
+    "confirmBan": "Ban {{user}}?",
+    "confirmRespawn": "Respawn {{user}}?",
+    "confirmSilence": "Silence {{user}}?",
+    "confirmUnsilence": "Unsilence {{user}}?",
+    "confirmRestart": "Restart this session?",
+    "confirmClose": "Close this session?",
+    "confirmSave": "Save this session?"
   }
 }

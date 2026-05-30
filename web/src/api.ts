@@ -36,6 +36,45 @@ export interface ConfigSummary {
   worldCount: number;
 }
 
+// フォーカス中セッションの詳細（internal/headless.WorldStatus）。
+export interface WorldStatus {
+  name: string;
+  sessionId: string;
+  currentUsers: number;
+  presentUsers: number;
+  maxUsers: number;
+  uptime: string;
+  accessLevel: string;
+  hiddenFromListing: boolean;
+  mobileFriendly: boolean;
+  description: string;
+  tags: string[];
+  users: string[];
+  resoniteLink: string;
+}
+
+// セッション内ユーザー1人（internal/headless.UserInfo）。
+export interface UserInfo {
+  name: string;
+  id: string;
+  role: string;
+  present: boolean;
+  pingMs: number;
+  fps: number;
+  silenced: boolean;
+}
+
+// UI ドロップダウン用の enum 候補（値の権威は Resonite・サーバーは値検証しない）。docs §2.4。
+export const ACCESS_LEVELS = [
+  "Private",
+  "LAN",
+  "Contacts",
+  "ContactsPlus",
+  "RegisteredUsers",
+  "Anyone",
+] as const;
+export const ROLES = ["Admin", "Builder", "Moderator", "Guest", "Spectator"] as const;
+
 const API = "/api/v1";
 
 async function req(path: string, init?: RequestInit): Promise<Response> {
@@ -105,3 +144,62 @@ export async function getLastUsedConfig(): Promise<string> {
   const d = await getData<{ lastUsed: string }>("/headless-configs/last-used");
   return d?.lastUsed ?? "";
 }
+
+// --- セッション（フォーカス中 idx）の取得 ---
+
+export async function getSessionStatus(idx: number): Promise<WorldStatus | null> {
+  return getData<WorldStatus>(`/sessions/${idx}/status`);
+}
+
+export async function getSessionUsers(idx: number): Promise<UserInfo[]> {
+  return (await getData<UserInfo[]>(`/sessions/${idx}/users`)) ?? [];
+}
+
+// --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
+
+export interface WriteResult {
+  ok: boolean;
+  error?: string;
+}
+
+async function post(path: string, body?: unknown): Promise<WriteResult> {
+  try {
+    const res = await req(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+    if (res.ok) return { ok: true };
+    let error: string | undefined;
+    try {
+      const j = await res.json();
+      error = j?.error?.message;
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, error };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
+// セッション設定
+export const setSessionName = (idx: number, name: string) => post(`/sessions/${idx}/name`, { name });
+export const setAccessLevel = (idx: number, level: string) => post(`/sessions/${idx}/accesslevel`, { level });
+export const setMaxUsers = (idx: number, maxUsers: number) => post(`/sessions/${idx}/maxusers`, { maxUsers });
+export const setDescription = (idx: number, description: string) =>
+  post(`/sessions/${idx}/description`, { description });
+export const setHideFromListing = (idx: number, hide: boolean) =>
+  post(`/sessions/${idx}/hidefromlisting`, { hide });
+
+// セッションライフサイクル
+export const saveSession = (idx: number) => post(`/sessions/${idx}/save`);
+export const restartSession = (idx: number) => post(`/sessions/${idx}/restart`);
+export const closeSession = (idx: number) => post(`/sessions/${idx}/close`);
+
+// セッション内ユーザー操作
+export const kickUser = (idx: number, user: string) => post(`/sessions/${idx}/kick`, { user });
+export const banUser = (idx: number, user: string) => post(`/sessions/${idx}/ban`, { user });
+export const silenceUser = (idx: number, user: string) => post(`/sessions/${idx}/silence`, { user });
+export const unsilenceUser = (idx: number, user: string) => post(`/sessions/${idx}/unsilence`, { user });
+export const respawnUser = (idx: number, user: string) => post(`/sessions/${idx}/respawn`, { user });
+export const setUserRole = (idx: number, user: string, role: string) =>
+  post(`/sessions/${idx}/role`, { user, role });
+export const messageUser = (idx: number, user: string, message: string) =>
+  post(`/sessions/${idx}/message`, { user, message });

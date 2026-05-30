@@ -91,14 +91,34 @@ func newStateFromConfig(configPath string, fallbackCount int) *state {
 	if len(names) == 0 {
 		return newState(fallbackCount)
 	}
+	// MRHC スタンドイン起動（-HeadlessConfig 指定）時は、セッションタブの
+	// ユーザーカードグリッドを意味のある見た目で確認できるよう複数のデモユーザーを置く。
+	// 役割・在席/離席・silenced をばらつかせる。統合テスト（configPath=""）は
+	// fallback の単一ユーザーのままで無影響。
+	users := demoUsers()
+	present := 0
+	for _, u := range users {
+		if u.Present {
+			present++
+		}
+	}
 	s := &state{focused: 0}
 	for _, n := range names {
-		s.worlds = append(s.worlds, world{Name: n, Users: 1, Present: 0, AccessLevel: "Private", MaxUsers: 4})
+		s.worlds = append(s.worlds, world{Name: n, Users: len(users), Present: present, AccessLevel: "Private", MaxUsers: 8})
 	}
-	s.users = []userRow{
-		{Name: "FakeUser", ID: "", Role: "Admin", PingMs: 0, FPS: 60.0},
-	}
+	s.users = users
 	return s
+}
+
+// demoUsers は UI 開発・確認用のサンプルユーザー一覧（スタンドイン時のみ使用）。
+func demoUsers() []userRow {
+	return []userRow{
+		{Name: "Alice", ID: "U-alice", Role: "Admin", Present: true, PingMs: 12, FPS: 72.0},
+		{Name: "Bob", ID: "U-bob", Role: "Guest", Present: false, PingMs: 88, FPS: 30.0, Silenced: true},
+		{Name: "Carol", ID: "U-carol", Role: "Builder", Present: true, PingMs: 25, FPS: 60.0},
+		{Name: "Dave", ID: "U-dave", Role: "Moderator", Present: true, PingMs: 40, FPS: 58.5},
+		{Name: "Eve", ID: "U-eve", Role: "Spectator", Present: false, PingMs: 150, FPS: 24.0},
+	}
 }
 
 // worldNamesFromConfig は headless config(JSON) の enabled な startWorlds.sessionName を返す。
@@ -268,7 +288,10 @@ func handleCommand(s *state, line string) {
 		setSilenced(s.users, strings.Trim(rest, `" `), true)
 	case "unsilence":
 		setSilenced(s.users, strings.Trim(rest, `" `), false)
-	case "respawn", "invite", "message", "role", "description",
+	case "role":
+		// role "<user>" <Role> → 在席ユーザーの Role を更新（UI の即適用を確認用に再現）。
+		setUserRole(s.users, rest)
+	case "respawn", "invite", "message", "description",
 		"save", "restart", "close",
 		"acceptfriendrequest", "sendfriendrequest", "removefriend", "unban", "unbanbyid":
 		// 受理してプロンプトのみ（状態変更は再現しない）
@@ -317,6 +340,34 @@ func setSilenced(users []userRow, name string, v bool) {
 	for i := range users {
 		if users[i].Name == name {
 			users[i].Silenced = v
+		}
+	}
+}
+
+// setUserRole は `role "<user>" <Role>` の rest を解析して該当ユーザーの Role を更新する。
+// 実機の引数形式（user は引用符・role はトークン）に合わせた最小パース（UI 即適用の確認用）。
+func setUserRole(users []userRow, rest string) {
+	rest = strings.TrimSpace(rest)
+	var name, role string
+	if strings.HasPrefix(rest, `"`) {
+		if end := strings.Index(rest[1:], `"`); end >= 0 {
+			name = rest[1 : 1+end]
+			role = strings.TrimSpace(rest[1+end+1:])
+		}
+	} else {
+		parts := strings.SplitN(rest, " ", 2)
+		name = parts[0]
+		if len(parts) > 1 {
+			role = strings.TrimSpace(parts[1])
+		}
+	}
+	role = strings.Trim(role, `" `)
+	if name == "" || role == "" {
+		return
+	}
+	for i := range users {
+		if users[i].Name == name {
+			users[i].Role = role
 		}
 	}
 }

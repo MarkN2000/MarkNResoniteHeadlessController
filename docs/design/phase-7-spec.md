@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **Phase 7-0 Foundation 実装済**（テーマ/AppShell/トップバー2モード/7タブ枠/SSE/配色/i18n/レスポンシブ。タブ中身は placeholder、次は 7-1 セッションタブ）。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。実装で確定した事項は §3.7。
+> ステータス: **Phase 7-1 セッションタブ 実装済**（インスペクタ風デザインシステム + セッション設定/ユーザーモデレーション）。Foundation(7-0)の確定事項は §3.7、7-1 の確定事項は §3.8。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は B1（status+users を detail 1本に集約）→ 7-2 フレンド。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -277,6 +277,23 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **フォーカス/セッション表示 = 2行**（上=セッション名〔長→自動縮小・`<br>`改行→折返し＋半分サイズ・行数 clamp で頭打ち〕／下=小さく `present/users/max · accessLevel`）。トップバーのフォーカスボタンとプルダウンで共用（`SessionTwoLine`）。§3.2 のモックアップの 🎯/1行表記はこの2行・状態ドット形に置換。
 - **モバイル**: 1行トップバーで操作要素（☰/起動/⋮）は `flex-shrink:0`、config Select が `min-width:0` で幅を吸収（起動ボタンの文字が見切れない）。
 - **開発支援**: `poc/fakehl` を MRHC の `-HeadlessConfig` で起動可能にし、その config の `startWorlds.sessionName` を世界名に使用 → 実機ヘッドレスなしで稼働中モード/セッション名の UI を確認できる（統合テストは configPath="" で従来通り＝無影響）。
+
+### 3.8 セッションタブ (7-1) で確定した実装事項
+
+7-1 でデザインを反復し確定した「インスペクタ風デザインシステム」。以降のタブ（コンフィグ/設定/フレンド等）はこの部品を流用する。実装の単一情報源 = `web/src/components/inspector/`（バレル `index.ts`）。
+
+- **インスペクタ風部品**（Resonite シーンインスペクタ準拠・参考画像ベース）:
+  - `InspectorCard` = カードヘッダ（中央=hero/yellow タイトル）＋**右隣に独立した別ボックスのアクション**（タイトルバーに重ねない）。本体は背景塗りなし（＝全体背景と同色）。
+  - `FieldRow` = 1行「項目名（左・色マーカー）｜値/入力欄（右）」。
+  - `InspectorTextInput`/`InspectorNumberInput`/`InspectorTextarea`/`InspectorSelect` = 入力ラッパ。スタイル/サイズ/▼アイコンを内蔵。
+  - `InspectorButton`（`severity="neutral|warning|danger"` で **gray/yellow/red** に色分け・色の単一情報源）、`RefreshButton`（ヘッダの ⟳）。
+- **配色/装飾ルール**: ヘッダ帯のみグレー、入力欄＝グレー fill、**縁取りは「キーボードで文字入力できる欄」のみ**（TextInput/NumberInput/Textarea）。Select は縁取りなし＋**▼ 1つ**（既定 chevron 置換）。読み取り専用はプレーン Text で区別。ボタン主アクション（適用）のみ cyan filled。
+- **ユーザー一覧 = 案B 2行コンパクト**: 情報行（状態ドット〔在席=緑/離席=灰〕＋名前／権限プルダウン＋在席離席）／操作行（リスポーン・ミュート・メッセージ＝中立、キック・BAN＝危険・右に分離）。操作行は `wrap` でモバイル折返し（~294px でも崩れない実測）。権限は**選択即適用**。
+- **確認ダイアログ**（`components/ConfirmModal`・ラベルは `common.*`）対象 = kick/ban/respawn/silence/unsilence ＋ save/restart/close。危険(kick/ban/close)は確定ボタン赤。メッセージは入力モーダル、適用はバッチ。
+- **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。自動 poll・Page Visibility・トーストは 7-7。**現状 status と users を別エンドポイントで取得（focus 2回）= 次に B1 で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）へ集約予定**。
+- **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
+- **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
+- **残課題**: B1（上記の取得集約）／`maxUsers` 空入力ガード（`Number("")=0` で送られ得る）→ B1 と一緒に対応予定。
 
 ---
 
