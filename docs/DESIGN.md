@@ -178,7 +178,6 @@ type PreRestartAction interface {
   - `port`、`resoniteHeadlessPath`、`headlessConfigDir`
   - `headlessCredentials`（Resoniteアカウント）
   - `restart`（トリガー/事前アクション/クラッシュ復帰設定）、`steam`（任意）
-  - `allowedCidrs`（任意の安全弁。既定はプライベートIP帯）
 - **配置場所**: アプリ設定・状態ファイルは**書き込み可能なデータディレクトリ**に置く（バイナリ隣 or 設定可能な data dir。Linuxの権限を考慮）。
 - **ヘッドレスconfig**: 公式 `HeadlessConfig.schema.json` 準拠のファイル群（`headlessConfigDir`）。`loginCredential`/`loginPassword` を含む（§3の通りファイル権限で保護）。アプリは**カスタムフォームエディタ**で生成・編集。
 
