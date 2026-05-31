@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済**。フレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-3 新規セッション or 7-7 仕上げ（トースト/自動poll）。
+> ステータス: **7-7 第1層（write 失敗/成功トースト）実装済**。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-3 新規セッション or 7-7 残（自動poll/Page Visibility）。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -291,11 +291,11 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **配色/装飾ルール**: ヘッダ帯のみグレー、入力欄＝グレー fill、**縁取りは「キーボードで文字入力できる欄」のみ**（TextInput/NumberInput/Textarea）。Select は縁取りなし＋**▼ 1つ**（既定 chevron 置換）。読み取り専用はプレーン Text で区別。ボタン主アクション（適用）のみ cyan filled。
 - **ユーザー一覧 = 案B 2行コンパクト**: 情報行（状態ドット〔在席=緑/離席=灰〕＋名前／権限プルダウン＋在席離席）／操作行（リスポーン・ミュート・メッセージ＝中立、キック・BAN＝危険・右に分離）。操作行は `wrap` でモバイル折返し（~294px でも崩れない実測）。権限は**選択即適用**。
 - **確認ダイアログ**（`components/ConfirmModal`・ラベルは `common.*`）対象 = kick/ban/respawn/silence/unsilence ＋ save/restart/close。危険(kick/ban/close)は確定ボタン赤。メッセージは入力モーダル、適用はバッチ。
-- **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。自動 poll・Page Visibility・トーストは 7-7。**現状 status と users を別エンドポイントで取得（focus 2回）= 次に B1 で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）へ集約予定**。
+- **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。**トーストは 7-7 第1層で実装済（§3.11）**。自動 poll・Page Visibility は 7-7 残。**現状 status と users を別エンドポイントで取得（focus 2回）= 次に B1 で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）へ集約予定**。
 - **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
 - **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
-- **残課題（7-7で対応）**: **write失敗が現状無音**（`api.post` の `WriteResult{ok,error}` を呼び出し側が見ていない）。7-7のトースト導入時に `useAsyncAction`/各操作で `WriteResult` を拾い、失敗を通知する（M2/L4）。`getData` が 409(not ready) を区別しない点(L5)も同時に整理。
+- **残課題**: ~~write失敗が現状無音（M2/L4）~~ → **✅ 完了（7-7 第1層・§3.11・commit 61af3e2）**。`useAsyncAction`/`useConfirm` で `WriteResult` を拾い失敗を赤トーストで通知。`getData` が 409(not ready) を区別しない点(L5)のみ現状維持（将来整理）。
 
 ### 3.9 フレンドタブ (7-2) で確定した実装事項
 
@@ -308,7 +308,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **検索の器**: ユーザー名/ID 検索・`[フォーカスセッション内]` は **disabled の「準備中(P9)」枠**として今から配置（将来 ②に検索/在席結果を出すだけ。申請/招待/解除ボタンも P9 で②の行に追加）。
 - **流用部品**: `components/inspector`・`hooks/useConfirm`・`hooks/useAsyncAction`・`components/ConfirmModal`・`components/SplitColumns`。`unban` は `unbanByID <userId>`（v1 の素 `unban` 誤りを rewrite で修正済）。
 - **開発支援（7-2 追加）**: fakehl スタンドインに `demoRequests()`/`demoBans()` を追加し、`acceptfriendrequest`/`unban(ByID)` で該当を除去（承認/解除→一覧から消えるのを目視確認）。統合テスト（configPath=""）は無影響。Chrome 実機相当で全フロー検証済。
-- **対象外（P9 / 7-7）**: `申請`(sendFriendRequest)/`解除`(removeFriend)/`招待`(invite) ＋ ユーザー検索 → P9-A（§3.10 で実装済）。write失敗トースト → 7-7。
+- **対象外（P9 / 7-7）**: `申請`(sendFriendRequest)/`解除`(removeFriend)/`招待`(invite) ＋ ユーザー検索 → P9-A（§3.10 で実装済）。write失敗トースト → 7-7 第1層で実装済（§3.11）。
 
 ### 3.10 フレンド検索 (P9-A) で確定した実装事項
 
@@ -323,9 +323,24 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **すべて確認ダイアログ**（外向き操作・§3.9 方針）。`解除` は danger。`invite` は `POST /sessions/{idx}/invite`（focus 必要・
   `FriendsTab` が focusedIdx を受け取る）。`申請`/`解除`/`招待` の backend は実装済（api.ts ラッパ追加のみ）。
 - **オンデマンド維持**: 検索も押した時だけ取得。`reqId` ガードで search/focused の取得競合も保護。⟳ は現ソース（検索は最後の語）を再取得。
-- **既知の限界**: 公開APIは友達関係を返さないため検索行は常に3操作を出す（非該当は backend 失敗・7-7 トーストまで無音）。`invite` は実機出力未確定（方針A 受理表示）。
+- **既知の限界**: 公開APIは友達関係を返さないため検索行は常に3操作を出す（非該当操作の backend 失敗は **7-7 第1層トーストで通知＝§3.11**。ただし方針A上、意味的失敗で HTTP 200 が返る場合は無音のまま）。`invite` は実機出力未確定（方針A 受理表示）。
 - **検証**: ユニット（resonite client + server ハンドラ・httptest）緑。Chrome 実機相当: 名前検索→実 api.resonite.com→結果＋アバター、申請の確認→実行、フォーカス内→申請/解除。**検索のみ外部公開APIに依存**（write は fakehl 経由でローカル完結）。
 - **対象外**: world 検索（§Won't）。P9-B Steam/DepotDownloader（別計画・DESIGN §5.7）。
+
+### 3.11 write 失敗/成功トースト (7-7 第1層) で確定した実装事項
+
+7-7 第1層。これまで write 操作（承認/unban/申請/解除/招待/設定適用/save/restart/close/kick/ban/silence/respawn/role/message ＋ 起動）の失敗が**完全無音**だった穴を塞ぐ。commit 61af3e2。
+
+- **失敗判定 = HTTP/トランスポートレベルのみ（＝方針A の範囲）**: `WriteResult{ok,error,code}` の `!ok`（停止中=not_ready / timeout / process_gone / 通信不通=network / 入力不正=bad_request）を**赤トースト**で明示。成功は受理ニュアンスの**緑トースト（2s で自動消滅）**。方針A 上トーストは「**届いた**」保証であり「**効いた**」保証ではないため over-claim しない（意味的失敗で HTTP 200 が返るケースは無音のまま＝許容）。
+- **設計の肝＝2フック集約**: 失敗/成功を**2つの実行フック（`hooks/useAsyncAction.run(fn, success?)` / `hooks/useConfirm.confirm()`）で1回だけ拾う**。呼び出し側はファクトリ関数が `WriteResult` を return するだけ（低 churn・全 write 操作を最小改修で網羅）。複数 write を束ねる適用系は「最初の失敗」を返す（`results.find(r => !r.ok) ?? {ok:true}`）。
+- **UI サイドエフェクトの隔離**: トースト表示は **`web/src/lib/notify.ts`**（`reportWriteResult(result, success?)` / `notifyError(message, title?)`）に閉じ込め、`api.ts` は純データ層のまま（低結合・SOLID）。`reportWriteResult` は型ガードで `WriteResult` のみ反応（無関係な戻り値は無視）。
+- **失敗本文 = backend `error.code` を権威に localize**: `post()` が `error.code` も抽出（`WriteResult.code` 追加）。`notify.ts` が code→i18n キー（`toast.errNotReady`/`errTimeout`/`errProcessGone`/`errNetwork`/既定 `errGeneric`）へ写像。コンポーネント外解決のため **singleton `i18n.t`**（`i18n.ts` の `export default i18n`）を使用。
+- **マウント**: `@mantine/notifications` を追加し、`main.tsx` に `<Notifications position="bottom-right" />` を**全タブ共通で1つだけ**マウント（`@mantine/notifications/styles.css` も import）。
+- **起動失敗**: `onStart` は write 操作とは別系統（`WriteResult` を通さない）。`api.start` の `!ok` と通信不通 throw を `try/catch` で拾い `notifyError(..., t("toast.startFailTitle"))` で赤化（旧 `TODO(7-7)` 解消）。
+- **第2層/第3層は不採用（方針A 維持）**: 第2層=出力パース（"Unknown command" 等）は脆く保守コスト高で方針A と矛盾。第3層=再取得差分判定は一覧駆動（承認/unban）のみ成立し競合と区別不可。→ 第1層（HTTP/トランスポート）のみ採用。
+- **i18n**: `toast.*`（失敗タイトル2種・エラー本文5種・成功メッセージ16種）を ja/en に追加。
+- **検証**: `npx tsc --noEmit` / `npm run build` 緑。Chrome 実機相当で**緑「フレンド申請を承認しました」**（トースト DOM を MutationObserver で捕捉）＋ **赤「サーバーに接続できません」**（backend kill で network 経路）を確認。
+- **流用基盤化**: 以降の write 系タブ（7-3 等）は `lib/notify` を追加コストなしで継承（`useAsyncAction`/`useConfirm` 経由なら自動でトースト化）。
 
 ---
 
