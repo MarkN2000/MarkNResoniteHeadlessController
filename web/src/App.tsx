@@ -13,6 +13,7 @@ import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
 import { SessionTab } from "./tabs/session/SessionTab";
 import { FriendsTab } from "./tabs/friends/FriendsTab";
 import { NewSessionTab } from "./tabs/newsession/NewSessionTab";
+import { ConfigTab } from "./tabs/config/ConfigTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -63,13 +64,23 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     return () => es.close();
   }, []);
 
-  // 停止中トップバーの config 選択肢。
-  useEffect(() => {
+  // 停止中トップバーの config 選択肢。コンフィグタブの CRUD 後にも再取得する（ConfigTab に渡す）。
+  const refreshConfigs = useCallback(() => {
     Promise.all([api.getConfigs(), api.getLastUsedConfig()]).then(([cs, last]) => {
       setConfigs(cs);
-      setSelectedConfig((cur) => cur ?? (cs.some((c) => c.name === last) ? last : cs[0]?.name ?? null));
+      // 現選択が消えていたら last-used→先頭に繰り上げ（削除/リネーム後の dangling 防止）。
+      setSelectedConfig((cur) =>
+        cur && cs.some((c) => c.name === cur)
+          ? cur
+          : cs.some((c) => c.name === last)
+            ? last
+            : (cs[0]?.name ?? null),
+      );
     });
   }, []);
+  useEffect(() => {
+    refreshConfigs();
+  }, [refreshConfigs]);
 
   const refreshSessions = useCallback(() => {
     api.getSessions().then(setSessions);
@@ -101,6 +112,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     if (activeTab === "friends") return running ? <FriendsTab idx={focusedIdx} /> : <StartPrompt />;
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
+    if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
 

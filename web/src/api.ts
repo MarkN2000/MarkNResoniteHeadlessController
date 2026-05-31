@@ -203,9 +203,10 @@ export interface WriteResult {
   code?: string;
 }
 
-async function post(path: string, body?: unknown): Promise<WriteResult> {
+// POST/PUT/DELETE の封筒を解いて WriteResult を返す共通実行（方針A）。
+async function write(method: string, path: string, body?: unknown): Promise<WriteResult> {
   try {
-    const res = await req(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+    const res = await req(path, { method, body: body !== undefined ? JSON.stringify(body) : undefined });
     if (res.ok) return { ok: true };
     let error: string | undefined;
     let code: string | undefined;
@@ -220,6 +221,10 @@ async function post(path: string, body?: unknown): Promise<WriteResult> {
   } catch {
     return { ok: false, code: "network" };
   }
+}
+
+function post(path: string, body?: unknown): Promise<WriteResult> {
+  return write("POST", path, body);
 }
 
 // セッション設定
@@ -261,3 +266,14 @@ export const inviteUser = (idx: number, user: string) => post(`/sessions/${idx}/
 // /start（プロセス起動）とは別物。結果は方針A で {executed:true}＝起動後に一覧を再取得して実状態を見せる。
 export const startWorldURL = (url: string) => post(`/sessions/start`, { mode: "url", url });
 export const startWorldTemplate = (template: string) => post(`/sessions/start`, { mode: "template", template });
+
+// --- Headless Config CRUD（コンフィグタブ・§3.14・バックエンドは Pre-7b 実装済）---
+// 全文取得（loginPassword は backend で "" マスク済）。不正JSON/未存在/通信不通は null。
+export async function getConfig(name: string): Promise<Record<string, unknown> | null> {
+  return getData<Record<string, unknown>>(`/headless-configs/${encodeURIComponent(name)}`);
+}
+// 保存（新規/上書き = upsert）。body は config 全文 map（未知フィールド含め丸ごと送る）。
+export const saveConfig = (name: string, body: Record<string, unknown>) =>
+  write("PUT", `/headless-configs/${encodeURIComponent(name)}`, body);
+// 削除。
+export const deleteConfig = (name: string) => write("DELETE", `/headless-configs/${encodeURIComponent(name)}`);
