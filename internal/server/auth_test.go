@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,12 +19,13 @@ import (
 
 func newTestAuth(password string) *authManager {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	// cfgMu はテストでは単独の RWMutex（並行書き換えは無いのでこれで十分）。
 	return newAuthManager(&config.Config{
 		Version:           config.SchemaVersion,
 		AdminPasswordHash: string(hash),
 		SessionSecret:     "test-session-secret-0123456789",
 		SessionTTLHours:   config.DefaultSessionTTLHours,
-	})
+	}, &sync.RWMutex{})
 }
 
 func TestAuth_CheckPassword(t *testing.T) {

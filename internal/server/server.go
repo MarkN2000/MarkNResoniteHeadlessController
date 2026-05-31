@@ -34,9 +34,10 @@ type Server struct {
 	webFS     fs.FS
 	resonite  *resonite.Client // Resonite 公開API（ユーザー検索）
 
-	// credMu は cfg.HeadlessCredentials の更新(credentials PUT)と起動時読取の競合を防ぐ。
-	// auth は別フィールド（SessionSecret/AdminPasswordHash）しか読まないため対象外。
-	credMu sync.RWMutex
+	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
+	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
+	// auth は &cfgMu を共有する。レート制限状態は auth.mu（別ロック）。
+	cfgMu sync.RWMutex
 }
 
 func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *resonite.Client, webFS fs.FS) *Server {
@@ -44,17 +45,18 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 	if cfgPath != "" {
 		dataDir = filepath.Dir(cfgPath)
 	}
-	return &Server{
+	s := &Server{
 		cfg:       cfg,
 		cfgPath:   cfgPath,
 		dataDir:   dataDir,
 		configDir: cfg.HeadlessConfigDirOrDefault(dataDir),
 		driver:    driver,
 		worlds:    headless.NewWorldsService(driver),
-		auth:      newAuthManager(cfg),
 		webFS:     webFS,
 		resonite:  reso,
 	}
+	s.auth = newAuthManager(cfg, &s.cfgMu)
+	return s
 }
 
 func (s *Server) Handler() http.Handler {
@@ -85,6 +87,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigDelete))
 	mux.HandleFunc("GET /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsGet))
 	mux.HandleFunc("PUT /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsPut))
+
+	// 設定タブ（7-5）: 管理パスワード変更 + アプリ設定 CRUD。
+	mux.HandleFunc("POST /api/v1/password", s.requireAuth(s.handlePasswordChange))
+	mux.HandleFunc("GET /api/v1/app-settings", s.requireAuth(s.handleAppSettingsGet))
+	mux.HandleFunc("PUT /api/v1/app-settings", s.requireAuth(s.handleAppSettingsPut))
 
 	// write API（Pre-7c）。全 POST・認証必須・idx は path・引数は JSON body。
 	// セッション内ユーザー操作（focus idx → <cmd> "<user>"）
@@ -161,16 +168,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "invalid_password", "パスワードが違います")
 		return
 	}
-	tok := s.auth.issueToken()
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookie,
-		Value:    tok,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-		Secure:   r.TLS != nil, // HTTPS提供時のみ Secure（平文LAN httpでは付けない＝cookieが送られなくなるため）
-		MaxAge:   int(s.cfg.SessionTTL().Seconds()),
-	})
+	s.setSessionCookie(w, r, s.auth.issueToken())
 	writeOK(w, map[string]any{"loggedIn": true})
 }
 
@@ -203,12 +201,14 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 起動時注入: config の creds が空なら中央アカウントを注入した一時 config を生成。
-	s.credMu.RLock()
+	// creds / Resonite パスは app-settings/credentials で実行時に書き換わるため cfgMu RLock 下で読む。
+	s.cfgMu.RLock()
 	central := hlconfig.Credentials{
 		Username: s.cfg.HeadlessCredentials.Username,
 		Password: s.cfg.HeadlessCredentials.Password,
 	}
-	s.credMu.RUnlock()
+	headlessPath := s.cfg.ResoniteHeadless
+	s.cfgMu.RUnlock()
 	runDir := filepath.Join(s.dataDir, ".run")
 	launchPath, err := hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
 	if err != nil {
@@ -219,7 +219,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
 		return
 	}
-	if err := s.driver.Start(s.cfg.ResoniteHeadless, launchPath, name); err != nil {
+	if err := s.driver.Start(headlessPath, launchPath, name); err != nil {
 		writeErr(w, http.StatusConflict, "start_failed", err.Error())
 		return
 	}

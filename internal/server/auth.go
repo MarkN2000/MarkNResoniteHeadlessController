@@ -31,18 +31,19 @@ const tokenVersion = "v1"
 //   - トークン = "v1.<expiryUnix>.<sig>"（絶対失効。既定30日）。
 //   - 検証は署名再計算 + 定数時間比較 + 期限チェックのみ。
 //
-// ⚠️ signingKey は cfg.SessionSecret / cfg.AdminPasswordHash を lock 無しで読む。
-// 現状これらを実行時に書き換える経路は無い（パスワード再設定は別プロセスの CLI）。
-// 将来 UI からのパスワード変更を実装する際は cfg アクセスの同期が必要。
+// cfg.SessionSecret / cfg.AdminPasswordHash の読みは cfgMu（Server と共有）で保護する。
+// UI からのパスワード変更（POST /password）が AdminPasswordHash を書き換えるため、
+// 署名鍵の読みと競合しないよう RLock を取る。レート制限状態は別ロック（mu）。
 type authManager struct {
 	cfg       *config.Config
-	mu        sync.Mutex
-	failures  int       // 連続ログイン失敗回数
-	lockUntil time.Time // ロックアウト解除時刻
+	cfgMu     *sync.RWMutex // Server と共有。cfg.AdminPasswordHash/SessionSecret の読みを保護
+	mu        sync.Mutex    // レート制限状態（failures/lockUntil）専用ロック
+	failures  int           // 連続ログイン失敗回数
+	lockUntil time.Time     // ロックアウト解除時刻
 }
 
-func newAuthManager(cfg *config.Config) *authManager {
-	return &authManager{cfg: cfg}
+func newAuthManager(cfg *config.Config, cfgMu *sync.RWMutex) *authManager {
+	return &authManager{cfg: cfg, cfgMu: cfgMu}
 }
 
 // loginLocked はログインがレート制限でロック中かを返す。
@@ -72,15 +73,21 @@ func (a *authManager) recordLoginResult(ok bool) {
 }
 
 func (a *authManager) checkPassword(pw string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(a.cfg.AdminPasswordHash), []byte(pw)) == nil
+	a.cfgMu.RLock()
+	hash := a.cfg.AdminPasswordHash
+	a.cfgMu.RUnlock()
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }
 
 // signingKey はトークン署名鍵を導出する。
 // SessionSecret を鍵、adminPasswordHash をメッセージとした HMAC。
 // → パスワード変更で adminPasswordHash が変わると署名鍵も変わり、既存トークンが全無効化される。
 func (a *authManager) signingKey() []byte {
-	mac := hmac.New(sha256.New, []byte(a.cfg.SessionSecret))
-	mac.Write([]byte(a.cfg.AdminPasswordHash))
+	a.cfgMu.RLock()
+	secret, hash := a.cfg.SessionSecret, a.cfg.AdminPasswordHash
+	a.cfgMu.RUnlock()
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(hash))
 	return mac.Sum(nil)
 }
 
@@ -139,6 +146,20 @@ func (s *Server) requireAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 		h(w, r)
 	}
+}
+
+// setSessionCookie は人間向けセッション Cookie を発行/更新する（login と password 変更で共用）。
+// 平文 LAN(http) では Secure を付けない（付けると cookie が送られず認証できなくなるため）。
+func (s *Server) setSessionCookie(w http.ResponseWriter, r *http.Request, tok string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    tok,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   r.TLS != nil,
+		MaxAge:   int(s.cfg.SessionTTL().Seconds()),
+	})
 }
 
 func bearerToken(r *http.Request) string {

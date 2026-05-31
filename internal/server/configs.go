@@ -88,8 +88,8 @@ func writeConfigErr(w http.ResponseWriter, err error) {
 
 // handleCredentialsGet: GET /api/v1/headless-credentials → {username, hasPassword}（password 非返却）
 func (s *Server) handleCredentialsGet(w http.ResponseWriter, r *http.Request) {
-	s.credMu.RLock()
-	defer s.credMu.RUnlock()
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
 	writeOK(w, map[string]any{
 		"username":    s.cfg.HeadlessCredentials.Username,
 		"hasPassword": s.cfg.HeadlessCredentials.Password != "",
@@ -107,7 +107,7 @@ func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正なリクエスト")
 		return
 	}
-	s.credMu.Lock()
+	s.cfgMu.Lock()
 	// 変更前を退避し、SaveTo 失敗時は in-memory を巻き戻してディスクとの整合を保つ。
 	oldU, oldP := s.cfg.HeadlessCredentials.Username, s.cfg.HeadlessCredentials.Password
 	s.cfg.HeadlessCredentials.Username = body.Username
@@ -121,7 +121,7 @@ func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 	}
 	uname := s.cfg.HeadlessCredentials.Username
 	hasPw := s.cfg.HeadlessCredentials.Password != ""
-	s.credMu.Unlock()
+	s.cfgMu.Unlock()
 	if saveErr != nil {
 		writeErr(w, http.StatusInternalServerError, "save_failed", saveErr.Error())
 		return
