@@ -180,12 +180,13 @@ type PreRestartAction interface {
   - `restart`（トリガー/事前アクション/クラッシュ復帰設定）、`steam`（任意）
   - `allowedCidrs`（任意の安全弁。既定はプライベートIP帯）
 - **配置場所**: アプリ設定・状態ファイルは**書き込み可能なデータディレクトリ**に置く（バイナリ隣 or 設定可能な data dir。Linuxの権限を考慮）。
-- **ヘッドレスconfig**: 公式 `HeadlessConfig.schema.json` 準拠のファイル群（`headlessConfigDir`）。`loginCredential`/`loginPassword` を含む（§3の通りファイル権限で保護）。アプリは**スキーマ駆動エディタ**で生成・編集。
+- **ヘッドレスconfig**: 公式 `HeadlessConfig.schema.json` 準拠のファイル群（`headlessConfigDir`）。`loginCredential`/`loginPassword` を含む（§3の通りファイル権限で保護）。アプリは**カスタムフォームエディタ**で生成・編集。
 
-### configエディタ（スキーマ駆動）
-- 公式スキーマからフォーム自動生成（react-jsonschema-form系）＋ `uiSchema` で日本語ラベル/グループ/ヘルプ/並び順を宣言的に調整。
-- 特殊UI（カスタムセッションID分割、`defaultUserRoles`マップ、ライブJSONプレビュー）のみカスタムウィジェット。
-- 効果: 自前コード激減・Resoniteのスキーマ更新に自動追従・入力検証無料。
+### configエディタ（カスタムフォーム・phase-7-spec §3.14）
+> 改訂（7-4）: 当初の react-jsonschema-form 自動生成方針を見直し、**手書きのカスタムフォーム**に変更（公式スキーマの構造が深く、日本語ラベル/特殊UIの宣言調整より直書きが低コストと判断）。
+- config は不透明な JSON map として扱い、フォームは主要キーのビュー。保存は「GET 全文 → フォーム管理項目だけ上書き → PUT」で**未知/レア項目を温存**（working-map 方式・マージ不要）。
+- 複数ワールドはタブ式。`customSessionId` は prefix/suffix ビルダー、tags/allowedUrlHosts/autoSpawnItems は配列⇔フォーム変換。**生JSON 編集は撤去**（ほぼ全項目をフォーム化するため不要・同期/セキュリティの複雑さ回避）。
+- バックエンドは name サニタイズ・`loginPassword` マスク・`startWorlds` 配列検証・`$schema` 付与のみ（値の意味検証はせず Resonite が権威。フォームがガードレール役）。
 
 ---
 
@@ -209,13 +210,18 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 ### 長時間操作は非同期
 起動・停止・再起動・**Steam更新（数分かかる）**は、HTTPリクエストで待たせない。**即「受け付けた」を返し、進捗・結果は SSE ＋ 状態エンドポイント**で見せる。`worlds`/`kick`等の短い操作は同期でよい。
 
-### エンドポイント（抜粋・実装で確定。`/api/v1` 配下）
-- 認証: `POST /login`、`POST /logout`、`POST /password`、`GET /apikey`(確認) / `POST /apikey/regenerate`
-- サーバー: `GET /status`、`POST /start`、`POST /stop`、`POST /restart`（いずれも非同期・受付応答）
-- configファイル: `GET/POST/DELETE /configs[...]`、`GET /schema`(スキーマ配信)
-- ランタイム（取得=GET / 操作=POST。APIキー経由はGETでも操作可）: `GET /worlds|status|users|bans|friend-requests`、`POST /focus`、`POST /command`、`POST /users/:action`(kick/ban/...)、`POST /session/*`(name/maxusers/accesslevel/...)
-- 再起動: `GET/POST /restart-config`、`GET /restart-status`、`POST /restart/trigger`
-- Steam(任意): `POST /steam/update`(非同期)、`POST /steam/guard-code`(Guardコード受領→再実行)、`GET /steam/config`。Guard要求時はSSE `update` を `guard-required` 状態にしUIへ入力を促す
+### エンドポイント（抜粋・`/api/v1` 配下。実装の正は code ＋ phase-7-spec §2.3/§2.4）
+- 認証: `POST /login`、`POST /logout`、`POST /password`（管理PW変更）
+- サーバー: `GET /status`、`POST /start`、`POST /stop`、`POST /command`、`GET /events`(SSE)（start/stop は非同期・受付応答）
+- アプリ設定: `GET/PUT /app-settings`（port / Resoniteパス / configDir）
+- ヘッドレスconfig: `GET /headless-configs`、`GET/PUT/DELETE /headless-configs/{name}`、`GET /headless-configs/last-used`、`GET/PUT /headless-credentials`（中央アカウント）
+- ランタイム取得（GET）: `GET /sessions`、`GET /sessions/{idx}/status|users|detail`、`GET /listbans`、`GET /friendrequests`
+- セッション操作（POST `/sessions/{idx}/…`・idx は path / 識別子・引数は body）: kick/ban/silence/unsilence/respawn/invite/role/message・accesslevel/maxusers/name/description/hidefromlisting・restart/save/close
+- 新規セッション: `POST /sessions/start`（url / template）
+- フレンド/BAN（グローバル・focus不要）: `POST /friendrequests/accept`、`POST /friends/add|remove`、`POST /bans/unban`
+- Resonite 公開API プロキシ: `GET /resonite/users?q=`（ユーザー検索・無認証先）
+- 再起動（**Phase 8・未実装**）: `GET/POST /restart-config`、`GET /restart-status`、`POST /restart/trigger`
+- Steam（**Phase 9・未実装**）: `POST /steam/update`(非同期)、`POST /steam/guard-code`、`GET /steam/config`。Guard要求時はSSE `steam` を `guard-required` 状態にしUIへ入力を促す
 
 ### ライブ更新（SSE）
 - `GET /api/v1/events`（SSEストリーム）。イベント: `log`, `status`, `metrics`, `update`（起動/停止/再起動/Steam等の進捗）。
