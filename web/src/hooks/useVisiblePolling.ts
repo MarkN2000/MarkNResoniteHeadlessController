@@ -26,9 +26,12 @@ export function useVisiblePolling(fn: () => void | Promise<void>, intervalMs: nu
     const tick = async () => {
       clear();
       if (cancelled || document.hidden) return;
-      await fnRef.current();
-      if (cancelled || document.hidden) return;
-      timer = setTimeout(() => void tick(), intervalMs);
+      try {
+        await fnRef.current();
+      } finally {
+        // fn が throw しても poll ループを止めない（次回で復帰）。停止/非表示/unmount 時のみ再予約しない。
+        if (!cancelled && !document.hidden) timer = setTimeout(() => void tick(), intervalMs);
+      }
     };
     const onVisibility = () => {
       if (document.hidden) clear();
