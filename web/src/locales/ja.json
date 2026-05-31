@@ -120,5 +120,30 @@
     "confirmSendRequest": "{{user}} にフレンド申請を送りますか？",
     "confirmRemoveFriend": "{{user}} とのフレンドを解除しますか？",
     "confirmInvite": "{{user}} をフォーカス中のセッションに招待しますか？"
+  },
+  "toast": {
+    "writeFailTitle": "操作に失敗しました",
+    "startFailTitle": "起動に失敗しました",
+    "errNotReady": "ヘッドレスが停止/起動中です",
+    "errTimeout": "応答がタイムアウトしました",
+    "errProcessGone": "ヘッドレスプロセスが終了しました",
+    "errNetwork": "サーバーに接続できません",
+    "errGeneric": "不明なエラーが発生しました",
+    "acceptDone": "フレンド申請を承認しました",
+    "unbanDone": "BAN解除を実行しました",
+    "sendRequestDone": "フレンド申請を送信しました",
+    "removeFriendDone": "フレンド解除を実行しました",
+    "inviteDone": "招待を送信しました",
+    "applyDone": "設定を適用しました",
+    "saveDone": "保存を実行しました",
+    "restartDone": "再起動を実行しました",
+    "closeDone": "セッションを閉じました",
+    "kickDone": "キックを実行しました",
+    "banDone": "BANを実行しました",
+    "respawnDone": "リスポーンを実行しました",
+    "silenceDone": "ミュートを実行しました",
+    "unsilenceDone": "ミュート解除を実行しました",
+    "roleDone": "権限を変更しました",
+    "messageDone": "メッセージを送信しました"
   }
 }

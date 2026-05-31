@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AppShell, Center, NavLink, Text } from "@mantine/core";
 import * as api from "./api";
 import type { ConfigSummary, LogLine, Status, World } from "./api";
+import { notifyError } from "./lib/notify";
 import { TABS, type TabId } from "./nav";
 import { SURFACE } from "./theme";
 import { Login } from "./components/Login";
@@ -81,8 +82,14 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
   async function onStart() {
     if (!selectedConfig) return;
-    const r = await api.start(selectedConfig);
-    if (!r.ok) console.warn("start failed:", r.status, r.error); // TODO(7-7): トースト表示
+    // 起動失敗は write 操作とは別系統（WriteResult を通さない）。赤トーストで明示する（7-7 第1層）。
+    // api.start は通信不通で throw し得るため try/catch で network も拾う。
+    try {
+      const r = await api.start(selectedConfig);
+      if (!r.ok) notifyError(r.error || t("toast.errGeneric"), t("toast.startFailTitle"));
+    } catch {
+      notifyError(t("toast.errNetwork"), t("toast.startFailTitle"));
+    }
   }
 
   function renderTab() {

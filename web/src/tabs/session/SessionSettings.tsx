@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Divider, Group, Stack, Switch } from "@mantine/core";
 import * as api from "../../api";
-import type { WorldStatus } from "../../api";
+import type { WorldStatus, WriteResult } from "../../api";
 import {
   FieldRow,
   InspectorButton,
@@ -60,25 +60,37 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
     description !== status.description ||
     hide !== status.hiddenFromListing;
 
+  // バッチ適用は各 write を順に実行し、最初の失敗を結果として返す（=その失敗をトースト）。
+  // 全成功なら {ok:true} を返し applyDone を緑トースト。1件も dirty でないときは ok のまま無音。
   function doApply() {
     void apply.run(async () => {
-      if (name !== status.name) await api.setSessionName(idx, name);
-      if (level !== status.accessLevel) await api.setAccessLevel(idx, level);
-      if (muValid && muNum !== status.maxUsers) await api.setMaxUsers(idx, muNum);
-      if (description !== status.description) await api.setDescription(idx, description);
-      if (hide !== status.hiddenFromListing) await api.setHideFromListing(idx, hide);
-    });
+      const results: WriteResult[] = [];
+      if (name !== status.name) results.push(await api.setSessionName(idx, name));
+      if (level !== status.accessLevel) results.push(await api.setAccessLevel(idx, level));
+      if (muValid && muNum !== status.maxUsers) results.push(await api.setMaxUsers(idx, muNum));
+      if (description !== status.description) results.push(await api.setDescription(idx, description));
+      if (hide !== status.hiddenFromListing) results.push(await api.setHideFromListing(idx, hide));
+      return results.find((r) => !r.ok) ?? { ok: true };
+    }, t("toast.applyDone"));
   }
 
-  // lifecycle 操作（保存/再起動/閉じる）は確認 → 実行 → 再取得。
-  const askLifecycle = (titleKey: string, msgKey: string, danger: boolean, op: () => Promise<unknown>) =>
+  // lifecycle 操作（保存/再起動/閉じる）は確認 → 実行 → 再取得。結果を返すと confirm() がトースト。
+  const askLifecycle = (
+    titleKey: string,
+    msgKey: string,
+    danger: boolean,
+    successKey: string,
+    op: () => Promise<unknown>,
+  ) =>
     confirm.ask({
       title: t(titleKey),
       message: t(msgKey),
       danger,
+      success: t(successKey),
       onConfirm: async () => {
-        await op();
+        const r = await op();
         onChanged();
+        return r;
       },
     });
 
@@ -122,19 +134,29 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
         <Group grow gap="xs">
           <InspectorButton
             severity="neutral"
-            onClick={() => askLifecycle("session.save", "session.confirmSave", false, () => api.saveSession(idx))}
+            onClick={() =>
+              askLifecycle("session.save", "session.confirmSave", false, "toast.saveDone", () => api.saveSession(idx))
+            }
           >
             {t("session.save")}
           </InspectorButton>
           <InspectorButton
             severity="warning"
-            onClick={() => askLifecycle("session.restart", "session.confirmRestart", true, () => api.restartSession(idx))}
+            onClick={() =>
+              askLifecycle("session.restart", "session.confirmRestart", true, "toast.restartDone", () =>
+                api.restartSession(idx),
+              )
+            }
           >
             {t("session.restart")}
           </InspectorButton>
           <InspectorButton
             severity="danger"
-            onClick={() => askLifecycle("session.close", "session.confirmClose", true, () => api.closeSession(idx))}
+            onClick={() =>
+              askLifecycle("session.close", "session.confirmClose", true, "toast.closeDone", () =>
+                api.closeSession(idx),
+              )
+            }
           >
             {t("session.close")}
           </InspectorButton>

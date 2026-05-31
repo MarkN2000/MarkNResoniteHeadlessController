@@ -120,5 +120,30 @@
     "confirmSendRequest": "Send a friend request to {{user}}?",
     "confirmRemoveFriend": "Remove {{user}} from your contacts?",
     "confirmInvite": "Invite {{user}} to the focused session?"
+  },
+  "toast": {
+    "writeFailTitle": "Operation failed",
+    "startFailTitle": "Failed to start",
+    "errNotReady": "Headless is stopped or starting",
+    "errTimeout": "The command timed out",
+    "errProcessGone": "The headless process exited",
+    "errNetwork": "Cannot reach the server",
+    "errGeneric": "An unknown error occurred",
+    "acceptDone": "Friend request accepted",
+    "unbanDone": "Unban executed",
+    "sendRequestDone": "Friend request sent",
+    "removeFriendDone": "Contact removed",
+    "inviteDone": "Invite sent",
+    "applyDone": "Settings applied",
+    "saveDone": "Save executed",
+    "restartDone": "Restart executed",
+    "closeDone": "Session closed",
+    "kickDone": "Kicked",
+    "banDone": "Banned",
+    "respawnDone": "Respawned",
+    "silenceDone": "Silenced",
+    "unsilenceDone": "Unsilenced",
+    "roleDone": "Role updated",
+    "messageDone": "Message sent"
   }
 }

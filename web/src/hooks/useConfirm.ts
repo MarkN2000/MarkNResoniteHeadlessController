@@ -1,11 +1,15 @@
 import { useState } from "react";
+import { reportWriteResult } from "../lib/notify";
 
 // 確認ダイアログの「開く要求」。onConfirm は同期/非同期どちらも可。
+//   - onConfirm が WriteResult を返した場合は結果をトースト（失敗=赤・成功=success 指定時のみ緑）。7-7 第1層。
+//   - success: 成功トーストの本文（受理ニュアンス・任意）。
 export interface ConfirmRequest {
   title: string;
   message?: string;
   danger?: boolean;
-  onConfirm: () => void | Promise<void>;
+  success?: string;
+  onConfirm: () => unknown | Promise<unknown>;
 }
 
 // 確認ダイアログの開閉と実行を1か所で扱う共通フック。
@@ -24,7 +28,8 @@ export function useConfirm() {
     if (!request) return;
     setBusy(true);
     try {
-      await request.onConfirm();
+      const result = await request.onConfirm();
+      reportWriteResult(result, request.success);
     } finally {
       setBusy(false);
       setRequest(null);

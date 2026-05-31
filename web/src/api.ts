@@ -191,9 +191,13 @@ export async function searchResoniteUsers(q: string): Promise<ResoniteUser[]> {
 
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
 
+// 成功 = {ok:true}。失敗 = {ok:false, error?, code?}。
+//   code は backend の error.code（not_ready/timeout/process_gone/exec_failed/bad_request 等）。
+//   通信不通など backend に届かない失敗は code:"network"。トーストの出し分けは code を権威にする。
 export interface WriteResult {
   ok: boolean;
   error?: string;
+  code?: string;
 }
 
 async function post(path: string, body?: unknown): Promise<WriteResult> {
@@ -201,15 +205,17 @@ async function post(path: string, body?: unknown): Promise<WriteResult> {
     const res = await req(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
     if (res.ok) return { ok: true };
     let error: string | undefined;
+    let code: string | undefined;
     try {
       const j = await res.json();
       error = j?.error?.message;
+      code = j?.error?.code;
     } catch {
       /* ignore */
     }
-    return { ok: false, error };
+    return { ok: false, error, code };
   } catch {
-    return { ok: false, error: "network" };
+    return { ok: false, code: "network" };
   }
 }
 

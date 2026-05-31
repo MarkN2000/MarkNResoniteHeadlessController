@@ -18,13 +18,19 @@ interface Props {
 type ConfirmKind = "kick" | "ban" | "respawn" | "silence" | "unsilence";
 const CONFIRM_ACTIONS: Record<
   ConfirmKind,
-  { titleKey: string; msgKey: string; danger: boolean; fn: (idx: number, user: string) => Promise<unknown> }
+  {
+    titleKey: string;
+    msgKey: string;
+    danger: boolean;
+    successKey: string;
+    fn: (idx: number, user: string) => Promise<unknown>;
+  }
 > = {
-  kick: { titleKey: "session.kick", msgKey: "session.confirmKick", danger: true, fn: api.kickUser },
-  ban: { titleKey: "session.ban", msgKey: "session.confirmBan", danger: true, fn: api.banUser },
-  respawn: { titleKey: "session.respawn", msgKey: "session.confirmRespawn", danger: false, fn: api.respawnUser },
-  silence: { titleKey: "session.silence", msgKey: "session.confirmSilence", danger: false, fn: api.silenceUser },
-  unsilence: { titleKey: "session.unsilence", msgKey: "session.confirmUnsilence", danger: false, fn: api.unsilenceUser },
+  kick: { titleKey: "session.kick", msgKey: "session.confirmKick", danger: true, successKey: "toast.kickDone", fn: api.kickUser },
+  ban: { titleKey: "session.ban", msgKey: "session.confirmBan", danger: true, successKey: "toast.banDone", fn: api.banUser },
+  respawn: { titleKey: "session.respawn", msgKey: "session.confirmRespawn", danger: false, successKey: "toast.respawnDone", fn: api.respawnUser },
+  silence: { titleKey: "session.silence", msgKey: "session.confirmSilence", danger: false, successKey: "toast.silenceDone", fn: api.silenceUser },
+  unsilence: { titleKey: "session.unsilence", msgKey: "session.confirmUnsilence", danger: false, successKey: "toast.unsilenceDone", fn: api.unsilenceUser },
 };
 
 // ユーザー一覧（案B: 2行コンパクト）。
@@ -45,9 +51,11 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
       title: t(a.titleKey),
       message: t(a.msgKey, { user }),
       danger: a.danger,
+      success: t(a.successKey),
       onConfirm: async () => {
-        await a.fn(idx, user);
+        const r = await a.fn(idx, user);
         onChanged();
+        return r;
       },
     });
   };
@@ -118,7 +126,7 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
               const text = msg;
               if (!to) return;
               setMsgTo(null);
-              void run(() => api.messageUser(idx, to, text));
+              void run(() => api.messageUser(idx, to, text), t("toast.messageDone"));
             }}
           >
             {t("session.send")}
@@ -142,7 +150,7 @@ function UserCard({
   busy: boolean;
   onConfirm: (kind: ConfirmKind) => void; // 確認モーダルを開く（respawn/silence/unsilence/kick/ban）
   onMessage: () => void;
-  onRun: (fn: () => Promise<unknown>) => void; // 即適用（権限）
+  onRun: (fn: () => Promise<unknown>, success?: string) => void; // 即適用（権限）
 }) {
   const { t } = useTranslation();
   const roleValue = api.ROLES.includes(u.role as (typeof api.ROLES)[number]) ? u.role : null;
@@ -177,7 +185,7 @@ function UserCard({
             data={[...api.ROLES]}
             value={roleValue}
             placeholder={u.role}
-            onChange={(v) => v && v !== u.role && onRun(() => api.setUserRole(idx, u.name, v))}
+            onChange={(v) => v && v !== u.role && onRun(() => api.setUserRole(idx, u.name, v), t("toast.roleDone"))}
           />
           <Text size="xs" c={u.present ? "green.5" : "dimmed"} style={{ width: 30, textAlign: "right" }}>
             {u.present ? t("session.present") : t("session.away")}
