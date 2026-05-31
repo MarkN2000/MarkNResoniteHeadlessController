@@ -88,7 +88,7 @@
     "confirmSave": "このセッションを保存しますか？"
   },
   "friends": {
-    "source": "ソース選択",
+    "source": "ユーザー検索",
     "searchByName": "ユーザー名で検索",
     "searchById": "ユーザーIDで検索",
     "search": "検索",

@@ -88,7 +88,7 @@
     "confirmSave": "Save this session?"
   },
   "friends": {
-    "source": "Source",
+    "source": "User search",
     "searchByName": "Search by username",
     "searchById": "Search by user ID",
     "search": "Search",
