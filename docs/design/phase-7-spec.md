@@ -226,6 +226,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - 停止中: セッション/フレンド/コマンド/新規セッションは「起動してください」表示。コンフィグ/スケジュール/設定はファイル編集なので使える
 
 ### 3.4 データ鮮度戦略
+（セッションタブの自動 poll / Page Visibility は **7-7 残として実装済＝§3.13**。`hooks/useVisiblePolling`。）
 - **Page Visibility 連動**: タブ非表示で poll 停止、再表示で即 refetch + 再開
 - **コンポーネント unmount で停止**（画面遷移時）
 - **アクティブな表示中タブのみ** poll
@@ -291,7 +292,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **配色/装飾ルール**: ヘッダ帯のみグレー、入力欄＝グレー fill、**縁取りは「キーボードで文字入力できる欄」のみ**（TextInput/NumberInput/Textarea）。Select は縁取りなし＋**▼ 1つ**（既定 chevron 置換）。読み取り専用はプレーン Text で区別。ボタン主アクション（適用）のみ cyan filled。
 - **ユーザー一覧 = 案B 2行コンパクト**: 情報行（状態ドット〔在席=緑/離席=灰〕＋名前／権限プルダウン＋在席離席）／操作行（リスポーン・ミュート・メッセージ＝中立、キック・BAN＝危険・右に分離）。操作行は `wrap` でモバイル折返し（~294px でも崩れない実測）。権限は**選択即適用**。
 - **確認ダイアログ**（`components/ConfirmModal`・ラベルは `common.*`）対象 = kick/ban/respawn/silence/unsilence ＋ save/restart/close。危険(kick/ban/close)は確定ボタン赤。メッセージは入力モーダル、適用はバッチ。
-- **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。**トーストは 7-7 第1層で実装済（§3.11）**。自動 poll・Page Visibility は 7-7 残。**status と users は B1（commit bdb54be）で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）に集約済**（focus 往復半減・一貫スナップショット）。`/status`・`/users` は部分再取得用に残置。
+- **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。**トースト＝7-7 第1層（§3.11）／自動 poll・Page Visibility＝7-7 残として実装済（§3.13）**。**status と users は B1（commit bdb54be）で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）に集約済**（focus 往復半減・一貫スナップショット）。`/status`・`/users` は部分再取得用に残置。
 - **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
 - **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
@@ -356,6 +357,16 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **ワールド検索枠（右・将来）**: disabled 検索入力＋「準備中（将来対応）」注記＋グレーのスケルトン結果カード2枚（将来のサムネ＋名前グリッドの形）。**有効化には DESIGN §Won't のワールド検索（v1 の `go.resonite.com` スクレイピング or 代替検索ソース）の判断が必要**。公式 API にワールド検索は無い。なお**検索結果からの起動は将来も既存 URL モード（`startworldurl "<resrec:// URL>"`）を流用**でき、追加バックエンドは"検索ソース"だけ。DESIGN.md §Won't 自体は不変（UI 枠の予約のみ）。
 - **開発支援**: fakehl は `startworldurl`/`startworldtemplate` を受理し新ワールドを worlds に追加済（スタンドインで一覧出現を確認可能）。
 - **既知の制約**: ① 不正 URL/未知テンプレは方針A で無音失敗になり得る（scheme 検証で軽減）。② 起動後の headless 自動 focus 挙動は未確定 → MVP は一覧再取得のみ（自動でセッションタブへ切替しない・将来検討）。
+
+### 3.13 セッションタブの自動 poll / Page Visibility (7-7 残) で確定した実装事項
+
+§3.4 のデータ鮮度戦略の残り。これまで全タブが純イベント駆動で、ユーザーの参加/退出は手動 ⟳ まで反映されなかった。**セッションタブのみ**、表示中に背景 poll を加える。
+
+- **再利用フック `web/src/hooks/useVisiblePolling(fn, intervalMs)`**: 表示中のみ `fn` を一定間隔で実行。**重複起動しない**（再帰 `setTimeout`＝前回完了後に次を予約）／`document.hidden` で停止・再表示で**即時実行＋再開**（`visibilitychange`）／unmount で停止／`fn` は ref 経由で常に最新（依存に入れず interval を再購読させない＝idx 変化でタイマーをリセットしない）。初回 poll は +intervalMs（マウント直後の即時取得と二重化させない）。
+- **`SessionTab`**: `refetch` に `{ silent? }` を追加。背景 poll は `silent:true`＝`loading` を触らず **⟳ スピナーを回さない**（画面のチラつき防止）。手動 ⟳ / マウント / focus 変更 / 操作後は従来どおりスピナー表示。`useVisiblePolling(() => refetch({ silent:true }), 10_000)`（§3.4 の 10 秒）。
+- **背景 poll の失敗は無音**（既存 M3：表示中データを保持・トーストは出さない＝10 秒ごとの赤通知を防ぐ）。
+- **スコープ（§3.4 準拠）**: セッションタブのみ。フレンド/コンフィグ/設定は自動 poll なし。**トップバーの全世界人数（`GET /sessions`＝`worlds`・focus 不要）は poll 対象外** → セッションタブ自身の人数/一覧は 10 秒で追従するが、トップバーのプルダウン人数は手動 ⟳ まで古いまま（既知の制限・要望あれば別途 `worlds` poll を追加可）。
+- **focus 競合**: 背景 poll は `focus idx→status→users` を行うが、MRHC の全 write も毎回 focus し直すため実害は軽微（§2.6 の単一管理者前提で許容済）。10 秒間隔で REPL 競合確率も小。
 
 ---
 
