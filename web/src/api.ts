@@ -90,6 +90,9 @@ export const ACCESS_LEVELS = [
 ] as const;
 export const ROLES = ["Admin", "Builder", "Moderator", "Guest", "Spectator"] as const;
 
+// 新規セッションのテンプレート候補（v1 踏襲。値の権威は Resonite・他名が使えるかは要実機採取）。
+export const WORLD_TEMPLATES = ["Grid", "Platform", "Blank"] as const;
+
 const API = "/api/v1";
 
 async function req(path: string, init?: RequestInit): Promise<Response> {
@@ -252,3 +255,9 @@ export const removeFriend = (user: string) => post(`/friends/remove`, { user });
 
 // 招待（フォーカス中セッションへ・focus 必要）
 export const inviteUser = (idx: number, user: string) => post(`/sessions/${idx}/invite`, { user });
+
+// 新規セッション（稼働中に新ワールドを開始・focus 不要・backend timeout 60s）。
+//   url      → startworldurl "<url>"      / template → startWorldTemplate "<name>"
+// /start（プロセス起動）とは別物。結果は方針A で {executed:true}＝起動後に一覧を再取得して実状態を見せる。
+export const startWorldURL = (url: string) => post(`/sessions/start`, { mode: "url", url });
+export const startWorldTemplate = (template: string) => post(`/sessions/start`, { mode: "template", template });

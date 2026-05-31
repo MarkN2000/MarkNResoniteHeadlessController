@@ -121,6 +121,22 @@
     "confirmRemoveFriend": "{{user}} とのフレンドを解除しますか？",
     "confirmInvite": "{{user}} をフォーカス中のセッションに招待しますか？"
   },
+  "newSession": {
+    "launchTitle": "起動方法",
+    "searchTitle": "検索して起動",
+    "template": "テンプレート",
+    "url": "URL",
+    "urlPlaceholder": "resrec://...",
+    "start": "起動",
+    "urlHint": "res://, resrec://, res-steam:// などで始めてください",
+    "confirmTitle": "新規セッション起動",
+    "confirmTemplate": "{{template}} で新規セッションを起動しますか？",
+    "confirmUrl": "この URL で新規セッションを起動しますか？",
+    "keyword": "キーワード",
+    "keywordPlaceholder": "ワールド名",
+    "search": "検索",
+    "searchSoon": "準備中（将来対応）"
+  },
   "toast": {
     "writeFailTitle": "操作に失敗しました",
     "startFailTitle": "起動に失敗しました",
@@ -144,6 +160,7 @@
     "silenceDone": "ミュートを実行しました",
     "unsilenceDone": "ミュート解除を実行しました",
     "roleDone": "権限を変更しました",
-    "messageDone": "メッセージを送信しました"
+    "messageDone": "メッセージを送信しました",
+    "newSessionDone": "セッションを起動しました"
   }
 }

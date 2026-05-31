@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **7-7 第1層（write 失敗/成功トースト）実装済**。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-3 新規セッション or 7-7 残（自動poll/Page Visibility）。
+> ステータス: **7-3 新規セッション（URL/テンプレ起動＋検索枠予約）実装済**。7-7 第1層（write 失敗/成功トースト）実装済。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11、7-3新規セッション=§3.12。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-7 残（自動poll/Page Visibility）or コンフィグ/設定タブ。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -216,7 +216,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 |---|---|---|---|---|
 | 1 | **セッション** | 1 | フォーカス中の設定（名前/アクセス/最大/AFK/説明/保存/再起動/閉じる）+ ユーザー一覧（アイコン/AFK/権限 + respawn/kick/ban/silence/role/message） | 「起動してください」 |
 | 2 | **フレンド** | 2 | リクエスト一覧 / Ban 一覧 / フォーカス内ユーザー / 検索(P9) → ユーザー操作（承認/申請/解除/invite=フォーカス中へ） | 「起動してください」 |
-| 3 | **新規セッション** | — | テンプレート / URL / 検索(P9) | 「起動してください」 |
+| 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
 | 4 | **コンフィグ** | (編集) | v1 同等 CRUD を作り直し | ✅ 使える |
 | 5 | **スケジュール** | — | 状態表示（前回起動/稼働時間/次回再起動）+ 再起動予定（P8、現状「開発中」） | ✅ 使える |
 | 6 | **設定** | — | アプリ設定 / パスワード変更 / Steam 設定(P9) | ✅ 使える |
@@ -341,6 +341,21 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **i18n**: `toast.*`（失敗タイトル2種・エラー本文5種・成功メッセージ16種）を ja/en に追加。
 - **検証**: `npx tsc --noEmit` / `npm run build` 緑。Chrome 実機相当で**緑「フレンド申請を承認しました」**（トースト DOM を MutationObserver で捕捉）＋ **赤「サーバーに接続できません」**（backend kill で network 経路）を確認。
 - **流用基盤化**: 以降の write 系タブ（7-3 等）は `lib/notify` を追加コストなしで継承（`useAsyncAction`/`useConfirm` 経由なら自動でトースト化）。
+
+### 3.12 新規セッション (7-3) で確定した実装事項
+
+稼働中ヘッドレスに**ランタイムで新ワールドを開始**するタブ。バックエンド `POST /api/v1/sessions/start`（url/template・execGlobal・focus 不要・timeout 60s・commit 7bc6e9b）は実装済のため **フロントのみ**（7-2 / P9-A と同様）。コンポーネント = `web/src/tabs/newsession/`（NewSessionTab/StartPanel/WorldSearchPanel）。
+
+- **2セクション構成（v1 踏襲・レイアウト前方互換が主眼）**: `SplitColumns` で ① `StartPanel`（左=起動方法・機能）＋ ② `WorldSearchPanel`（右=検索して起動・**将来対応の disabled プレースホルダ**）。②を**今から枠だけ予約**することで、将来ワールド検索を実装してもレイアウトが変わらない（7-2 の「準備中(P9)」枠予約と同手法）。
+- **起動方法 = URL ＋ テンプレートの2手段**（左カラム）。`InspectorCard` 内に `FieldRow` 2行（各行 値側に `Group([input][起動])`）。
+  - **テンプレート = 固定3択** `Grid / Platform / Blank`（既定 Grid・`api.WORLD_TEMPLATES`・`InspectorSelect`）。v1 の `templateSuggestions` 踏襲。**他テンプレ名が現行 Resonite で使えるかは要実機採取**（§4）。
+  - **URL** = `InspectorTextInput`（placeholder `resrec://...`）。**scheme をクライアント検証** `^res[-\w]*:\/\//i`（v1 踏襲）。空 or 不一致は [起動] を `disabled`、非空かつ不正時のみ下にヒント文。方針A 上、不正 URL でも backend は HTTP 200 を返し得る（＝無音失敗）ため空振りを減らす狙い。
+  - **[起動]は2つともニュートラル灰**（`InspectorButton severity="neutral"`・§3.7「ボタン全般=Mid grey」踏襲。適用のような cyan filled にはしない＝ユーザー決定）。
+- **起動前に確認ダイアログあり**（`useConfirm` + `ConfirmModal`）。`confirm.busy` がモーダルの loading を駆動（startworldurl は最大60s かかり得る）。`onConfirm` が `WriteResult` を return → 結果トーストは 7-7 第1層基盤で自動（成功=緑 `toast.newSessionDone`／失敗=赤）。
+- **起動成功後はトップバーのセッション一覧を再取得**（`App.tsx` の `refreshSessions` を `onStarted` で渡す）→ 新ワールドがプルダウンに出現＝方針A の「再取得で実状態を見せる」。
+- **ワールド検索枠（右・将来）**: disabled 検索入力＋「準備中（将来対応）」注記＋グレーのスケルトン結果カード2枚（将来のサムネ＋名前グリッドの形）。**有効化には DESIGN §Won't のワールド検索（v1 の `go.resonite.com` スクレイピング or 代替検索ソース）の判断が必要**。公式 API にワールド検索は無い。なお**検索結果からの起動は将来も既存 URL モード（`startworldurl "<resrec:// URL>"`）を流用**でき、追加バックエンドは"検索ソース"だけ。DESIGN.md §Won't 自体は不変（UI 枠の予約のみ）。
+- **開発支援**: fakehl は `startworldurl`/`startworldtemplate` を受理し新ワールドを worlds に追加済（スタンドインで一覧出現を確認可能）。
+- **既知の制約**: ① 不正 URL/未知テンプレは方針A で無音失敗になり得る（scheme 検証で軽減）。② 起動後の headless 自動 focus 挙動は未確定 → MVP は一覧再取得のみ（自動でセッションタブへ切替しない・将来検討）。
 
 ---
 

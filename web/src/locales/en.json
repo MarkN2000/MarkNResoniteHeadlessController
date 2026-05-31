@@ -121,6 +121,22 @@
     "confirmRemoveFriend": "Remove {{user}} from your contacts?",
     "confirmInvite": "Invite {{user}} to the focused session?"
   },
+  "newSession": {
+    "launchTitle": "Launch method",
+    "searchTitle": "Search & launch",
+    "template": "Template",
+    "url": "URL",
+    "urlPlaceholder": "resrec://...",
+    "start": "Start",
+    "urlHint": "Must start with res://, resrec://, res-steam://, etc.",
+    "confirmTitle": "Start new session",
+    "confirmTemplate": "Start a new session from template \"{{template}}\"?",
+    "confirmUrl": "Start a new session from this URL?",
+    "keyword": "Keyword",
+    "keywordPlaceholder": "World name",
+    "search": "Search",
+    "searchSoon": "Coming later"
+  },
   "toast": {
     "writeFailTitle": "Operation failed",
     "startFailTitle": "Failed to start",
@@ -144,6 +160,7 @@
     "silenceDone": "Silenced",
     "unsilenceDone": "Unsilenced",
     "roleDone": "Role updated",
-    "messageDone": "Message sent"
+    "messageDone": "Message sent",
+    "newSessionDone": "Session started"
   }
 }

@@ -12,6 +12,7 @@ import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
 import { SessionTab } from "./tabs/session/SessionTab";
 import { FriendsTab } from "./tabs/friends/FriendsTab";
+import { NewSessionTab } from "./tabs/newsession/NewSessionTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -98,6 +99,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     if (!def.availableWhenStopped && stopped) return <StartPrompt />;
     if (activeTab === "session") return running ? <SessionTab idx={focusedIdx} /> : <StartPrompt />;
     if (activeTab === "friends") return running ? <FriendsTab idx={focusedIdx} /> : <StartPrompt />;
+    if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
