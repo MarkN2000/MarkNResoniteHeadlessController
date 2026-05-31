@@ -4,6 +4,10 @@ import { ActionIcon, Burger, Button, Group, Menu, Select, Text } from "@mantine/
 import type { ConfigSummary, Status, World } from "../api";
 import { LANGUAGES, setLanguage } from "../i18n";
 
+// フォーカスボタン（＝ドロップダウン）の最大幅。ヘッダーの空き幅まで伸ばしつつ、
+// 広い画面での伸びすぎを防ぐ上限(px)。ドロップダウンは width="target" でこの実幅に追従する。
+const FOCUS_MAX_WIDTH = 960;
+
 interface TopBarProps {
   status: Status | null;
   // 稼働中
@@ -38,7 +42,7 @@ function nameDisplay(name: string): { text: string; fontSize: number; multiline:
 // セッションを2行で表示（上=名前 / 下=小さい present/users/max · accessLevel）。
 // フォーカスボタンとプルダウンの両方で共用（DRY）。名前は nameDisplay の規則に従い、
 // 改行ありは clampLines 行で頭打ちにして親（ヘッダ高さ等）を超えないようにする。
-function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: number; clampLines: number }) {
+function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: number | string; clampLines: number }) {
   const nd = nameDisplay(s.name);
   const nameStyle: CSSProperties = {
     fontSize: nd.fontSize,
@@ -62,6 +66,10 @@ function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: numbe
         alignItems: "flex-start",
         lineHeight: 1.15,
         maxWidth,
+        // 文字列(="100%")指定時は親(ドロップダウン項目)幅いっぱいに広げ、
+        // minWidth:0 で flex 内でも省略表示(ellipsis)が効くようにする。
+        width: typeof maxWidth === "string" ? "100%" : undefined,
+        minWidth: 0,
         overflow: "hidden",
       }}
     >
@@ -83,7 +91,7 @@ export function TopBar(props: TopBarProps) {
   const overflowMenu = (showForceStop: boolean) => (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
-        <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0 }}>
+        <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0, marginLeft: "auto" }}>
           ⋮
         </ActionIcon>
       </Menu.Target>
@@ -146,24 +154,33 @@ export function TopBar(props: TopBarProps) {
           )}
         </>
       ) : (
-        <Menu position="bottom-start" withinPortal onOpen={props.onRefreshSessions}>
+        <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
           <Menu.Target>
-            <Button rightSection="▾" styles={{ root: { height: "auto", paddingTop: 4, paddingBottom: 4 } }}>
-              {focused ? <SessionTwoLine s={focused} maxWidth={220} clampLines={2} /> : t("topbar.noSession")}
+            <Button
+              rightSection="▾"
+              styles={{
+                // flex:1 でヘッダーの空き幅まで伸び、minWidth:0 で狭画面では縮む。maxWidth で上限。
+                root: { flex: 1, minWidth: 0, maxWidth: FOCUS_MAX_WIDTH, height: "auto", paddingTop: 4, paddingBottom: 4 },
+                // 名前(label)を左いっぱいに広げ、▾(section)を右端へ押し出す。
+                inner: { width: "100%" },
+                label: { flex: 1, minWidth: 0, overflow: "hidden" },
+                section: { flexShrink: 0 },
+              }}
+            >
+              {focused ? <SessionTwoLine s={focused} maxWidth="100%" clampLines={2} /> : t("topbar.noSession")}
             </Button>
           </Menu.Target>
           <Menu.Dropdown>
             {props.sessions.length === 0 && <Menu.Item disabled>{t("topbar.noSession")}</Menu.Item>}
             {props.sessions.map((s) => (
               <Menu.Item key={s.index} onClick={() => props.onFocus(s.index)}>
-                <SessionTwoLine s={s} maxWidth={300} clampLines={3} />
+                <SessionTwoLine s={s} maxWidth="100%" clampLines={3} />
               </Menu.Item>
             ))}
           </Menu.Dropdown>
         </Menu>
       )}
 
-      <div style={{ flex: 1 }} />
       {overflowMenu(!stopped)}
     </Group>
   );
