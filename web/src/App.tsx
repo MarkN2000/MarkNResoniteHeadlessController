@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppShell, Center, NavLink, Text } from "@mantine/core";
+import { Alert, AppShell, Box, Button, Center, Group, NavLink, Stack, Text } from "@mantine/core";
 import * as api from "./api";
 import type { ConfigSummary, LogLine, Status, World } from "./api";
 import { notifyError } from "./lib/notify";
@@ -8,12 +8,14 @@ import { TABS, type TabId } from "./nav";
 import { SURFACE } from "./theme";
 import { Login } from "./components/Login";
 import { TopBar } from "./components/TopBar";
+import { AccountSetupModal } from "./components/AccountSetupModal";
 import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
 import { SessionTab } from "./tabs/session/SessionTab";
 import { FriendsTab } from "./tabs/friends/FriendsTab";
 import { NewSessionTab } from "./tabs/newsession/NewSessionTab";
 import { ConfigTab } from "./tabs/config/ConfigTab";
+import { SettingsTab } from "./tabs/settings/SettingsTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -45,6 +47,11 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("session");
   const [navOpened, setNavOpened] = useState(false);
   const seenSeq = useRef<Set<number>>(new Set());
+  // 中央 Resonite アカウントの設定状態（初回モーダル + 未設定バナーを駆動）。
+  // null=未取得/取得失敗（バナー出さず）。取得成功して username+password が揃えば false。
+  const [credUnset, setCredUnset] = useState<boolean | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupShown = useRef(false);
 
   const running = status?.state === "running";
 
@@ -86,6 +93,24 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     api.getSessions().then(setSessions);
   }, []);
 
+  // アカウント設定状態の再評価（マウント時＋設定タブ/モーダルでの保存後）。
+  // 取得失敗（null）はバナーを出さない（一時的なエラーで誤って煽らない）。
+  const refreshCred = useCallback(() => {
+    void api.getCredentials().then((c) => {
+      if (c) setCredUnset(!(c.username.trim() !== "" && c.hasPassword));
+    });
+  }, []);
+  useEffect(() => {
+    refreshCred();
+  }, [refreshCred]);
+  // 未設定を検知したら初回のみモーダルを自動表示（閉じてもバナーは残る）。
+  useEffect(() => {
+    if (credUnset === true && !setupShown.current) {
+      setupShown.current = true;
+      setSetupOpen(true);
+    }
+  }, [credUnset]);
+
   // 稼働開始でセッション取得、停止でクリア。
   useEffect(() => {
     if (running) refreshSessions();
@@ -113,10 +138,12 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
+    if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
 
   return (
+    <>
     <AppShell
       header={{ height: 56 }}
       navbar={{ width: 220, breakpoint: "sm", collapsed: { mobile: !navOpened } }}
@@ -169,7 +196,26 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         })}
       </AppShell.Navbar>
 
-      <AppShell.Main style={{ height: "100dvh" }}>{renderTab()}</AppShell.Main>
+      <AppShell.Main style={{ height: "100dvh" }}>
+        <Stack h="100%" gap={0}>
+          {/* Resonite アカウント未設定の常設バナー（事実のみ・帰結文は付けない）。全タブで表示。 */}
+          {credUnset === true && (
+            <Alert variant="light" color="orange" radius={0} p="xs" styles={{ message: { width: "100%" } }}>
+              <Group justify="space-between" wrap="nowrap" gap="sm">
+                <Text size="sm">{t("settings.bannerUnset")}</Text>
+                <Button size="xs" variant="default" style={{ flexShrink: 0 }} onClick={() => setSetupOpen(true)}>
+                  {t("settings.bannerAction")}
+                </Button>
+              </Group>
+            </Alert>
+          )}
+          <Box style={{ flex: 1, minHeight: 0 }}>{renderTab()}</Box>
+        </Stack>
+      </AppShell.Main>
     </AppShell>
+
+    {/* 初回オンボーディング: アカウント未設定時にログイン直後 1 回自動表示（バナーからも開ける）。 */}
+    <AccountSetupModal opened={setupOpen} onClose={() => setSetupOpen(false)} onSaved={refreshCred} />
+    </>
   );
 }

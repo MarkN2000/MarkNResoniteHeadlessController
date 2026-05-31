@@ -277,3 +277,32 @@ export const saveConfig = (name: string, body: Record<string, unknown>) =>
   write("PUT", `/headless-configs/${encodeURIComponent(name)}`, body);
 // 削除。
 export const deleteConfig = (name: string) => write("DELETE", `/headless-configs/${encodeURIComponent(name)}`);
+
+// --- 設定タブ（7-5）: 中央 Resonite アカウント / アプリ設定 / 管理パスワード変更 ---
+
+// 中央 Resonite アカウントの状態（password は返さず hasPassword のみ）。internal/server/configs.go。
+export interface CredentialsInfo {
+  username: string;
+  hasPassword: boolean;
+}
+export async function getCredentials(): Promise<CredentialsInfo | null> {
+  return getData<CredentialsInfo>("/headless-credentials");
+}
+// 保存（password 空=既存保持・username のみ更新）。
+export const putCredentials = (username: string, password: string) =>
+  write("PUT", "/headless-credentials", { username, password });
+
+// アプリ設定（秘密・encoding を含まない公開サブセット）。internal/server/settings.go。
+export interface AppSettings {
+  port: number;
+  resoniteHeadlessPath: string;
+  headlessConfigDir: string;
+}
+export async function getAppSettings(): Promise<AppSettings | null> {
+  return getData<AppSettings>("/app-settings");
+}
+export const putAppSettings = (s: AppSettings) => write("PUT", "/app-settings", s);
+
+// 管理パスワード変更（成功時 backend が新Cookieを再発行＝このブラウザは継続・他端末は失効）。
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  post("/password", { currentPassword, newPassword });
