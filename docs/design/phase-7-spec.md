@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **7-3 新規セッション（URL/テンプレ起動＋検索枠予約）実装済**。7-7 第1層（write 失敗/成功トースト）実装済。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11、7-3新規セッション=§3.12、7-7残自動poll/PageVisibility=§3.13、コンフィグ(7-4)確定仕様=§3.14。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次はコンフィグタブ(7-4)実装。
+> ステータス: **7-3 新規セッション（URL/テンプレ起動＋検索枠予約）実装済**。7-7 第1層（write 失敗/成功トースト）実装済。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11、7-3新規セッション=§3.12、7-7残自動poll/PageVisibility=§3.13、コンフィグ(7-4)=§3.14、**設定タブ(7-5)=§3.15（実装済）**。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**Phase 7 UI は7タブ中6タブ完成（残=スケジュール＝Phase 8）。次は Phase 8（自動再起動）**。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -410,6 +410,34 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **流用部品**：`components/inspector`（InspectorCard/FieldRow/InspectorSelect/InspectorTextInput/InspectorNumberInput/InspectorTextarea/InspectorButton/RefreshButton）・`hooks/useConfirm`＋`ConfirmModal`・`hooks/useAsyncAction`・`lib/notify`（結果トースト自動）・`SplitColumns`。
 
 **バックエンド**：改修ゼロ。GET `/headless-configs`（一覧）・GET `/headless-configs/{name}`（全文・pw マスク）・PUT（upsert）・DELETE。新規雛形はフロントが同梱デフォルト（Private・1ワールド・creds 空）を保持。
+
+### 3.15 設定タブ (7-5) で確定した実装事項
+
+`mrhc.config.json`（アプリ本体設定）を GUI 化するタブ。停止中でも使える（アプリ/ファイル設定系）。
+§3.3 の「アプリ設定 / パスワード変更 / Steam(P9)」を具体化。**バックエンドは小規模に新設**（credentials は既存流用）。
+
+**構成＝縦積み4セクション**（`InspectorCard`・単一中央カラム maw560・`ScrollArea`）
+1. **管理パスワード変更**：現PW＋新PW＋確認 → `POST /password`。一致/空はクライアント検証（赤テキスト）、現PW誤り等は 7-7 トースト。
+2. **Resonite アカウント**（重要）：username/password（空=変更なし）。`config` で個別指定が無いとき各ワールドに注入される既定アカウント。**初回モーダル＋未設定バナーで設定を促す**（下記）。
+3. **アプリ設定**：`port`（普通に表示・**MRHC再起動後反映**）・`resoniteHeadlessPath`（**次回ヘッドレス起動で反映**＝`handleStart` が cfg をライブ参照）＋折りたたみ「上級設定」に `headlessConfigDir`（再起動後反映）。**`encoding` は UI 非搭載**（両OS自動判定が実証済・逃げ道は config 手編集）。
+4. **DepotDownloader（Steam）設定**：将来枠の disabled プレースホルダ（7-2/7-3 と同じ予約手法・P9-B）。
+
+**初回オンボーディング（App 全体にはみ出す）**
+- ログイン後 `GET /headless-credentials` を取得（`App` の `refreshCred`）。**未設定**（username 空 or password 無し）なら **初回モーダルを1回自動表示**（`setupShown` ref・「後で」で閉じ可・強制ブロックなし）＋**常設バナー**「Resonite アカウントが未設定です [設定する]」（`Alert` orange・全タブ表示）。
+- バナー文言は**事実のみ**（「公開になる恐れ」等の帰結文は付けない＝[[wording-simple-factual]]）。保存で再評価し両方解消。取得失敗（null）はバナーを出さない（一時エラーで誤って煽らない）。
+
+**確定した設計判断**
+- **パスワード変更後＝操作中ブラウザは継続**：`AdminPasswordHash` 変更で署名鍵が変わり全トークン失効するが、応答で**新Cookieを再発行**して操作端末だけログイン維持（他端末は失効）。`setSessionCookie` を login と共用。
+- **cfg 同期の一本化**：旧 `credMu` を **`cfgMu`（RWMutex）に格上げ**し、全 cfg 書き換え（credentials/password/app-settings）＋読み取り（auth の署名鍵・`handleStart` の creds/パス）を保護。`auth` は `&cfgMu` を共有（レート制限状態は別ロック `auth.mu`）。ロックは入れ子にしない（RLock→Unlock→Lock の順次）。
+- **アカウント入力の共通化＝案A**：`AccountForm`（presentational）＋`useCredentialsForm`（状態/保存）を**設定タブと初回モーダルで共用**。**コンフィグタブは据え置き**（ラベルが config キー名で異なる・出荷直後コードを触らない）。password 欄は config タブと同じ `InspectorTextInput type="password"`。
+- 新規 UI プリミティブは**バナー（`Alert`）と初回モーダル（`Modal`）のみ**。他は `inspector`/`useAsyncAction`/`lib/notify` を流用。
+
+**バックエンド（新設）** `internal/server/settings.go`
+- `POST /api/v1/password {currentPassword,newPassword}`：現PW bcrypt 検証→新ハッシュ保存（ロールバック付き）→新Cookie再発行。
+- `GET/PUT /api/v1/app-settings {port,resoniteHeadlessPath,headlessConfigDir}`：port 範囲(1–65535)検証・秘密/encoding 非露出・SaveTo ロールバック。
+- 反映: port・configDir＝MRHC 再起動後 / resoniteHeadlessPath＝次回ヘッドレス起動（cfg ライブ参照）。
+
+**検証**：Go 単体（`settings_test.go`＝PW変更の現PW検証/Cookie再発行/旧PW失効・app-settings GET/PUT/不正port/ファイル永続化）＋`go test ./...` green。`npx tsc --noEmit` / `npm run build` green。
 
 ---
 
