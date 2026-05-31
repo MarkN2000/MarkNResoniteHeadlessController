@@ -11,7 +11,8 @@
 
 スコープ外:
 - **ライフサイクル**: 起動/停止（既存 `Driver.Start/Stop`）／プロセスI/Oの低層（既存 `readPipe`／encoding）はそのまま利用。
-- ⚠️ **終了系コマンド（`shutdown` / `restart` / `close`）は Exec の対象外**。理由：Exec はプロンプト復帰を完了シグナルにするが、これらはプロセス（or 当該世界）が消えてプロンプトが返らないため必ず timeout になる。`shutdown` は既存 `Driver.Stop()`（fire-and-forget＋プロセス終了監視）に任せる。`restart`/`close` は今後ハンドリング設計時に明示的に「Exec ではない経路」で扱う。
+- ⚠️ **`shutdown` は Exec の対象外**。Exec はプロンプト復帰を完了シグナルにするが、`shutdown` はプロセスが消えてプロンプトが返らないため必ず timeout になる → 既存 `Driver.Stop()`（fire-and-forget＋プロセス終了監視）に任せる。
+  - **📝 更新(2026-05-30)**: `restart`/`save`/`close` は当初 Exec 非対象と想定したが、**実機検証でプロンプトを返すと確認**（空ワールドで restart≈1s/save・close≈0.2s）。よって **Exec（長 timeout: restart・close=180s / save=600s）で扱う**ことに決定。timeout 値は phase-7-spec §2.5.1 が正本。
 
 ## 2. 配置と既存実装との関係
 

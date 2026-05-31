@@ -24,7 +24,8 @@
 
 ### コマンド完了の判定（重要なドメイン挙動）
 Resoniteヘッドレスは**構造化レスポンスを返さない**。コマンド送信後の完了判定は以下のヒューリスティック：
-- **タイムアウト**（コマンド毎に既定3000ms、status=4000、invite/role/accesslevel=5000、startworldurl=30000）
+- **タイムアウト**（v1 値: コマンド毎に既定3000ms、status=4000、invite/role/accesslevel=5000、startworldurl=30000）
+  ※ rewrite は**プロンプト復帰ベースの完了検出**（応答時間非依存）で、timeout は上限のみ。値は phase-7-spec §2.5.1（既定5s / start=60s / restart・close=180s / save=600s）。
 - **プロンプト検出**: 末尾が `>` の行＝フォーカス中セッションのプロンプト（例 `<sessionName>>`）。`stopWhen`で早期終了。
 - **データ後プロンプト検出**: データ行（例: usersの`... ID: ...`）が出た後のプロンプトで終了（`createPromptAfterDataDetector`）。
 - 一致後 `settleDurationMs`（80〜500ms）待って出力を確定。
@@ -107,6 +108,18 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 - **フレンド**: `sendFriendRequest <name>`, `removeFriend <name>`, `login`, `logout`
 - **アセット**: `import <path|URL>`, `importMinecraft <folder>`
 - **システム**: `saveConfig [filename]`, `gc`（GC実行）, `tickRate <tps>`, `version`, `log`, `debugWorldState`
+
+### Resonite 公開クラウドAPI（コンソール外・無認証・P9-A で利用）
+
+ヘッドレスのコンソールとは別に、Resonite には**公開・無認証の HTTP API** がある。フレンド申請/招待の
+「相手探し」（ユーザー検索）に使う。rewrite では `internal/resonite` がプロキシ（ブラウザ直叩きは CORS 不可なため）。
+
+- **ユーザー検索（名前）**: `GET https://api.resonite.com/users/?name=<q>` → ユーザー配列。
+- **ユーザー取得（ID）**: `GET https://api.resonite.com/users/<U-id>` → 単一ユーザー。
+- **認証**: 不要（`User-Agent` を付けるのみ）。✅ v1 実装＋2026-05-31 実機確認（`MarkN` 検索で4件取得）。
+- **ユーザーオブジェクト（使用フィールド）**: `id`(U-xxx) / `username`（無ければ `normalizedUsername`）/ `profile.iconUrl`。
+- **アバターURL**: `iconUrl` は `resdb:///<hash>.<ext>` 形式 → `https://assets.resonite.com/<hash>`（拡張子除去）に変換すると画像取得可。
+- **対象外**: ワールド検索（v1 は `go.resonite.com` スクレイピング）は DESIGN §Won't のため不採用。
 
 ---
 

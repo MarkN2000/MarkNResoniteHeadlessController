@@ -35,9 +35,9 @@ Phase 8 (自動再起動):
   - スケジュールタブの機能実装 ← 再起動条件の詳細設計はここで協議
 
 Phase 9 (Resonite / Steam 統合):
-  - Resonite API 連携（ユーザー検索/詳細/ワールド検索）
-  - 新規セッション「検索」方式 + フレンド「検索」
-  - Steam 更新（DepotDownloader 統一・2FA UI 入力→stdin・進捗 SSE）
+  - ✅ P9-A: Resonite 公開API ユーザー検索（名/ID・無認証）＋フレンド申請/解除/招待（実装済・§3.10）
+  - P9-B: Steam 更新（DepotDownloader 統一・2FA UI 入力→stdin・進捗 SSE）← 別計画・DESIGN §5.7
+  - ※ ワールド検索は DESIGN §Won't（不採用）。新規セッションは URL/テンプレート方式（7-3）
 ```
 
 ### 廃止した v1 機能（採用しない）
@@ -148,9 +148,10 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 → **方針 A 確定**: ノイジー出力をパースせず、「プロンプト `>` 復帰＝コマンド完了＝成功扱い」。`{"executed":true}` を返す。直後に該当データ（users / worlds 等）を再取得して**実状態で結果を見せる**。UI はトースト「実行しました」+ 再取得。
 
 ### 2.5.1 timeout / 実装方針
-- **timeout**: start 系=60s、restart=180s（暫定）、他=既定5s（`WithTimeout` で個別指定）。
-  ⚠️ restart が実機でプロンプトを返さない場合（driver.go の警告）、成功でも ErrTimeout→500 を誤報し、
-  かつ最大 180s 間 execMu を占有して他コマンドを止める。検証バッチ項目3で確認するまでの楽観実装。
+- **timeout**（`WithTimeout` で個別指定）: start 系=60s、restart=180s、**close=180s**、**save=600s**、他=既定5s。
+  実機検証(2026-05-30)で restart/save/close は**プロンプトを返す**と確認済（空ワールドで restart≈1s / save・close≈0.2s）。
+  save/close は**大規模ワールドのクラウド保存が数分かかり得る**ため長めに取る（タイムアウトは上限・保険であって
+  プロンプト復帰で即返る／プロセス死亡時は ErrProcessGone で即中断）。`shutdown` のみ Exec 非対象（`Driver.Stop()`）。
 - **反復ハンドラは helper 集約**: 単一引数 session-user 操作（kick/ban/silence/unsilence/respawn/invite）は
   `sessionUserOp` ファクトリ、引数なし lifecycle（restart/save/close）は `sessionCmdOp` ファクトリ、
   グローバル単一引数（accept/add/remove）は `globalUserOp` ファクトリで生成。引数付き（role/message/
