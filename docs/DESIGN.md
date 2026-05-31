@@ -174,7 +174,7 @@ type PreRestartAction interface {
 旧来の散乱（`.env`/`config/auth.json`/`backend/config/*`・二重example）を**1ファイルに集約**。秘密は1箇所で自動生成。
 
 - **アプリ設定**（例 `mrhc.config.json`）:
-  - `adminPasswordHash`（ハッシュ保存）、`apiKey`（スクリプト用・再生成可）、`sessionSecret`（自動生成）
+  - `adminPasswordHash`（ハッシュ保存）、`sessionSecret`（自動生成・Cookie署名鍵の導出に使用）
   - `port`、`resoniteHeadlessPath`、`headlessConfigDir`
   - `headlessCredentials`（Resoniteアカウント）
   - `restart`（トリガー/事前アクション/クラッシュ復帰設定）、`steam`（任意）
@@ -195,12 +195,15 @@ type PreRestartAction interface {
 UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの一クライアントとして使う**（UIでできること = HTTPでできること = 自動化/curl/ワールド内ボタンから操作可）。外部API安定性のため **`/api/v1/` のバージョンprefix** を付け、応答は**統一エラー形式** `{ ok, error: { code, message } }` とする。
 
 ### 認証（2経路・CSRF安全）
+> 改訂（Pre-Phase 7）: 旧 APIキー方式を撤去し、秘密を**管理パスワード1つに統一**。詳細は phase-7-spec §2.1。
+
 | クライアント | 認証 | 操作メソッド | CSRF |
 |---|---|---|---|
-| Web UI（人間） | セッションCookie（`SameSite=Strict`） | **操作はPOST** | SameSiteで防止 |
-| スクリプト/ワールド内 | **APIキー**（`Authorization`ヘッダ優先、`?apiKey=`も許容） | GET/POST両対応 | Cookie不使用＝環境権限なし＝CSRF不成立 |
+| Web UI（人間） | **stateless HMAC 署名 Cookie**（`SameSite=Strict`・絶対失効30日） | **操作はPOST** | SameSiteで防止 |
+| スクリプト/ワールド内 | **`Authorization: Bearer <管理パスワード>`** | GET/POST両対応 | Cookie不使用＝環境権限なし＝CSRF不成立 |
 
-- APIキーはセットアップ時生成、UIで確認・**再生成可**。**ログにAPIキーを残さない**（クエリのキーはマスク）。
+- 署名鍵 = HMAC(SessionSecret, adminPasswordHash)。サーバー側にセッション状態を持たず、**パスワード変更で署名鍵が変わり全 Cookie が自動失効**（失効リスト不要）。
+- パスワード再設定: CLI `mrhc reset-password`（旧PW不要・復旧用） ＋ Web `POST /password`（現PW検証→新Cookie再発行で操作端末は継続）。
 - HTTPS不採用（LAN/HTTP前提）。これによりCORSは不要（同一オリジン）。レート制限はログイン失敗の軽い間引き程度。
 
 ### 長時間操作は非同期
@@ -216,7 +219,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 
 ### ライブ更新（SSE）
 - `GET /api/v1/events`（SSEストリーム）。イベント: `log`, `status`, `metrics`, `update`（起動/停止/再起動/Steam等の進捗）。
-- 認証はCookie（Web UI）。外部のSSE購読はAPIキー(`?apiKey=`)も可（読み取りのみで低リスク）。
+- 認証は Cookie（Web UI・同一オリジンで自動送出）。外部購読は `Authorization: Bearer <管理パスワード>`（ブラウザ EventSource はヘッダ不可のため curl/スクリプト用）。
 - socket.ioは不採用。
 
 ---
