@@ -2,9 +2,9 @@ import { useTranslation } from "react-i18next";
 import { Box, Group, Stack, Text } from "@mantine/core";
 import { FieldRow, InspectorButton, InspectorCard, InspectorTextInput } from "../../components/inspector";
 
-// ワールド検索 → 検索結果から起動する枠（将来対応）。今はレイアウト予約のための
-// disabled プレースホルダ（ロジック無し）。有効化には DESIGN §Won't のワールド検索
-// （go.resonite.com スクレイピング or 代替検索ソース）の判断が必要。起動自体は将来も
+// ワールド検索 → 検索結果から起動する枠（将来実装）。今はレイアウト予約のための
+// disabled プレースホルダ（ロジック無し）。ワールド検索は DESIGN Should（2026-05-31 判断修正で
+// §Won't から格上げ・実装は将来）＝v1 の go.resonite.com スクレイピング移植予定。起動自体は
 // 既存 URL モード（startWorldURL に resrec:// を渡す）を流用できる。phase-7-spec §3.12。
 export function WorldSearchPanel() {
   const { t } = useTranslation();

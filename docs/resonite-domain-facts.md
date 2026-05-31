@@ -119,7 +119,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 - **認証**: 不要（`User-Agent` を付けるのみ）。✅ v1 実装＋2026-05-31 実機確認（`MarkN` 検索で4件取得）。
 - **ユーザーオブジェクト（使用フィールド）**: `id`(U-xxx) / `username`（無ければ `normalizedUsername`）/ `profile.iconUrl`。
 - **アバターURL**: `iconUrl` は `resdb:///<hash>.<ext>` 形式 → `https://assets.resonite.com/<hash>`（拡張子除去）に変換すると画像取得可。
-- **対象外**: ワールド検索（v1 は `go.resonite.com` スクレイピング）は DESIGN §Won't のため不採用。
+- **ワールド検索**: 公式 `api.resonite.com` には**ワールド検索が無い**（ユーザー検索のみ）。v1 は `go.resonite.com` の HTML スクレイピングで実現。DESIGN Should（2026-05-31 判断修正で §Won't から格上げ・実装は将来）。
 
 ---
 

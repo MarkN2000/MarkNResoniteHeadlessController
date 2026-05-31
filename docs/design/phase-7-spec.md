@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **7-3 新規セッション（URL/テンプレ起動＋検索枠予約）実装済**。7-7 第1層（write 失敗/成功トースト）実装済。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11、7-3新規セッション=§3.12。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-7 残（自動poll/Page Visibility）or コンフィグ/設定タブ。
+> ステータス: **7-3 新規セッション（URL/テンプレ起動＋検索枠予約）実装済**。7-7 第1層（write 失敗/成功トースト）実装済。Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済でフレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10、7-7第1層トースト=§3.11、7-3新規セッション=§3.12、7-7残自動poll/PageVisibility=§3.13、コンフィグ(7-4)確定仕様=§3.14。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次はコンフィグタブ(7-4)実装。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -37,7 +37,7 @@ Phase 8 (自動再起動):
 Phase 9 (Resonite / Steam 統合):
   - ✅ P9-A: Resonite 公開API ユーザー検索（名/ID・無認証）＋フレンド申請/解除/招待（実装済・§3.10）
   - P9-B: Steam 更新（DepotDownloader 統一・2FA UI 入力→stdin・進捗 SSE）← 別計画・DESIGN §5.7
-  - ※ ワールド検索は DESIGN §Won't（不採用）。新規セッションは URL/テンプレート方式（7-3）
+  - ※ ワールド検索（go.resonite.com スクレイピング）は DESIGN Should（将来実装・2026-05-31 判断修正で §Won't から格上げ）。新規セッションは現状 URL/テンプレート方式（7-3）＋検索枠を予約（§3.12）
 ```
 
 ### 廃止した v1 機能（採用しない）
@@ -217,7 +217,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 | 1 | **セッション** | 1 | フォーカス中の設定（名前/アクセス/最大/AFK/説明/保存/再起動/閉じる）+ ユーザー一覧（アイコン/AFK/権限 + respawn/kick/ban/silence/role/message） | 「起動してください」 |
 | 2 | **フレンド** | 2 | リクエスト一覧 / Ban 一覧 / フォーカス内ユーザー / 検索(P9) → ユーザー操作（承認/申請/解除/invite=フォーカス中へ） | 「起動してください」 |
 | 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
-| 4 | **コンフィグ** | (編集) | v1 同等 CRUD を作り直し | ✅ 使える |
+| 4 | **コンフィグ** | (編集) | v1 同等 CRUD（フォームのみ・タブ式複数ワールド・§3.14） | ✅ 使える |
 | 5 | **スケジュール** | — | 状態表示（前回起動/稼働時間/次回再起動）+ 再起動予定（P8、現状「開発中」） | ✅ 使える |
 | 6 | **設定** | — | アプリ設定 / パスワード変更 / Steam 設定(P9) | ✅ 使える |
 | 7 | **コマンド** | — | SSE ライブログ + コマンド直送（上級者用） | 「起動してください」 |
@@ -314,7 +314,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 ### 3.10 フレンド検索 (P9-A) で確定した実装事項
 
 §3.9 の「準備中(P9)」枠を解禁。**Resonite 公開API（`api.resonite.com/users`・無認証）** によるユーザー検索＋
-申請/解除/招待を実装。world 検索は DESIGN §Won't のため対象外。
+申請/解除/招待を実装。world 検索（go.resonite.com）は DESIGN Should だが将来実装のため本 P9-A の対象外。
 
 - **検索 = 無認証プロキシ**: 新パッケージ `internal/resonite`（`Client.SearchUsers`・`User-Agent`・timeout 8s・baseURLテスト差替可）。
   `q` が `U-` 始まり→`/users/<id>`（単一）/ それ以外→`/users/?name=<q>`（配列）。iconUrl は `resdb:///<hash>.<ext>` →
@@ -326,7 +326,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **オンデマンド維持**: 検索も押した時だけ取得。`reqId` ガードで search/focused の取得競合も保護。⟳ は現ソース（検索は最後の語）を再取得。
 - **既知の限界**: 公開APIは友達関係を返さないため検索行は常に3操作を出す（非該当操作の backend 失敗は **7-7 第1層トーストで通知＝§3.11**。ただし方針A上、意味的失敗で HTTP 200 が返る場合は無音のまま）。`invite` は実機出力未確定（方針A 受理表示）。
 - **検証**: ユニット（resonite client + server ハンドラ・httptest）緑。Chrome 実機相当: 名前検索→実 api.resonite.com→結果＋アバター、申請の確認→実行、フォーカス内→申請/解除。**検索のみ外部公開APIに依存**（write は fakehl 経由でローカル完結）。
-- **対象外**: world 検索（§Won't）。P9-B Steam/DepotDownloader（別計画・DESIGN §5.7）。
+- **対象外**: world 検索（DESIGN Should・将来実装）。P9-B Steam/DepotDownloader（別計画・DESIGN §5.7）。
 
 ### 3.11 write 失敗/成功トースト (7-7 第1層) で確定した実装事項
 
@@ -354,7 +354,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **[起動]は2つともニュートラル灰**（`InspectorButton severity="neutral"`・§3.7「ボタン全般=Mid grey」踏襲。適用のような cyan filled にはしない＝ユーザー決定）。
 - **起動前に確認ダイアログあり**（`useConfirm` + `ConfirmModal`）。`confirm.busy` がモーダルの loading を駆動（startworldurl は最大60s かかり得る）。`onConfirm` が `WriteResult` を return → 結果トーストは 7-7 第1層基盤で自動（成功=緑 `toast.newSessionDone`／失敗=赤）。
 - **起動成功後はトップバーのセッション一覧を再取得**（`App.tsx` の `refreshSessions` を `onStarted` で渡す）→ 新ワールドがプルダウンに出現＝方針A の「再取得で実状態を見せる」。
-- **ワールド検索枠（右・将来）**: disabled 検索入力＋「準備中（将来対応）」注記＋グレーのスケルトン結果カード2枚（将来のサムネ＋名前グリッドの形）。**有効化には DESIGN §Won't のワールド検索（v1 の `go.resonite.com` スクレイピング or 代替検索ソース）の判断が必要**。公式 API にワールド検索は無い。なお**検索結果からの起動は将来も既存 URL モード（`startworldurl "<resrec:// URL>"`）を流用**でき、追加バックエンドは"検索ソース"だけ。DESIGN.md §Won't 自体は不変（UI 枠の予約のみ）。
+- **ワールド検索枠（右・将来実装）**: disabled 検索入力＋「準備中（将来対応）」注記＋グレーのスケルトン結果カード2枚（将来のサムネ＋名前グリッドの形）。**ワールド検索は 2026-05-31 の判断修正で DESIGN §Won't → Should に格上げ（実装は将来）**。移植元 = v1 の `go.resonite.com` HTML スクレイピング（`GET /world-search?term=` → `ol.listing li a.listing-item` から name/画像/`R-`レコードID/`U-`(or `G-`)所有者ID を抽出し `resrec:///<owner>/<record>` を生成）。公式 API にワールド検索は無いため go.resonite.com 依存（HTML 構造変更で壊れ得る点は受容）。**検索結果からの起動は既存 URL モード（`startworldurl "<resrec:// URL>"`）を流用**でき、追加バックエンドは"検索ソース1本"のみ。
 - **開発支援**: fakehl は `startworldurl`/`startworldtemplate` を受理し新ワールドを worlds に追加済（スタンドインで一覧出現を確認可能）。
 - **既知の制約**: ① 不正 URL/未知テンプレは方針A で無音失敗になり得る（scheme 検証で軽減）。② 起動後の headless 自動 focus 挙動は未確定 → MVP は一覧再取得のみ（自動でセッションタブへ切替しない・将来検討）。
 
@@ -368,11 +368,53 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **スコープ（§3.4 準拠）**: セッションタブのみ。フレンド/コンフィグ/設定は自動 poll なし。**トップバーの全世界人数（`GET /sessions`＝`worlds`・focus 不要）は poll 対象外** → セッションタブ自身の人数/一覧は 10 秒で追従するが、トップバーのプルダウン人数は手動 ⟳ まで古いまま（既知の制限・要望あれば別途 `worlds` poll を追加可）。
 - **focus 競合**: 背景 poll は `focus idx→status→users` を行うが、MRHC の全 write も毎回 focus し直すため実害は軽微（§2.6 の単一管理者前提で許容済）。10 秒間隔で REPL 競合確率も小。
 
+### 3.14 コンフィグタブ (7-4) の確定仕様（実装前・本節がレビュー確定の単一情報源）
+
+Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エディタを v1 同等で作り直す。**バックエンド CRUD は実装済**（§2.3・`internal/hlconfig`＋`internal/server/configs.go`）のため **フロントのみ**（7-2/7-3/P9-A と同様・改修ゼロ）。決定経緯は 2026-05-31 のレビュー（v1 `main:frontend/src/routes/+page.svelte` 監査含む）。
+
+**前提（バックエンドの性質）**
+- config は**不透明な JSON map**。MRHC は name サニタイズ・`loginPassword` マスク/保持・`$schema` 付与・`startWorlds` 配列検証のみ。**未知フィールドは保持**。
+- 値の意味検証はしない（accessLevel/preset 名の正当性は Resonite が権威）→ フォームがガードレール役。
+- name = ファイル名（`^[A-Za-z0-9_\-]{1,64}$`）。リネーム API 無し。PUT は upsert。GET は `loginPassword=""` マスク。
+
+**(A) エディタ方式＝フォームのみ（生JSON 撤去）**
+- 整形フォーム＋複数ワールドは**タブ式**。**生JSON 編集セクションは設けない**（ほぼ全項目をフォーム化するため不要・フォーム↔JSON 同期の複雑さとセキュリティ懸念を回避。v1 の編集可能 JSON プレビューも省く）。
+- **未知/レア項目の温存は保存ロジックで invisible に継続（必須）**：保存時に `GET 全文 → フォーム管理項目だけ上書き → 残り（レア/未知）はそのまま → PUT`。これが無いと編集保存で `parentSessionIds`/`*CloudVariable` 等が消失する。
+- トレードオフ：UI 非搭載のレア項目（下記）は**温存のみ・UI 編集不可**。必要時に後日フォーム化。
+
+**(D) レイアウト・CRUD**
+- 左=config 一覧レール（~260・名前＋worldCount バッジ・選択で右に読込・上部に [＋新規]）／右=エディタカード。狭幅は「config 選択プルダウン＋エディタ」に畳む（`SplitColumns` 流儀）。
+- 新規（name 入力→同梱デフォルト雛形）／複製（GET→別名 PUT）／削除（確認）／保存（dirty 追跡＋未保存ガード）。**リネーム非提供**（複製→旧削除で代替）。
+- **誤上書き防止**：新規/複製で**既存 name と衝突したら警告**（PUT が黙って上書きするため）。name は即時バリデーション。
+
+**(B) アカウント**
+- config 毎に任意の `loginCredential`/`loginPassword` 欄（空=中央アカウント注入）。password マスク・空=変更なし。中央アカウント設定自体は設定タブ（次フェーズ）の領分。
+
+**(C) フィールド構成＝v1 同等（基本的に全フォーム化）**
+- config トップ（フォーム）：`comment`・`tickRate`・`maxConcurrentAssetTransfers`・`usernameOverride`・`dataFolder`・`cacheFolder`・`logsFolder`・`allowedUrlHosts`（add/remove リスト）・`autoSpawnItems`（カンマ→配列）＋アカウント欄。
+- 各ワールド（startWorlds[]・タブ・フォーム）
+  - 基本：`isEnabled`（タブ有効/無効）・`sessionName`・`description`・`accessLevel`・`maxUsers`・`loadWorldPresetName`＋`loadWorldURL`（**両表示**・スキーマ上両立可・どちらが効くかは Resonite 依存＝URL 優先）・`customSessionId`（**prefix/suffix ビルダー**・`:` 分割/結合・自動補完=ボット名依存は将来）。
+  - 運用：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`・`forcedRestartInterval`・`autosaveInterval`（各 `-1=無効` 注記）・`saveOnExit`・`autoRecover`・`autoSleep`・`hideFromPublicListing`・`mobileFriendly`。
+- **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`enableResoniteLink`・`forceResoniteLinkPort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。
+
+**安全/堅牢**
+- 新規 config の `accessLevel` 既定は **Private**（v1 の Anyone と違い安全側。no-config/誤 accessLevel は公開事故＝domain-facts §7）。
+- **未保存ガード**：dirty 時は **config 切替・新規作成・複製**で破棄確認を挟む（`guardDiscard` で3経路統一）。複製は保存状態（`original`）をクローン。同一 config 内のワールドタブ移動は保存単位が同じため不要。ワールド削除・config 削除は確認ダイアログ。**既知の制限**：コンフィグタブから**他タブへ離脱**すると未保存編集は警告なく失われる（アプリ横断の未保存ガードは未実装＝他タブ方針と整合・MVP 許容）。
+- **ワールドは最低1つ**（最後の1枚は削除不可）。
+- **稼働中の config 編集は再起動まで未反映**の注記。
+- `loginPassword` は常時マスク（タイプした平文を画面に再表示しない）。
+- 不正 JSON の config はロード失敗を画面表示（クラッシュしない・一覧には name のみ出る）。
+
+**ワールド検索（将来）**：`loadWorldURL` の検索ピッカーは将来（ワールド検索＝DESIGN Should・将来実装・§3.12）。今は URL プレーンテキスト欄。
+
+**流用部品**：`components/inspector`（InspectorCard/FieldRow/InspectorSelect/InspectorTextInput/InspectorNumberInput/InspectorTextarea/InspectorButton/RefreshButton）・`hooks/useConfirm`＋`ConfirmModal`・`hooks/useAsyncAction`・`lib/notify`（結果トースト自動）・`SplitColumns`。
+
+**バックエンド**：改修ゼロ。GET `/headless-configs`（一覧）・GET `/headless-configs/{name}`（全文・pw マスク）・PUT（upsert）・DELETE。新規雛形はフロントが同梱デフォルト（Private・1ワールド・creds 空）を保持。
+
 ---
 
 ## 4. 後で詳細協議が必要な領域
 - **スケジュールの再起動条件**（モジュール式設計・待機制御 waitControl）← Phase 8 着手前
-- **コンフィグエディタの具体的フィールド構成**（v1 のフォーム項目を作り直し）
 - **設定タブの中身**
 - **新規セッション「テンプレート」の実体**（`startWorldTemplate` の有効テンプレート名）← 実機採取
 - **Steam（DepotDownloader）の 2FA UI フロー詳細** ← Phase 9、ARM 実機採取と合わせて（メモリ `arm-support-plan`）
