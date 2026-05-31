@@ -45,26 +45,36 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
             ? `${t("friends.focusedUsers")} (${focusedUsers.length})`
             : t("friends.result");
 
-  // 外向き操作（申請/解除/招待）は確認 → 実行 → 現ソース再取得。
-  const askOp = (labelKey: string, msgKey: string, danger: boolean, username: string, fn: () => Promise<unknown>) =>
+  // unban は操作で項目がリストから消えるので確認 → 実行 → 再取得。メッセージは名前+userId。
+  const askUnban = (b: BanEntry) =>
+    confirm.ask({
+      title: t("friends.unbanTitle"),
+      message: t("friends.confirmUnban", { user: b.username, userId: b.userId }),
+      danger: true,
+      onConfirm: async () => {
+        await api.unban(b.userId);
+        onRefetch();
+      },
+    });
+
+  // 関係操作（申請/解除/招待）は外向きなので確認するが、search/focused のリストは
+  // 友達関係を表示しないため**操作後 refetch しない**（リストは変化しない・手動 ⟳ で更新）。
+  const askUserOp = (labelKey: string, msgKey: string, danger: boolean, username: string, fn: () => Promise<unknown>) =>
     confirm.ask({
       title: t(labelKey),
       message: t(msgKey, { user: username }),
       danger,
       onConfirm: async () => {
         await fn();
-        onRefetch();
       },
     });
 
-  const askUnban = (b: BanEntry) =>
-    askOp("friends.unbanTitle", "friends.confirmUnban", true, b.username, () => api.unban(b.userId));
   const askSendRequest = (u: string) =>
-    askOp("friends.sendRequest", "friends.confirmSendRequest", false, u, () => api.sendFriendRequest(u));
+    askUserOp("friends.sendRequest", "friends.confirmSendRequest", false, u, () => api.sendFriendRequest(u));
   const askRemoveFriend = (u: string) =>
-    askOp("friends.removeFriend", "friends.confirmRemoveFriend", true, u, () => api.removeFriend(u));
+    askUserOp("friends.removeFriend", "friends.confirmRemoveFriend", true, u, () => api.removeFriend(u));
   const askInvite = (u: string) =>
-    askOp("friends.invite", "friends.confirmInvite", false, u, () => api.inviteUser(idx, u));
+    askUserOp("friends.invite", "friends.confirmInvite", false, u, () => api.inviteUser(idx, u));
 
   let body: ReactNode;
   if (loading) {
