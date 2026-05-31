@@ -20,6 +20,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 )
 
 type Server struct {
@@ -31,13 +32,14 @@ type Server struct {
 	worlds    headless.WorldsService
 	auth      *authManager
 	webFS     fs.FS
+	resonite  *resonite.Client // Resonite 公開API（ユーザー検索）
 
 	// credMu は cfg.HeadlessCredentials の更新(credentials PUT)と起動時読取の競合を防ぐ。
 	// auth は別フィールド（SessionSecret/AdminPasswordHash）しか読まないため対象外。
 	credMu sync.RWMutex
 }
 
-func New(cfg *config.Config, cfgPath string, driver *headless.Driver, webFS fs.FS) *Server {
+func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *resonite.Client, webFS fs.FS) *Server {
 	dataDir := ""
 	if cfgPath != "" {
 		dataDir = filepath.Dir(cfgPath)
@@ -51,6 +53,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, webFS fs.F
 		worlds:    headless.NewWorldsService(driver),
 		auth:      newAuthManager(cfg),
 		webFS:     webFS,
+		resonite:  reso,
 	}
 }
 
@@ -110,6 +113,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/friends/add", s.requireAuth(s.globalUserOp("sendFriendRequest")))
 	mux.HandleFunc("POST /api/v1/friends/remove", s.requireAuth(s.globalUserOp("removeFriend")))
 	mux.HandleFunc("POST /api/v1/bans/unban", s.requireAuth(s.handleBanUnban))
+
+	// Resonite 公開API（ユーザー検索）。フレンド申請/招待の相手探しに使う（無認証プロキシ・P9-A）。
+	mux.HandleFunc("GET /api/v1/resonite/users", s.requireAuth(s.handleResoniteUserSearch))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
@@ -375,6 +381,26 @@ func (s *Server) handleFriendRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, headless.ParseFriendRequests(lines))
+}
+
+// handleResoniteUserSearch: GET /api/v1/resonite/users?q=<term> → []resonite.User
+// Resonite 公開API（api.resonite.com/users）への無認証プロキシ。q が "U-" 始まりなら ID 検索、
+// それ以外は名前検索。ヘッドレス稼働は不要（クラウドAPI直叩き）。
+func (s *Server) handleResoniteUserSearch(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		writeErr(w, http.StatusBadRequest, "missing_query", "検索語 q は必須です")
+		return
+	}
+	users, err := s.resonite.SearchUsers(r.Context(), q)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "resonite_api_error", err.Error())
+		return
+	}
+	if users == nil {
+		users = []resonite.User{} // null ではなく [] を返す
+	}
+	writeOK(w, users)
 }
 
 // parseSessionIdx は /api/v1/sessions/{idx}/... のパスパラメータを int に変換する。

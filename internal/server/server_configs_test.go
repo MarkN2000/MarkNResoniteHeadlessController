@@ -18,6 +18,7 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 )
 
 // newConfigServer は driver 未起動の Server を立て、temp の cfgPath/configDir を使う。
@@ -37,7 +38,7 @@ func newConfigServer(t *testing.T) (ts *httptest.Server, pw, configDir string) {
 		t.Fatal(err)
 	}
 	drv := headless.NewDriver(nil)
-	srv := New(cfg, cfgPath, drv, nil)
+	srv := New(cfg, cfgPath, drv, resonite.NewClient(), nil)
 	ts = httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return ts, testPassword, configDir
@@ -195,7 +196,7 @@ func TestConfigs_StartByName(t *testing.T) {
 	}
 
 	drv := headless.NewDriver(nil)
-	srv := New(cfg, cfgPath, drv, nil)
+	srv := New(cfg, cfgPath, drv, resonite.NewClient(), nil)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() {
 		ts.Close()

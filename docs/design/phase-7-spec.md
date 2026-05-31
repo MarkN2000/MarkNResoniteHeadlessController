@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **Phase 7-2 フレンドタブ（承認+unban のクリーンMVP）実装済**。7-1 セッションタブ実装済（インスペクタ風デザインシステム + セッション設定/ユーザーモデレーション）。Foundation(7-0)=§3.7、7-1=§3.8、7-2=§3.9。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-3 新規セッション or P9 検索（フレンド申請/解除/招待を含む）。
+> ステータス: **Phase 9-A フレンド検索（申請/解除/招待＋Resoniteユーザー検索）実装済**。フレンドタブは完成（7-2 承認+unban のクリーンMVP → P9-A で検索/関係操作を解禁）。7-1 セッションタブ・7-0 Foundation 実装済。Foundation=§3.7、7-1=§3.8、7-2=§3.9、P9-A=§3.10。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-3 新規セッション or 7-7 仕上げ（トースト/自動poll）。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -307,7 +307,24 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **検索の器**: ユーザー名/ID 検索・`[フォーカスセッション内]` は **disabled の「準備中(P9)」枠**として今から配置（将来 ②に検索/在席結果を出すだけ。申請/招待/解除ボタンも P9 で②の行に追加）。
 - **流用部品**: `components/inspector`・`hooks/useConfirm`・`hooks/useAsyncAction`・`components/ConfirmModal`・`components/SplitColumns`。`unban` は `unbanByID <userId>`（v1 の素 `unban` 誤りを rewrite で修正済）。
 - **開発支援（7-2 追加）**: fakehl スタンドインに `demoRequests()`/`demoBans()` を追加し、`acceptfriendrequest`/`unban(ByID)` で該当を除去（承認/解除→一覧から消えるのを目視確認）。統合テスト（configPath=""）は無影響。Chrome 実機相当で全フロー検証済。
-- **対象外（P9 / 7-7）**: `申請`(sendFriendRequest)/`解除`(removeFriend)/`招待`(invite) ＋ ユーザー検索 → P9。write失敗トースト → 7-7。
+- **対象外（P9 / 7-7）**: `申請`(sendFriendRequest)/`解除`(removeFriend)/`招待`(invite) ＋ ユーザー検索 → P9-A（§3.10 で実装済）。write失敗トースト → 7-7。
+
+### 3.10 フレンド検索 (P9-A) で確定した実装事項
+
+§3.9 の「準備中(P9)」枠を解禁。**Resonite 公開API（`api.resonite.com/users`・無認証）** によるユーザー検索＋
+申請/解除/招待を実装。world 検索は DESIGN §Won't のため対象外。
+
+- **検索 = 無認証プロキシ**: 新パッケージ `internal/resonite`（`Client.SearchUsers`・`User-Agent`・timeout 8s・baseURLテスト差替可）。
+  `q` が `U-` 始まり→`/users/<id>`（単一）/ それ以外→`/users/?name=<q>`（配列）。iconUrl は `resdb:///<hash>.<ext>` →
+  `https://assets.resonite.com/<hash>` に正規化。ルート `GET /api/v1/resonite/users?q=`（`requireAuth`）。**hermetic ユニット**（httptest stub）。
+- **②に行種別を追加**: `search`（検索結果）/`focused`（フォーカス内在席者）。`UsersBody`＝アバター＋名前＋id＋
+  `[申請][解除]`＋（search のみ）`[招待]`。招待は在席者では無意味のため focused には出さない。
+- **すべて確認ダイアログ**（外向き操作・§3.9 方針）。`解除` は danger。`invite` は `POST /sessions/{idx}/invite`（focus 必要・
+  `FriendsTab` が focusedIdx を受け取る）。`申請`/`解除`/`招待` の backend は実装済（api.ts ラッパ追加のみ）。
+- **オンデマンド維持**: 検索も押した時だけ取得。`reqId` ガードで search/focused の取得競合も保護。⟳ は現ソース（検索は最後の語）を再取得。
+- **既知の限界**: 公開APIは友達関係を返さないため検索行は常に3操作を出す（非該当は backend 失敗・7-7 トーストまで無音）。`invite` は実機出力未確定（方針A 受理表示）。
+- **検証**: ユニット（resonite client + server ハンドラ・httptest）緑。Chrome 実機相当: 名前検索→実 api.resonite.com→結果＋アバター、申請の確認→実行、フォーカス内→申請/解除。**検索のみ外部公開APIに依存**（write は fakehl 経由でローカル完結）。
+- **対象外**: world 検索（§Won't）。P9-B Steam/DepotDownloader（別計画・DESIGN §5.7）。
 
 ---
 

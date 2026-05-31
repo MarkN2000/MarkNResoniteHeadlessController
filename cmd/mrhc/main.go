@@ -20,6 +20,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/server"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/setup"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/web"
@@ -73,7 +74,7 @@ func main() {
 	}
 
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
-	srv := server.New(cfg, cfgPath, driver, web.FS())
+	srv := server.New(cfg, cfgPath, driver, resonite.NewClient(), web.FS())
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Port), Handler: srv.Handler()}
 	go func() {

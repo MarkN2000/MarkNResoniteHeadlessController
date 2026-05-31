@@ -1,8 +1,8 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Box, Center, Divider, Group, Loader, Stack, Text } from "@mantine/core";
+import { Avatar, Box, Center, Divider, Group, Loader, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
-import type { BanEntry } from "../../api";
+import type { BanEntry, ResoniteUser, UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, RefreshButton } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
@@ -10,16 +10,26 @@ import { useConfirm } from "../../hooks/useConfirm";
 import type { FriendSource } from "./FriendsTab";
 
 interface Props {
+  idx: number;
   source: FriendSource | null;
   requests: string[];
   bans: BanEntry[];
+  searchResults: ResoniteUser[];
+  focusedUsers: UserInfo[];
   loading: boolean;
   onRefetch: () => void; // 現ソースの再取得（操作後 / ⟳）
 }
 
-// ② 統一結果リスト。①で選んだソース種別に応じて行を描画する（検索/フォーカス内も将来ここに出す）。
-// 行内ボタン方式: リクエスト行→[承認]（即時）、BAN行→[解除]（確認）。
-export function ResultList({ source, requests, bans, loading, onRefetch }: Props) {
+// 統一リストで扱うユーザー行の共通形（検索結果=ResoniteUser / フォーカス内=UserInfo を正規化）。
+interface UserRow {
+  id: string;
+  username: string;
+  iconUrl?: string;
+}
+
+// ② 統一結果リスト。①で選んだソース種別に応じて行を描画する（行内ボタン方式）。
+//   requests→[承認](即時) / bans→[解除](確認) / search・focused→[申請][解除](+search時[招待])（確認）。
+export function ResultList({ idx, source, requests, bans, searchResults, focusedUsers, loading, onRefetch }: Props) {
   const { t } = useTranslation();
   const accept = useAsyncAction(onRefetch); // 承認は内向き操作なので即時
   const confirm = useConfirm();
@@ -29,18 +39,67 @@ export function ResultList({ source, requests, bans, loading, onRefetch }: Props
       ? `${t("friends.requests")} (${requests.length})`
       : source === "bans"
         ? `${t("friends.bans")} (${bans.length})`
-        : t("friends.result");
+        : source === "search"
+          ? `${t("friends.searchResults")} (${searchResults.length})`
+          : source === "focused"
+            ? `${t("friends.focusedUsers")} (${focusedUsers.length})`
+            : t("friends.result");
 
-  const askUnban = (b: BanEntry) =>
+  // 外向き操作（申請/解除/招待）は確認 → 実行 → 現ソース再取得。
+  const askOp = (labelKey: string, msgKey: string, danger: boolean, username: string, fn: () => Promise<unknown>) =>
     confirm.ask({
-      title: t("friends.unbanTitle"),
-      message: t("friends.confirmUnban", { user: b.username, userId: b.userId }),
-      danger: true,
+      title: t(labelKey),
+      message: t(msgKey, { user: username }),
+      danger,
       onConfirm: async () => {
-        await api.unban(b.userId);
+        await fn();
         onRefetch();
       },
     });
+
+  const askUnban = (b: BanEntry) =>
+    askOp("friends.unbanTitle", "friends.confirmUnban", true, b.username, () => api.unban(b.userId));
+  const askSendRequest = (u: string) =>
+    askOp("friends.sendRequest", "friends.confirmSendRequest", false, u, () => api.sendFriendRequest(u));
+  const askRemoveFriend = (u: string) =>
+    askOp("friends.removeFriend", "friends.confirmRemoveFriend", true, u, () => api.removeFriend(u));
+  const askInvite = (u: string) =>
+    askOp("friends.invite", "friends.confirmInvite", false, u, () => api.inviteUser(idx, u));
+
+  let body: ReactNode;
+  if (loading) {
+    body = (
+      <Center py="md">
+        <Loader size="sm" />
+      </Center>
+    );
+  } else if (source === null) {
+    body = <Empty text={t("friends.selectSource")} />;
+  } else if (source === "requests") {
+    body = (
+      <RequestsBody
+        requests={requests}
+        busy={accept.busy}
+        onAccept={(name) => void accept.run(() => api.acceptFriendRequest(name))}
+      />
+    );
+  } else if (source === "bans") {
+    body = <BansBody bans={bans} onUnban={askUnban} />;
+  } else {
+    // search / focused を共通の UserRow に正規化して UsersBody で描画。
+    const users: UserRow[] =
+      source === "search" ? searchResults : focusedUsers.map((u) => ({ id: u.id, username: u.name }));
+    body = (
+      <UsersBody
+        users={users}
+        showInvite={source === "search"} // 招待は在席者では無意味（実機 ambient のみ）→ search のみ
+        emptyText={source === "search" ? t("friends.noResults") : t("friends.noFocusedUsers")}
+        onSendRequest={askSendRequest}
+        onRemoveFriend={askRemoveFriend}
+        onInvite={askInvite}
+      />
+    );
+  }
 
   return (
     <>
@@ -52,19 +111,7 @@ export function ResultList({ source, requests, bans, loading, onRefetch }: Props
           ) : undefined
         }
       >
-        {loading ? (
-          <Center py="md">
-            <Loader size="sm" />
-          </Center>
-        ) : source === null ? (
-          <Text c="dimmed" size="sm" ta="center" py="md">
-            {t("friends.selectSource")}
-          </Text>
-        ) : source === "requests" ? (
-          <RequestsBody requests={requests} busy={accept.busy} onAccept={(name) => void accept.run(() => api.acceptFriendRequest(name))} />
-        ) : (
-          <BansBody bans={bans} onUnban={askUnban} />
-        )}
+        {body}
       </InspectorCard>
 
       <ConfirmModal
@@ -80,6 +127,14 @@ export function ResultList({ source, requests, bans, loading, onRefetch }: Props
   );
 }
 
+function Empty({ text }: { text: string }) {
+  return (
+    <Text c="dimmed" size="sm" ta="center" py="md">
+      {text}
+    </Text>
+  );
+}
+
 function RequestsBody({
   requests,
   busy,
@@ -90,17 +145,10 @@ function RequestsBody({
   onAccept: (name: string) => void;
 }) {
   const { t } = useTranslation();
-  if (requests.length === 0) {
-    return (
-      <Text c="dimmed" size="sm" ta="center" py="md">
-        {t("friends.noRequests")}
-      </Text>
-    );
-  }
+  if (requests.length === 0) return <Empty text={t("friends.noRequests")} />;
   return (
     <Stack gap="xs">
       {requests.map((name, i) => (
-        // 同名 pending が来ても衝突しないよう name+index で一意化。
         <Fragment key={`${name}#${i}`}>
           {i > 0 && <Divider color="dark.5" />}
           <Group justify="space-between" wrap="nowrap" gap="xs">
@@ -119,20 +167,13 @@ function RequestsBody({
 
 function BansBody({ bans, onUnban }: { bans: BanEntry[]; onUnban: (b: BanEntry) => void }) {
   const { t } = useTranslation();
-  if (bans.length === 0) {
-    return (
-      <Text c="dimmed" size="sm" ta="center" py="md">
-        {t("friends.noBans")}
-      </Text>
-    );
-  }
+  if (bans.length === 0) return <Empty text={t("friends.noBans")} />;
   return (
     <Stack gap="xs">
       {bans.map((b, i) => (
         <Fragment key={b.userId || `${b.username}#${i}`}>
           {i > 0 && <Divider color="dark.5" />}
           <Box>
-            {/* 1行目: 🚫 名前 + [解除]（危険・確認あり） */}
             <Group justify="space-between" wrap="nowrap" gap="xs">
               <Text fw={600} truncate>
                 {/* 🚫 は装飾（BAN一覧という文脈＋ユーザー名で冗長）なのでスクリーンリーダーから隠す。 */}
@@ -142,11 +183,71 @@ function BansBody({ bans, onUnban }: { bans: BanEntry[]; onUnban: (b: BanEntry) 
                 {t("friends.unban")}
               </InspectorButton>
             </Group>
-            {/* 2行目: userId · Machine（dimmed・省略表示） */}
             <Text size="xs" c="dimmed" truncate>
               {b.userId}
               {b.machineIds.length > 0 ? ` · ${t("friends.machine")}: ${b.machineIds.join(" ")}` : ""}
             </Text>
+          </Box>
+        </Fragment>
+      ))}
+    </Stack>
+  );
+}
+
+// 検索結果 / フォーカス内ユーザーの共通描画。情報行（アバター＋名前＋id）＋操作行（申請/招待/解除）。
+function UsersBody({
+  users,
+  showInvite,
+  emptyText,
+  onSendRequest,
+  onRemoveFriend,
+  onInvite,
+}: {
+  users: UserRow[];
+  showInvite: boolean;
+  emptyText: string;
+  onSendRequest: (username: string) => void;
+  onRemoveFriend: (username: string) => void;
+  onInvite: (username: string) => void;
+}) {
+  const { t } = useTranslation();
+  if (users.length === 0) return <Empty text={emptyText} />;
+  return (
+    <Stack gap="xs">
+      {users.map((u, i) => (
+        <Fragment key={u.id || `${u.username}#${i}`}>
+          {i > 0 && <Divider color="dark.5" />}
+          <Box>
+            {/* 情報行: アバター + 名前 + id */}
+            <Group wrap="nowrap" gap="xs" mb={6}>
+              <Avatar src={u.iconUrl || undefined} radius="xl" size={32}>
+                {(u.username || "?").slice(0, 1).toUpperCase()}
+              </Avatar>
+              <Box style={{ minWidth: 0 }}>
+                <Text fw={600} truncate>
+                  {u.username || t("friends.unknownUser")}
+                </Text>
+                {u.id && (
+                  <Text size="xs" c="dimmed" truncate>
+                    {u.id}
+                  </Text>
+                )}
+              </Box>
+            </Group>
+            {/* 操作行: 申請 / 招待 / 解除（モバイルで折返し）。 */}
+            <Group gap={4} wrap="wrap">
+              <InspectorButton severity="neutral" onClick={() => onSendRequest(u.username)}>
+                {t("friends.sendRequest")}
+              </InspectorButton>
+              {showInvite && (
+                <InspectorButton severity="neutral" onClick={() => onInvite(u.username)}>
+                  {t("friends.invite")}
+                </InspectorButton>
+              )}
+              <InspectorButton severity="danger" onClick={() => onRemoveFriend(u.username)}>
+                {t("friends.removeFriend")}
+              </InspectorButton>
+            </Group>
           </Box>
         </Fragment>
       ))}

@@ -92,8 +92,8 @@
     "searchByName": "ユーザー名で検索",
     "searchById": "ユーザーIDで検索",
     "search": "検索",
-    "searchPlaceholder": "（準備中）",
-    "searchSoon": "ユーザー検索は今後対応予定です",
+    "searchNamePlaceholder": "ユーザー名",
+    "searchIdPlaceholder": "U- の後を入力",
     "loadRequests": "フレンドリクエスト一覧",
     "loadBans": "BAN一覧",
     "loadFocused": "フォーカスセッション内",
@@ -108,6 +108,17 @@
     "noBans": "BANはありません",
     "selectSource": "ソースを選択してください",
     "refresh": "更新",
-    "machine": "Machine"
+    "machine": "Machine",
+    "searchResults": "検索結果",
+    "focusedUsers": "セッション内ユーザー",
+    "noResults": "該当するユーザーがいません",
+    "noFocusedUsers": "セッションにユーザーがいません",
+    "unknownUser": "(不明)",
+    "sendRequest": "申請",
+    "removeFriend": "解除",
+    "invite": "招待",
+    "confirmSendRequest": "{{user}} にフレンド申請を送りますか？",
+    "confirmRemoveFriend": "{{user}} とのフレンドを解除しますか？",
+    "confirmInvite": "{{user}} をフォーカス中のセッションに招待しますか？"
   }
 }

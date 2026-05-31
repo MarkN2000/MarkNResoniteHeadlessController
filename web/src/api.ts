@@ -72,6 +72,13 @@ export interface BanEntry {
   machineIds: string[];
 }
 
+// Resonite 公開API のユーザー検索結果（internal/resonite.User）。iconUrl は https 正規化済（空可）。
+export interface ResoniteUser {
+  id: string;
+  username: string;
+  iconUrl: string;
+}
+
 // UI ドロップダウン用の enum 候補（値の権威は Resonite・サーバーは値検証しない）。docs §2.4。
 export const ACCESS_LEVELS = [
   "Private",
@@ -177,6 +184,11 @@ export async function getListBans(): Promise<BanEntry[]> {
   return (await getData<BanEntry[]>("/listbans")) ?? [];
 }
 
+// Resonite 公開API でユーザー検索（q が "U-" 始まりなら ID 検索・それ以外は名前検索）。
+export async function searchResoniteUsers(q: string): Promise<ResoniteUser[]> {
+  return (await getData<ResoniteUser[]>(`/resonite/users?q=${encodeURIComponent(q)}`)) ?? [];
+}
+
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
 
 export interface WriteResult {
@@ -229,3 +241,8 @@ export const messageUser = (idx: number, user: string, message: string) =>
 // フレンド / BAN（グローバル・focus 不要）
 export const acceptFriendRequest = (user: string) => post(`/friendrequests/accept`, { user });
 export const unban = (userId: string) => post(`/bans/unban`, { userId });
+export const sendFriendRequest = (user: string) => post(`/friends/add`, { user });
+export const removeFriend = (user: string) => post(`/friends/remove`, { user });
+
+// 招待（フォーカス中セッションへ・focus 必要）
+export const inviteUser = (idx: number, user: string) => post(`/sessions/${idx}/invite`, { user });

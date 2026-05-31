@@ -21,6 +21,7 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 )
 
 var fakehlPath string
@@ -81,7 +82,7 @@ func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 		t.Fatalf("fakehl never became ready")
 	}
 
-	srv := New(cfg, "", drv, nil) // webFS=nil → '/' ハンドラは未登録（テストでは不要）
+	srv := New(cfg, "", drv, resonite.NewClient(), nil) // webFS=nil → '/' ハンドラは未登録（テストでは不要）
 	ts = httptest.NewServer(srv.Handler())
 
 	t.Cleanup(func() {

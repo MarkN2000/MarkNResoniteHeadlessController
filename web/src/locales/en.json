@@ -92,8 +92,8 @@
     "searchByName": "Search by username",
     "searchById": "Search by user ID",
     "search": "Search",
-    "searchPlaceholder": "(coming soon)",
-    "searchSoon": "User search is coming soon",
+    "searchNamePlaceholder": "Username",
+    "searchIdPlaceholder": "part after U-",
     "loadRequests": "Friend requests",
     "loadBans": "Ban list",
     "loadFocused": "Focused session",
@@ -108,6 +108,17 @@
     "noBans": "No bans",
     "selectSource": "Select a source",
     "refresh": "Refresh",
-    "machine": "Machine"
+    "machine": "Machine",
+    "searchResults": "Search results",
+    "focusedUsers": "Users in session",
+    "noResults": "No matching users",
+    "noFocusedUsers": "No users in session",
+    "unknownUser": "(unknown)",
+    "sendRequest": "Request",
+    "removeFriend": "Remove",
+    "invite": "Invite",
+    "confirmSendRequest": "Send a friend request to {{user}}?",
+    "confirmRemoveFriend": "Remove {{user}} from your contacts?",
+    "confirmInvite": "Invite {{user}} to the focused session?"
   }
 }

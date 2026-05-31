@@ -1,31 +1,51 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Divider, Group, Stack, Text } from "@mantine/core";
 import { InspectorButton, InspectorCard, InspectorTextInput } from "../../components/inspector";
-import type { FriendSource } from "./FriendsTab";
+import type { FriendSource, LoadSource } from "./FriendsTab";
 
 interface Props {
   active: FriendSource | null; // 現在表示中のソース（ボタンのハイライト用）
   loading: boolean;
-  onLoad: (src: FriendSource) => void;
+  onLoad: (src: LoadSource) => void;
+  onSearch: (term: string) => void;
 }
 
-// ① ソース選択パネル。結果は②（ResultList）に集約されるため、ここは「何を取得/検索するか」だけを持つ。
-// ユーザー名/ID 検索とフォーカスセッション内は Resonite クラウドAPI 等が要るため P9（今は disabled の枠）。
-export function SourcePanel({ active, loading, onLoad }: Props) {
+// ① ソース選択パネル。結果は②（ResultList）に集約。ここは「何を取得/検索するか」だけを持つ。
+// ユーザー検索は Resonite 公開API（無認証）。フォーカス内は現セッションの在席者。
+export function SourcePanel({ active, loading, onLoad, onSearch }: Props) {
   const { t } = useTranslation();
+  const [nameQ, setNameQ] = useState("");
+  const [idQ, setIdQ] = useState("");
+
+  const searchByName = () => {
+    const q = nameQ.trim();
+    if (q) onSearch(q);
+  };
+  const searchById = () => {
+    // 表示済みの "U-" 接頭辞を二重化しないよう、入力側の U- は剥がしてから付け直す。
+    const q = idQ.trim().replace(/^U-/i, "");
+    if (q) onSearch("U-" + q);
+  };
+
   return (
     <InspectorCard title={t("friends.source")}>
       <Stack gap="sm">
-        {/* 検索（準備中・P9）。器だけ用意して将来 ②に検索結果を出す。 */}
+        {/* ユーザー検索（Resonite 公開API・無認証） */}
         <Box>
           <Text size="xs" c="dimmed" mb={4}>
             {t("friends.searchByName")}
           </Text>
           <Group gap="xs" wrap="nowrap">
             <Box style={{ flex: 1 }}>
-              <InspectorTextInput disabled placeholder={t("friends.searchPlaceholder")} />
+              <InspectorTextInput
+                value={nameQ}
+                onChange={(e) => setNameQ(e.currentTarget.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchByName()}
+                placeholder={t("friends.searchNamePlaceholder")}
+              />
             </Box>
-            <InspectorButton disabled>{t("friends.search")}</InspectorButton>
+            <InspectorButton onClick={searchByName}>{t("friends.search")}</InspectorButton>
           </Group>
         </Box>
         <Box>
@@ -37,18 +57,20 @@ export function SourcePanel({ active, loading, onLoad }: Props) {
               U-
             </Text>
             <Box style={{ flex: 1 }}>
-              <InspectorTextInput disabled placeholder={t("friends.searchPlaceholder")} />
+              <InspectorTextInput
+                value={idQ}
+                onChange={(e) => setIdQ(e.currentTarget.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchById()}
+                placeholder={t("friends.searchIdPlaceholder")}
+              />
             </Box>
-            <InspectorButton disabled>{t("friends.search")}</InspectorButton>
+            <InspectorButton onClick={searchById}>{t("friends.search")}</InspectorButton>
           </Group>
         </Box>
-        <Text size="xs" c="dimmed" ta="center">
-          {t("friends.searchSoon")}
-        </Text>
 
         <Divider color="dark.4" />
 
-        {/* 取得（有効）。押したソースだけ②に取得する。現ソースは filled でハイライト。 */}
+        {/* 取得系ソース。押したソースだけ②に取得。現ソースは filled でハイライト。 */}
         <InspectorButton
           fullWidth
           variant={active === "requests" ? "filled" : "light"}
@@ -65,8 +87,12 @@ export function SourcePanel({ active, loading, onLoad }: Props) {
         >
           {t("friends.loadBans")}
         </InspectorButton>
-        {/* フォーカスセッション内ソースは P9（検索と同じく今は枠のみ）。 */}
-        <InspectorButton fullWidth disabled>
+        <InspectorButton
+          fullWidth
+          variant={active === "focused" ? "filled" : "light"}
+          loading={loading && active === "focused"}
+          onClick={() => onLoad("focused")}
+        >
           {t("friends.loadFocused")}
         </InspectorButton>
       </Stack>

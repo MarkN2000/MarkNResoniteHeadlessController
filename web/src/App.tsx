@@ -90,7 +90,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     const stopped = (status?.state ?? "stopped") === "stopped";
     if (!def.availableWhenStopped && stopped) return <StartPrompt />;
     if (activeTab === "session") return running ? <SessionTab idx={focusedIdx} /> : <StartPrompt />;
-    if (activeTab === "friends") return running ? <FriendsTab /> : <StartPrompt />;
+    if (activeTab === "friends") return running ? <FriendsTab idx={focusedIdx} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
