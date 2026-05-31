@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **Phase 7-1 セッションタブ 実装済**（インスペクタ風デザインシステム + セッション設定/ユーザーモデレーション）。Foundation(7-0)の確定事項は §3.7、7-1 の確定事項は §3.8。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は B1（status+users を detail 1本に集約）→ 7-2 フレンド。
+> ステータス: **Phase 7-2 フレンドタブ（承認+unban のクリーンMVP）実装済**。7-1 セッションタブ実装済（インスペクタ風デザインシステム + セッション設定/ユーザーモデレーション）。Foundation(7-0)=§3.7、7-1=§3.8、7-2=§3.9。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。次は 7-3 新規セッション or P9 検索（フレンド申請/解除/招待を含む）。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -295,6 +295,19 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
 - **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
 - **残課題（7-7で対応）**: **write失敗が現状無音**（`api.post` の `WriteResult{ok,error}` を呼び出し側が見ていない）。7-7のトースト導入時に `useAsyncAction`/各操作で `WriteResult` を拾い、失敗を通知する（M2/L4）。`getData` が 409(not ready) を区別しない点(L5)も同時に整理。
+
+### 3.9 フレンドタブ (7-2) で確定した実装事項
+
+7-2 は **2セクション構成（v1 master-detail を踏襲・拡張性重視）**＋**クリーンMVP（承認 + unban のみ）**。実装は原則フロントのみ（バックエンドの `/friendrequests`・`/listbans`・`/friendrequests/accept`・`/bans/unban` は実装済）。コンポーネント = `web/src/tabs/friends/`（FriendsTab/SourcePanel/ResultList）。
+
+- **構成の根拠**: v1(main) のフレンド機能は大半が **Resonite クラウドAPI ユーザー検索（=P9）依存**で、検索なしで一覧駆動で確実に成立するのは `承認`（リクエスト一覧）と `unban`（BAN一覧）の2つのみ（`申請`/`解除`/`招待` は検索選択駆動。特に `招待` は在席者では無意味＝実機 ambient のみ）。よって 7-2 は v1 の一覧駆動サブセットに限定。
+- **2セクション**: ① `SourcePanel`（何を取得/検索するか）＋ ② `ResultList`（結果を1か所に集約）。`SplitColumns` で広い画面は左右、狭い画面は縦積み。**ソース毎にカードを増やさず②に集約**（検索追加でも増えない）。
+- **オンデマンド取得**: タブを開いた時は**何も取得しない**（②は「ソースを選択」）。①のボタンを押した時だけ取得。②の ⟳ は**現ソースのみ**再取得（開く度に全要素を取りに行かない）。現ソースのボタンは filled でハイライト。
+- **②=行内ボタン**（7-1 と同方式）: request 行→`[承認]`（neutral・**内向きなので即時**）／ ban 行→2行（名 + `[解除]`(danger) / `userId · Machine` dimmed）。`解除` は外向き/security のため**確認ダイアログ**（`ConfirmModal`・名+userId）。
+- **検索の器**: ユーザー名/ID 検索・`[フォーカスセッション内]` は **disabled の「準備中(P9)」枠**として今から配置（将来 ②に検索/在席結果を出すだけ。申請/招待/解除ボタンも P9 で②の行に追加）。
+- **流用部品**: `components/inspector`・`hooks/useConfirm`・`hooks/useAsyncAction`・`components/ConfirmModal`・`components/SplitColumns`。`unban` は `unbanByID <userId>`（v1 の素 `unban` 誤りを rewrite で修正済）。
+- **開発支援（7-2 追加）**: fakehl スタンドインに `demoRequests()`/`demoBans()` を追加し、`acceptfriendrequest`/`unban(ByID)` で該当を除去（承認/解除→一覧から消えるのを目視確認）。統合テスト（configPath=""）は無影響。Chrome 実機相当で全フロー検証済。
+- **対象外（P9 / 7-7）**: `申請`(sendFriendRequest)/`解除`(removeFriend)/`招待`(invite) ＋ ユーザー検索 → P9。write失敗トースト → 7-7。
 
 ---
 

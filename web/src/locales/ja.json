@@ -86,5 +86,28 @@
     "confirmRestart": "このセッションを再起動しますか？",
     "confirmClose": "このセッションを閉じますか？",
     "confirmSave": "このセッションを保存しますか？"
+  },
+  "friends": {
+    "source": "ソース選択",
+    "searchByName": "ユーザー名で検索",
+    "searchById": "ユーザーIDで検索",
+    "search": "検索",
+    "searchPlaceholder": "（準備中）",
+    "searchSoon": "ユーザー検索は今後対応予定です",
+    "loadRequests": "フレンドリクエスト一覧",
+    "loadBans": "BAN一覧",
+    "loadFocused": "フォーカスセッション内",
+    "result": "結果",
+    "requests": "フレンドリクエスト",
+    "bans": "BAN一覧",
+    "accept": "承認",
+    "unban": "解除",
+    "unbanTitle": "BAN解除",
+    "confirmUnban": "{{user}} ({{userId}}) のBANを解除しますか？",
+    "noRequests": "リクエストはありません",
+    "noBans": "BANはありません",
+    "selectSource": "ソースを選択してください",
+    "refresh": "更新",
+    "machine": "Machine"
   }
 }

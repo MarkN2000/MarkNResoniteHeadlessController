@@ -107,6 +107,8 @@ func newStateFromConfig(configPath string, fallbackCount int) *state {
 		s.worlds = append(s.worlds, world{Name: n, Users: len(users), Present: present, AccessLevel: "Private", MaxUsers: 8})
 	}
 	s.users = users
+	s.bans = demoBans()         // フレンドタブ（BAN一覧/解除）の確認用
+	s.requests = demoRequests() // フレンドタブ（リクエスト一覧/承認）の確認用
 	return s
 }
 
@@ -118,6 +120,19 @@ func demoUsers() []userRow {
 		{Name: "Carol", ID: "U-carol", Role: "Builder", Present: true, PingMs: 25, FPS: 60.0},
 		{Name: "Dave", ID: "U-dave", Role: "Moderator", Present: true, PingMs: 40, FPS: 58.5},
 		{Name: "Eve", ID: "U-eve", Role: "Spectator", Present: false, PingMs: 150, FPS: 24.0},
+	}
+}
+
+// demoRequests は受信フレンドリクエストのサンプル（スタンドイン時のみ・匿名名）。
+func demoRequests() []string {
+	return []string{"frank_req", "grace-2024", "heidi"}
+}
+
+// demoBans は BAN 一覧のサンプル（スタンドイン時のみ・匿名名）。
+func demoBans() []banEntry {
+	return []banEntry{
+		{Username: "Spammer123", UserID: "U-spammer", MachineIDs: []string{"machine-aaaa1111"}},
+		{Username: "TrollUser", UserID: "U-trolluser", MachineIDs: []string{"machine-bbbb2222", "machine-cccc3333"}},
 	}
 }
 
@@ -291,9 +306,15 @@ func handleCommand(s *state, line string) {
 	case "role":
 		// role "<user>" <Role> → 在席ユーザーの Role を更新（UI の即適用を確認用に再現）。
 		setUserRole(s.users, rest)
+	case "acceptfriendrequest":
+		// 受信リクエストから該当ユーザー名を除去（承認→一覧から消えるのを確認用に再現）。
+		s.requests = removeStringByValue(s.requests, strings.Trim(rest, `" `))
+	case "unban", "unbanbyid":
+		// BAN一覧から該当 userId を除去（解除→一覧から消えるのを確認用に再現）。unbanByID <userId>。
+		s.bans = removeBanByUserID(s.bans, strings.TrimSpace(rest))
 	case "respawn", "invite", "message", "description",
 		"save", "restart", "close",
-		"acceptfriendrequest", "sendfriendrequest", "removefriend", "unban", "unbanbyid":
+		"sendfriendrequest", "removefriend":
 		// 受理してプロンプトのみ（状態変更は再現しない）
 	case "hidefromlisting":
 		// 受理のみ
@@ -330,6 +351,28 @@ func removeUserByName(users []userRow, name string) []userRow {
 	for _, u := range users {
 		if u.Name != name {
 			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// removeStringByValue は指定値を除いた新しいスライスを返す（acceptfriendrequest 用）。
+func removeStringByValue(items []string, val string) []string {
+	out := make([]string, 0, len(items))
+	for _, s := range items {
+		if s != val {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// removeBanByUserID は指定 userId を除いた新しい BAN スライスを返す（unban 用）。
+func removeBanByUserID(bans []banEntry, userID string) []banEntry {
+	out := make([]banEntry, 0, len(bans))
+	for _, b := range bans {
+		if b.UserID != userID {
+			out = append(out, b)
 		}
 	}
 	return out

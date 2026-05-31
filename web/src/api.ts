@@ -64,6 +64,14 @@ export interface UserInfo {
   silenced: boolean;
 }
 
+// listbans の1件（internal/headless.BanEntry）。
+export interface BanEntry {
+  index: number;
+  username: string;
+  userId: string;
+  machineIds: string[];
+}
+
 // UI ドロップダウン用の enum 候補（値の権威は Resonite・サーバーは値検証しない）。docs §2.4。
 export const ACCESS_LEVELS = [
   "Private",
@@ -157,6 +165,18 @@ export async function getSessionDetail(idx: number): Promise<SessionDetail | nul
   return getData<SessionDetail>(`/sessions/${idx}/detail`);
 }
 
+// --- フレンド / BAN（グローバル取得・focus 不要）---
+
+// 受信中フレンドリクエストのユーザー名一覧（incoming pending のみ）。
+export async function getFriendRequests(): Promise<string[]> {
+  return (await getData<string[]>("/friendrequests")) ?? [];
+}
+
+// BAN 一覧（listbans）。
+export async function getListBans(): Promise<BanEntry[]> {
+  return (await getData<BanEntry[]>("/listbans")) ?? [];
+}
+
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
 
 export interface WriteResult {
@@ -205,3 +225,7 @@ export const setUserRole = (idx: number, user: string, role: string) =>
   post(`/sessions/${idx}/role`, { user, role });
 export const messageUser = (idx: number, user: string, message: string) =>
   post(`/sessions/${idx}/message`, { user, message });
+
+// フレンド / BAN（グローバル・focus 不要）
+export const acceptFriendRequest = (user: string) => post(`/friendrequests/accept`, { user });
+export const unban = (userId: string) => post(`/bans/unban`, { userId });

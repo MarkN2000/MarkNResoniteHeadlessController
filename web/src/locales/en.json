@@ -86,5 +86,28 @@
     "confirmRestart": "Restart this session?",
     "confirmClose": "Close this session?",
     "confirmSave": "Save this session?"
+  },
+  "friends": {
+    "source": "Source",
+    "searchByName": "Search by username",
+    "searchById": "Search by user ID",
+    "search": "Search",
+    "searchPlaceholder": "(coming soon)",
+    "searchSoon": "User search is coming soon",
+    "loadRequests": "Friend requests",
+    "loadBans": "Ban list",
+    "loadFocused": "Focused session",
+    "result": "Result",
+    "requests": "Friend requests",
+    "bans": "Bans",
+    "accept": "Accept",
+    "unban": "Unban",
+    "unbanTitle": "Unban",
+    "confirmUnban": "Unban {{user}} ({{userId}})?",
+    "noRequests": "No friend requests",
+    "noBans": "No bans",
+    "selectSource": "Select a source",
+    "refresh": "Refresh",
+    "machine": "Machine"
   }
 }
