@@ -135,7 +135,8 @@ function BansBody({ bans, onUnban }: { bans: BanEntry[]; onUnban: (b: BanEntry) 
             {/* 1行目: 🚫 名前 + [解除]（危険・確認あり） */}
             <Group justify="space-between" wrap="nowrap" gap="xs">
               <Text fw={600} truncate>
-                🚫 {b.username}
+                {/* 🚫 は装飾（BAN一覧という文脈＋ユーザー名で冗長）なのでスクリーンリーダーから隠す。 */}
+                <span aria-hidden="true">🚫</span> {b.username}
               </Text>
               <InspectorButton severity="danger" onClick={() => onUnban(b)}>
                 {t("friends.unban")}

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Box, ScrollArea } from "@mantine/core";
 import * as api from "../../api";
 import type { BanEntry } from "../../api";
@@ -18,13 +18,24 @@ export function FriendsTab() {
   const [requests, setRequests] = useState<string[]>([]);
   const [bans, setBans] = useState<BanEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  // 取得シーケンス番号。ソースを取得完了前に切り替えた場合、古い取得結果（と loading 解除）を
+  // 破棄して「最新の取得だけ」反映する（空表示のちらつき防止）。P9 で検索/フォーカス内が増えても堅牢。
+  const reqId = useRef(0);
 
   // 押されたソースだけ取得して②へ。タブを開いただけでは何も取得しない。
   const load = useCallback(async (src: FriendSource) => {
+    const id = ++reqId.current;
     setSource(src);
     setLoading(true);
-    if (src === "requests") setRequests(await api.getFriendRequests());
-    else setBans(await api.getListBans());
+    if (src === "requests") {
+      const r = await api.getFriendRequests();
+      if (id !== reqId.current) return; // 後続のクリックに追い抜かれた → 破棄
+      setRequests(r);
+    } else {
+      const b = await api.getListBans();
+      if (id !== reqId.current) return;
+      setBans(b);
+    }
     setLoading(false);
   }, []);
 
