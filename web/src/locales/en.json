@@ -122,16 +122,16 @@
     "confirmInvite": "Invite {{user}} to the focused session?"
   },
   "newSession": {
-    "launchTitle": "Launch method",
-    "searchTitle": "Search & launch",
+    "launchTitle": "Open a session",
+    "searchTitle": "Search & open",
     "template": "Template",
     "url": "URL",
     "urlPlaceholder": "resrec://...",
-    "start": "Start",
+    "start": "Open",
     "urlHint": "Must start with res://, resrec://, res-steam://, etc.",
-    "confirmTitle": "Start new session",
-    "confirmTemplate": "Start a new session from template \"{{template}}\"?",
-    "confirmUrl": "Start a new session from this URL?",
+    "confirmTitle": "Open a session",
+    "confirmTemplate": "Open a session from template \"{{template}}\"?",
+    "confirmUrl": "Open a session from this URL?",
     "keyword": "Keyword",
     "keywordPlaceholder": "World name",
     "search": "Search",
@@ -161,6 +161,6 @@
     "unsilenceDone": "Unsilenced",
     "roleDone": "Role updated",
     "messageDone": "Message sent",
-    "newSessionDone": "Session started"
+    "newSessionDone": "Session opened"
   }
 }

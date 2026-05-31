@@ -122,16 +122,16 @@
     "confirmInvite": "{{user}} をフォーカス中のセッションに招待しますか？"
   },
   "newSession": {
-    "launchTitle": "起動方法",
-    "searchTitle": "検索して起動",
+    "launchTitle": "セッションを開く",
+    "searchTitle": "検索して開く",
     "template": "テンプレート",
     "url": "URL",
     "urlPlaceholder": "resrec://...",
-    "start": "起動",
+    "start": "開く",
     "urlHint": "res://, resrec://, res-steam:// などで始めてください",
-    "confirmTitle": "新規セッション起動",
-    "confirmTemplate": "{{template}} で新規セッションを起動しますか？",
-    "confirmUrl": "この URL で新規セッションを起動しますか？",
+    "confirmTitle": "セッションを開く",
+    "confirmTemplate": "{{template}} でセッションを開きますか？",
+    "confirmUrl": "この URL でセッションを開きますか？",
     "keyword": "キーワード",
     "keywordPlaceholder": "ワールド名",
     "search": "検索",
@@ -161,6 +161,6 @@
     "unsilenceDone": "ミュート解除を実行しました",
     "roleDone": "権限を変更しました",
     "messageDone": "メッセージを送信しました",
-    "newSessionDone": "セッションを起動しました"
+    "newSessionDone": "セッションを開きました"
   }
 }
