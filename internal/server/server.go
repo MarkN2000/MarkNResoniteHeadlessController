@@ -36,6 +36,7 @@ type Server struct {
 	resonite  *resonite.Client          // Resonite 公開API（ユーザー検索）
 	restart   *restartOrchestrator      // 自動再起動の進行管理（Phase 8・P8-3）
 	scheduler *restartScheduler         // 予定再起動の発火（Phase 8・P8-4a）
+	crashMon  *crashMonitor             // クラッシュ自動復帰（Phase 8・P8-4b）
 
 	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
@@ -61,6 +62,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 	s.auth = newAuthManager(cfg, &s.cfgMu)
 	s.restart = newRestartOrchestrator(s)
 	s.scheduler = newRestartScheduler(s)
+	s.crashMon = newCrashMonitor(s)
 	return s
 }
 
@@ -69,8 +71,10 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 // best-effort で中止する（①②③のみ。④以降は仕様上 cancel 不可）。main から起動時に1回呼ぶ。
 func (s *Server) Start() (stop func()) {
 	ctx, cancel := context.WithCancel(context.Background())
-	s.restart.setParent(ctx) // 進行中フローを bg ctx の子に＝shutdown で ①②③ を cancel
+	s.restart.setParent(ctx)                          // 進行中フローを bg ctx の子に＝shutdown で ①②③ を cancel
+	s.driver.SetOnUnexpectedExit(s.crashMon.onUnexpectedExit) // クラッシュ検知を crash-monitor へ（P8-4b）
 	go s.scheduler.run(ctx)
+	go s.crashMon.run(ctx)
 	return func() {
 		cancel()
 		_ = s.restart.Cancel()

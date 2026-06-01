@@ -103,6 +103,10 @@ type Driver struct {
 	// focus はプロンプトを変えるため、応答先頭のグルーは「直前コマンドのプロンプト」になる。
 	// execMu 保持中（execLocked 内）でのみアクセスする。
 	lastPrompt string
+
+	// onUnexpectedExit は意図しない終了（クラッシュ）検知時に1回呼ばれる（設定時のみ）。
+	// waitExit が wasStopping==false のとき mu 外で呼ぶ。中身は非ブロッキングに保つこと（crash-monitor §5.6）。
+	onUnexpectedExit func()
 }
 
 // NewDriver は文字コード enc（nil=UTF-8パススルー）でドライバを生成する。
@@ -113,6 +117,14 @@ func NewDriver(enc encoding.Encoding) *Driver {
 		statusHub: newHub[Status](),
 		state:     StateStopped,
 	}
+}
+
+// SetOnUnexpectedExit は意図しない終了（クラッシュ）の通知コールバックを登録する（§5.6・P8-4b）。
+// 起動前に1回設定する想定。コールバックは waitExit の goroutine で走るため非ブロッキングに保つこと。
+func (d *Driver) SetOnUnexpectedExit(fn func()) {
+	d.mu.Lock()
+	d.onUnexpectedExit = fn
+	d.mu.Unlock()
 }
 
 // --- 状態 ---
@@ -346,6 +358,7 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	}
 	d.mu.Lock()
 	wasStopping := d.stopping
+	onExit := d.onUnexpectedExit
 	d.cmd = nil
 	d.stdin = nil
 	d.pid = 0
@@ -357,7 +370,9 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 		d.publishLog("sys", "ヘッドレスを停止しました")
 	} else {
 		d.publishLog("sys", fmt.Sprintf("ヘッドレスが終了しました（意図しない終了の可能性: %v）", err))
-		// TODO(v1.x §5.6): クラッシュ自動復帰（設定ON時・クラッシュループ保護付き）
+		if onExit != nil {
+			onExit() // §5.6 クラッシュ自動復帰: crash-monitor へ非ブロッキング通知（mu 外で呼ぶ）
+		}
 	}
 }
 
