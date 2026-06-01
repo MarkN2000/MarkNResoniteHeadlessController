@@ -1,4 +1,52 @@
 // スケジュールタブの表示ヘルパ（純関数）。Phase 8・§3.16。
+import type { ScheduledRestart } from "../../api";
+
+// 2桁ゼロ埋め（時刻表示）。
+export const pad = (n: number): string => String(n).padStart(2, "0");
+
+// 種別 → i18n キー。
+export function typeKey(type: string): string {
+  switch (type) {
+    case "once":
+      return "schedule.typeOnce";
+    case "weekly":
+      return "schedule.typeWeekly";
+    default:
+      return "schedule.typeDaily";
+  }
+}
+
+// 曜日(0=日..6=土) → i18n キー。
+export const WEEKDAY_KEYS = [
+  "schedule.weekday0",
+  "schedule.weekday1",
+  "schedule.weekday2",
+  "schedule.weekday3",
+  "schedule.weekday4",
+  "schedule.weekday5",
+  "schedule.weekday6",
+] as const;
+
+// 予定の時刻を種別ごとに整形（weekly の曜日ラベルは呼び出し側が解決して渡す）。
+export function formatScheduleTime(s: ScheduledRestart, weekdayLabel: string): string {
+  const hm = `${pad(s.hour)}:${pad(s.minute)}`;
+  if (s.type === "once") return `${s.year ?? 0}/${pad(s.month ?? 0)}/${pad(s.day ?? 0)} ${hm}`;
+  if (s.type === "weekly") return `${weekdayLabel} ${hm}`;
+  return hm; // daily
+}
+
+// once の年月日が実在する暦日か（2/30 等を弾く・JS Date 往復）。
+export function isValidOnceDate(y: number, m: number, d: number): boolean {
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return false;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+// 新規予定の雛形（毎日 05:00・有効・前回 config）。id はブラウザ生成。
+export function defaultScheduled(): ScheduledRestart {
+  return { id: crypto.randomUUID(), enabled: true, type: "daily", weekday: 0, hour: 5, minute: 0, configName: "" };
+}
 
 // 稼働時間/残り時間を言語非依存の短い表記にする（例: "1d 2h" / "2h 34m" / "34m"）。
 export function formatDuration(sec: number): string {

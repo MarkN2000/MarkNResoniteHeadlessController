@@ -10,6 +10,7 @@ import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
 import { StatusCard } from "./StatusCard";
 import { ManualCard } from "./ManualCard";
+import { ScheduleListCard } from "./ScheduleListCard";
 import { WaitControlCard } from "./WaitControlCard";
 import { PreActionsCard } from "./PreActionsCard";
 import { CrashRecoveryCard } from "./CrashRecoveryCard";
@@ -100,7 +101,11 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
             right={
               rc ? (
                 <Stack gap="lg">
-                  {/* P8-5b-2: ③予定リストカード（編集モーダル）はここに入る */}
+                  <ScheduleListCard
+                    schedules={rc.scheduled}
+                    configs={configs}
+                    onChange={(scheduled) => patch({ scheduled })}
+                  />
                   <WaitControlCard value={rc.waitControl} onChange={(waitControl) => patch({ waitControl })} />
                   <PreActionsCard value={rc.preActions} onChange={(preActions) => patch({ preActions })} />
                   <CrashRecoveryCard value={rc.crashRecovery} onChange={(crashRecovery) => patch({ crashRecovery })} />
