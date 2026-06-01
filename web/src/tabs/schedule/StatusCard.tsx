@@ -51,7 +51,7 @@ export function StatusCard({
           : dim(t("schedule.none"))}
       </FieldRow>
 
-      {running && (
+      {(running || inProgress) && (
         <FieldRow label={t("schedule.progress")}>
           {inProgress ? (
             <Group justify="space-between" wrap="nowrap" gap="xs">
