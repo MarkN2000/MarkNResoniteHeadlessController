@@ -271,6 +271,8 @@
     "waitNote": "While users remain, waits quietly up to this long, then announces the given minutes before the deadline.",
     "preActionsTitle": "Pre-actions",
     "announceSection": "Announce (dynamicImpulse)",
+    "announceItemType": "Item",
+    "announceManual": "Manual input",
     "announceItemUrl": "Item URL",
     "announceImpulseTag": "Impulse tag",
     "announceMessage": "Message",

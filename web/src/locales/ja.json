@@ -271,6 +271,8 @@
     "waitNote": "人が居る間は最大この時間まで静かに待機し、締切の指定分前に告知します。",
     "preActionsTitle": "事前アクション",
     "announceSection": "告知（dynamicImpulse）",
+    "announceItemType": "アイテム",
+    "announceManual": "手動入力",
     "announceItemUrl": "アイテムURL",
     "announceImpulseTag": "impulse タグ",
     "announceMessage": "メッセージ",

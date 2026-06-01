@@ -310,6 +310,14 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
 // --- スケジュール（自動再起動）タブ（Phase 8・§3.16）---
 // restart 設定は単一オブジェクト（config.Restart のミラー）。完全オブジェクトを PUT する（pointer 設計前提）。
 
+// 告知アイテムのテンプレート（v1 main の登録 2 種を踏襲）。選択で itemUrl を設定。
+// 受信タグは全テンプレ共通（v1 restartManager の固定値）＝下の ANNOUNCE_COMMON_TAG。
+export const ANNOUNCE_TEMPLATES = [
+  { label: "とらぞセッション閉店アナウンス", url: "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4" },
+  { label: "テキスト読み上げ", url: "resrec:///U-MarkN/R-47c7c916-1e47-470d-abae-9e7c22315743" },
+] as const;
+export const ANNOUNCE_COMMON_TAG = "MRHC.play";
+
 export type RestartType = "once" | "weekly" | "daily";
 
 export interface ScheduledRestart {

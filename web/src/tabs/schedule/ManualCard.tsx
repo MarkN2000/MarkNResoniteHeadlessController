@@ -35,6 +35,7 @@ export function ManualCard({
         </FieldRow>
         <InspectorButton
           fullWidth
+          severity="warning"
           disabled={!running}
           onClick={() => onRestart(sel === PREV ? "" : sel)}
         >
