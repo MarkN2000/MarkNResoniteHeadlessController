@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **設定タブ(7-5) 実装済（§3.15）＝Phase 7 UI は7タブ中6タブ完成（残=スケジュール＝Phase 8）**。実装済タブ: 7-0 Foundation(§3.7)／7-1 セッション(§3.8)／7-2 フレンド(§3.9)＋P9-A 検索(§3.10)／7-7 第1層トースト(§3.11)／7-3 新規セッション(§3.12)／7-7残 自動poll・PageVisibility(§3.13)／7-4 コンフィグ(§3.14)／7-5 設定(§3.15)。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**Phase 8（自動再起動＝スケジュールタブ・§3.16）はバックエンド（P8-1〜P8-4）＋UI 状態/手動（P8-5a）を実装済（〜cf1b103）。残=P8-5b（右カラム設定群）で Phase 8 完了＝全7タブ完成**。
+> ステータス: **🎉Phase 7 UI 全7タブ完成＋Phase 8（自動再起動）完了（〜commit 7319fbd）**。実装済タブ: 7-0 Foundation(§3.7)／7-1 セッション(§3.8)／7-2 フレンド(§3.9)＋P9-A 検索(§3.10)／7-7 第1層トースト(§3.11)／7-3 新規セッション(§3.12)／7-7残 自動poll・PageVisibility(§3.13)／7-4 コンフィグ(§3.14)／7-5 設定(§3.15)／スケジュール(§3.16・Phase 8)。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**Phase 8（自動再起動）= バックエンド（P8-1〜P8-4）＋UI（P8-5a 状態/手動・5b-1 待機/事前/クラッシュ・5b-2 予定リスト/編集モーダル）すべて実装・実機検証済。次は P9-B（Steam/DepotDownloader・ARM）**。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -32,7 +32,7 @@ Phase 7 (UI MVP):
 Phase 8 (自動再起動): 確定仕様=§3.16（2026-06-01 協議）
   - トリガー=手動通常 + scheduled の2つ（userZero/highLoad/chatMessage は不採用）
   - 統一安全再起動フロー（0人即/①セッション変更→②待機→③dynamicImpulse告知→④停止起動）+ waitControl + クラッシュ自動復帰
-  - スケジュールタブ実装: P8-1〜P8-5a 済・残 P8-5b（右カラム設定群）
+  - スケジュールタブ実装: P8-1〜P8-5b 完了（Phase 8 完了・全7タブ完成）
 
 Phase 9 (Resonite / Steam 統合):
   - ✅ P9-A: Resonite 公開API ユーザー検索（名/ID・無認証）＋フレンド申請/解除/招待（実装済・§3.10）
@@ -218,7 +218,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 | 2 | **フレンド** | 2 | リクエスト一覧 / Ban 一覧 / フォーカス内ユーザー / 検索(P9) → ユーザー操作（承認/申請/解除/invite=フォーカス中へ） | 「起動してください」 |
 | 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
 | 4 | **コンフィグ** | (編集) | v1 同等 CRUD（フォームのみ・タブ式複数ワールド・§3.14） | ✅ 使える |
-| 5 | **スケジュール** | — | 自動再起動（手動通常/scheduled・安全再起動フロー・事前アクション・クラッシュ復帰）＋状態表示（P8・§3.16・**P8-1〜P8-5a 実装済／残=P8-5b 設定群**） | ✅ 使える |
+| 5 | **スケジュール** | — | 自動再起動（手動通常/scheduled・安全再起動フロー・事前アクション・クラッシュ復帰）＋予定リスト/編集モーダル＋状態表示（P8・§3.16・**P8-1〜P8-5b 実装済＝Phase 8 完了**） | ✅ 使える |
 | 6 | **設定** | — | 管理PW変更 / Resoniteアカウント / アプリ設定 / Steam設定(P9・枠のみ)（実装済・§3.15） | ✅ 使える |
 | 7 | **コマンド** | — | SSE ライブログ + コマンド直送（上級者用） | 「起動してください」 |
 
@@ -441,7 +441,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 ### 3.16 スケジュール（自動再起動）タブ (Phase 8) の確定仕様
 
-> 本節は**スケジュールタブの確定仕様＝単一情報源**（§3.14 と同方針）。2026-06-01 のユーザーとの設計協議で確定し、**P8-1〜P8-5a を実装済（〜cf1b103）／残=P8-5b**（右カラム設定群＝③予定リスト・④待機制御・⑤事前アクション・⑥クラッシュ復帰・単一working+保存バー）。本節は**実装で確定した差分も反映済**（各項に「実装」注記）。親方針: DESIGN §5.4–§5.6・要件 [[rewrite-plan]]。
+> 本節は**スケジュールタブの確定仕様＝単一情報源**（§3.14 と同方針）。2026-06-01 のユーザーとの設計協議で確定し、**P8-1〜P8-5b すべて実装・実機検証済（〜commit 7319fbd）＝Phase 8 完了**（5a 状態/手動・5b-1 待機/事前/クラッシュ＋保存バー・5b-2 予定リスト/編集モーダル）。本節は**実装で確定した差分も反映済**（各項に「実装」注記）。親方針: DESIGN §5.4–§5.6・要件 [[rewrite-plan]]。
 
 `nav.ts` の `schedule` を実体化。**バックエンドは新設**（`config` に `restart` 追加・scheduler / restart-orchestrator / crash-monitor の goroutine・restart API）。土台は実装済（`WorldsService.List/ForEach`・`Driver.Start/Stop`・`d.stopping` 意図的停止判別・`recordLastUsed/loadLastUsed`）。
 
@@ -524,14 +524,15 @@ POST /api/v1/restart/cancel                  進行中の再起動を中止（�
 `SplitColumns` で配置。**広い画面（xl以上）は2カラム＝左に運用/状態〔①②③〕・右に設定〔④⑤⑥〕／狭い画面は縦1カラム**にカードを積む:
 1. **ステータスカード**: 稼働時間・**次回予定再起動**（日時+config）・最終再起動（時刻/トリガー種別）・現在の進行状態・クラッシュ復帰状態。**再起動進行中は現在フェーズ（待機/告知）＋残り時間＋`[中止]`ボタンを表示**（中止後は「セッション設定は変更されたまま」と一言添える）。稼働時間/進行は稼働中のみ。
 2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**・ボタン色は `severity="warning"`＝セッションタブの再起動と同色）。
-3. **予定リストカード**: 各行（種別 / 時刻 / config / 有効トグル / 編集 / 削除）＋`[＋新規]`。編集は**モーダル**（type 選択・時刻入力・config `Select`）。
+3. **予定リストカード**: 各行（有効トグル / 種別・時刻 / config / 編集✎ / 削除×〔**直接削除**＝未保存ゆえ保存前は取り消し可〕）＋`[＋新規]`・空時「予定がありません」。編集は**モーダル**（type 選択で日時欄を出し分け〔once=年月日+時分/weekly=曜日+時分/daily=時分〕・config `Select`〔#prev 番兵〕・ドラフト→`[OK]` で working 配列へ反映/`[キャンセル]` 破棄）。
+   - **実装**: 新規 id は `scheduleModel.genId()`（`crypto.randomUUID` はセキュアコンテキスト限定＝LAN/HTTP で不可のため `getRandomValues`→`Math.random` にフォールバック・[[lan-http-no-secure-context-apis]]）。**インライン検証**（時/分の範囲＋once 暦実在＝JS Date 往復で 2/30 等を弾き [OK] 無効化、年下限 `MIN_YEAR=2000` は backend 準拠）。daily/weekly へ切替時は once 専用の year/month/day をクリアして保存JSONを汚さない。日付入力は `@mantine/dates` 不使用で `NumberInput`。
 4. **待機制御カード**: `forceRestartTimeoutMin` / `actionTimingMin`。
 5. **事前アクションカード**: 告知（有効 / itemUrl〔テンプレ選択+手動入力〕 / impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。message は任意（空可）。詳細は §3.16(2) 実装注記。
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
 - 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。
 - **保存モデル（実装・P8-5 で確定）**: 設定群（③④⑤⑥）は**単一 working オブジェクト＋一括保存バー**＝dirty 判定し**完全オブジェクトを `PUT /restart-config`**（backend の pointer 設計に一致・コンフィグタブと同方式）。①状態・②手動は live（poll＋アクション）で保存対象外。手動 config Select は空値を扱えないため番兵 `#prev`（config 名に無効な `#`）を使い送信時に `""`（=前回）へ変換。
-- **実装状況**: ①②（状態カード・手動再起動）＝**P8-5a 実装済**（`web/src/tabs/schedule/`）。③④⑤⑥＋保存バー＝**P8-5b 残**。
+- **実装状況**: 全カード実装済（`web/src/tabs/schedule/`）。①②（状態カード・手動再起動）＝P8-5a。③予定リスト＋編集モーダル＝P8-5b-2。④⑤⑥＋保存バー＝P8-5b-1。**＝Phase 8 完了**。
 
 **(8) バックエンドアーキ（実装=案A mutex モデル）**
 - **scheduler goroutine**（`scheduler.go`）: 有効予定から次回発火時刻（`NextScheduled`）を算出し待機。**config 変更は `Reload()` シグナル**（バッファ1の非ブロッキング channel・restart-config PUT 後に呼ぶ）で即再計算（ポーリングしない）。strictly-future ゆえ同分の二重発火なし。発火で `orchestrator.Trigger("scheduled", configName)`。非稼働/進行中は Trigger の err を log して継続（停止中 skip）。

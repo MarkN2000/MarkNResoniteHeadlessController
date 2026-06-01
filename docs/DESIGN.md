@@ -33,7 +33,7 @@ Resonite Headless Controller を、要件からゼロ再定義して作り直す
 1. 構造化ダッシュボード（`worlds` / `status` / `users` のパース表示・フォーカス切替）
 2. ユーザー操作（kick / ban / silence / unsilence / respawn / role / invite）
 3. configエディタ（スキーマ駆動）
-4. 自動再起動（scheduled / userZero / 手動）＋**ヘッドレスのクラッシュ自動復帰**
+4. 自動再起動（scheduled / 手動通常）＋**ヘッドレスのクラッシュ自動復帰**（全員退出待ちは安全再起動フローの待機段に内包＝userZero 独立トリガーは廃止・§3.16）
 5. フレンド管理 / BAN一覧
 6. Steam更新（実行＋ログのみ）
 
@@ -80,7 +80,7 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
   ├─ Console Driver        … stdin送信(エンコード)・stdout収集(リングバッファ)・コマンドキュー＋応答相関・原子的コマンドグループ
   ├─ WorldsService         … worlds一覧 と「全ワールド巡回(ForEach)」の共通機構
   ├─ Output Parser         … worlds/status/users/listbans/friendRequests を構造化（★Resonite事実を集約。friendRequestsはv1互換のbest-effort: docs/resonite-domain-facts.md §6 参照）
-  ├─ Restart Orchestrator  … 手動/scheduled/userZero → 単一の「安全に再起動」動作
+  ├─ Restart Orchestrator  … 手動/scheduled → 単一の「安全に再起動」動作（全員退出待ちは待機段に内包＝userZero 独立トリガー廃止・§3.16）
   ├─ PreRestartAction(plugin) … chatWarning 等。レジストリで拡張
   └─ Process Lifecycle Monitor … ヘッドレスの異常終了を検知→状態反映＋(設定ONで)自動再起動(クラッシュループ保護)
   ↓
@@ -223,7 +223,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 - 新規セッション: `POST /sessions/start`（url / template）
 - フレンド/BAN（グローバル・focus不要）: `POST /friendrequests/accept`、`POST /friends/add|remove`、`POST /bans/unban`
 - Resonite 公開API プロキシ: `GET /resonite/users?q=`（ユーザー検索・無認証先）
-- 再起動（**Phase 8・未実装**）: `GET/POST /restart-config`、`GET /restart-status`、`POST /restart/trigger`
+- 再起動（**Phase 8・実装済**）: `GET/PUT /restart-config`、`GET /restart-status`、`POST /restart/trigger`、`POST /restart/cancel`
 - Steam（**Phase 9・未実装**）: `POST /steam/update`(非同期)、`POST /steam/guard-code`、`GET /steam/config`。Guard要求時はSSE `steam` を `guard-required` 状態にしUIへ入力を促す
 
 ### ライブ更新（SSE）
