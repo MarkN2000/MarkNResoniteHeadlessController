@@ -46,7 +46,6 @@ export function ConfigList({
                   label: {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                    color: active ? "var(--mantine-color-dark-9)" : undefined,
                   },
                 }}
               >

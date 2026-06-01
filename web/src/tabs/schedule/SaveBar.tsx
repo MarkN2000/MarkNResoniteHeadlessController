@@ -11,7 +11,6 @@ export function SaveBar({ dirty, saving, onSave }: { dirty: boolean; saving: boo
       size="xs"
       variant={dirty ? "filled" : "default"}
       color="brand"
-      styles={dirty ? { label: { color: "var(--mantine-color-dark-9)" } } : undefined}
       disabled={!dirty}
       loading={saving}
       onClick={onSave}

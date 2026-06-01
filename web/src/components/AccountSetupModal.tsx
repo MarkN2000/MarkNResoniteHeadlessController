@@ -45,7 +45,6 @@ export function AccountSetupModal({
           <Button
             color="brand"
             variant="filled"
-            styles={{ label: { color: "var(--mantine-color-dark-9)" } }}
             disabled={!f.canSave}
             loading={f.busy}
             onClick={f.save}

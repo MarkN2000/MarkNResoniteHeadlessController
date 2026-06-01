@@ -27,7 +27,7 @@ export function CommandTab({ logs, onSend }: { logs: LogLine[]; onSend: (cmd: st
 
   return (
     <Stack h="100%" gap="xs">
-      <ScrollArea style={{ flex: 1, minHeight: 0 }} bg="dark.9" p="xs" styles={{ root: { borderRadius: 8 } }}>
+      <ScrollArea style={{ flex: 1, minHeight: 0 }} bg="dark.9" p="xs" styles={{ root: { borderRadius: "var(--mantine-radius-md)" } }}>
         {logs.map((l) => (
           <Text
             key={l.seq}

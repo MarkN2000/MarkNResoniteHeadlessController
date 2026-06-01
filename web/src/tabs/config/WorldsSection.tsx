@@ -68,7 +68,6 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
             variant={i === idx ? "filled" : "default"}
             color="gray"
             onClick={() => setActive(i)}
-            styles={i === idx ? { label: { color: "var(--mantine-color-dark-9)" } } : undefined}
           >
             {worldLabel(w, i)}
           </Button>

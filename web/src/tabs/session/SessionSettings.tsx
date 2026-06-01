@@ -116,14 +116,13 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
           <Switch checked={hide} onChange={(e) => setHide(e.currentTarget.checked)} />
         </FieldRow>
 
-        {/* 適用は主アクション（変更時のみ cyan filled で点灯）。アクティブ時は白だと読みにくいのでラベルを濃色に。 */}
+        {/* 適用は主アクション（変更時のみ cyan filled で点灯）。明色背景の文字色は theme の autoContrast が自動で濃色化。 */}
         <Button
           fullWidth
           size="xs"
           mt={4}
           variant={dirty ? "filled" : "default"}
           color="brand"
-          styles={dirty ? { label: { color: "var(--mantine-color-dark-9)" } } : undefined}
           disabled={!dirty}
           loading={apply.busy}
           onClick={doApply}

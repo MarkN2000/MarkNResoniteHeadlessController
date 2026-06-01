@@ -20,7 +20,6 @@ export function SaveButton({
       mt={4}
       variant={disabled ? "default" : "filled"}
       color="brand"
-      styles={disabled ? undefined : { label: { color: "var(--mantine-color-dark-9)" } }}
       disabled={disabled}
       loading={loading}
       onClick={onClick}

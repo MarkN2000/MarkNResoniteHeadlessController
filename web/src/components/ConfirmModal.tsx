@@ -32,9 +32,12 @@ export function ConfirmModal({
         <Button variant="default" onClick={onClose}>
           {t("common.cancel")}
         </Button>
+        {/* 危険ボタンは filled red。theme の autoContrast だと濃色文字になるため、
+            白文字を保つよう autoContrast={false} で opt-out（default variant 時は無影響）。 */}
         <Button
           color={danger ? "red" : undefined}
           variant={danger ? "filled" : "default"}
+          autoContrast={false}
           loading={loading}
           onClick={onConfirm}
         >

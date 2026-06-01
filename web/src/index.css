@@ -3,3 +3,39 @@ body,
 #root {
   height: 100%;
 }
+
+/* ダーク背景での文字を滑らかに。 */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ダークUIに合わせたネイティブスクロールバー（Mantine ScrollArea は独自オーバーレイのため非対象）。
+   色は theme の dark ランプを CSS 変数経由で参照（色の単一情報源を維持）。 */
+html {
+  scrollbar-color: var(--mantine-color-dark-4) transparent; /* Firefox: thumb track */
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-dark-4);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-dark-3);
+  background-clip: padding-box;
+}
+
+/* テキスト選択色を brand ティントに統一。 */
+::selection {
+  background: var(--mantine-color-brand-9);
+  color: var(--mantine-color-white);
+}

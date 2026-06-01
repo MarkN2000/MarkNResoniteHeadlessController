@@ -36,7 +36,6 @@ export function ConfigEditor({
           size="xs"
           variant={dirty ? "filled" : "default"}
           color="brand"
-          styles={dirty ? { label: { color: "var(--mantine-color-dark-9)" } } : undefined}
           disabled={!dirty}
           loading={saving}
           onClick={onSave}

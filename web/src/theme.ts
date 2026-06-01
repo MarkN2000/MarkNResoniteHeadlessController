@@ -64,6 +64,12 @@ export const theme = createTheme({
   primaryColor: "brand",
   primaryShade: 6,
   defaultRadius: "md",
+  // 明色アクセント（cyan/green/yellow 等）の filled 背景で文字を自動的に濃色化する。
+  // これにより各所の「ラベルを濃色に」アドホック手当てを廃し、コントラストの単一情報源とする。
+  // 危険ボタン（filled red）は白文字を保つため呼び出し側で autoContrast={false} を指定（ConfirmModal）。
+  autoContrast: true,
+  // 日本語フォールバックを明示（Win/各OSのシステムフォント優先）。
+  fontFamily: 'system-ui, "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif',
   colors: {
     brand: ramp("#61d1fa"), // Cyan = 主アクション/選択
     dark,

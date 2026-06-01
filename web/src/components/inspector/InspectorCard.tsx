@@ -25,7 +25,7 @@ export function InspectorCard({
             flex: 1,
             minWidth: 0,
             height: 34,
-            borderRadius: 8,
+            borderRadius: "var(--mantine-radius-md)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
