@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **設定タブ(7-5) 実装済（§3.15）＝Phase 7 UI は7タブ中6タブ完成（残=スケジュール＝Phase 8）**。実装済タブ: 7-0 Foundation(§3.7)／7-1 セッション(§3.8)／7-2 フレンド(§3.9)＋P9-A 検索(§3.10)／7-7 第1層トースト(§3.11)／7-3 新規セッション(§3.12)／7-7残 自動poll・PageVisibility(§3.13)／7-4 コンフィグ(§3.14)／7-5 設定(§3.15)。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**Phase 8（自動再起動＝スケジュールタブ）は設計協議を完了し §3.16 に確定仕様を起案（実装前レビュー段階）**。
+> ステータス: **設定タブ(7-5) 実装済（§3.15）＝Phase 7 UI は7タブ中6タブ完成（残=スケジュール＝Phase 8）**。実装済タブ: 7-0 Foundation(§3.7)／7-1 セッション(§3.8)／7-2 フレンド(§3.9)＋P9-A 検索(§3.10)／7-7 第1層トースト(§3.11)／7-3 新規セッション(§3.12)／7-7残 自動poll・PageVisibility(§3.13)／7-4 コンフィグ(§3.14)／7-5 設定(§3.15)。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**Phase 8（自動再起動＝スケジュールタブ・§3.16）はバックエンド（P8-1〜P8-4）＋UI 状態/手動（P8-5a）を実装済（〜cf1b103）。残=P8-5b（右カラム設定群）で Phase 8 完了＝全7タブ完成**。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -29,10 +29,10 @@ Phase 7 (UI MVP):
   - 7 タブ（スケジュールは状態表示のみ、Steam/検索は P9 待ち）
   - SSE ライブログ
 
-Phase 8 (自動再起動):
-  - scheduled + userZero + waitControl
-  - preRestartActions (chatMessage / itemSpawn / sessionChanges)
-  - スケジュールタブの機能実装 ← 再起動条件の詳細設計はここで協議
+Phase 8 (自動再起動): 確定仕様=§3.16（2026-06-01 協議）
+  - トリガー=手動通常 + scheduled の2つ（userZero/highLoad/chatMessage は不採用）
+  - 統一安全再起動フロー（0人即/①セッション変更→②待機→③dynamicImpulse告知→④停止起動）+ waitControl + クラッシュ自動復帰
+  - スケジュールタブ実装: P8-1〜P8-5a 済・残 P8-5b（右カラム設定群）
 
 Phase 9 (Resonite / Steam 統合):
   - ✅ P9-A: Resonite 公開API ユーザー検索（名/ID・無認証）＋フレンド申請/解除/招待（実装済・§3.10）
@@ -218,7 +218,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 | 2 | **フレンド** | 2 | リクエスト一覧 / Ban 一覧 / フォーカス内ユーザー / 検索(P9) → ユーザー操作（承認/申請/解除/invite=フォーカス中へ） | 「起動してください」 |
 | 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
 | 4 | **コンフィグ** | (編集) | v1 同等 CRUD（フォームのみ・タブ式複数ワールド・§3.14） | ✅ 使える |
-| 5 | **スケジュール** | — | 自動再起動（手動通常/scheduled・安全再起動フロー・事前アクション・クラッシュ復帰）＋状態表示（P8・確定仕様 §3.16・実装前） | ✅ 使える |
+| 5 | **スケジュール** | — | 自動再起動（手動通常/scheduled・安全再起動フロー・事前アクション・クラッシュ復帰）＋状態表示（P8・§3.16・**P8-1〜P8-5a 実装済／残=P8-5b 設定群**） | ✅ 使える |
 | 6 | **設定** | — | 管理PW変更 / Resoniteアカウント / アプリ設定 / Steam設定(P9・枠のみ)（実装済・§3.15） | ✅ 使える |
 | 7 | **コマンド** | — | SSE ライブログ + コマンド直送（上級者用） | 「起動してください」 |
 
@@ -441,9 +441,9 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 ### 3.16 スケジュール（自動再起動）タブ (Phase 8) の確定仕様
 
-> 本節は**実装前・レビュー確定の単一情報源**（§3.14 と同方針）。2026-06-01 のユーザーとの設計協議で確定。親方針: DESIGN §5.4–§5.6・要件 [[rewrite-plan]]。
+> 本節は**スケジュールタブの確定仕様＝単一情報源**（§3.14 と同方針）。2026-06-01 のユーザーとの設計協議で確定し、**P8-1〜P8-5a を実装済（〜cf1b103）／残=P8-5b**（右カラム設定群＝③予定リスト・④待機制御・⑤事前アクション・⑥クラッシュ復帰・単一working+保存バー）。本節は**実装で確定した差分も反映済**（各項に「実装」注記）。親方針: DESIGN §5.4–§5.6・要件 [[rewrite-plan]]。
 
-Phase 7 最後の未実装タブ。`nav.ts` に枠だけある `schedule` を実体化する。**バックエンドは新設**（`config` に `restart` 追加・scheduler / restart-orchestrator / crash-monitor の goroutine・restart API）。土台は実装済（`WorldsService.List/ForEach`・`Driver.Start/Stop`・`d.stopping` 意図的停止判別・`recordLastUsed/loadLastUsed`）。
+`nav.ts` の `schedule` を実体化。**バックエンドは新設**（`config` に `restart` 追加・scheduler / restart-orchestrator / crash-monitor の goroutine・restart API）。土台は実装済（`WorldsService.List/ForEach`・`Driver.Start/Stop`・`d.stopping` 意図的停止判別・`recordLastUsed/loadLastUsed`）。
 
 **(0) 協議で確定したスコープ（v1 から削ぎ落とした点）**
 - **トリガーは2つ**: 手動「通常再起動」/ scheduled。**userZero 独立トリガーは作らない**＝「全員退出を待つ」は再起動フローの待機段に内包（v1 の userZeroWatcher 常時監視〔複数→0 検知〕は廃止）。**highLoad 不採用**（要件）。
@@ -473,9 +473,11 @@ Phase 7 最後の未実装タブ。`nav.ts` に枠だけある `schedule` を実
 - **再起動の config** = 予定/手動で選択（既定は空文字 `""` = 直近起動と同じ config。`configName` を指定すればその config で起動）。
 - 待機・強制は `forceRestartTimeout`/`actionTiming` のグローバル値を使用。
 - **キャンセル**: 進行中（①②③＝停止④の前）のみ「中止」可能。中止すると再起動を取りやめ、ヘッドレスは稼働継続。**即発火済みのセッション変更（Private化等）は自動で戻さず、必要なら管理者がセッションタブで手動復元**（UI に「設定は変更されたまま」と添える）。scheduled をキャンセルしても**今回分のみ**＝次回は通常発火（予定は無効化しない）。④停止開始後は中止不可。
+- **実装（レビュー反映）**: ②待機中にヘッドレスが落ちた（クラッシュ/外部停止）場合は、締切（最大60分）を待たず**即 ④ で復帰**（Stop は空振り・Start で起動）。この間 crash-monitor は「進行中」を見て手を出さない（orchestrator が所有）。
 
 **(2) 事前アクション**
 - **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn <itemUrl> true` → `dynamicimpulsestring <tag> "<message>"`。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
+  - **実装**: **spawn → impulse の間に約10秒待機**（spawn したアイテムがワールド内で実体化してから impulse を送る・v1 `ITEM_SPAWN_DELAY` 踏襲・固定定数）。**2パス**で実行（全ワールド spawn → 10秒 sleep → 全ワールド impulse）。待機中は execMu を解放し他コマンドを妨げない。`itemUrl` 空なら spawn を省略し impulse のみ（常設受け機構前提）。
 - **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。
   - **各項目は独立トグル（全OFF可）**＝「Private化はしたくない」なら setPrivate=OFF のままにできる。既定は **maxusers=1 のみ ON・Private と改名は OFF**。
 
@@ -512,10 +514,10 @@ Phase 7 最後の未実装タブ。`nav.ts` に枠だけある `schedule` を実
 GET  /api/v1/restart-config                  restart 設定を返す
 PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック）
 GET  /api/v1/restart-status                  次回予定 / 最終再起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
-POST /api/v1/restart/trigger {type:"normal","configName"?}  手動「通常再起動」を即受付（非同期）
+POST /api/v1/restart/trigger {configName?}   手動「通常再起動」を即受付（非同期）。空=前回config
 POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続）
 ```
-- SSE: 既存 `status`/`update` イベントに再起動進行フェーズ（preparing / waiting / announcing / restarting）を反映（起動・停止が数分かかり得るため非同期＝DESIGN §7）。
+- **進行状態の伝送はポーリング（実装・P8-5 で確定）**: UI が `restart-status` を `useVisiblePolling` で3秒ごと追従（表示中のみ）。restart-status は `inProgress`/`phase`(idle|preparing|waiting|announcing|restarting)/`restartTriggerType`/`restartConfigName`/`deadlineAt`/`lastRestartAt`/`lastRestartTrigger`/`nextScheduled*` を返す。SSE への進行フェーズ反映は将来拡張（MVP 非採用）。
 
 **(7) UI 構成（スケジュールタブ・インスペクタ風・停止中も編集可）**
 `SplitColumns` で配置。**広い画面（xl以上）は2カラム＝左に運用/状態〔①②③〕・右に設定〔④⑤⑥〕／狭い画面は縦1カラム**にカードを積む:
@@ -527,14 +529,17 @@ POST /api/v1/restart/cancel                  進行中の再起動を中止（�
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
 - 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。
+- **保存モデル（実装・P8-5 で確定）**: 設定群（③④⑤⑥）は**単一 working オブジェクト＋一括保存バー**＝dirty 判定し**完全オブジェクトを `PUT /restart-config`**（backend の pointer 設計に一致・コンフィグタブと同方式）。①状態・②手動は live（poll＋アクション）で保存対象外。手動 config Select は空値を扱えないため番兵 `#prev`（config 名に無効な `#`）を使い送信時に `""`（=前回）へ変換。
+- **実装状況**: ①②（状態カード・手動再起動）＝**P8-5a 実装済**（`web/src/tabs/schedule/`）。③④⑤⑥＋保存バー＝**P8-5b 残**。
 
-**(8) バックエンドアーキ（§4 channel 所有モデル）**
-- **scheduler goroutine**: 有効予定から次回発火時刻を算出し、その時刻まで待機（設定 PUT で再計算）。発火で orchestrator にトリガー通知。
-- **restart orchestrator**: 手動/scheduled/crash のトリガーを受け統一フロー（(1)）を実行。進行中フラグで排他。`WorldsService.List`（人数）・`ForEach`（事前アクション）・`Driver.Stop/Start` を使用。**config 解決（name→launchPath＋認証注入）は `handleStart` と共通化**（既存ロジックを再利用関数へ抽出）。
-- **crash monitor**: Driver 終了監視で `d.stopping==false` の終了を検知→ループ保護判定→自動復帰。
-- 状態は単一 goroutine が所有し channel で操作（"share memory by communicating"）。`restart-status` を SSE/GET で公開。
+**(8) バックエンドアーキ（実装=案A mutex モデル）**
+- **scheduler goroutine**（`scheduler.go`）: 有効予定から次回発火時刻（`NextScheduled`）を算出し待機。**config 変更は `Reload()` シグナル**（バッファ1の非ブロッキング channel・restart-config PUT 後に呼ぶ）で即再計算（ポーリングしない）。strictly-future ゆえ同分の二重発火なし。発火で `orchestrator.Trigger("scheduled", configName)`。非稼働/進行中は Trigger の err を log して継続（停止中 skip）。
+- **restart orchestrator**（`orchestrator.go`）: 手動/scheduled のトリガーを受け統一フロー（(1)）を実行。`inProgress` で排他。`WorldsService.List`（人数）・`ForEach`（事前アクション）・`Driver.Stop/Start` を使用。**config 解決（name→launchPath＋認証注入）は `handleStart` と共通化＝`resolveLaunch` に抽出**。
+- **crash monitor**（`crashmonitor.go`）: Driver に **`SetOnUnexpectedExit` コールバック**を追加し、`waitExit` の `d.stopping==false`（管理外の異常終了）時のみ**非ブロッキング通知**（誤検知ゼロ）。受信側で enabled 確認→進行中なら skip（orchestrator 所有）→rolling window でループ保護→直近 config で復帰。
+- **並行モデル=案A（mutex）**: 進行状態を小さな mutex で保護し、flow は goroutine、cancel は context（既存 cfgMu/driver.mu と同流儀）。仕様当初の「channel 所有の単一 goroutine」は **flow が最大60分のブロッキング I/O を抱えるため見送り**（worker 分離が結局必要で複雑化）。実コマンドの直列化は driver の execMu が担う。`restart-status` は GET（UI はポーリング）で公開。
+- **常駐ライフサイクル**: `Server.Start()` が scheduler・crash-monitor を bg ctx で起動し stop 関数を返す。`main` が SIGINT で `driver.Stop()` の前に stop()（予定発火を打ち切り・`orchestrator.setParent(bgCtx)` 経由で進行中の①②③を cancel）。
 
-**(9) 状態永続化**: 次回スケジュール再起動・最終再起動（時刻/トリガー種別）・稼働時間を既存 `runtime-state.json` に追記。
+**(9) 状態永続化**（実装）: **最終再起動（`lastRestartAt`／`lastRestartTrigger`=manual|scheduled|crash）のみ** `runtime-state.json` に追記する。recordLastUsed が消さないよう **read-modify-write で `lastUsedConfig` と共存**させ、`runtimeMu` で直列化（orchestrator/crash-monitor〔goroutine〕と handleStart〔HTTP〕の並行書き込み防止）。orchestrator/crash-monitor が再起動成功時に記録。**次回スケジュール再起動は予定から都度算出・稼働時間は driver の `StartedAt` 由来＝どちらも永続化せず導出**。
 
 **(10) 既知の制約 / 将来拡張**
 - dynamicImpulse の到達はワールド側受け機構に依存（フル設定型で吸収）。

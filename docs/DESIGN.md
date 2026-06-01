@@ -93,8 +93,9 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 
 ### 並行モデル（Goの要点）
 - プロセスハンドル・ログリングバッファ・再起動状態は**それぞれ単一のgoroutineが所有**し、他からは**channel経由のメッセージ**でのみ操作（"share memory by communicating"）。旧コードの3タイマー競合を構造的に排除。
-- 背景goroutine: stdout読取 / SSEブロードキャスト / scheduled・userZero監視 / メトリクス収集 / プロセス死活監視。
-- **状態の永続化**: 次回スケジュール再起動・最終再起動・稼働時間などを、ツール再起動後も保つ小コンポーネント（JSON状態ファイル）。
+- 背景goroutine: stdout読取 / SSEブロードキャスト / **scheduler（予定発火）・crash-monitor（プロセス死活監視→自動復帰）**（§5.4–5.6）。（userZero 常時監視・メトリクス収集は不採用/将来）
+- **状態の永続化**: 最終再起動などを、ツール再起動後も保つ小コンポーネント（JSON状態ファイル）。
+- **実装メモ（§3.16・Phase 8）**: 再起動状態は上記「channel 所有」案ではなく **案A（mutex + per-flow goroutine + context cancel）** で実装（flow が最大60分のブロッキング I/O を抱え、channel 所有だと worker 分離が結局必要で複雑化するため）。実コマンド直列化は driver の execMu。永続化は **最終再起動（lastRestartAt/Trigger）のみ** `runtime-state.json` に追記（次回予定・稼働時間は導出）。
 
 ---
 
@@ -130,6 +131,7 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
   3. 停止 →（任意：Steam更新）→ 起動
 - userZeroは「既に空」なので待機不要＝即実行。
 - **二重起動防止**: 再起動中フラグで、同時/連打のトリガーを排他。
+- **実装（確定仕様=phase-7-spec §3.16・2026-06-01 協議で確定差分）**: 本節は当初設計。実装では **userZero を独立トリガーにしない**＝「全員退出を待つ」は再起動フローの待機段②に内包（userZeroWatcher 常時監視は廃止）。**cron ライブラリは使わず**独自 once/weekly/daily を scheduler goroutine が自前算出（config 変更は Reload シグナルで再計算）。①セッション変更はトリガー時に即発火（新規参加を静かに止める）・③告知だけ締切前。並行モデルは**案A（mutex+goroutine+context cancel）**＝長時間ブロッキング flow のため channel 所有モデルは見送り。
 
 ### 5.5 PreRestartAction（プラグイン）
 - 共通IF（OCP）。依存は `RestartContext` 経由でDI（具体プロセスに非依存）。アクションは原則**全ワールドに対して**適用（`WorldsService.ForEach`）。
@@ -150,12 +152,14 @@ type PreRestartAction interface {
 - レジストリ `map[string]PreRestartAction`。設定は配列 `[{type,enabled,params}]`（均一形・前方互換・未知typeは無視）。
 - **v1はchatWarningのみ**。`itemSpawn`等はレジストリに1件追加するだけで拡張。
 - ⚠️ **chatWarningの到達範囲**: Resoniteに全体送信コマンドは無く、`message <friend> <msg>` は**フレンド宛DMのみ**＝非フレンドには届かない。現実解は「`users`列挙→各人へDM(フレンドのみ着)」または「`dynamicImpulseString`でワールド側の通知機構を起動(ワールド対応が前提)」。**v1はこの制約を明示**したうえでDM方式とし、ワールド内通知はitemSpawn/dynamicImpulse拡張で対応。
+- **実装（§3.16）**: 上記プラグインIFは実装せず、事前アクションは **`PreActions{announce, sessionChanges}` の固定2種**に簡素化（YAGNI）。`announce`=**dynamicImpulse 告知（フル設定型・spawn→約10秒→impulse の2パス）**、`sessionChanges`=Private化/maxusers=1/改名（各独立トグル）。**chatWarning（DM方式）は到達不確実のため不採用**。新アクション追加時にプラグイン化を再検討。
 
 ### 5.6 Process Lifecycle Monitor（クラッシュ自動復帰）
 - ヘッドレスの**プロセス終了を監視**。こちらの**意図的な停止**（stop/restart）以外の終了＝異常終了として、
   - (必須) 状態へ反映（ダッシュボードに「異常終了」表示）
   - (任意・設定ON時) **ヘッドレスを自動再起動**。**クラッシュループ保護**（短時間にN回以上落ちる場合は自動復帰を止めて通知）。
 - 復帰対象は**ヘッドレス**であり、MRHC自身ではない（MRHCは手動起動）。
+- **実装（§3.16(4)・P8-4b）**: Driver に **`SetOnUnexpectedExit` コールバック**を追加し、`waitExit` の `d.stopping==false`（管理外の異常終了）時のみ非ブロッキング通知（誤検知ゼロ）。crash-monitor が **rolling window でループ保護**（既定「10分に3回」で停止・通知）し直近 config で復帰。**再起動進行中（orchestrator 所有）なら skip**（二重起動防止）。
 
 ### 5.7 Resoniteの入手・更新（DepotDownloaderに統一・Could/後段機能）
 > ⚠️ **方針転換（2026-05-29）**: 旧計画のsteamcmdは**ARM Linux非対応**のため廃止。**全OSでDepotDownloader（.NET製・ARM64ネイティブ）に統一**。詳細は[`resonite-domain-facts.md`](./resonite-domain-facts.md)§4 と メモリ`arm-support-plan`。

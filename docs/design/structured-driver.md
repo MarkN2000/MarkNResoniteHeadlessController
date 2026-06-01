@@ -160,7 +160,7 @@ type WorldsService interface {
     ForEach(ctx, fn func(w World, s Scope) error) error  // 各worldをfocus→fn を原子的に
 }
 ```
-- `List()` の合計人数で **userZero 判定**（focus 巡回不要）
+- `List()` の合計人数で **空判定（合計0人）**（focus 巡回不要）。再起動フローの待機段②で監視（独立 userZero トリガーは廃止・§3.16）
 - 事前アクション・セッション変更・各world のユーザー一覧取得は `ForEach` を共用
 
 ## 8. パーサ（コマンド毎）
