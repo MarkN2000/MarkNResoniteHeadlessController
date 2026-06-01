@@ -19,16 +19,18 @@ type Restart struct {
 // ScheduledRestart は1件の再起動予定。Type により使うフィールドが変わる（独自形式・cron不使用）。
 // 時刻はサーバーのローカル時刻で解釈する。
 type ScheduledRestart struct {
-	ID         string `json:"id"`         // フロント生成の安定ID（編集/削除の単位）
-	Enabled    bool   `json:"enabled"`    // この予定の有効/無効
-	Type       string `json:"type"`       // "once" | "weekly" | "daily"
-	Year       int    `json:"year"`       // once のみ
-	Month      int    `json:"month"`      // once のみ（1-12）
-	Day        int    `json:"day"`        // once のみ（1-31）
-	Weekday    int    `json:"weekday"`    // weekly のみ（0=日..6=土）
-	Hour       int    `json:"hour"`       // 全 type（0-23）
-	Minute     int    `json:"minute"`     // 全 type（0-59）
-	ConfigName string `json:"configName"` // 空=前回起動と同じ config / 非空=その config 名
+	ID      string `json:"id"`      // フロント生成の安定ID（編集/削除の単位）
+	Enabled bool   `json:"enabled"` // この予定の有効/無効
+	Type    string `json:"type"`    // "once" | "weekly" | "daily"
+	// year/month/day は once 専用で必ず正値（Validate 済）。daily/weekly では未使用＝0 のため
+	// omitempty で保存JSONから省く。weekday(0=日)・hour・minute は 0 が有効値なので omitempty 不可。
+	Year       int    `json:"year,omitempty"`  // once のみ
+	Month      int    `json:"month,omitempty"` // once のみ（1-12）
+	Day        int    `json:"day,omitempty"`   // once のみ（1-31）
+	Weekday    int    `json:"weekday"`         // weekly のみ（0=日..6=土）
+	Hour       int    `json:"hour"`            // 全 type（0-23）
+	Minute     int    `json:"minute"`          // 全 type（0-59）
+	ConfigName string `json:"configName"`      // 空=前回起動と同じ config / 非空=その config 名
 }
 
 // WaitControl は「予告→空くまで待つ→締切で強制」のグローバル設定。
