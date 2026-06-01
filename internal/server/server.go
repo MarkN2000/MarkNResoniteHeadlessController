@@ -32,7 +32,8 @@ type Server struct {
 	worlds    headless.WorldsService
 	auth      *authManager
 	webFS     fs.FS
-	resonite  *resonite.Client // Resonite 公開API（ユーザー検索）
+	resonite  *resonite.Client          // Resonite 公開API（ユーザー検索）
+	restart   *restartOrchestrator      // 自動再起動の進行管理（Phase 8・P8-3）
 
 	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
@@ -56,6 +57,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		resonite:  reso,
 	}
 	s.auth = newAuthManager(cfg, &s.cfgMu)
+	s.restart = newRestartOrchestrator(s)
 	return s
 }
 
@@ -93,10 +95,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/app-settings", s.requireAuth(s.handleAppSettingsGet))
 	mux.HandleFunc("PUT /api/v1/app-settings", s.requireAuth(s.handleAppSettingsPut))
 
-	// スケジュール（Phase 8・§3.16）: 自動再起動 設定/状態（P8-1）。trigger/cancel は後続フェーズ。
+	// スケジュール（Phase 8・§3.16）: 自動再起動 設定/状態（P8-1）＋手動トリガー/中止（P8-3b）。
 	mux.HandleFunc("GET /api/v1/restart-config", s.requireAuth(s.handleRestartConfigGet))
 	mux.HandleFunc("PUT /api/v1/restart-config", s.requireAuth(s.handleRestartConfigPut))
 	mux.HandleFunc("GET /api/v1/restart-status", s.requireAuth(s.handleRestartStatus))
+	mux.HandleFunc("POST /api/v1/restart/trigger", s.requireAuth(s.handleRestartTrigger))
+	mux.HandleFunc("POST /api/v1/restart/cancel", s.requireAuth(s.handleRestartCancel))
 
 	// write API（Pre-7c）。全 POST・認証必須・idx は path・引数は JSON body。
 	// セッション内ユーザー操作（focus idx → <cmd> "<user>"）

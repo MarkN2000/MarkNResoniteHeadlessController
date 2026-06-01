@@ -7,7 +7,9 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
@@ -65,14 +67,18 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 }
 
 // restartStatus は restart-status の応答。
-// 次回予定（NextScheduled*）は P8-2（scheduler）で算出。InProgress/Phase/LastRestart は
-// P8-3（orchestrator）で埋める（現状は idle/ゼロ）。
+// 次回予定（NextScheduled*）は P8-2（scheduler）。進行状態（InProgress/Phase/Restart*）は
+// P8-3（orchestrator）。最終再起動（LastRestart）は永続化（P8-4・§3.16(9)）で埋める。
 type restartStatus struct {
 	Running              bool   `json:"running"`
 	UptimeSeconds        int64  `json:"uptimeSeconds"`
 	CrashRecoveryEnabled bool   `json:"crashRecoveryEnabled"`
 	InProgress           bool   `json:"inProgress"`
-	Phase                string `json:"phase"` // idle | waiting | announcing | restarting
+	Phase                string `json:"phase"` // idle | preparing | waiting | announcing | restarting
+	// 進行中の再起動（InProgress=true のときのみ意味を持つ）。
+	RestartTriggerType string  `json:"restartTriggerType,omitempty"` // manual | scheduled
+	RestartConfigName  string  `json:"restartConfigName,omitempty"`  // 進行中の対象 config（空=前回）
+	DeadlineAt         *string `json:"deadlineAt"`                   // ② 待機の締切（RFC3339）/ null
 	// 次回予定再起動（有効予定の最も近い発火）。予定が無ければ全て null/空。
 	NextScheduledAt         *string `json:"nextScheduledAt"`         // RFC3339（サーバーローカルTZ）/ null=予定なし
 	NextScheduledConfigName string  `json:"nextScheduledConfigName"` // 空=前回config
@@ -89,11 +95,23 @@ func (s *Server) handleRestartStatus(w http.ResponseWriter, r *http.Request) {
 	out := restartStatus{
 		Running:              st.State == headless.StateRunning,
 		CrashRecoveryEnabled: rc.CrashRecovery.Enabled,
-		Phase:                "idle",
+		Phase:                phaseIdle,
 	}
 	if st.StartedAt != nil {
 		out.UptimeSeconds = int64(time.Since(*st.StartedAt).Seconds())
 	}
+	// 進行中の再起動（P8-3b）。
+	if snap := s.restart.snapshot(); snap.inProgress {
+		out.InProgress = true
+		out.Phase = snap.phase
+		out.RestartTriggerType = snap.triggerType
+		out.RestartConfigName = snap.configName
+		if !snap.deadlineAt.IsZero() {
+			d := snap.deadlineAt.Format(time.RFC3339)
+			out.DeadlineAt = &d
+		}
+	}
+	// 次回予定再起動（P8-2）。
 	if next, sc, ok := rc.NextScheduled(time.Now()); ok {
 		at := next.Format(time.RFC3339)
 		out.NextScheduledAt = &at
@@ -102,4 +120,51 @@ func (s *Server) handleRestartStatus(w http.ResponseWriter, r *http.Request) {
 		out.NextScheduledType = sc.Type
 	}
 	writeOK(w, out)
+}
+
+// handleRestartTrigger: POST /api/v1/restart/trigger {configName?}
+// 手動「通常再起動」を即受付（非同期）。configName 空＝前回 config（§3.16(1)）。
+func (s *Server) handleRestartTrigger(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ConfigName string `json:"configName"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	name := strings.TrimSpace(body.ConfigName)
+	if name != "" {
+		if err := hlconfig.SanitizeName(name); err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
+			return
+		}
+	}
+	if err := s.restart.Trigger("manual", name); err != nil {
+		switch {
+		case errors.Is(err, errRestartInProgress):
+			writeErr(w, http.StatusConflict, "restart_in_progress", err.Error())
+		case errors.Is(err, errRestartNotRunning):
+			writeErr(w, http.StatusConflict, "not_running", err.Error())
+		case errors.Is(err, errRestartNoConfig):
+			writeErr(w, http.StatusBadRequest, "config_required", err.Error())
+		default:
+			writeErr(w, http.StatusInternalServerError, "trigger_failed", err.Error())
+		}
+		return
+	}
+	writeOK(w, map[string]any{"accepted": true})
+}
+
+// handleRestartCancel: POST /api/v1/restart/cancel
+// 進行中の再起動を中止（①②③のみ・ヘッドレスは継続）。④以降は 409。
+func (s *Server) handleRestartCancel(w http.ResponseWriter, r *http.Request) {
+	if err := s.restart.Cancel(); err != nil {
+		switch {
+		case errors.Is(err, errNoRestartInProgress):
+			writeErr(w, http.StatusConflict, "no_restart", err.Error())
+		case errors.Is(err, errRestartNotCancellable):
+			writeErr(w, http.StatusConflict, "not_cancellable", err.Error())
+		default:
+			writeErr(w, http.StatusInternalServerError, "cancel_failed", err.Error())
+		}
+		return
+	}
+	writeOK(w, map[string]any{"accepted": true})
 }
