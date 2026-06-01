@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button, Group, Modal, Stack, Text } from "@mantine/core";
 import type { ConfigSummary, RestartType, ScheduledRestart } from "../../api";
 import { FieldRow, InspectorNumberInput, InspectorSelect } from "../../components/inspector";
-import { WEEKDAY_KEYS, isValidOnceDate } from "./scheduleModel";
+import { MIN_YEAR, WEEKDAY_KEYS, isValidOnceDate } from "./scheduleModel";
 
 // config Select は空値を扱えないため番兵を使い、送信時に "" (=前回config) へ変換する（ManualCard と同方式）。
 const PREV = "#prev";
@@ -32,15 +32,20 @@ export function ScheduleEditModal({
   const num = (key: "year" | "month" | "day" | "hour" | "minute") => (v: number | string) =>
     setField(key, v === "" ? 0 : Number(v));
 
-  // 種別変更。once へ切替時に年月日が未設定なら今日で初期化する。
+  // 種別変更。once へ切替時に年月日が未設定なら今日で初期化。
+  // daily/weekly へ切替時は once 専用の年月日をクリアし、保存JSONに残らないようにする。
   const changeType = (v: string | null) => {
     if (!v) return;
     const type = v as RestartType;
-    if (type === "once" && !draft.year) {
-      const now = new Date();
-      setDraft((d) => ({ ...d, type, year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }));
+    if (type === "once") {
+      if (draft.year) {
+        setField("type", type);
+      } else {
+        const now = new Date();
+        setDraft((d) => ({ ...d, type, year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }));
+      }
     } else {
-      setField("type", type);
+      setDraft((d) => ({ ...d, type, year: undefined, month: undefined, day: undefined }));
     }
   };
 
@@ -78,7 +83,7 @@ export function ScheduleEditModal({
               <InspectorNumberInput
                 value={draft.year ?? 0}
                 onChange={num("year")}
-                min={2024}
+                min={MIN_YEAR}
                 max={2100}
                 allowNegative={false}
                 style={{ width: 96 }}
