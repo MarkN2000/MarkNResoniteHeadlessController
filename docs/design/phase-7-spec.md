@@ -1,6 +1,6 @@
 # Phase 7+ (フロントエンド統合) 仕様書 — 改訂版
 
-> ステータス: **設定タブ(7-5) 実装済（§3.15）＝Phase 7 UI は7タブ中6タブ完成（残=スケジュール＝Phase 8）**。実装済タブ: 7-0 Foundation(§3.7)／7-1 セッション(§3.8)／7-2 フレンド(§3.9)＋P9-A 検索(§3.10)／7-7 第1層トースト(§3.11)／7-3 新規セッション(§3.12)／7-7残 自動poll・PageVisibility(§3.13)／7-4 コンフィグ(§3.14)／7-5 設定(§3.15)。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**次は Phase 8（自動再起動＝スケジュールタブ実体・§4 で着手前に協議）**。
+> ステータス: **設定タブ(7-5) 実装済（§3.15）＝Phase 7 UI は7タブ中6タブ完成（残=スケジュール＝Phase 8）**。実装済タブ: 7-0 Foundation(§3.7)／7-1 セッション(§3.8)／7-2 フレンド(§3.9)＋P9-A 検索(§3.10)／7-7 第1層トースト(§3.11)／7-3 新規セッション(§3.12)／7-7残 自動poll・PageVisibility(§3.13)／7-4 コンフィグ(§3.14)／7-5 設定(§3.15)。仕様は v1 全機能監査（2026-05-29）を踏まえ全面再設計。**Phase 8（自動再起動＝スケジュールタブ）は設計協議を完了し §3.16 に確定仕様を起案（実装前レビュー段階）**。
 > 親設計: [docs/DESIGN.md](../DESIGN.md)
 > 関連: [docs/design/structured-driver.md](structured-driver.md), [docs/resonite-domain-facts.md](../resonite-domain-facts.md)
 > ARM/Steam 方針: メモリ `arm-support-plan`（Steam 更新 = DepotDownloader 統一）
@@ -218,7 +218,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 | 2 | **フレンド** | 2 | リクエスト一覧 / Ban 一覧 / フォーカス内ユーザー / 検索(P9) → ユーザー操作（承認/申請/解除/invite=フォーカス中へ） | 「起動してください」 |
 | 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
 | 4 | **コンフィグ** | (編集) | v1 同等 CRUD（フォームのみ・タブ式複数ワールド・§3.14） | ✅ 使える |
-| 5 | **スケジュール** | — | 状態表示（前回起動/稼働時間/次回再起動）+ 再起動予定（P8、現状「開発中」） | ✅ 使える |
+| 5 | **スケジュール** | — | 自動再起動（手動通常/scheduled・安全再起動フロー・事前アクション・クラッシュ復帰）＋状態表示（P8・確定仕様 §3.16・実装前） | ✅ 使える |
 | 6 | **設定** | — | 管理PW変更 / Resoniteアカウント / アプリ設定 / Steam設定(P9・枠のみ)（実装済・§3.15） | ✅ 使える |
 | 7 | **コマンド** | — | SSE ライブログ + コマンド直送（上級者用） | 「起動してください」 |
 
@@ -439,10 +439,111 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **検証**：Go 単体（`settings_test.go`＝PW変更の現PW検証/Cookie再発行/旧PW失効・app-settings GET/PUT/不正port/ファイル永続化）＋`go test ./...` green。`npx tsc --noEmit` / `npm run build` green。
 
+### 3.16 スケジュール（自動再起動）タブ (Phase 8) の確定仕様
+
+> 本節は**実装前・レビュー確定の単一情報源**（§3.14 と同方針）。2026-06-01 のユーザーとの設計協議で確定。親方針: DESIGN §5.4–§5.6・要件 [[rewrite-plan]]。
+
+Phase 7 最後の未実装タブ。`nav.ts` に枠だけある `schedule` を実体化する。**バックエンドは新設**（`config` に `restart` 追加・scheduler / restart-orchestrator / crash-monitor の goroutine・restart API）。土台は実装済（`WorldsService.List/ForEach`・`Driver.Start/Stop`・`d.stopping` 意図的停止判別・`recordLastUsed/loadLastUsed`）。
+
+**(0) 協議で確定したスコープ（v1 から削ぎ落とした点）**
+- **トリガーは2つ**: 手動「通常再起動」/ scheduled。**userZero 独立トリガーは作らない**＝「全員退出を待つ」は再起動フローの待機段に内包（v1 の userZeroWatcher 常時監視〔複数→0 検知〕は廃止）。**highLoad 不採用**（要件）。
+- **手動は「通常（安全再起動）」1ボタンのみ**。即時(forced)は既存の停止→起動で代替できるため作らない。「告知のみ」も MVP では作らない。
+- **告知はチャットDMを使わない**（`message` はフレンド限定で到達不確実）。**dynamicImpulse 告知のみ**（フル設定型）。
+- **待機制御はグローバル設定のみ**（予定ごと override は持ち込まない＝YAGNI）。
+
+**(1) 統一フロー「安全再起動」（手動通常・scheduled 共通）**
+```
+[トリガー] 予定時刻 到達 / 手動「通常再起動」
+   ↓
+合計0人？ ──YES──→ 即時再起動（①②③スキップ・告知も待機も無し）
+   │ NO
+   ↓
+① 即発火: セッション変更（Private化 / maxusers=1 / 改名）＝新規参加を静かに止める
+   ↓
+② 静かに待機（最大 forceRestartTimeout＝既定60分・worlds 合計人数を監視）
+   │   └─ 待機中に0人化 → 即再起動（③告知を待たない）
+   ↓ 締切の actionTiming（既定2分）前まで来てもまだ居る
+③ 告知: dynamicImpulse を1回発信「まもなく再起動します」
+   ↓ actionTiming 経過
+④ 強制再起動 → 停止 →（任意Steam=P9-B）→ 選択 config で起動
+```
+境界条件・決定:
+- **セッション変更（①）はトリガー時に即発火**（新規参加を静かに止める）。**dynamicImpulse 告知（③）だけが締切前**＝静かに待ち、強制が近づいた時だけ告知する運用。
+- **二重起動防止**: 再起動進行中フラグでトリガーを排他（手動/scheduled/crash 同時を排他）。
+- **再起動の config** = 予定/手動で選択（既定は空文字 `""` = 直近起動と同じ config。`configName` を指定すればその config で起動）。
+- 待機・強制は `forceRestartTimeout`/`actionTiming` のグローバル値を使用。
+- **キャンセル**: 進行中（①②③＝停止④の前）のみ「中止」可能。中止すると再起動を取りやめ、ヘッドレスは稼働継続。**即発火済みのセッション変更（Private化等）は自動で戻さず、必要なら管理者がセッションタブで手動復元**（UI に「設定は変更されたまま」と添える）。scheduled をキャンセルしても**今回分のみ**＝次回は通常発火（予定は無効化しない）。④停止開始後は中止不可。
+
+**(2) 事前アクション**
+- **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn <itemUrl> true` → `dynamicimpulsestring <tag> "<message>"`。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
+- **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。
+  - **各項目は独立トグル（全OFF可）**＝「Private化はしたくない」なら setPrivate=OFF のままにできる。既定は **maxusers=1 のみ ON・Private と改名は OFF**。
+
+**(3) scheduled 時刻モデル（独自・once/weekly/daily）**
+- `type: "once" | "weekly" | "daily"`。**サーバーローカル時刻**で判定し UI に適用 TZ を明示。
+- once = 年月日時分／weekly = 曜日(0=日..6=土)+時分／daily = 時分。各予定に `enabled`・`configName`（**空 `""` = 前回 / 非空 = その config 名**）。※ config 名は `_` を含み得る（`__previous__` すら有効名）ため、前回の番兵は衝突しない**空文字**を使う。
+- **次回再起動時刻** = 全有効予定の次回発火時刻のうち最も近いもの（restart-status で公開）。判定はスケジューラ goroutine が自前計算（cron ライブラリ不要）。
+
+**(4) クラッシュ自動復帰（DESIGN §5.6）**
+- **既定ON**。意図しないプロセス終了（`d.stopping==false` での終了）を検知 → ヘッドレスを直近 config で自動再起動。
+- **ループ保護**: 既定「**10分に3回**」でクラッシュしたら自動復帰を停止し通知（無限再起動ループ防止）。`maxCrashes`/`windowMinutes` を設定可。
+- 復帰対象はヘッドレスのみ（MRHC 自身は手動起動）。
+
+**(5) 設定データ構造（`mrhc.config.json` の `restart`）**
+```jsonc
+"restart": {
+  "scheduled": [
+    { "id":"...", "enabled":true,  "type":"daily",  "hour":5, "minute":0, "configName":"" },              // ""=前回config
+    { "id":"...", "enabled":true,  "type":"weekly", "weekday":1, "hour":4, "minute":0, "configName":"night" },
+    { "id":"...", "enabled":false, "type":"once",   "year":2026,"month":6,"day":10,"hour":3,"minute":0, "configName":"" }
+  ],
+  "waitControl":  { "forceRestartTimeoutMin": 60, "actionTimingMin": 2 },
+  "preActions": {
+    "announce":       { "enabled":true, "itemUrl":"resrec:///...", "impulseTag":"MRHC.play", "message":"まもなく再起動します" },
+    "sessionChanges": { "setPrivate":false, "setMaxUsersOne":true, "renameEnabled":false, "renameTo":"" }
+  },
+  "crashRecovery": { "enabled":true, "maxCrashes":3, "windowMinutes":10 }
+}
+```
+`cfgMu`（既存 RWMutex）で読み書きを保護（設定タブと同じ一本化方針・§3.15）。
+
+**(6) API / SSE**
+```
+GET  /api/v1/restart-config                  restart 設定を返す
+PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック）
+GET  /api/v1/restart-status                  次回予定 / 最終再起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
+POST /api/v1/restart/trigger {type:"normal","configName"?}  手動「通常再起動」を即受付（非同期）
+POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続）
+```
+- SSE: 既存 `status`/`update` イベントに再起動進行フェーズ（preparing / waiting / announcing / restarting）を反映（起動・停止が数分かかり得るため非同期＝DESIGN §7）。
+
+**(7) UI 構成（スケジュールタブ・インスペクタ風・停止中も編集可）**
+`SplitColumns` で配置。**広い画面（xl以上）は2カラム＝左に運用/状態〔①②③〕・右に設定〔④⑤⑥〕／狭い画面は縦1カラム**にカードを積む:
+1. **ステータスカード**: 稼働時間・**次回予定再起動**（日時+config）・最終再起動（時刻/トリガー種別）・現在の進行状態・クラッシュ復帰状態。**再起動進行中は現在フェーズ（待機/告知）＋残り時間＋`[中止]`ボタンを表示**（中止後は「セッション設定は変更されたまま」と一言添える）。稼働時間/進行は稼働中のみ。
+2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**）。
+3. **予定リストカード**: 各行（種別 / 時刻 / config / 有効トグル / 編集 / 削除）＋`[＋新規]`。編集は**モーダル**（type 選択・時刻入力・config `Select`）。
+4. **待機制御カード**: `forceRestartTimeoutMin` / `actionTimingMin`。
+5. **事前アクションカード**: 告知（有効 / itemUrl / impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。
+6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
+- 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
+- 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。
+
+**(8) バックエンドアーキ（§4 channel 所有モデル）**
+- **scheduler goroutine**: 有効予定から次回発火時刻を算出し、その時刻まで待機（設定 PUT で再計算）。発火で orchestrator にトリガー通知。
+- **restart orchestrator**: 手動/scheduled/crash のトリガーを受け統一フロー（(1)）を実行。進行中フラグで排他。`WorldsService.List`（人数）・`ForEach`（事前アクション）・`Driver.Stop/Start` を使用。**config 解決（name→launchPath＋認証注入）は `handleStart` と共通化**（既存ロジックを再利用関数へ抽出）。
+- **crash monitor**: Driver 終了監視で `d.stopping==false` の終了を検知→ループ保護判定→自動復帰。
+- 状態は単一 goroutine が所有し channel で操作（"share memory by communicating"）。`restart-status` を SSE/GET で公開。
+
+**(9) 状態永続化**: 次回スケジュール再起動・最終再起動（時刻/トリガー種別）・稼働時間を既存 `runtime-state.json` に追記。
+
+**(10) 既知の制約 / 将来拡張**
+- dynamicImpulse の到達はワールド側受け機構に依存（フル設定型で吸収）。
+- 将来候補: 告知カウントダウン繰り返し・「告知のみ」手動ボタン・即時再起動ボタン・残り時間差し込み変数・予定ごと待機 override・Steam 更新を④に挟む（P9-B・DESIGN §5.7）。
+
 ---
 
 ## 4. 後で詳細協議が必要な領域
-- **スケジュールの再起動条件**（モジュール式設計・待機制御 waitControl）← Phase 8 着手前
+- ~~**スケジュールの再起動条件**（モジュール式設計・待機制御 waitControl）← Phase 8 着手前~~ → **確定（§3.16）**
 - **新規セッション「テンプレート」の実体**（`startWorldTemplate` の有効テンプレート名）← 実機採取
 - **Steam（DepotDownloader）の 2FA UI フロー詳細** ← Phase 9、ARM 実機採取と合わせて（メモリ `arm-support-plan`）
 
