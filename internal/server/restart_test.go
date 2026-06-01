@@ -7,6 +7,7 @@ package server
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 )
@@ -107,5 +108,40 @@ func TestRestartStatus_Idle(t *testing.T) {
 	}
 	if !got.Data.CrashRecoveryEnabled {
 		t.Fatalf("既定では crashRecoveryEnabled=true のはず: %+v", got.Data)
+	}
+	if got.Data.NextScheduledAt != nil {
+		t.Fatalf("既定（予定なし）では nextScheduledAt=null のはず: %v", *got.Data.NextScheduledAt)
+	}
+}
+
+// PUT で有効な daily 予定を入れると status に次回予定（未来・config 名つき）が出る（P8-2）。
+func TestRestartStatus_NextScheduled(t *testing.T) {
+	ts, pw, _ := newSettingsServer(t)
+	body := `{
+		"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":5,"minute":0,"configName":"night"}],
+		"waitControl":{"forceRestartTimeoutMin":60,"actionTimingMin":2},
+		"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}
+	}`
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/restart-config", pw, "application/json", body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PUT status=%d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	var got okEnv[restartStatus]
+	authGet(t, ts.URL+"/api/v1/restart-status", pw, &got)
+	d := got.Data
+	if d.NextScheduledAt == nil {
+		t.Fatal("daily 予定があるのに nextScheduledAt=null")
+	}
+	if d.NextScheduledID != "a" || d.NextScheduledType != "daily" || d.NextScheduledConfigName != "night" {
+		t.Fatalf("次回予定のメタが想定外: %+v", d)
+	}
+	when, err := time.Parse(time.RFC3339, *d.NextScheduledAt)
+	if err != nil {
+		t.Fatalf("nextScheduledAt が RFC3339 でない: %q (%v)", *d.NextScheduledAt, err)
+	}
+	if !when.After(time.Now()) {
+		t.Fatalf("次回予定が未来でない: %v", when)
 	}
 }

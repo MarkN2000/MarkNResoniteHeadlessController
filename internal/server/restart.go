@@ -65,29 +65,41 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 }
 
 // restartStatus は restart-status の応答。
-// P8-1 では実行時状態（次回予定・最終再起動・進行フェーズ）は未実装のため idle/ゼロを返す。
-// NextScheduled は P8-2（scheduler）、InProgress/Phase/LastRestart は P8-3（orchestrator）で埋める。
+// 次回予定（NextScheduled*）は P8-2（scheduler）で算出。InProgress/Phase/LastRestart は
+// P8-3（orchestrator）で埋める（現状は idle/ゼロ）。
 type restartStatus struct {
 	Running              bool   `json:"running"`
 	UptimeSeconds        int64  `json:"uptimeSeconds"`
 	CrashRecoveryEnabled bool   `json:"crashRecoveryEnabled"`
 	InProgress           bool   `json:"inProgress"`
 	Phase                string `json:"phase"` // idle | waiting | announcing | restarting
+	// 次回予定再起動（有効予定の最も近い発火）。予定が無ければ全て null/空。
+	NextScheduledAt         *string `json:"nextScheduledAt"`         // RFC3339（サーバーローカルTZ）/ null=予定なし
+	NextScheduledConfigName string  `json:"nextScheduledConfigName"` // 空=前回config
+	NextScheduledID         string  `json:"nextScheduledId"`
+	NextScheduledType       string  `json:"nextScheduledType"` // once | weekly | daily
 }
 
 // handleRestartStatus: GET /api/v1/restart-status
 func (s *Server) handleRestartStatus(w http.ResponseWriter, r *http.Request) {
 	st := s.driver.Status()
 	s.cfgMu.RLock()
-	crashOn := s.cfg.RestartOrDefault().CrashRecovery.Enabled
+	rc := s.cfg.RestartOrDefault()
 	s.cfgMu.RUnlock()
 	out := restartStatus{
 		Running:              st.State == headless.StateRunning,
-		CrashRecoveryEnabled: crashOn,
+		CrashRecoveryEnabled: rc.CrashRecovery.Enabled,
 		Phase:                "idle",
 	}
 	if st.StartedAt != nil {
 		out.UptimeSeconds = int64(time.Since(*st.StartedAt).Seconds())
+	}
+	if next, sc, ok := rc.NextScheduled(time.Now()); ok {
+		at := next.Format(time.RFC3339)
+		out.NextScheduledAt = &at
+		out.NextScheduledConfigName = sc.ConfigName
+		out.NextScheduledID = sc.ID
+		out.NextScheduledType = sc.Type
 	}
 	writeOK(w, out)
 }
