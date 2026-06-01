@@ -117,11 +117,10 @@ func (r Restart) Validate() error {
 	}
 	an := r.PreActions.Announce
 	if an.Enabled {
+		// インパルスタグは dynamicimpulse の宛先指定に必須。
+		// メッセージは任意（空可）＝受信アイテムが固定内容でメッセージを使わない場合があるため。
 		if strings.TrimSpace(an.ImpulseTag) == "" {
 			return fmt.Errorf("告知を有効にする場合はインパルスタグを入力してください")
-		}
-		if strings.TrimSpace(an.Message) == "" {
-			return fmt.Errorf("告知を有効にする場合はメッセージを入力してください")
 		}
 	}
 	sc := r.PreActions.SessionChanges

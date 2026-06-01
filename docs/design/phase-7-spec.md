@@ -478,6 +478,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **(2) 事前アクション**
 - **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn <itemUrl> true` → `dynamicimpulsestring <tag> "<message>"`。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
   - **実装**: **spawn → impulse の間に約10秒待機**（spawn したアイテムがワールド内で実体化してから impulse を送る・v1 `ITEM_SPAWN_DELAY` 踏襲・固定定数）。**2パス**で実行（全ワールド spawn → 10秒 sleep → 全ワールド impulse）。待機中は execMu を解放し他コマンドを妨げない。`itemUrl` 空なら spawn を省略し impulse のみ（常設受け機構前提）。
+  - **実装（UI・5b-1 追補）**: `itemUrl` は **テンプレ選択（v1 main 由来の2種＝とらぞセッション閉店アナウンス/テキスト読み上げ）＋手動入力** の `Select`。テンプレ選択で `itemUrl`＋**共通タグ `MRHC.play`**（`ANNOUNCE_COMMON_TAG`）を自動設定し URL/タグ欄を隠す。手動入力時のみ URL/タグ欄を表示。**`tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
 - **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。
   - **各項目は独立トグル（全OFF可）**＝「Private化はしたくない」なら setPrivate=OFF のままにできる。既定は **maxusers=1 のみ ON・Private と改名は OFF**。
 
@@ -522,10 +523,10 @@ POST /api/v1/restart/cancel                  進行中の再起動を中止（�
 **(7) UI 構成（スケジュールタブ・インスペクタ風・停止中も編集可）**
 `SplitColumns` で配置。**広い画面（xl以上）は2カラム＝左に運用/状態〔①②③〕・右に設定〔④⑤⑥〕／狭い画面は縦1カラム**にカードを積む:
 1. **ステータスカード**: 稼働時間・**次回予定再起動**（日時+config）・最終再起動（時刻/トリガー種別）・現在の進行状態・クラッシュ復帰状態。**再起動進行中は現在フェーズ（待機/告知）＋残り時間＋`[中止]`ボタンを表示**（中止後は「セッション設定は変更されたまま」と一言添える）。稼働時間/進行は稼働中のみ。
-2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**）。
+2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**・ボタン色は `severity="warning"`＝セッションタブの再起動と同色）。
 3. **予定リストカード**: 各行（種別 / 時刻 / config / 有効トグル / 編集 / 削除）＋`[＋新規]`。編集は**モーダル**（type 選択・時刻入力・config `Select`）。
 4. **待機制御カード**: `forceRestartTimeoutMin` / `actionTimingMin`。
-5. **事前アクションカード**: 告知（有効 / itemUrl / impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。
+5. **事前アクションカード**: 告知（有効 / itemUrl〔テンプレ選択+手動入力〕 / impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。message は任意（空可）。詳細は §3.16(2) 実装注記。
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
 - 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。

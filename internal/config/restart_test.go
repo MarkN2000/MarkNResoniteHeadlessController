@@ -45,6 +45,13 @@ func TestRestartValidate(t *testing.T) {
 		t.Fatalf("妥当な設定が弾かれた: %v", err)
 	}
 
+	// 告知ON・タグあり・メッセージ空は妥当（メッセージは任意＝受信アイテム依存）。
+	msgOptional := DefaultRestart()
+	msgOptional.PreActions.Announce = AnnounceAction{Enabled: true, ImpulseTag: "MRHC.play", Message: ""}
+	if err := msgOptional.Validate(); err != nil {
+		t.Fatalf("メッセージ空の告知が弾かれた（任意のはず）: %v", err)
+	}
+
 	bad := func(mut func(r *Restart)) {
 		t.Helper()
 		r := DefaultRestart()
