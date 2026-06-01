@@ -93,6 +93,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/app-settings", s.requireAuth(s.handleAppSettingsGet))
 	mux.HandleFunc("PUT /api/v1/app-settings", s.requireAuth(s.handleAppSettingsPut))
 
+	// スケジュール（Phase 8・§3.16）: 自動再起動 設定/状態（P8-1）。trigger/cancel は後続フェーズ。
+	mux.HandleFunc("GET /api/v1/restart-config", s.requireAuth(s.handleRestartConfigGet))
+	mux.HandleFunc("PUT /api/v1/restart-config", s.requireAuth(s.handleRestartConfigPut))
+	mux.HandleFunc("GET /api/v1/restart-status", s.requireAuth(s.handleRestartStatus))
+
 	// write API（Pre-7c）。全 POST・認証必須・idx は path・引数は JSON body。
 	// セッション内ユーザー操作（focus idx → <cmd> "<user>"）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/kick", s.requireAuth(s.sessionUserOp("kick")))

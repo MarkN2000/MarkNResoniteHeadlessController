@@ -34,7 +34,8 @@ type Config struct {
 	HeadlessConfigDir   string              `json:"headlessConfigDir,omitempty"`    // ヘッドレスconfig格納先（空=既定 {dataDir}/headless-configs）
 	HeadlessCredentials HeadlessCredentials `json:"headlessCredentials,omitempty"`  // 既定の Resonite アカウント（起動時に各 config へ注入）
 	Encoding            string              `json:"encoding,omitempty"`             // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
-	// 後続でRestart / Steam などを追加
+	Restart             *Restart            `json:"restart,omitempty"`              // 自動再起動設定（未設定=DefaultRestart・§3.16）
+	// 後続でSteam などを追加
 }
 
 // HeadlessCredentials は生成/起動する headless config に注入する既定の Resonite アカウント。
