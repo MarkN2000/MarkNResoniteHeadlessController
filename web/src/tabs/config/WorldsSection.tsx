@@ -100,10 +100,10 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
             <InspectorNumberInput value={asNum(world.maxUsers)} onChange={numW("maxUsers")} min={1} allowNegative={false} />
           </FieldRow>
           <FieldRow label={t("config.loadWorldPresetName")}>
-            <InspectorTextInput
-              value={asStr(world.loadWorldPresetName)}
-              onChange={(e) => setW("loadWorldPresetName", e.currentTarget.value)}
-              placeholder="Grid"
+            <InspectorSelect
+              data={[...api.WORLD_TEMPLATES]}
+              value={asStr(world.loadWorldPresetName) || "Grid"}
+              onChange={(v) => v && setW("loadWorldPresetName", v)}
             />
           </FieldRow>
           <FieldRow label={t("config.loadWorldURL")}>

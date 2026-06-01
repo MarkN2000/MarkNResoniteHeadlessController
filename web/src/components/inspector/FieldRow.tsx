@@ -43,7 +43,7 @@ export function FieldRow({
   label,
   children,
   marker = "var(--mantine-color-brand-6)",
-  labelWidth = 116,
+  labelWidth = 168,
   align = "center",
 }: {
   label: string;
