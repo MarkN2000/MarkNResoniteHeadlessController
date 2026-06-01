@@ -63,6 +63,7 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, http.StatusInternalServerError, "save_failed", saveErr.Error())
 		return
 	}
+	s.scheduler.Reload() // 予定変更を scheduler に即反映（次回発火を再計算）
 	writeOK(w, body)
 }
 

@@ -76,6 +76,9 @@ func main() {
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
 	srv := server.New(cfg, cfgPath, driver, resonite.NewClient(), web.FS())
 
+	// バックグラウンドワーカー（scheduler 等・Phase 8）を起動。stop で停止する。
+	stopBackground := srv.Start()
+
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Port), Handler: srv.Handler()}
 	go func() {
 		fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)
@@ -90,6 +93,10 @@ func main() {
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	<-sigCh
 	fmt.Println("\n終了シグナル受信。ヘッドレスを停止しています...（もう一度Ctrl-Cで即終了）")
+
+	// 先にバックグラウンドワーカーを止める（予定発火を打ち切り、進行中の再起動 ①②③ を cancel して
+	// 下の driver.Stop() と競合しないようにする）。
+	stopBackground()
 
 	if driver.Status().State != headless.StateStopped {
 		go func() {

@@ -73,16 +73,18 @@ type restartOrchestrator struct {
 	stopWaitTimeout  time.Duration // ④ stop 後 StateStopped を待つ最大
 	stopPollInterval time.Duration // ④ stop 待ちのポーリング間隔
 
-	mu     sync.Mutex
-	p      restartProgress
-	cancel context.CancelFunc
+	mu        sync.Mutex
+	p         restartProgress
+	cancel    context.CancelFunc
+	parentCtx context.Context // 進行中フローの親 ctx（Start で bg ctx に差し替え＝shutdown で ①②③ を cancel）
 }
 
 func newRestartOrchestrator(s *Server) *restartOrchestrator {
 	return &restartOrchestrator{
-		driver:  s.driver,
-		worlds:  s.worlds,
-		resolve: s.resolveLaunch,
+		driver:    s.driver,
+		worlds:    s.worlds,
+		resolve:   s.resolveLaunch,
+		parentCtx: context.Background(),
 		restartCfg: func() config.Restart {
 			s.cfgMu.RLock()
 			defer s.cfgMu.RUnlock()
@@ -118,7 +120,11 @@ func (o *restartOrchestrator) Trigger(triggerType, configName string) error {
 		o.mu.Unlock()
 		return errRestartInProgress // 二重起動防止（§3.16(1)）
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	parent := o.parentCtx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
 	o.cancel = cancel
 	o.p = restartProgress{
 		inProgress:  true,
@@ -154,6 +160,13 @@ func (o *restartOrchestrator) snapshot() restartProgress {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.p
+}
+
+// setParent は進行中フローの親 ctx を差し替える（Start で bg ctx に・shutdown で ①②③ を cancel）。
+func (o *restartOrchestrator) setParent(ctx context.Context) {
+	o.mu.Lock()
+	o.parentCtx = ctx
+	o.mu.Unlock()
 }
 
 func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name string) {

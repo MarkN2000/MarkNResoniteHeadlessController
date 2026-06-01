@@ -5,6 +5,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +35,7 @@ type Server struct {
 	webFS     fs.FS
 	resonite  *resonite.Client          // Resonite 公開API（ユーザー検索）
 	restart   *restartOrchestrator      // 自動再起動の進行管理（Phase 8・P8-3）
+	scheduler *restartScheduler         // 予定再起動の発火（Phase 8・P8-4a）
 
 	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
@@ -58,7 +60,21 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 	}
 	s.auth = newAuthManager(cfg, &s.cfgMu)
 	s.restart = newRestartOrchestrator(s)
+	s.scheduler = newRestartScheduler(s)
 	return s
+}
+
+// Start はバックグラウンドワーカー（scheduler・P8-4a／後続で crash-monitor）を起動し、
+// 停止関数を返す。停止関数は bg ctx を cancel（ワーカー停止）し、進行中の再起動を
+// best-effort で中止する（①②③のみ。④以降は仕様上 cancel 不可）。main から起動時に1回呼ぶ。
+func (s *Server) Start() (stop func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.restart.setParent(ctx) // 進行中フローを bg ctx の子に＝shutdown で ①②③ を cancel
+	go s.scheduler.run(ctx)
+	return func() {
+		cancel()
+		_ = s.restart.Cancel()
+	}
 }
 
 func (s *Server) Handler() http.Handler {
