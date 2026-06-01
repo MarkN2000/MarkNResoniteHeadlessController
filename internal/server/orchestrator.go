@@ -204,6 +204,9 @@ loop:
 		if ctx.Err() != nil {
 			return // ②③中の cancel
 		}
+		if o.driver.Status().State == headless.StateStopped {
+			break // フロー中にヘッドレスが落ちた → 締切を待たず即 ④ で復帰（Stop は空振り・Start で起動）
+		}
 		switch decideWait(total, err != nil, time.Until(deadline), action, announced, rc.PreActions.Announce.Enabled) {
 		case waitRestart:
 			break loop
@@ -287,8 +290,11 @@ func (o *restartOrchestrator) setPhase(phase string) {
 
 func (o *restartOrchestrator) finish() {
 	o.mu.Lock()
-	o.p = restartProgress{phase: phaseIdle}
+	if o.cancel != nil {
+		o.cancel() // context を解放（親 bg ctx の children から外す＝再起動毎のリーク防止）
+	}
 	o.cancel = nil
+	o.p = restartProgress{phase: phaseIdle}
 	o.mu.Unlock()
 }
 

@@ -81,6 +81,20 @@ func TestCrashMonitor_DisabledAndInProgress(t *testing.T) {
 	expectNoStart(t, started, "再起動進行中は復帰しないはず")
 }
 
+// 起動時 config が Validate 未経由で不正値（maxCrashes=0/windowMin=0）でも、
+// クランプで安全側（最小1）に倒れ、無限再起動せず即ループ保護する（レビュー #4）。
+func TestCrashMonitor_ClampsBadConfig(t *testing.T) {
+	started := make(chan string, 4)
+	now := func() time.Time { return time.Unix(1_700_000_000, 0) }
+	cm := newTestCrashMon(func() (bool, int, int) { return true, 0, 0 }, func() bool { return false }, func(string) error { started <- "x"; return nil }, now)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go cm.run(ctx)
+	cm.onUnexpectedExit()
+	// クランプ後 maxCrashes=1 → 初回クラッシュで即ループ保護＝復帰しない（安全側・無限ループ防止）。
+	expectNoStart(t, started, "不正値クランプ後は安全側（復帰せず）になるはず")
+}
+
 func expectStart(t *testing.T, ch chan string, want, msg string) {
 	t.Helper()
 	select {

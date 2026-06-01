@@ -7,8 +7,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
+
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 )
 
 type crashMonitor struct {
@@ -76,6 +79,13 @@ func (cm *crashMonitor) handleCrash() {
 	if !enabled {
 		return // クラッシュ復帰 OFF
 	}
+	// 防御: 起動時 config が Validate 未経由（手編集）でも安全側に倒す（最小1）。
+	if maxCrashes < 1 {
+		maxCrashes = 1
+	}
+	if windowMin < 1 {
+		windowMin = 1
+	}
 	if cm.inProgress() {
 		cm.logf("[crash] 再起動進行中のため自動復帰をスキップ（orchestrator が処理）")
 		return
@@ -100,6 +110,11 @@ func (cm *crashMonitor) handleCrash() {
 		return
 	}
 	if err := cm.start(name); err != nil {
+		if errors.Is(err, headless.ErrAlreadyRunning) {
+			// orchestrator 等が先に起動した＝復帰不要（inProgress チェックと start の非アトミック性の保険）。
+			cm.logf("[crash] 既に起動済みのため自動復帰をスキップ")
+			return
+		}
 		cm.logf("[crash] 自動復帰の起動に失敗（%s）: %v", name, err)
 		return
 	}

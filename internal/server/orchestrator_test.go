@@ -50,6 +50,11 @@ func (d *fakeDriver) snap() (state headless.State, stops, starts int, label stri
 	defer d.mu.Unlock()
 	return d.state, d.stops, d.starts, d.label
 }
+func (d *fakeDriver) setState(s headless.State) {
+	d.mu.Lock()
+	d.state = s
+	d.mu.Unlock()
+}
 
 type fakeWorlds struct {
 	mu    sync.Mutex
@@ -258,6 +263,31 @@ func TestTrigger_DoubleRejected(t *testing.T) {
 	}
 	_ = o.Cancel()
 	waitUntil(t, func() bool { return !o.snapshot().inProgress }, 2*time.Second, "片付け")
+}
+
+// フロー中（②待機中）にヘッドレスが落ちたら、締切を待たず即 ④ で復帰する（レビュー #2）。
+func TestTrigger_HeadlessStopsDuringWait(t *testing.T) {
+	d := &fakeDriver{state: headless.StateRunning}
+	fw := &fakeWorlds{users: 2} // 居続ける→本来は締切まで待機
+	rc := config.DefaultRestart()
+	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0} // 実質止まらない締切
+	rc.PreActions.Announce.Enabled = false
+	o := newTestOrch(d, fw, rc, "night")
+
+	if err := o.Trigger("manual", ""); err != nil {
+		t.Fatalf("trigger 失敗: %v", err)
+	}
+	waitUntil(t, func() bool { return o.snapshot().phase == phaseWaiting }, 2*time.Second, "待機到達")
+
+	// フロー中にヘッドレスがクラッシュ（停止）したと模擬。
+	d.setState(headless.StateStopped)
+
+	// 締切（実質無限）を待たず即 ④ で復帰するはず。
+	waitUntil(t, func() bool { _, _, starts, _ := d.snap(); return starts == 1 }, 2*time.Second, "即時復帰")
+	waitUntil(t, func() bool { return !o.snapshot().inProgress }, 2*time.Second, "進行終了")
+	if _, _, starts, label := d.snap(); starts != 1 || label != "night" {
+		t.Fatalf("フロー中クラッシュ後の復帰が想定外: starts=%d label=%q", starts, label)
+	}
 }
 
 func TestCancel_WhenIdle(t *testing.T) {
