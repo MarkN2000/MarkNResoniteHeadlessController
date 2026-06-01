@@ -48,7 +48,10 @@
   },
   "common": {
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "resetToDefault": "Reset to default",
+    "resetConfirmTitle": "Reset to default",
+    "resetConfirmMsg": "Reset \"{{field}}\" to its default value?"
   },
   "session": {
     "settings": "Session settings",

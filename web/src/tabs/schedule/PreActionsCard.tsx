@@ -9,6 +9,9 @@ import {
   InspectorTextInput,
   InspectorTextarea,
 } from "../../components/inspector";
+import { ConfirmModal } from "../../components/ConfirmModal";
+import { useConfirm } from "../../hooks/useConfirm";
+import { defaultAnnounce, defaultSessionChanges } from "./scheduleModel";
 
 // 「手動入力」を表す番兵（config 値の itemUrl には現れない "#" を含むため実テンプレ URL と衝突しない）。
 const MANUAL = "#manual";
@@ -28,6 +31,18 @@ export function PreActionsCard({
   const s = value.sessionChanges;
   const setAnnounce = (announce: RestartAnnounce) => onChange({ ...value, announce });
   const setSession = (sessionChanges: RestartSessionChanges) => onChange({ ...value, sessionChanges });
+
+  // マーカークリック＝その項目を既定値へ戻す（確認あり）。
+  const confirm = useConfirm();
+  const resetProps = (apply: () => void, fieldLabel: string) => ({
+    markerLabel: t("common.resetToDefault"),
+    onMarkerClick: () =>
+      confirm.ask({
+        title: t("common.resetConfirmTitle"),
+        message: t("common.resetConfirmMsg", { field: fieldLabel }),
+        onConfirm: apply,
+      }),
+  });
 
   // 告知アイテム＝テンプレ選択 or 手動入力。保存値（itemUrl）から選択状態を導出する。
   // テンプレ URL に一致すればそのテンプレ、それ以外（空含む）は手動入力。
@@ -50,24 +65,37 @@ export function PreActionsCard({
     <InspectorCard title={t("schedule.preActionsTitle")}>
       <Stack gap="xs">
         <Divider color="dark.4" label={t("schedule.announceSection")} labelPosition="center" />
-        <FieldRow label={t("schedule.enabled")}>
+        <FieldRow
+          label={t("schedule.enabled")}
+          {...resetProps(() => setAnnounce({ ...a, enabled: defaultAnnounce().enabled }), t("schedule.enabled"))}
+        >
           <Switch checked={a.enabled} onChange={(e) => setAnnounce({ ...a, enabled: e.currentTarget.checked })} />
         </FieldRow>
         {a.enabled && (
           <>
+            {/* 告知アイテム種別は itemUrl から導出する表示専用の選択（保存フィールドではない）ためリセット対象外。 */}
             <FieldRow label={t("schedule.announceItemType")}>
               <InspectorSelect data={itemData} value={itemKey} onChange={selectItem} />
             </FieldRow>
             {isManual && (
               <>
-                <FieldRow label={t("schedule.announceItemUrl")}>
+                <FieldRow
+                  label={t("schedule.announceItemUrl")}
+                  {...resetProps(() => setAnnounce({ ...a, itemUrl: defaultAnnounce().itemUrl }), t("schedule.announceItemUrl"))}
+                >
                   <InspectorTextInput
                     value={a.itemUrl}
                     onChange={(e) => setAnnounce({ ...a, itemUrl: e.currentTarget.value })}
                     placeholder="resrec:///..."
                   />
                 </FieldRow>
-                <FieldRow label={t("schedule.announceImpulseTag")}>
+                <FieldRow
+                  label={t("schedule.announceImpulseTag")}
+                  {...resetProps(
+                    () => setAnnounce({ ...a, impulseTag: defaultAnnounce().impulseTag }),
+                    t("schedule.announceImpulseTag"),
+                  )}
+                >
                   <InspectorTextInput
                     value={a.impulseTag}
                     onChange={(e) => setAnnounce({ ...a, impulseTag: e.currentTarget.value })}
@@ -76,7 +104,11 @@ export function PreActionsCard({
                 </FieldRow>
               </>
             )}
-            <FieldRow label={t("schedule.announceMessage")} align="start">
+            <FieldRow
+              label={t("schedule.announceMessage")}
+              align="start"
+              {...resetProps(() => setAnnounce({ ...a, message: defaultAnnounce().message }), t("schedule.announceMessage"))}
+            >
               <InspectorTextarea
                 value={a.message}
                 onChange={(e) => setAnnounce({ ...a, message: e.currentTarget.value })}
@@ -86,26 +118,44 @@ export function PreActionsCard({
         )}
 
         <Divider color="dark.4" label={t("schedule.sessionSection")} labelPosition="center" mt="xs" />
-        <FieldRow label={t("schedule.setPrivate")}>
+        <FieldRow
+          label={t("schedule.setPrivate")}
+          {...resetProps(() => setSession({ ...s, setPrivate: defaultSessionChanges().setPrivate }), t("schedule.setPrivate"))}
+        >
           <Switch
             checked={s.setPrivate}
             onChange={(e) => setSession({ ...s, setPrivate: e.currentTarget.checked })}
           />
         </FieldRow>
-        <FieldRow label={t("schedule.setMaxUsersOne")}>
+        <FieldRow
+          label={t("schedule.setMaxUsersOne")}
+          {...resetProps(
+            () => setSession({ ...s, setMaxUsersOne: defaultSessionChanges().setMaxUsersOne }),
+            t("schedule.setMaxUsersOne"),
+          )}
+        >
           <Switch
             checked={s.setMaxUsersOne}
             onChange={(e) => setSession({ ...s, setMaxUsersOne: e.currentTarget.checked })}
           />
         </FieldRow>
-        <FieldRow label={t("schedule.renameEnabled")}>
+        <FieldRow
+          label={t("schedule.renameEnabled")}
+          {...resetProps(
+            () => setSession({ ...s, renameEnabled: defaultSessionChanges().renameEnabled }),
+            t("schedule.renameEnabled"),
+          )}
+        >
           <Switch
             checked={s.renameEnabled}
             onChange={(e) => setSession({ ...s, renameEnabled: e.currentTarget.checked })}
           />
         </FieldRow>
         {s.renameEnabled && (
-          <FieldRow label={t("schedule.renameTo")}>
+          <FieldRow
+            label={t("schedule.renameTo")}
+            {...resetProps(() => setSession({ ...s, renameTo: defaultSessionChanges().renameTo }), t("schedule.renameTo"))}
+          >
             <InspectorTextInput
               value={s.renameTo}
               onChange={(e) => setSession({ ...s, renameTo: e.currentTarget.value })}
@@ -113,6 +163,15 @@ export function PreActionsCard({
           </FieldRow>
         )}
       </Stack>
+      <ConfirmModal
+        opened={confirm.request !== null}
+        title={confirm.request?.title ?? ""}
+        message={confirm.request?.message}
+        danger={confirm.request?.danger}
+        loading={confirm.busy}
+        onConfirm={() => void confirm.confirm()}
+        onClose={confirm.close}
+      />
     </InspectorCard>
   );
 }

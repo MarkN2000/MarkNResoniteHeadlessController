@@ -48,7 +48,10 @@
   },
   "common": {
     "cancel": "キャンセル",
-    "confirm": "実行"
+    "confirm": "実行",
+    "resetToDefault": "既定値に戻す",
+    "resetConfirmTitle": "既定値に戻す",
+    "resetConfirmMsg": "「{{field}}」を既定値に戻しますか？"
   },
   "session": {
     "settings": "セッション設定",

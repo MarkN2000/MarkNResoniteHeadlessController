@@ -2,6 +2,9 @@ import { useTranslation } from "react-i18next";
 import { Stack, Text } from "@mantine/core";
 import type { RestartWaitControl } from "../../api";
 import { InspectorCard, FieldRow, InspectorNumberInput } from "../../components/inspector";
+import { ConfirmModal } from "../../components/ConfirmModal";
+import { useConfirm } from "../../hooks/useConfirm";
+import { defaultWaitControl } from "./scheduleModel";
 
 // ④待機制御カード（§3.16(7)）。安全再起動フロー共通のグローバル待機/告知タイミング（分）。
 // 予定ごとの override は持たない（YAGNI）。
@@ -17,10 +20,28 @@ export function WaitControlCard({
   const num = (key: keyof RestartWaitControl, fallback: number) => (v: number | string) =>
     onChange({ ...value, [key]: v === "" ? fallback : Number(v) });
 
+  // マーカークリック＝その項目を既定値へ戻す（確認あり）。
+  const confirm = useConfirm();
+  const resetProps = (apply: () => void, fieldLabel: string) => ({
+    markerLabel: t("common.resetToDefault"),
+    onMarkerClick: () =>
+      confirm.ask({
+        title: t("common.resetConfirmTitle"),
+        message: t("common.resetConfirmMsg", { field: fieldLabel }),
+        onConfirm: apply,
+      }),
+  });
+
   return (
     <InspectorCard title={t("schedule.waitTitle")}>
       <Stack gap="xs">
-        <FieldRow label={t("schedule.forceRestartTimeout")}>
+        <FieldRow
+          label={t("schedule.forceRestartTimeout")}
+          {...resetProps(
+            () => onChange({ ...value, forceRestartTimeoutMin: defaultWaitControl().forceRestartTimeoutMin }),
+            t("schedule.forceRestartTimeout"),
+          )}
+        >
           <InspectorNumberInput
             value={value.forceRestartTimeoutMin}
             onChange={num("forceRestartTimeoutMin", 1)}
@@ -28,7 +49,13 @@ export function WaitControlCard({
             allowNegative={false}
           />
         </FieldRow>
-        <FieldRow label={t("schedule.actionTiming")}>
+        <FieldRow
+          label={t("schedule.actionTiming")}
+          {...resetProps(
+            () => onChange({ ...value, actionTimingMin: defaultWaitControl().actionTimingMin }),
+            t("schedule.actionTiming"),
+          )}
+        >
           <InspectorNumberInput
             value={value.actionTimingMin}
             onChange={num("actionTimingMin", 0)}
@@ -40,6 +67,15 @@ export function WaitControlCard({
           {t("schedule.waitNote")}
         </Text>
       </Stack>
+      <ConfirmModal
+        opened={confirm.request !== null}
+        title={confirm.request?.title ?? ""}
+        message={confirm.request?.message}
+        danger={confirm.request?.danger}
+        loading={confirm.busy}
+        onConfirm={() => void confirm.confirm()}
+        onClose={confirm.close}
+      />
     </InspectorCard>
   );
 }
