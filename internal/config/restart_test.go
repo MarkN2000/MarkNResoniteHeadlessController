@@ -64,4 +64,7 @@ func TestRestartValidate(t *testing.T) {
 	bad(func(r *Restart) {
 		r.Scheduled = []ScheduledRestart{{ID: "x", Type: RestartTypeDaily, Hour: 1}, {ID: "x", Type: RestartTypeDaily, Hour: 2}}
 	})
+	bad(func(r *Restart) { // 2月30日（実在しない暦日）は弾く
+		r.Scheduled = []ScheduledRestart{{ID: "a", Type: RestartTypeOnce, Year: 2026, Month: 2, Day: 30, Hour: 1, Minute: 0}}
+	})
 }

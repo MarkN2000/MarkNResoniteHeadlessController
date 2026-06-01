@@ -85,6 +85,7 @@ func TestRestartConfig_PutInvalid(t *testing.T) {
 		"announce no tag":      `{"scheduled":[],"waitControl":{"forceRestartTimeoutMin":60,"actionTimingMin":2},"preActions":{"announce":{"enabled":true,"impulseTag":"","message":"x"}},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}}`,
 		"duplicate id":         `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":1,"minute":0},{"id":"a","enabled":true,"type":"daily","hour":2,"minute":0}],` + base + `}`,
 		"bad config name":      `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":1,"minute":0,"configName":"../escape"}],` + base + `}`,
+		"invalid calendar":     `{"scheduled":[{"id":"a","enabled":true,"type":"once","year":2026,"month":2,"day":30,"hour":1,"minute":0}],` + base + `}`,
 	}
 	for name, b := range cases {
 		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/restart-config", pw, "application/json", b)

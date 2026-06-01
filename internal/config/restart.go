@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Restart は自動再起動（スケジュール）設定。確定仕様: docs/design/phase-7-spec.md §3.16。
@@ -148,6 +149,12 @@ func (r Restart) Validate() error {
 		if s.Type == RestartTypeOnce {
 			if s.Year < 2000 || s.Year > 9999 || s.Month < 1 || s.Month > 12 || s.Day < 1 || s.Day > 31 {
 				return fmt.Errorf("予定[%d]: 日付が不正です", i)
+			}
+			// 実在チェック: time.Date は不正日付を正規化する（2/30→3/2）ため、
+			// 往復で年月日が変わらないことを確認して 2/30 等を弾く。時刻は別途範囲検証済み。
+			d := time.Date(s.Year, time.Month(s.Month), s.Day, 0, 0, 0, 0, time.Local)
+			if d.Year() != s.Year || int(d.Month()) != s.Month || d.Day() != s.Day {
+				return fmt.Errorf("予定[%d]: 実在しない日付です", i)
 			}
 		}
 	}
