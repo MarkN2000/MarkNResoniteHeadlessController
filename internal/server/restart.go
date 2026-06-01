@@ -80,6 +80,9 @@ type restartStatus struct {
 	RestartTriggerType string  `json:"restartTriggerType,omitempty"` // manual | scheduled
 	RestartConfigName  string  `json:"restartConfigName,omitempty"`  // 進行中の対象 config（空=前回）
 	DeadlineAt         *string `json:"deadlineAt"`                   // ② 待機の締切（RFC3339）/ null
+	// 最終再起動（§3.16(9)・runtime-state.json 由来）。未記録なら null/空。
+	LastRestartAt      *string `json:"lastRestartAt"`                // RFC3339 / null
+	LastRestartTrigger string  `json:"lastRestartTrigger,omitempty"` // manual | scheduled | crash
 	// 次回予定再起動（有効予定の最も近い発火）。予定が無ければ全て null/空。
 	NextScheduledAt         *string `json:"nextScheduledAt"`         // RFC3339（サーバーローカルTZ）/ null=予定なし
 	NextScheduledConfigName string  `json:"nextScheduledConfigName"` // 空=前回config
@@ -111,6 +114,12 @@ func (s *Server) handleRestartStatus(w http.ResponseWriter, r *http.Request) {
 			d := snap.deadlineAt.Format(time.RFC3339)
 			out.DeadlineAt = &d
 		}
+	}
+	// 最終再起動（P8-5・§3.16(9)）。
+	if at, trigger := s.loadLastRestart(); at != "" {
+		a := at
+		out.LastRestartAt = &a
+		out.LastRestartTrigger = trigger
 	}
 	// 次回予定再起動（P8-2）。
 	if next, sc, ok := rc.NextScheduled(time.Now()); ok {

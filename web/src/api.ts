@@ -306,3 +306,81 @@ export const putAppSettings = (s: AppSettings) => write("PUT", "/app-settings", 
 // 管理パスワード変更（成功時 backend が新Cookieを再発行＝このブラウザは継続・他端末は失効）。
 export const changePassword = (currentPassword: string, newPassword: string) =>
   post("/password", { currentPassword, newPassword });
+
+// --- スケジュール（自動再起動）タブ（Phase 8・§3.16）---
+// restart 設定は単一オブジェクト（config.Restart のミラー）。完全オブジェクトを PUT する（pointer 設計前提）。
+
+export type RestartType = "once" | "weekly" | "daily";
+
+export interface ScheduledRestart {
+  id: string;
+  enabled: boolean;
+  type: RestartType;
+  year?: number; // once のみ
+  month?: number; // once のみ（1-12）
+  day?: number; // once のみ（1-31）
+  weekday: number; // weekly のみ（0=日..6=土）
+  hour: number; // 0-23
+  minute: number; // 0-59
+  configName: string; // 空=前回config
+}
+export interface RestartWaitControl {
+  forceRestartTimeoutMin: number;
+  actionTimingMin: number;
+}
+export interface RestartAnnounce {
+  enabled: boolean;
+  itemUrl: string;
+  impulseTag: string;
+  message: string;
+}
+export interface RestartSessionChanges {
+  setPrivate: boolean;
+  setMaxUsersOne: boolean;
+  renameEnabled: boolean;
+  renameTo: string;
+}
+export interface RestartCrashRecovery {
+  enabled: boolean;
+  maxCrashes: number;
+  windowMinutes: number;
+}
+export interface RestartConfig {
+  scheduled: ScheduledRestart[];
+  waitControl: RestartWaitControl;
+  preActions: { announce: RestartAnnounce; sessionChanges: RestartSessionChanges };
+  crashRecovery: RestartCrashRecovery;
+}
+
+// restart-status の応答（internal/server.restartStatus）。
+export interface RestartStatus {
+  running: boolean;
+  uptimeSeconds: number;
+  crashRecoveryEnabled: boolean;
+  inProgress: boolean;
+  phase: string; // idle | preparing | waiting | announcing | restarting
+  restartTriggerType?: string; // manual | scheduled（進行中のみ）
+  restartConfigName?: string; // 進行中の対象 config
+  deadlineAt: string | null; // ② 待機の締切（RFC3339）
+  lastRestartAt: string | null; // 最終再起動（RFC3339）
+  lastRestartTrigger?: string; // manual | scheduled | crash
+  nextScheduledAt: string | null; // 次回予定（RFC3339）
+  nextScheduledConfigName: string;
+  nextScheduledId: string;
+  nextScheduledType: string; // once | weekly | daily
+}
+
+export async function getRestartConfig(): Promise<RestartConfig | null> {
+  return getData<RestartConfig>("/restart-config");
+}
+export const putRestartConfig = (rc: RestartConfig) => write("PUT", "/restart-config", rc);
+
+export async function getRestartStatus(): Promise<RestartStatus | null> {
+  return getData<RestartStatus>("/restart-status");
+}
+
+// 手動「通常再起動」を受付（configName 空=前回 config）。
+export const triggerRestart = (configName?: string) =>
+  post("/restart/trigger", { configName: configName ?? "" });
+// 進行中の再起動を中止（①②③のみ）。
+export const cancelRestart = () => post("/restart/cancel");

@@ -59,12 +59,13 @@ type restartProgress struct {
 }
 
 type restartOrchestrator struct {
-	driver     restartDriver
-	worlds     headless.WorldsService
-	resolve    func(name string) (headlessPath, launchPath string, err error)
-	restartCfg func() config.Restart
-	lastUsed   func() string
-	recordUsed func(name string)
+	driver       restartDriver
+	worlds       headless.WorldsService
+	resolve      func(name string) (headlessPath, launchPath string, err error)
+	restartCfg   func() config.Restart
+	lastUsed     func() string
+	recordUsed   func(name string)
+	recordRestart func(trigger, at string) // 最終再起動の記録（§3.16(9)）
 
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。
 	minute           time.Duration // forceTimeout/actionTiming の「分」単位（本番 time.Minute）
@@ -92,6 +93,7 @@ func newRestartOrchestrator(s *Server) *restartOrchestrator {
 		},
 		lastUsed:         s.loadLastUsed,
 		recordUsed:       s.recordLastUsed,
+		recordRestart:    s.recordLastRestart,
 		minute:           time.Minute,
 		waitInterval:     10 * time.Second,
 		spawnDelay:       10 * time.Second,
@@ -135,7 +137,7 @@ func (o *restartOrchestrator) Trigger(triggerType, configName string) error {
 	}
 	o.mu.Unlock()
 
-	go o.run(ctx, rc, name)
+	go o.run(ctx, rc, name, triggerType)
 	return nil
 }
 
@@ -169,13 +171,13 @@ func (o *restartOrchestrator) setParent(ctx context.Context) {
 	o.mu.Unlock()
 }
 
-func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name string) {
+func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name, triggerType string) {
 	defer o.finish()
 
 	// 0人なら ①②③ を飛ばして即再起動。
 	if total, err := o.totalUsers(ctx); err == nil && total == 0 {
 		if o.enterRestarting() {
-			o.doRestart(name)
+			o.doRestart(name, triggerType)
 		}
 		return
 	}
@@ -229,7 +231,7 @@ loop:
 
 	// ④ 強制再起動（cancel 不可）。
 	if o.enterRestarting() {
-		o.doRestart(name)
+		o.doRestart(name, triggerType)
 	}
 }
 
@@ -353,7 +355,7 @@ func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAct
 }
 
 // doRestart は ④ 停止→（StateStopped 待ち）→選択 config で起動。cancel 不可（ctx は渡さない）。
-func (o *restartOrchestrator) doRestart(name string) {
+func (o *restartOrchestrator) doRestart(name, triggerType string) {
 	_ = o.driver.Stop() // 既に停止していれば ErrNotRunning（無視）
 	o.waitStopped()
 	headlessPath, launchPath, err := o.resolve(name)
@@ -366,6 +368,9 @@ func (o *restartOrchestrator) doRestart(name string) {
 		return
 	}
 	o.recordUsed(name)
+	if o.recordRestart != nil {
+		o.recordRestart(triggerType, time.Now().Format(time.RFC3339)) // 最終再起動を記録（§3.16(9)）
+	}
 }
 
 func (o *restartOrchestrator) waitStopped() {

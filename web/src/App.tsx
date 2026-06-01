@@ -16,6 +16,7 @@ import { FriendsTab } from "./tabs/friends/FriendsTab";
 import { NewSessionTab } from "./tabs/newsession/NewSessionTab";
 import { ConfigTab } from "./tabs/config/ConfigTab";
 import { SettingsTab } from "./tabs/settings/SettingsTab";
+import { ScheduleTab } from "./tabs/schedule/ScheduleTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -139,6 +140,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
     if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} />;
+    if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
 

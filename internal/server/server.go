@@ -42,6 +42,10 @@ type Server struct {
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
 	// auth は &cfgMu を共有する。レート制限状態は auth.mu（別ロック）。
 	cfgMu sync.RWMutex
+
+	// runtimeMu は runtime-state.json（last-used / 最終再起動）の read-modify-write を直列化する
+	// （handleStart〔HTTP〕と orchestrator/crash-monitor〔goroutine〕からの並行書き込みを防ぐ）。
+	runtimeMu sync.Mutex
 }
 
 func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *resonite.Client, webFS fs.FS) *Server {

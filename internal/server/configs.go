@@ -129,38 +129,70 @@ func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"username": uname, "hasPassword": hasPw})
 }
 
-// --- runtime-state（last-used config）---
+// --- runtime-state（last-used config / 最終再起動）---
+// 複数フィールドを持つため read-modify-write で保全する（recordLastUsed が lastRestart を消さない）。
+// orchestrator/crash-monitor（goroutine）と handleStart（HTTP）から並行に書かれるため runtimeMu で直列化。
 
 type runtimeState struct {
-	LastUsedConfig string `json:"lastUsedConfig"`
+	LastUsedConfig     string `json:"lastUsedConfig"`
+	LastRestartAt      string `json:"lastRestartAt,omitempty"`      // RFC3339・最終再起動時刻（§3.16(9)）
+	LastRestartTrigger string `json:"lastRestartTrigger,omitempty"` // manual | scheduled | crash
 }
 
 func (s *Server) runtimeStatePath() string {
 	return filepath.Join(s.dataDir, "runtime-state.json")
 }
 
-func (s *Server) loadLastUsed() string {
+// loadRuntimeStateLocked / saveRuntimeStateLocked は runtimeMu 保持前提の素の read/write。
+func (s *Server) loadRuntimeStateLocked() runtimeState {
+	var st runtimeState
 	if s.dataDir == "" {
-		return ""
+		return st
 	}
 	b, err := os.ReadFile(s.runtimeStatePath())
 	if err != nil {
-		return ""
+		return st
 	}
-	var st runtimeState
-	if json.Unmarshal(b, &st) != nil {
-		return ""
-	}
-	return st.LastUsedConfig
+	_ = json.Unmarshal(b, &st)
+	return st
 }
 
-func (s *Server) recordLastUsed(name string) {
+func (s *Server) saveRuntimeStateLocked(st runtimeState) {
 	if s.dataDir == "" {
 		return
 	}
-	b, err := json.MarshalIndent(runtimeState{LastUsedConfig: name}, "", "  ")
-	if err != nil {
-		return
+	if b, err := json.MarshalIndent(st, "", "  "); err == nil {
+		_ = os.WriteFile(s.runtimeStatePath(), b, 0o600)
 	}
-	_ = os.WriteFile(s.runtimeStatePath(), b, 0o600)
+}
+
+func (s *Server) loadLastUsed() string {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+	return s.loadRuntimeStateLocked().LastUsedConfig
+}
+
+func (s *Server) recordLastUsed(name string) {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+	st := s.loadRuntimeStateLocked()
+	st.LastUsedConfig = name
+	s.saveRuntimeStateLocked(st)
+}
+
+// recordLastRestart は最終再起動の時刻/トリガー種別を記録する（§3.16(9)・orchestrator/crash-monitor から）。
+func (s *Server) recordLastRestart(trigger, at string) {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+	st := s.loadRuntimeStateLocked()
+	st.LastRestartAt = at
+	st.LastRestartTrigger = trigger
+	s.saveRuntimeStateLocked(st)
+}
+
+func (s *Server) loadLastRestart() (at, trigger string) {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+	st := s.loadRuntimeStateLocked()
+	return st.LastRestartAt, st.LastRestartTrigger
 }

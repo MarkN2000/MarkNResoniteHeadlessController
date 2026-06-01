@@ -97,6 +97,29 @@ func TestRestartConfig_PutInvalid(t *testing.T) {
 	}
 }
 
+// runtime-state は複数フィールドを read-modify-write で保全する（recordLastUsed が lastRestart を消さない・P8-5）。
+func TestRuntimeState_PreservesFields(t *testing.T) {
+	s := &Server{dataDir: t.TempDir()}
+	s.recordLastUsed("night")
+	s.recordLastRestart("scheduled", "2026-06-01T05:00:00+09:00")
+
+	if got := s.loadLastUsed(); got != "night" {
+		t.Fatalf("lastUsed が想定外: %q", got)
+	}
+	at, trig := s.loadLastRestart()
+	if at != "2026-06-01T05:00:00+09:00" || trig != "scheduled" {
+		t.Fatalf("lastRestart が想定外: at=%q trig=%q", at, trig)
+	}
+	// recordLastUsed は lastRestart を消さない。
+	s.recordLastUsed("day")
+	if at2, trig2 := s.loadLastRestart(); at2 != at || trig2 != trig {
+		t.Fatalf("recordLastUsed が lastRestart を消した: at=%q trig=%q", at2, trig2)
+	}
+	if s.loadLastUsed() != "day" {
+		t.Fatal("lastUsed が更新されていない")
+	}
+}
+
 func TestRestartStatus_Idle(t *testing.T) {
 	ts, pw, _ := newSettingsServer(t)
 	var got okEnv[restartStatus]
