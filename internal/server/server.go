@@ -205,17 +205,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
 		return
 	}
-	// 起動時注入: config の creds が空なら中央アカウントを注入した一時 config を生成。
-	// creds / Resonite パスは app-settings/credentials で実行時に書き換わるため cfgMu RLock 下で読む。
-	s.cfgMu.RLock()
-	central := hlconfig.Credentials{
-		Username: s.cfg.HeadlessCredentials.Username,
-		Password: s.cfg.HeadlessCredentials.Password,
-	}
-	headlessPath := s.cfg.ResoniteHeadless
-	s.cfgMu.RUnlock()
-	runDir := filepath.Join(s.dataDir, ".run")
-	launchPath, err := hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
+	headlessPath, launchPath, err := s.resolveLaunch(name)
 	if err != nil {
 		if errors.Is(err, hlconfig.ErrNotFound) {
 			writeErr(w, http.StatusNotFound, "config_not_found", "指定のコンフィグが見つかりません")
@@ -230,6 +220,23 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	s.recordLastUsed(name)
 	writeOK(w, map[string]any{"accepted": true})
+}
+
+// resolveLaunch は config 名から起動に必要な (headlessPath, launchPath) を解決する。
+// 中央 creds / Resonite パスは app-settings・credentials で実行時に書き換わるため cfgMu RLock 下で読み、
+// config の creds が空なら中央アカウントを注入した一時 config を ResolveForLaunch で生成する。
+// handleStart と restart-orchestrator（P8-3）で共用する。name の検証・空判定は呼び出し側の責務。
+func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, err error) {
+	s.cfgMu.RLock()
+	central := hlconfig.Credentials{
+		Username: s.cfg.HeadlessCredentials.Username,
+		Password: s.cfg.HeadlessCredentials.Password,
+	}
+	headlessPath = s.cfg.ResoniteHeadless
+	s.cfgMu.RUnlock()
+	runDir := filepath.Join(s.dataDir, ".run")
+	launchPath, err = hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
+	return headlessPath, launchPath, err
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
