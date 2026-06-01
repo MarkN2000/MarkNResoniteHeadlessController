@@ -102,12 +102,7 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
                 <Stack gap="lg">
                   {/* P8-5b-2: ③予定リストカード（編集モーダル）はここに入る */}
                   <WaitControlCard value={rc.waitControl} onChange={(waitControl) => patch({ waitControl })} />
-                  <PreActionsCard
-                    announce={rc.preActions.announce}
-                    sessionChanges={rc.preActions.sessionChanges}
-                    onAnnounceChange={(announce) => patch({ preActions: { ...rc.preActions, announce } })}
-                    onSessionChange={(sessionChanges) => patch({ preActions: { ...rc.preActions, sessionChanges } })}
-                  />
+                  <PreActionsCard value={rc.preActions} onChange={(preActions) => patch({ preActions })} />
                   <CrashRecoveryCard value={rc.crashRecovery} onChange={(crashRecovery) => patch({ crashRecovery })} />
                   <SaveBar dirty={dirty} saving={apply.busy} onSave={save} />
                 </Stack>

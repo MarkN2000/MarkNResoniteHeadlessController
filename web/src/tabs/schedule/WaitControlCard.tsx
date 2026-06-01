@@ -13,9 +13,9 @@ export function WaitControlCard({
   onChange: (v: RestartWaitControl) => void;
 }) {
   const { t } = useTranslation();
-  // 空入力は 0 として扱う（保存時に backend がクランプ）。
-  const num = (key: keyof RestartWaitControl) => (v: number | string) =>
-    onChange({ ...value, [key]: v === "" ? 0 : Number(v) });
+  // 空入力は各フィールドの最小値にフォールバック（force=1 / timing=0）＝無効な 0 状態を作らない。
+  const num = (key: keyof RestartWaitControl, fallback: number) => (v: number | string) =>
+    onChange({ ...value, [key]: v === "" ? fallback : Number(v) });
 
   return (
     <InspectorCard title={t("schedule.waitTitle")}>
@@ -23,7 +23,7 @@ export function WaitControlCard({
         <FieldRow label={t("schedule.forceRestartTimeout")}>
           <InspectorNumberInput
             value={value.forceRestartTimeoutMin}
-            onChange={num("forceRestartTimeoutMin")}
+            onChange={num("forceRestartTimeoutMin", 1)}
             min={1}
             allowNegative={false}
           />
@@ -31,7 +31,7 @@ export function WaitControlCard({
         <FieldRow label={t("schedule.actionTiming")}>
           <InspectorNumberInput
             value={value.actionTimingMin}
-            onChange={num("actionTimingMin")}
+            onChange={num("actionTimingMin", 0)}
             min={0}
             allowNegative={false}
           />
