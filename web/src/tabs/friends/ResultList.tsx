@@ -16,6 +16,7 @@ interface Props {
   bans: BanEntry[];
   searchResults: ResoniteUser[];
   focusedUsers: UserInfo[];
+  selfUserId: string | null; // ヘッドレス自身(ホスト)の UserID。自分への申請/解除/招待を無効化（R2）
   loading: boolean;
   onRefetch: () => void; // 現ソースの再取得（操作後 / ⟳）
 }
@@ -29,7 +30,7 @@ interface UserRow {
 
 // ② 統一結果リスト。①で選んだソース種別に応じて行を描画する（行内ボタン方式）。
 //   requests→[承認](即時) / bans→[解除](確認) / search・focused→[申請][解除](+search時[招待])（確認）。
-export function ResultList({ idx, source, requests, bans, searchResults, focusedUsers, loading, onRefetch }: Props) {
+export function ResultList({ idx, source, requests, bans, searchResults, focusedUsers, selfUserId, loading, onRefetch }: Props) {
   const { t } = useTranslation();
   const accept = useAsyncAction(onRefetch); // 承認は内向き操作なので即時
   const confirm = useConfirm();
@@ -118,6 +119,7 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
         users={users}
         showInvite={source === "search"} // 招待は在席者では無意味（実機 ambient のみ）→ search のみ
         emptyText={source === "search" ? t("friends.noResults") : t("friends.noFocusedUsers")}
+        selfUserId={selfUserId}
         onSendRequest={askSendRequest}
         onRemoveFriend={askRemoveFriend}
         onInvite={askInvite}
@@ -223,6 +225,7 @@ function UsersBody({
   users,
   showInvite,
   emptyText,
+  selfUserId,
   onSendRequest,
   onRemoveFriend,
   onInvite,
@@ -230,6 +233,7 @@ function UsersBody({
   users: UserRow[];
   showInvite: boolean;
   emptyText: string;
+  selfUserId: string | null; // 自分(ホスト)＝申請/解除/招待を無効化（R2・search/focused 共通）
   onSendRequest: (username: string) => void;
   onRemoveFriend: (username: string) => void;
   onInvite: (username: string) => void;
@@ -238,7 +242,9 @@ function UsersBody({
   if (users.length === 0) return <Empty text={emptyText} />;
   return (
     <Stack gap="xs">
-      {users.map((u, i) => (
+      {users.map((u, i) => {
+        const isSelf = !!selfUserId && u.id === selfUserId; // 自分への申請/解除/招待は無意味→無効化
+        return (
         <Fragment key={u.id || `${u.username}#${i}`}>
           {i > 0 && <Divider color="dark.5" />}
           <Box>
@@ -258,23 +264,24 @@ function UsersBody({
                 )}
               </Box>
             </Group>
-            {/* 操作行: 申請 / 招待 / 解除（モバイルで折返し）。 */}
+            {/* 操作行: 申請 / 招待 / 解除（モバイルで折返し）。自分(ホスト)は無効化（R2）。 */}
             <Group gap={4} wrap="wrap">
-              <InspectorButton severity="neutral" onClick={() => onSendRequest(u.username)}>
+              <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onSendRequest(u.username)}>
                 {t("friends.sendRequest")}
               </InspectorButton>
               {showInvite && (
-                <InspectorButton severity="neutral" onClick={() => onInvite(u.username)}>
+                <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onInvite(u.username)}>
                   {t("friends.invite")}
                 </InspectorButton>
               )}
-              <InspectorButton severity="danger" onClick={() => onRemoveFriend(u.username)}>
+              <InspectorButton severity="danger" disabled={isSelf} onClick={() => onRemoveFriend(u.username)}>
                 {t("friends.removeFriend")}
               </InspectorButton>
             </Group>
           </Box>
         </Fragment>
-      ))}
+        );
+      })}
     </Stack>
   );
 }

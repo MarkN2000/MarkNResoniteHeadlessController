@@ -136,7 +136,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     if (!def.availableWhenStopped && stopped) return <StartPrompt />;
     if (activeTab === "session")
       return running ? <SessionTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} /> : <StartPrompt />;
-    if (activeTab === "friends") return running ? <FriendsTab idx={focusedIdx} /> : <StartPrompt />;
+    if (activeTab === "friends")
+      return running ? <FriendsTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} /> : <StartPrompt />;
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;

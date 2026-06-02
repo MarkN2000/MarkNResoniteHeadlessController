@@ -324,6 +324,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   `https://assets.resonite.com/<hash>` に正規化。ルート `GET /api/v1/resonite/users?q=`（`requireAuth`）。**hermetic ユニット**（httptest stub）。
 - **②に行種別を追加**: `search`（検索結果）/`focused`（フォーカス内在席者）。`UsersBody`＝アバター＋名前＋id＋
   `[申請][解除]`＋（search のみ）`[招待]`。招待は在席者では無意味のため focused には出さない。
+  - **自分（ホスト）への申請/解除/招待を無効化（R2）**: `selfUserId`（`status.loginUserId`）と `u.id` 一致の行は `[申請][解除][招待]` を `disabled`（グレーアウト）。自分に対しては無意味なため。**`UsersBody` 共通で search/focused 両方をカバー**（検索結果に自分が出た場合も無効）。`selfUserId` は App→FriendsTab→ResultList→UsersBody と prop 配線。R3 とグレーアウト方式で統一。
 - **すべて確認ダイアログ**（外向き操作・§3.9 方針）。`解除` は danger。`invite` は `POST /sessions/{idx}/invite`（focus 必要・
   `FriendsTab` が focusedIdx を受け取る）。`申請`/`解除`/`招待` の backend は実装済（api.ts ラッパ追加のみ）。
 - **オンデマンド維持**: 検索も押した時だけ取得。`reqId` ガードで search/focused の取得競合も保護。⟳ は現ソース（検索は最後の語）を再取得。

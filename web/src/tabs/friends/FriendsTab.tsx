@@ -17,7 +17,7 @@ export type LoadSource = Exclude<FriendSource, "search">;
 //   ① SourcePanel = 取得/検索ソースの選択（オンデマンド。開いた時は取得しない）
 //   ② ResultList  = 選んだソースの結果を1か所に集約（行内ボタンで承認/解除/申請/招待）
 // idx = フォーカス中セッション（招待 と フォーカス内ユーザー取得に必要）。
-export function FriendsTab({ idx }: { idx: number }) {
+export function FriendsTab({ idx, selfUserId }: { idx: number; selfUserId: string | null }) {
   const [source, setSource] = useState<FriendSource | null>(null);
   const [requests, setRequests] = useState<string[]>([]);
   const [bans, setBans] = useState<BanEntry[]>([]);
@@ -87,6 +87,7 @@ export function FriendsTab({ idx }: { idx: number }) {
               bans={bans}
               searchResults={searchResults}
               focusedUsers={focusedUsers}
+              selfUserId={selfUserId}
               loading={loading}
               onRefetch={refetch}
             />
