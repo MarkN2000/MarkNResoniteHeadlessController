@@ -14,7 +14,7 @@ import { SessionUsers } from "./SessionUsers";
 // ＋ 表示中のみ 10 秒ごとの背景 poll（ユーザーの参加/退出を追従・Page Visibility 連動・§3.4）。
 const POLL_INTERVAL_MS = 10_000;
 
-export function SessionTab({ idx }: { idx: number }) {
+export function SessionTab({ idx, selfUserId }: { idx: number; selfUserId: string | null }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<WorldStatus | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
@@ -71,7 +71,7 @@ export function SessionTab({ idx }: { idx: number }) {
       <Box pb="md">
         <SplitColumns
           left={<SessionSettings idx={idx} status={status} onChanged={refetch} refreshing={loading} />}
-          right={<SessionUsers idx={idx} users={users} onChanged={refetch} />}
+          right={<SessionUsers idx={idx} users={users} onChanged={refetch} selfUserId={selfUserId} />}
         />
       </Box>
     </ScrollArea>

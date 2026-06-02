@@ -12,6 +12,7 @@ interface Props {
   idx: number;
   users: UserInfo[];
   onChanged: () => void; // 操作後の refetch（方針A）
+  selfUserId: string | null; // ヘッドレス自身(ホスト)の UserID（status.loginUserId）。自分への危険操作を無効化（R3）
 }
 
 // 確認が要るユーザー操作の種別と、その表示・危険度・実行 API を1か所にまとめる。
@@ -37,7 +38,7 @@ const CONFIRM_ACTIONS: Record<
 //   情報行 = 状態ドット + 名前（左） / 権限ドロップダウン + 在席離席（右）
 //   操作行 = リスポーン/ミュート/メッセージ（中立）+ キック/BAN（危険・右に分離）
 // 権限は選択した瞬間に即適用。respawn/silence/kick/ban は確認、message は入力モーダル。
-export function SessionUsers({ idx, users, onChanged }: Props) {
+export function SessionUsers({ idx, users, onChanged, selfUserId }: Props) {
   const { t } = useTranslation();
   const { busy, run } = useAsyncAction(onChanged); // 権限の即適用・メッセージ送信用
   const confirm = useConfirm();
@@ -78,6 +79,7 @@ export function SessionUsers({ idx, users, onChanged }: Props) {
                   idx={idx}
                   u={u}
                   busy={busy}
+                  isSelf={!!selfUserId && u.id === selfUserId}
                   onConfirm={(kind) => askConfirm(kind, u.name)}
                   onMessage={() => {
                     setMsg("");
@@ -141,6 +143,7 @@ function UserCard({
   idx,
   u,
   busy,
+  isSelf,
   onConfirm,
   onMessage,
   onRun,
@@ -148,6 +151,7 @@ function UserCard({
   idx: number;
   u: UserInfo;
   busy: boolean;
+  isSelf: boolean; // 自分(ホスト)＝危険操作/権限変更を無効化し respawn+message のみ許可（R3）
   onConfirm: (kind: ConfirmKind) => void; // 確認モーダルを開く（respawn/silence/unsilence/kick/ban）
   onMessage: () => void;
   onRun: (fn: () => Promise<unknown>, success?: string) => void; // 即適用（権限）
@@ -182,6 +186,7 @@ function UserCard({
           <InspectorSelect
             aria-label={t("session.role")}
             w={132}
+            disabled={isSelf} // 自分(ホスト)の権限は変更不可（R3）
             data={[...api.ROLES]}
             value={roleValue}
             placeholder={u.role}
@@ -201,7 +206,7 @@ function UserCard({
           </InspectorButton>
           <InspectorButton
             severity="neutral"
-            disabled={busy}
+            disabled={busy || isSelf}
             onClick={() => onConfirm(u.silenced ? "unsilence" : "silence")}
           >
             {u.silenced ? `🔈 ${t("session.unsilence")}` : `🔇 ${t("session.silence")}`}
@@ -211,10 +216,10 @@ function UserCard({
           </InspectorButton>
         </Group>
         <Group gap={4} wrap="nowrap">
-          <InspectorButton severity="danger" disabled={busy} onClick={() => onConfirm("kick")}>
+          <InspectorButton severity="danger" disabled={busy || isSelf} onClick={() => onConfirm("kick")}>
             {t("session.kick")}
           </InspectorButton>
-          <InspectorButton severity="danger" disabled={busy} onClick={() => onConfirm("ban")}>
+          <InspectorButton severity="danger" disabled={busy || isSelf} onClick={() => onConfirm("ban")}>
             {t("session.ban")}
           </InspectorButton>
         </Group>
