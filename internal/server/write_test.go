@@ -127,6 +127,24 @@ func TestServer_Write_Unban(t *testing.T) {
 	}
 }
 
+// 正常系: グローバル banByID（focus 不要・R1）。方針A で executed=true。
+func TestServer_Write_BanByID(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/bans/banByID", pw, `{"userId":"U-1NzqeqewOpM"}`)
+	if code != http.StatusOK || env.Data["executed"] != true {
+		t.Fatalf("banByID failed: code=%d env=%+v", code, env)
+	}
+}
+
+// 入力検証: banByID の userId が不正トークン（空白/記号）→ 400 invalid_value。
+func TestServer_Write_BanByID_InvalidID_400(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/bans/banByID", pw, `{"userId":"bad id!"}`)
+	if code != http.StatusBadRequest || env.Error.Code != "invalid_value" {
+		t.Fatalf("expected 400 invalid_value, got code=%d env=%+v", code, env)
+	}
+}
+
 // 正常系: グローバル friend 追加（focus 不要）。
 func TestServer_Write_FriendAdd(t *testing.T) {
 	ts, pw := newTestServer(t)

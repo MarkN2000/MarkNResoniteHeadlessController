@@ -133,6 +133,7 @@ POST /api/v1/friendrequests/accept  {"user":"..."}                         → a
 POST /api/v1/friends/add            {"user":"..."}                         → sendFriendRequest "<user>"
 POST /api/v1/friends/remove         {"user":"..."}                         → removeFriend "<user>"
 POST /api/v1/bans/unban             {"userId":"..."}                       → unbanByID <userId>（listbans の UserID。素の unban は username 用・実機確定2026-05-30）
+POST /api/v1/bans/banByID           {"userId":"..."}                       → banByID <userId>（全セッションから BAN・在席不要・検索結果用・R1。unban と対称）
 ```
 
 **引数の扱い**
@@ -333,6 +334,11 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **自分（ホスト）への申請/解除/招待を無効化（R2）**: `selfUserId`（`status.loginUserId`）と `u.id` 一致の行は `[申請][解除][招待]` を `disabled`（グレーアウト）。自分に対しては無意味なため。**`UsersBody` 共通で search/focused 両方をカバー**（検索結果に自分が出た場合も無効）。`selfUserId` は App→FriendsTab→ResultList→UsersBody と prop 配線。R3 とグレーアウト方式で統一。
 - **すべて確認ダイアログ**（外向き操作・§3.9 方針）。`解除` は danger。`invite` は `POST /sessions/{idx}/invite`（focus 必要・
   `FriendsTab` が focusedIdx を受け取る）。`申請`/`解除`/`招待` の backend は実装済（api.ts ラッパ追加のみ）。
+- **検索結果にモデレーション段を追加（R1）**: `UsersBody` の **search のみ**（`showModeration`）2段目に `[✉ メッセージ][BAN][BAN解除]`。
+  - **メッセージ** = 入力モーダル（session タブと同方式・`api.messageUser(idx, username, text)`・フレンド宛のみ届く制約は許容）。username 駆動なので常時有効。
+  - **BAN** = `banByID <userId>`（`POST /bans/banByID`・全セッションから・在席不要なので検索した非在席者も BAN 可）／**BAN解除** = `api.unban(u.id)`（unbanByID 再利用）。どちらも確認ダイアログ（赤）。
+  - **userId 必須**: id 空の行は BAN/BAN解除 を `disabled`（banByID/unbanByID は ID 必須）。self（ホスト）も R2 同様 `disabled`。
+  - **再取得なし**: 検索リストは ban/unban で変化しないためトーストのみ（既存の検索行と同じ）。focused 行は据え置き（在席者のモデレーションはセッションタブ）。
 - **オンデマンド維持**: 検索も押した時だけ取得。`reqId` ガードで search/focused の取得競合も保護。⟳ は現ソース（検索は最後の語）を再取得。
 - **既知の限界**: 公開APIは友達関係を返さないため検索行は常に3操作を出す（非該当操作の backend 失敗は **7-7 第1層トーストで通知＝§3.11**。ただし方針A上、意味的失敗で HTTP 200 が返る場合は無音のまま）。`invite` は実機出力未確定（方針A 受理表示）。
 - **検証**: ユニット（resonite client + server ハンドラ・httptest）緑。Chrome 実機相当: 名前検索→実 api.resonite.com→結果＋アバター、申請の確認→実行、フォーカス内→申請/解除。**検索のみ外部公開APIに依存**（write は fakehl 経由でローカル完結）。

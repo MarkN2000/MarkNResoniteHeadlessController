@@ -138,7 +138,12 @@
     "invite": "Invite",
     "confirmSendRequest": "Send a friend request to {{user}}?",
     "confirmRemoveFriend": "Remove {{user}} from your contacts?",
-    "confirmInvite": "Invite {{user}} to the focused session?"
+    "confirmInvite": "Invite {{user}} to the focused session?",
+    "message": "Message",
+    "ban": "Ban",
+    "banUnban": "Unban",
+    "banTitle": "Ban",
+    "confirmBan": "Ban {{user}} ({{userId}}) from all sessions?"
   },
   "newSession": {
     "launchTitle": "Open a session",

@@ -157,6 +157,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/friends/add", s.requireAuth(s.globalUserOp("sendFriendRequest")))
 	mux.HandleFunc("POST /api/v1/friends/remove", s.requireAuth(s.globalUserOp("removeFriend")))
 	mux.HandleFunc("POST /api/v1/bans/unban", s.requireAuth(s.handleBanUnban))
+	mux.HandleFunc("POST /api/v1/bans/banByID", s.requireAuth(s.handleBanByID)) // ID 指定 BAN（検索結果・R1）
 
 	// Resonite 公開API（ユーザー検索）。フレンド申請/招待の相手探しに使う（無認証プロキシ・P9-A）。
 	mux.HandleFunc("GET /api/v1/resonite/users", s.requireAuth(s.handleResoniteUserSearch))

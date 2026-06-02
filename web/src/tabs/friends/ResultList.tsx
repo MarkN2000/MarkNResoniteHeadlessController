@@ -1,6 +1,6 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Avatar, Box, Center, Divider, Group, Loader, Stack, Text } from "@mantine/core";
+import { Avatar, Box, Button, Center, Divider, Group, Loader, Modal, Stack, Text, Textarea } from "@mantine/core";
 import * as api from "../../api";
 import type { BanEntry, ResoniteUser, UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, RefreshButton } from "../../components/inspector";
@@ -33,7 +33,10 @@ interface UserRow {
 export function ResultList({ idx, source, requests, bans, searchResults, focusedUsers, selfUserId, loading, onRefetch }: Props) {
   const { t } = useTranslation();
   const accept = useAsyncAction(onRefetch); // 承認は内向き操作なので即時
+  const send = useAsyncAction(); // メッセージ送信（検索リストは変化しないので refetch なし・R1）
   const confirm = useConfirm();
+  const [msgTo, setMsgTo] = useState<string | null>(null); // メッセージ入力モーダルの宛先（username）
+  const [msgText, setMsgText] = useState("");
 
   const title =
     source === "requests"
@@ -91,6 +94,30 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
   const askInvite = (u: string) =>
     askUserOp("friends.invite", "friends.confirmInvite", false, u, "toast.inviteDone", () => api.inviteUser(idx, u));
 
+  // モデレーション操作（検索結果・R1）。ban/unban は userId 駆動なので UserRow を受け取る。
+  // 検索リストは ban/unban で変化しないため操作後 refetch しない（トーストのみ）。
+  const askBan = (u: UserRow) =>
+    confirm.ask({
+      title: t("friends.banTitle"),
+      message: t("friends.confirmBan", { user: u.username, userId: u.id }),
+      danger: true,
+      success: t("toast.banDone"),
+      onConfirm: () => api.banByID(u.id),
+    });
+  const askUnbanById = (u: UserRow) =>
+    confirm.ask({
+      title: t("friends.unbanTitle"),
+      message: t("friends.confirmUnban", { user: u.username, userId: u.id }),
+      danger: true,
+      success: t("toast.unbanDone"),
+      onConfirm: () => api.unban(u.id),
+    });
+  // メッセージは入力モーダル（確認ダイアログではなく本文入力・session タブと同方式）。
+  const openMessage = (username: string) => {
+    setMsgText("");
+    setMsgTo(username);
+  };
+
   let body: ReactNode;
   if (loading) {
     body = (
@@ -118,11 +145,15 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
       <UsersBody
         users={users}
         showInvite={source === "search"} // 招待は在席者では無意味（実機 ambient のみ）→ search のみ
+        showModeration={source === "search"} // メッセージ/BAN/BAN解除 は検索結果のみ（R1・在席者はセッションタブ）
         emptyText={source === "search" ? t("friends.noResults") : t("friends.noFocusedUsers")}
         selfUserId={selfUserId}
         onSendRequest={askSendRequest}
         onRemoveFriend={askRemoveFriend}
         onInvite={askInvite}
+        onMessage={openMessage}
+        onBan={askBan}
+        onUnban={askUnbanById}
       />
     );
   }
@@ -149,6 +180,39 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
         onConfirm={() => void confirm.confirm()}
         onClose={confirm.close}
       />
+
+      <Modal
+        opened={msgTo !== null}
+        onClose={() => setMsgTo(null)}
+        title={t("session.messageTo", { user: msgTo ?? "" })}
+        centered
+      >
+        <Textarea
+          value={msgText}
+          onChange={(e) => setMsgText(e.currentTarget.value)}
+          placeholder={t("session.messagePlaceholder")}
+          autosize
+          minRows={3}
+        />
+        <Group justify="flex-end" gap="xs" mt="md">
+          <Button variant="default" onClick={() => setMsgTo(null)}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            loading={send.busy}
+            disabled={!msgText.trim()}
+            onClick={() => {
+              const to = msgTo;
+              const text = msgText;
+              if (!to) return;
+              setMsgTo(null);
+              void send.run(() => api.messageUser(idx, to, text), t("toast.messageDone"));
+            }}
+          >
+            {t("session.send")}
+          </Button>
+        </Group>
+      </Modal>
     </>
   );
 }
@@ -224,19 +288,27 @@ function BansBody({ bans, onUnban }: { bans: BanEntry[]; onUnban: (b: BanEntry) 
 function UsersBody({
   users,
   showInvite,
+  showModeration,
   emptyText,
   selfUserId,
   onSendRequest,
   onRemoveFriend,
   onInvite,
+  onMessage,
+  onBan,
+  onUnban,
 }: {
   users: UserRow[];
   showInvite: boolean;
+  showModeration: boolean; // メッセージ/BAN/BAN解除 段を出すか（検索結果のみ・R1）
   emptyText: string;
-  selfUserId: string | null; // 自分(ホスト)＝申請/解除/招待を無効化（R2・search/focused 共通）
+  selfUserId: string | null; // 自分(ホスト)＝申請/解除/招待/モデレーションを無効化（R2/R1・search/focused 共通）
   onSendRequest: (username: string) => void;
   onRemoveFriend: (username: string) => void;
   onInvite: (username: string) => void;
+  onMessage: (username: string) => void;
+  onBan: (u: UserRow) => void; // banByID は userId 必須なので行ごと渡す
+  onUnban: (u: UserRow) => void; // unbanByID も userId 必須
 }) {
   const { t } = useTranslation();
   if (users.length === 0) return <Empty text={emptyText} />;
@@ -264,7 +336,7 @@ function UsersBody({
                 )}
               </Box>
             </Group>
-            {/* 操作行: 申請 / 招待 / 解除（モバイルで折返し）。自分(ホスト)は無効化（R2）。 */}
+            {/* 関係操作行: 申請 / 招待 / 解除（モバイルで折返し）。自分(ホスト)は無効化（R2）。 */}
             <Group gap={4} wrap="wrap">
               <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onSendRequest(u.username)}>
                 {t("friends.sendRequest")}
@@ -278,6 +350,21 @@ function UsersBody({
                 {t("friends.removeFriend")}
               </InspectorButton>
             </Group>
+            {/* モデレーション行（検索結果のみ・R1）: メッセージ / BAN / BAN解除。
+                BAN/BAN解除 は userId 必須なので id 空の行は無効化。メッセージは username 駆動。 */}
+            {showModeration && (
+              <Group gap={4} wrap="wrap" mt={4}>
+                <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onMessage(u.username)}>
+                  ✉ {t("friends.message")}
+                </InspectorButton>
+                <InspectorButton severity="danger" disabled={isSelf || !u.id} onClick={() => onBan(u)}>
+                  {t("friends.ban")}
+                </InspectorButton>
+                <InspectorButton severity="danger" disabled={isSelf || !u.id} onClick={() => onUnban(u)}>
+                  {t("friends.banUnban")}
+                </InspectorButton>
+              </Group>
+            )}
           </Box>
         </Fragment>
         );

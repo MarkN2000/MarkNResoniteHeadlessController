@@ -346,3 +346,21 @@ func (s *Server) handleBanUnban(w http.ResponseWriter, r *http.Request) {
 	}
 	s.execGlobal(w, r, "unbanByID "+id)
 }
+
+// handleBanByID: banByID <userId>（全セッションから BAN・focus 不要・R1）。
+// 検索結果など在席していないユーザーを ID で BAN するのに使う（unbanByID と対称）。
+// userId は引用なしトークン（U-xxxx 形式）。help 確定: "Bans user with given User ID from all sessions"。
+func (s *Server) handleBanByID(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		UserID string `json:"userId"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	id, err := headless.SanitizeToken(body.UserID)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid_value", "userId: "+err.Error())
+		return
+	}
+	s.execGlobal(w, r, "banByID "+id)
+}

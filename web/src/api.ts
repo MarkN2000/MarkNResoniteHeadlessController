@@ -260,6 +260,8 @@ export const messageUser = (idx: number, user: string, message: string) =>
 // フレンド / BAN（グローバル・focus 不要）
 export const acceptFriendRequest = (user: string) => post(`/friendrequests/accept`, { user });
 export const unban = (userId: string) => post(`/bans/unban`, { userId });
+// ID 指定 BAN（全セッションから・検索結果の userId を使う・R1）。unban と対称。
+export const banByID = (userId: string) => post(`/bans/banByID`, { userId });
 export const sendFriendRequest = (user: string) => post(`/friends/add`, { user });
 export const removeFriend = (user: string) => post(`/friends/remove`, { user });
 

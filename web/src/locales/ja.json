@@ -138,7 +138,12 @@
     "invite": "招待",
     "confirmSendRequest": "{{user}} にフレンド申請を送りますか？",
     "confirmRemoveFriend": "{{user}} とのフレンドを解除しますか？",
-    "confirmInvite": "{{user}} をフォーカス中のセッションに招待しますか？"
+    "confirmInvite": "{{user}} をフォーカス中のセッションに招待しますか？",
+    "message": "メッセージ",
+    "ban": "BAN",
+    "banUnban": "BAN解除",
+    "banTitle": "BAN",
+    "confirmBan": "{{user}} ({{userId}}) を全セッションから BAN しますか？"
   },
   "newSession": {
     "launchTitle": "セッションを開く",
