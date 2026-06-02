@@ -58,9 +58,11 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
   };
 
   const onCancel = () => {
+    // 進行中が通常停止（R7）なら中止ダイアログ文言を「停止」連動にする（既定は再起動）。
+    const isStop = rs?.restartTriggerType === "stop";
     confirm.ask({
-      title: t("schedule.cancelTitle"),
-      message: `${t("schedule.confirmCancel")}\n${t("schedule.cancelNote")}`,
+      title: t(isStop ? "schedule.cancelStopTitle" : "schedule.cancelTitle"),
+      message: `${t(isStop ? "schedule.confirmCancelStop" : "schedule.confirmCancel")}\n${t("schedule.cancelNote")}`,
       danger: true,
       success: t("schedule.toastCancelDone"),
       onConfirm: async () => {

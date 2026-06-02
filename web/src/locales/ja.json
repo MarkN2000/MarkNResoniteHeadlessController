@@ -263,6 +263,8 @@
     "cancel": "中止",
     "cancelTitle": "再起動を中止",
     "confirmCancel": "進行中の再起動を中止しますか？",
+    "cancelStopTitle": "停止を中止",
+    "confirmCancelStop": "進行中の停止を中止しますか？",
     "cancelNote": "セッション設定（Private 化など）は変更されたままです。必要ならセッションタブで戻してください。",
     "toastCancelDone": "再起動を中止しました",
     "manualTitle": "手動再起動",

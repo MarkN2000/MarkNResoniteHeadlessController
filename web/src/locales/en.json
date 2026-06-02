@@ -263,6 +263,8 @@
     "cancel": "Cancel",
     "cancelTitle": "Cancel restart",
     "confirmCancel": "Cancel the restart in progress?",
+    "cancelStopTitle": "Cancel stop",
+    "confirmCancelStop": "Cancel the graceful stop in progress?",
     "cancelNote": "Session changes (e.g. set to Private) stay applied. Revert them manually in the Session tab if needed.",
     "toastCancelDone": "Restart cancelled",
     "manualTitle": "Manual restart",
