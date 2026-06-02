@@ -18,11 +18,11 @@ import (
 // --- フェイク ---
 
 type fakeDriver struct {
-	mu      sync.Mutex
-	state   headless.State
-	stops   int
-	starts  int
-	label   string
+	mu     sync.Mutex
+	state  headless.State
+	stops  int
+	starts int
+	label  string
 }
 
 func (d *fakeDriver) Status() headless.Status {
@@ -139,14 +139,14 @@ func hasCmd(cmds []string, substr string) bool {
 func TestDecideWait(t *testing.T) {
 	min := time.Minute
 	cases := []struct {
-		name           string
-		total          int
-		totalErr       bool
-		remaining      time.Duration
-		actionTiming   time.Duration
-		announced      bool
-		announceOn     bool
-		want           waitAction
+		name         string
+		total        int
+		totalErr     bool
+		remaining    time.Duration
+		actionTiming time.Duration
+		announced    bool
+		announceOn   bool
+		want         waitAction
 	}{
 		{"0人→即再起動", 0, false, 10 * min, 2 * min, false, true, waitRestart},
 		{"取得失敗は0人扱いしない", 0, true, 10 * min, 2 * min, false, true, waitContinue},

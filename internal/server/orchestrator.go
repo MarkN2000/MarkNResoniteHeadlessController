@@ -59,12 +59,12 @@ type restartProgress struct {
 }
 
 type restartOrchestrator struct {
-	driver       restartDriver
-	worlds       headless.WorldsService
-	resolve      func(name string) (headlessPath, launchPath string, err error)
-	restartCfg   func() config.Restart
-	lastUsed     func() string
-	recordUsed   func(name string)
+	driver      restartDriver
+	worlds      headless.WorldsService
+	resolve     func(name string) (headlessPath, launchPath string, err error)
+	restartCfg  func() config.Restart
+	lastUsed    func() string
+	recordUsed  func(name string)
 	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)）
 
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。

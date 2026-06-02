@@ -18,14 +18,14 @@ type crashMonitor struct {
 	// cfg は現在の crashRecovery 設定（有効・許容回数・窓分）を返す（restartCfg 由来）。
 	cfg func() (enabled bool, maxCrashes, windowMin int)
 	// inProgress は再起動進行中か（true なら orchestrator がライフサイクルを所有＝復帰しない）。
-	inProgress func() bool
-	lastUsed      func() string
-	start         func(name string) error // 直近 config で起動（resolveLaunch + driver.Start）
+	inProgress  func() bool
+	lastUsed    func() string
+	start       func(name string) error  // 直近 config で起動（resolveLaunch + driver.Start）
 	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)・trigger="crash"）
-	now           func() time.Time
-	windowUnit time.Duration // windowMin の単位（本番 time.Minute・テストで縮める seam）
-	signals    chan struct{}
-	logf       func(format string, args ...any)
+	now         func() time.Time
+	windowUnit  time.Duration // windowMin の単位（本番 time.Minute・テストで縮める seam）
+	signals     chan struct{}
+	logf        func(format string, args ...any)
 
 	crashes []time.Time // ループ保護の窓（run goroutine 専有）
 }
@@ -49,10 +49,10 @@ func newCrashMonitor(s *Server) *crashMonitor {
 			return s.driver.Start(headlessPath, launchPath, name)
 		},
 		recordStart: s.recordLastStart,
-		now:           time.Now,
-		windowUnit:    time.Minute,
-		signals:    make(chan struct{}, 4),
-		logf:       log.Printf,
+		now:         time.Now,
+		windowUnit:  time.Minute,
+		signals:     make(chan struct{}, 4),
+		logf:        log.Printf,
 	}
 }
 

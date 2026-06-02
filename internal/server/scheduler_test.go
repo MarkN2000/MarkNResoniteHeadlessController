@@ -50,8 +50,8 @@ func TestScheduler_FiresAndTriggers(t *testing.T) {
 }
 
 func TestScheduler_ReloadRecomputes(t *testing.T) {
-	var armed int32      // 1 になったら予定が現れる
-	var fireCalls int32  // 予定は1回だけ発火させる
+	var armed int32     // 1 になったら予定が現れる
+	var fireCalls int32 // 予定は1回だけ発火させる
 	nextFire := func(now time.Time) (time.Time, string, bool) {
 		if atomic.LoadInt32(&armed) == 1 && atomic.AddInt32(&fireCalls, 1) == 1 {
 			return now.Add(20 * time.Millisecond), "day", true
