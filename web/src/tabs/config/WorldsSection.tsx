@@ -38,7 +38,15 @@ const SENTINEL_DEFAULTS: Record<string, number> = {
 import { BufferedTextInput, CustomSessionIdInput } from "./fields";
 
 // startWorlds[] のタブ式エディタ。タブ=1ワールド、＋で追加、最後の1枚は削除不可。
-export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cfg: ConfigMap) => void }) {
+export function WorldsSection({
+  cfg,
+  onChange,
+  centralUserId,
+}: {
+  cfg: ConfigMap;
+  onChange: (cfg: ConfigMap) => void;
+  centralUserId?: string; // customSessionId prefix の自動入力元（R12）
+}) {
   const { t } = useTranslation();
   const worlds = getWorlds(cfg);
   const [active, setActive] = useState(0);
@@ -156,7 +164,14 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
           </FieldRow>
           {/* customSessionId はバッファ付き入力（内部 state）でリセットが表示へ反映されないため対象外。 */}
           <FieldRow label={t("config.customSessionId")} align="start">
-            <CustomSessionIdInput key={idx} initial={asStr(world.customSessionId)} onChange={(v) => setW("customSessionId", v)} />
+            {/* key に centralUserId を含め、UserID が後から届いても prefix 自動入力が反映されるよう再シード。
+                編集は毎キーストロークで map に commit 済のため、再マウントしても入力済の値は保持される。 */}
+            <CustomSessionIdInput
+              key={`${idx}:${centralUserId ?? ""}`}
+              initial={asStr(world.customSessionId)}
+              autoPrefix={centralUserId}
+              onChange={(v) => setW("customSessionId", v)}
+            />
           </FieldRow>
 
           <Divider my={4} color="dark.4" />

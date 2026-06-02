@@ -35,9 +35,19 @@ export function BufferedTextInput({
 
 // customSessionId の prefix/suffix ビルダー（v1 互換・最初の ':' で結合）。
 // prefix のみ等の途中状態を保持するため内部 state。key={worldIndex} で再シードする。
-export function CustomSessionIdInput({ initial, onChange }: { initial: string; onChange: (v: string) => void }) {
+// autoPrefix（中央アカウントの解決済 UserID・R12）: 既存 prefix が空のときだけ自動シード（上書き可）。
+// 表示のみ初期化し、map へは編集（onChange）時に初めて書く＝未編集なら customSessionId は未設定のまま。
+export function CustomSessionIdInput({
+  initial,
+  onChange,
+  autoPrefix,
+}: {
+  initial: string;
+  onChange: (v: string) => void;
+  autoPrefix?: string;
+}) {
   const s0 = splitCustomSessionId(initial);
-  const [prefix, setPrefix] = useState(s0.prefix);
+  const [prefix, setPrefix] = useState(s0.prefix || autoPrefix || "");
   const [suffix, setSuffix] = useState(s0.suffix);
   const emit = (p: string, s: string) => {
     setPrefix(p);

@@ -299,6 +299,7 @@ export const deleteConfig = (name: string) => write("DELETE", `/headless-configs
 export interface CredentialsInfo {
   username: string;
   hasPassword: boolean;
+  userId: string; // username から解決した Resonite UserID（U-xxx・空=未解決・R12）
 }
 export async function getCredentials(): Promise<CredentialsInfo | null> {
   return getData<CredentialsInfo>("/headless-credentials");

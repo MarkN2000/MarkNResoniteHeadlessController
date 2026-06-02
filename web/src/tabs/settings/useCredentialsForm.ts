@@ -14,6 +14,7 @@ export function useCredentialsForm(onSaved?: () => void) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [hasPassword, setHasPassword] = useState(false);
+  const [userId, setUserId] = useState(""); // 解決済 UserID（表示用・R12）
   const [loaded, setLoaded] = useState(false);
   const apply = useAsyncAction();
 
@@ -22,6 +23,7 @@ export function useCredentialsForm(onSaved?: () => void) {
     if (c) {
       setUsername(c.username);
       setHasPassword(c.hasPassword);
+      setUserId(c.userId);
     }
     setPassword("");
     setLoaded(true);
@@ -35,10 +37,11 @@ export function useCredentialsForm(onSaved?: () => void) {
       if (r.ok) {
         setPassword("");
         setHasPassword(true);
+        await load(); // 解決された UserID を表示へ反映（PUT 応答は WriteResult のため再取得）
         onSaved?.();
       }
       return r;
     }, t("settings.toastAccountSaved"));
 
-  return { username, setUsername, password, setPassword, hasPassword, loaded, load, canSave, busy: apply.busy, save };
+  return { username, setUsername, password, setPassword, hasPassword, userId, loaded, load, canSave, busy: apply.busy, save };
 }

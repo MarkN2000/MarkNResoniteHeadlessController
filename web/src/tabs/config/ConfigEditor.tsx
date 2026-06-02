@@ -15,6 +15,7 @@ export function ConfigEditor({
   dirty,
   saving,
   onSave,
+  centralUserId,
 }: {
   name: string;
   cfg: ConfigMap;
@@ -22,6 +23,7 @@ export function ConfigEditor({
   dirty: boolean;
   saving: boolean;
   onSave: () => void;
+  centralUserId?: string; // customSessionId prefix の自動入力元（R12）
 }) {
   const { t } = useTranslation();
   return (
@@ -29,7 +31,7 @@ export function ConfigEditor({
       <Stack gap="sm">
         <GeneralSection cfg={cfg} onChange={onChange} />
         <Divider color="dark.4" />
-        <WorldsSection cfg={cfg} onChange={onChange} />
+        <WorldsSection cfg={cfg} onChange={onChange} centralUserId={centralUserId} />
         <Divider color="dark.4" />
         <Button
           fullWidth

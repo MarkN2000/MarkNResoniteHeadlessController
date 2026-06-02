@@ -56,6 +56,17 @@ export function AccountSection({ onSaved, status }: { onSaved?: () => void; stat
           onPassword={f.setPassword}
           passwordPlaceholder={f.hasPassword ? t("settings.passwordKeep") : undefined}
         />
+        {/* 解決済 UserID（R12・保存時に username から解決して保持）。未解決は非表示（事実だけ）。 */}
+        {f.userId !== "" && (
+          <Group gap={6} wrap="nowrap">
+            <Text size="xs" c="dimmed">
+              {t("settings.userIdLabel")}:
+            </Text>
+            <Text size="xs" c="dimmed">
+              {f.userId}
+            </Text>
+          </Group>
+        )}
         <LoginStatusLine status={status ?? null} />
         <SaveButton label={t("settings.save")} onClick={f.save} disabled={!f.canSave} loading={f.busy} />
       </Stack>

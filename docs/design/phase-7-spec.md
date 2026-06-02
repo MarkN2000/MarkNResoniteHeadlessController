@@ -409,11 +409,12 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **(C) フィールド構成＝v1 同等（基本的に全フォーム化）**
 - config トップ（フォーム）：`comment`・`tickRate`・`maxConcurrentAssetTransfers`・`usernameOverride`・`dataFolder`・`cacheFolder`・`logsFolder`・`allowedUrlHosts`（add/remove リスト）・`autoSpawnItems`（カンマ→配列）＋アカウント欄。
 - 各ワールド（startWorlds[]・タブ・フォーム）
-  - 基本：`isEnabled`（タブ有効/無効）・`sessionName`・`description`・`accessLevel`・`maxUsers`・`loadWorldPresetName`＋`loadWorldURL`（**両表示**・スキーマ上両立可・どちらが効くかは Resonite 依存＝URL 優先）・`customSessionId`（**prefix/suffix ビルダー**・`:` 分割/結合・自動補完=ボット名依存は将来）。
+  - 基本：`isEnabled`（タブ有効/無効）・`sessionName`・`description`・`accessLevel`・`maxUsers`・`loadWorldPresetName`＋`loadWorldURL`（**両表示**・スキーマ上両立可・どちらが効くかは Resonite 依存＝URL 優先）・`customSessionId`（**prefix/suffix ビルダー**・`:` 分割/結合・**prefix は中央アカウントの解決済 UserID を自動入力＝R12**・上書き可）。
   - 運用（**折りたたみ・既定=閉じ**＝R11）：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`・`forcedRestartInterval`・`autosaveInterval`（各 `-1=無効` 注記）・`saveOnExit`・`autoRecover`・`autoSleep`・`hideFromPublicListing`・`mobileFriendly`。
 - **折りたたみ共通コンポーネント（R11）**: `components/inspector/CollapsibleSection`（`title`＋`defaultOpen?`＋`▾/▴`＋Mantine `Collapse`・`aria-expanded`）。設定タブの上級折りたたみ（`AppSettingsSection`）を本コンポーネントに置換（挙動不変）＋ワールド運用群を折りたたみ既定で包む。R6/R13 の追加項目もこの折りたたみ内に置く土台。
 - **ワールド削除＝各タブの×（R5）**: ワールドタブを `Group[選択Button][× ActionIcon]`（`ConfigList` 行と同方式・ネストボタン回避）にし、各タブの×でそのワールドを削除（確認ダイアログ）。**最後の1枚は×非表示**（唯一のワールドは削除不可）。下部の「ワールド削除」ボタンは撤去。削除位置に応じてアクティブ index を補正。
 - **-1=無効フィールドを必ず数値に（R6）**: `awayKickMinutes`/`idleRestartInterval`/`forcedRestartInterval`/`autosaveInterval` は **未設定なら既定値を表示**（`asNumOr`・既定=スキーマ値 -1/1800/-1/-1）し、**空欄は -1（無効）へスナップ**（`sentinelW`＝map に `""` を書かない）。UI 方式は「数値入力＋一般ヒント `config.sentinelNote`」（トグルは不採用）。
+- **customSessionId prefix 自動入力（R12）**: 中央アカウント保存時に `username→UserID` を解決（backend `resonite.ResolveUserID`・`normalizedUsername` 完全一致・メール/未一致は空・§2.x credentials）し `headless-credentials.userId` に保持。設定タブに **UserID を読み取り表示**＋アカウント名 placeholder から「/ メール」削除（解決成功率↑）。config タブは中央 UserID を取得し `CustomSessionIdInput` の `autoPrefix` に渡す＝**prefix が空なら自動シード（上書き可・表示のみ初期化で未編集なら map 未書込・編集時に commit）**。UserID が後着でも `key` 再シードで反映。
 - **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`enableResoniteLink`・`forceResoniteLinkPort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。
 
 **安全/堅牢**

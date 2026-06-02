@@ -33,6 +33,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const [original, setOriginal] = useState<ConfigMap | null>(null);
   const [loading, setLoading] = useState(false);
   const [nameModal, setNameModal] = useState<NameModalState | null>(null);
+  const [centralUserId, setCentralUserId] = useState(""); // customSessionId prefix の自動入力元（R12）
   const confirm = useConfirm();
   const apply = useAsyncAction();
 
@@ -59,13 +60,16 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     setOriginal(m);
   };
 
-  // 初回: 一覧取得 → 先頭を読込。
+  // 初回: 一覧取得 → 先頭を読込。中央アカウントの解決済 UserID も取得（prefix 自動入力用・R12）。
   useEffect(() => {
     void (async () => {
       const l = await api.getConfigs();
       setList(l);
       if (l[0]) void load(l[0].name);
     })();
+    void api.getCredentials().then((c) => {
+      if (c) setCentralUserId(c.userId);
+    });
   }, []);
 
   // 未保存編集があれば破棄確認を挟んでから action を実行（一覧切替/新規/複製で共通）。
@@ -188,6 +192,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
                 dirty={dirty}
                 saving={apply.busy}
                 onSave={save}
+                centralUserId={centralUserId}
               />
             ) : (
               <Center h={200}>
