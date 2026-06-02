@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -41,13 +42,28 @@ type LogLine struct {
 	Text string    `json:"text"`
 }
 
+// LoginState は Resonite アカウントのログイン状態（起動ログから検出）。
+type LoginState string
+
+const (
+	LoginAnonymous LoginState = "anonymous" // ログイン試行なし＝アカウント未設定の意図的匿名
+	LoginLoggedIn  LoginState = "loggedIn"  // ログイン成功（LoginUserID 付き）
+	LoginFailed    LoginState = "failed"    // ログイン試行はあったが成功確認なし
+)
+
+// loginUserIDRe は "Initializing SignalR: UserLogin: U-xxx" から UserID を抽出する
+// （実機ログ・fixtures 2026-05-28-lan-login で確認・v1 踏襲）。
+var loginUserIDRe = regexp.MustCompile(`Initializing SignalR: UserLogin:\s*(U-\S+)`)
+
 // Status はヘッドレスの現在状態。
 type Status struct {
-	State     State      `json:"state"`
-	PID       int        `json:"pid,omitempty"`
-	Config    string     `json:"config,omitempty"`
-	StartedAt *time.Time `json:"startedAt,omitempty"`
-	Ready     bool       `json:"ready"`
+	State       State      `json:"state"`
+	PID         int        `json:"pid,omitempty"`
+	Config      string     `json:"config,omitempty"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	Ready       bool       `json:"ready"`
+	LoginState  LoginState `json:"loginState"`            // anonymous|loggedIn|failed
+	LoginUserID string     `json:"loginUserId,omitempty"` // 例 "U-xxxx"（loggedIn 時のみ）
 }
 
 var (
@@ -90,6 +106,12 @@ type Driver struct {
 	started  time.Time
 	ready    bool
 	stopping bool
+
+	// Resonite アカウントのログイン状態（起動ログから検出・d.mu 保護）。
+	// 成功行 "Logged in successfully" は "World running" より前に出る（実機確認）ため ready 時点で確定。
+	loginAttempted bool   // "Logging in as ..." を観測
+	loginConfirmed bool   // "Logged in successfully" を観測
+	loginUserID    string // "UserLogin: U-xxx" の U- 付き UserID
 
 	// warmupStarted は "World running" 検出で warmup を一度だけ起動するためのガード（d.mu 保護）。
 	warmupStarted bool
@@ -141,7 +163,22 @@ func (d *Driver) statusLocked() Status {
 		t := d.started
 		startedAt = &t
 	}
-	return Status{State: d.state, PID: d.pid, Config: d.cfgPath, StartedAt: startedAt, Ready: d.ready}
+	return Status{
+		State: d.state, PID: d.pid, Config: d.cfgPath, StartedAt: startedAt, Ready: d.ready,
+		LoginState: d.loginStateLocked(), LoginUserID: d.loginUserID,
+	}
+}
+
+// loginStateLocked は観測フラグから現在のログイン状態を導出する（d.mu 保持前提）。
+func (d *Driver) loginStateLocked() LoginState {
+	switch {
+	case d.loginConfirmed:
+		return LoginLoggedIn
+	case d.loginAttempted:
+		return LoginFailed
+	default:
+		return LoginAnonymous
+	}
 }
 
 // setStateLocked は d.mu 保持中に呼ぶ。状態を更新し購読者へ通知する。
@@ -211,6 +248,9 @@ func (d *Driver) Start(headlessPath, configPath, configLabel string) error {
 	d.ready = false
 	d.stopping = false
 	d.warmupStarted = false
+	d.loginAttempted = false
+	d.loginConfirmed = false
+	d.loginUserID = ""
 	d.setStateLocked(StateStarting)
 	d.mu.Unlock()
 
@@ -244,6 +284,7 @@ func (d *Driver) readPipe(r io.Reader, kind string) {
 					d.publishLog(kind, text)
 					if kind == "out" {
 						d.maybeReady(text)
+						d.scanLogin(text)
 						if c := d.activeCollector.Load(); c != nil {
 							c.appendLine(text)
 						}
@@ -296,6 +337,32 @@ func (d *Driver) decodeLine(raw []byte) string {
 		return string(raw) // デコード失敗時は生バイトにフォールバック（行は失わない）
 	}
 	return string(decoded)
+}
+
+// scanLogin は起動ログから Resonite アカウントのログイン状態を検出する。
+// 実機ログ（fixtures 2026-05-28-lan-login）: 成功=「Logging in as X」→「…UserLogin: U-xxx」→
+// 「Logged in successfully」（成功行は "World running" より前）／匿名（未設定）=これらが出ず
+// 「Initial Startup」のみ／失敗=試行はあるが成功確認なし。手動 login コマンドにも追従する。
+func (d *Driver) scanLogin(text string) {
+	switch {
+	case strings.HasPrefix(text, "Logging in as "):
+		d.mu.Lock()
+		// 新規ログイン試行＝成功/UserID をリセットしてから試行フラグを立てる（再ログイン追従）。
+		d.loginAttempted = true
+		d.loginConfirmed = false
+		d.loginUserID = ""
+		d.mu.Unlock()
+	case strings.Contains(text, "Logged in successfully"):
+		d.mu.Lock()
+		d.loginConfirmed = true
+		d.mu.Unlock()
+	case strings.Contains(text, "UserLogin:"):
+		if m := loginUserIDRe.FindStringSubmatch(text); m != nil {
+			d.mu.Lock()
+			d.loginUserID = m[1]
+			d.mu.Unlock()
+		}
+	}
 }
 
 // maybeReady は readiness 合図 "World running..." を検出したら一度だけ warmup を起動する。
