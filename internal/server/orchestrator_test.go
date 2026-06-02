@@ -57,23 +57,23 @@ func (d *fakeDriver) setState(s headless.State) {
 }
 
 type fakeWorlds struct {
-	mu    sync.Mutex
-	users int
-	cmds  []string
+	mu      sync.Mutex
+	present int // orchestrator は在席者数（Present）のみ参照する（R0・B案）
+	cmds    []string
 }
 
 func (fw *fakeWorlds) List(context.Context) ([]headless.World, error) {
 	fw.mu.Lock()
 	defer fw.mu.Unlock()
-	return []headless.World{{Index: 0, Name: "W", Users: fw.users}}, nil
+	return []headless.World{{Index: 0, Name: "W", Present: fw.present}}, nil
 }
 func (fw *fakeWorlds) ForEach(_ context.Context, fn func(headless.World, headless.Scope) error) error {
 	w := headless.World{Index: 0, Name: "W"}
 	return fn(w, &fakeScope{fw: fw, w: w})
 }
-func (fw *fakeWorlds) setUsers(n int) {
+func (fw *fakeWorlds) setPresent(n int) {
 	fw.mu.Lock()
-	fw.users = n
+	fw.present = n
 	fw.mu.Unlock()
 }
 func (fw *fakeWorlds) commands() []string {
@@ -164,6 +164,26 @@ func TestDecideWait(t *testing.T) {
 	}
 }
 
+// --- presentUserCount（純関数・R0 ホスト除外）---
+
+func TestPresentUserCount(t *testing.T) {
+	cases := []struct {
+		name   string
+		worlds []headless.World
+		want   int
+	}{
+		{"ワールドなし", nil, 0},
+		{"ホストのみ2ワールド（各Present:0）", []headless.World{{Present: 0}, {Present: 0}}, 0},
+		{"在席2人+ホストのみワールド", []headless.World{{Present: 2}, {Present: 0}}, 2},
+		{"複数ワールドの在席合算", []headless.World{{Present: 3}, {Present: 1}, {Present: 0}}, 4},
+	}
+	for _, c := range cases {
+		if got := presentUserCount(c.worlds); got != c.want {
+			t.Errorf("%s: got %d want %d", c.name, got, c.want)
+		}
+	}
+}
+
 // --- フロー ---
 
 func TestTrigger_NotRunning(t *testing.T) {
@@ -176,7 +196,7 @@ func TestTrigger_NotRunning(t *testing.T) {
 
 func TestTrigger_ZeroUsersImmediate(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
-	fw := &fakeWorlds{users: 0}
+	fw := &fakeWorlds{present: 0} // 在席0（ホストのみのワールド＝R0 の実シナリオ）→即時再起動
 	o := newTestOrch(d, fw, config.DefaultRestart(), "night")
 
 	if err := o.Trigger("manual", ""); err != nil { // 空→lastUsed("night")
@@ -196,7 +216,7 @@ func TestTrigger_ZeroUsersImmediate(t *testing.T) {
 
 func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
-	fw := &fakeWorlds{users: 2} // 常に居る→締切で強制
+	fw := &fakeWorlds{present: 2} // 常に在席→締切で強制
 	rc := config.DefaultRestart()
 	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100, ActionTimingMin: 50} // 100ms/50ms（minute=1ms）
 	rc.PreActions.SessionChanges = config.SessionChanges{SetPrivate: true, SetMaxUsersOne: true}
@@ -226,7 +246,7 @@ func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 
 func TestTrigger_CancelDuringWaiting(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
-	fw := &fakeWorlds{users: 2} // 居続ける→待機にとどまる
+	fw := &fakeWorlds{present: 2} // 在席し続ける→待機にとどまる
 	rc := config.DefaultRestart()
 	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0} // 実質止まらない
 	rc.PreActions.Announce.Enabled = false
@@ -249,7 +269,7 @@ func TestTrigger_CancelDuringWaiting(t *testing.T) {
 
 func TestTrigger_DoubleRejected(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
-	fw := &fakeWorlds{users: 2}
+	fw := &fakeWorlds{present: 2}
 	rc := config.DefaultRestart()
 	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0}
 	rc.PreActions.Announce.Enabled = false
@@ -268,7 +288,7 @@ func TestTrigger_DoubleRejected(t *testing.T) {
 // フロー中（②待機中）にヘッドレスが落ちたら、締切を待たず即 ④ で復帰する（レビュー #2）。
 func TestTrigger_HeadlessStopsDuringWait(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
-	fw := &fakeWorlds{users: 2} // 居続ける→本来は締切まで待機
+	fw := &fakeWorlds{present: 2} // 在席し続ける→本来は締切まで待機
 	rc := config.DefaultRestart()
 	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0} // 実質止まらない締切
 	rc.PreActions.Announce.Enabled = false

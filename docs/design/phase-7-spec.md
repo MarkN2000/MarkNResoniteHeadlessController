@@ -457,19 +457,20 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 ```
 [トリガー] 予定時刻 到達 / 手動「通常再起動」
    ↓
-合計0人？ ──YES──→ 即時再起動（①②③スキップ・告知も待機も無し）
+在席者0人？（ΣPresent・ホストは Present:False で自然除外） ──YES──→ 即時再起動（①②③スキップ・告知も待機も無し）
    │ NO
    ↓
 ① 即発火: セッション変更（Private化 / maxusers=1 / 改名）＝新規参加を静かに止める
    ↓
-② 静かに待機（最大 forceRestartTimeout＝既定60分・worlds 合計人数を監視）
-   │   └─ 待機中に0人化 → 即再起動（③告知を待たない）
+② 静かに待機（最大 forceRestartTimeout＝既定60分・worlds の在席者(Present)合計を監視）
+   │   └─ 待機中に在席0人化 → 即再起動（③告知を待たない）
    ↓ 締切の actionTiming（既定2分）前まで来てもまだ居る
 ③ 告知: dynamicImpulse を1回発信「まもなく再起動します」
    ↓ actionTiming 経過
 ④ 強制再起動 → 停止 →（任意Steam=P9-B）→ 選択 config で起動
 ```
 境界条件・決定:
+- **人数指標＝在席者(Present)合計**（R0・`orchestrator.presentUserCount`＝`Σ worlds[].Present`）。ホスト（ヘッドレス自身）は実機採取(2026-05-28: ホストのみ=Users:1/Present:0)で `Present:False` のため自然に除外される（"Users−ワールド数" のような補正は不要）。「接続中だが在席でない人（ユーザースペース等）」は在席0扱い＝即時/早期再起動の対象になる点は許容（即時分岐は無告知のため、この指標選択は方針として明示・採用）。表示（TopBar/SessionTab は Current＝ホスト込み）とは指標が異なる。
 - **セッション変更（①）はトリガー時に即発火**（新規参加を静かに止める）。**dynamicImpulse 告知（③）だけが締切前**＝静かに待ち、強制が近づいた時だけ告知する運用。
 - **二重起動防止**: 再起動進行中フラグでトリガーを排他（手動/scheduled/crash 同時を排他）。
 - **再起動の config** = 予定/手動で選択（既定は空文字 `""` = 直近起動と同じ config。`configName` を指定すればその config で起動）。

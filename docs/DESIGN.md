@@ -124,10 +124,10 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 
 ### 5.4 Restart Orchestrator
 - **トリガー**: 手動 / scheduled（毎日・毎週・日時、サーバーローカル時刻） / userZero（全員退出）。highLoadは不採用。scheduledは時刻判定（cronライブラリ推奨、旧来の1分ポーリング廃止）。
-- **userZero検知**: `WorldsService.List()`（＝`worlds`一発）で**全ワールドの合計人数**を見て0かを判定。**1ワールドずつfocusする必要はない**。起動直後は除外（`minUptime`ゲート）。
+- **userZero検知**: `WorldsService.List()`（＝`worlds`一発）で**全ワールドの在席者(Present)合計**を見て0かを判定（R0・`presentUserCount`）。ホストは `Present:False` のため自然に除外される。**1ワールドずつfocusする必要はない**。起動直後は除外（`minUptime`ゲート）。
 - **単一の「安全に再起動」動作**（マルチワールド前提）:
   1. **全ワールドに対し**事前アクション実行（§5.5、`WorldsService.ForEach`）
-  2. **全ワールドのユーザーが0になるまで**待機（**締切付き**＝`forceRestartTimeout`超過で強制実行）
+  2. **全ワールドの在席者(Present)が0になるまで**待機（**締切付き**＝`forceRestartTimeout`超過で強制実行）
   3. 停止 →（任意：Steam更新）→ 起動
 - userZeroは「既に空」なので待機不要＝即実行。
 - **二重起動防止**: 再起動中フラグで、同時/連打のトリガーを排他。

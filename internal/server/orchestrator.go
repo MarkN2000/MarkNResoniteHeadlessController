@@ -300,17 +300,25 @@ func (o *restartOrchestrator) finish() {
 	o.mu.Unlock()
 }
 
-// totalUsers は全ワールドの合計人数。取得失敗は err を返す（呼び出し側で0人と区別する）。
+// presentUserCount は全ワールドの在席ユーザー合計。
+// ホスト（ヘッドレス自身）は実機採取(2026-05-28: ホストのみ=Users:1/Present:0)で
+// Present:False のため自然に除外される（"-1" ハックも「ホスト=各ワールド1人」前提も不要）。
+func presentUserCount(worlds []headless.World) int {
+	sum := 0
+	for _, w := range worlds {
+		sum += w.Present
+	}
+	return sum
+}
+
+// totalUsers は全ワールドの在席ユーザー合計（ホスト除外）。取得失敗は err を返す
+// （呼び出し側で0人と区別する）。run() の即時再起動判定と decideWait の両方が共有する。
 func (o *restartOrchestrator) totalUsers(ctx context.Context) (int, error) {
 	worlds, err := o.worlds.List(ctx)
 	if err != nil {
 		return -1, err
 	}
-	sum := 0
-	for _, w := range worlds {
-		sum += w.Users
-	}
-	return sum, nil
+	return presentUserCount(worlds), nil
 }
 
 // applySessionChanges は ① 各ワールドに accesslevel/maxusers/name を適用（best-effort）。
