@@ -69,6 +69,8 @@ export function ScheduleEditModal({
   const valid = timeValid && dateValid;
 
   const numStyle = { width: 84 };
+  // 縦並び日付の単位ラベル（年/月/日）。固定幅で3段の入力欄の右端を揃える。
+  const dateUnitStyle = { width: 44, flexShrink: 0 } as const;
 
   return (
     <Modal opened onClose={onClose} title={t(isNew ? "schedule.newScheduleTitle" : "schedule.editScheduleTitle")} centered>
@@ -78,21 +80,35 @@ export function ScheduleEditModal({
         </FieldRow>
 
         {draft.type === "once" && (
-          <FieldRow label={t("schedule.scheduleDate")}>
-            <Group gap={4} wrap="nowrap" align="center">
-              <InspectorNumberInput
-                value={draft.year ?? 0}
-                onChange={num("year")}
-                min={MIN_YEAR}
-                max={2100}
-                allowNegative={false}
-                style={{ width: 96 }}
-              />
-              <Text size="sm">/</Text>
-              <InspectorNumberInput value={draft.month ?? 0} onChange={num("month")} min={1} max={12} allowNegative={false} style={numStyle} />
-              <Text size="sm">/</Text>
-              <InspectorNumberInput value={draft.day ?? 0} onChange={num("day")} min={1} max={31} allowNegative={false} style={numStyle} />
-            </Group>
+          // スマホ向けに年/月/日を縦並び（横一列は狭幅ではみ出すため・R8）。各入力は full-width＋右に単位ラベル。
+          <FieldRow label={t("schedule.scheduleDate")} align="start">
+            <Stack gap={4}>
+              <Group gap={6} wrap="nowrap" align="center">
+                <InspectorNumberInput
+                  value={draft.year ?? 0}
+                  onChange={num("year")}
+                  min={MIN_YEAR}
+                  max={2100}
+                  allowNegative={false}
+                  style={{ flex: 1 }}
+                />
+                <Text size="sm" c="dimmed" style={dateUnitStyle}>
+                  {t("schedule.unitYear")}
+                </Text>
+              </Group>
+              <Group gap={6} wrap="nowrap" align="center">
+                <InspectorNumberInput value={draft.month ?? 0} onChange={num("month")} min={1} max={12} allowNegative={false} style={{ flex: 1 }} />
+                <Text size="sm" c="dimmed" style={dateUnitStyle}>
+                  {t("schedule.unitMonth")}
+                </Text>
+              </Group>
+              <Group gap={6} wrap="nowrap" align="center">
+                <InspectorNumberInput value={draft.day ?? 0} onChange={num("day")} min={1} max={31} allowNegative={false} style={{ flex: 1 }} />
+                <Text size="sm" c="dimmed" style={dateUnitStyle}>
+                  {t("schedule.unitDay")}
+                </Text>
+              </Group>
+            </Stack>
           </FieldRow>
         )}
 
