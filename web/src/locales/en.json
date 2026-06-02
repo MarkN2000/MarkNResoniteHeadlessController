@@ -218,7 +218,10 @@
     "autoRecover": "Auto-recover",
     "autoSleep": "Auto-sleep",
     "hideFromPublicListing": "Hide from listing",
-    "mobileFriendly": "Mobile-friendly"
+    "mobileFriendly": "Mobile-friendly",
+    "enableResoniteLink": "Enable ResoniteLink",
+    "forceResoniteLinkPort": "ResoniteLink port",
+    "resoniteLinkPortHint": "empty = auto"
   },
   "settings": {
     "passwordSection": "Change admin password",

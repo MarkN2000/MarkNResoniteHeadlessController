@@ -58,6 +58,8 @@ export function WorldsSection({
   const numW = (key: string) => (v: number | string) => setW(key, v === "" ? "" : Number(v));
   // -1=無効 型: 空欄は -1（無効）へスナップ＝map に "" を書かず必ず数値にする（R6）。
   const sentinelW = (key: string) => (v: number | string) => setW(key, v === "" ? -1 : Number(v));
+  // 任意ポート: 空欄は未設定（undefined＝保存JSONから省く＝null/自動）。数値はそのまま（R13）。
+  const portW = (key: string) => (v: number | string) => setW(key, v === "" ? undefined : Number(v));
 
   // マーカークリック＝そのワールド項目を defaultWorld() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
@@ -233,6 +235,23 @@ export function WorldsSection({
               </FieldRow>
               <FieldRow label={t("config.mobileFriendly")} {...resetProps("mobileFriendly", t("config.mobileFriendly"))}>
                 <Switch checked={asBool(world.mobileFriendly)} onChange={(e) => setW("mobileFriendly", e.currentTarget.checked)} />
+              </FieldRow>
+              {/* ResoniteLink（R13）。port は空＝自動（未設定）＝保存JSONから省く。 */}
+              <FieldRow label={t("config.enableResoniteLink")} {...resetProps("enableResoniteLink", t("config.enableResoniteLink"))}>
+                <Switch
+                  checked={asBool(world.enableResoniteLink)}
+                  onChange={(e) => setW("enableResoniteLink", e.currentTarget.checked)}
+                />
+              </FieldRow>
+              <FieldRow label={t("config.forceResoniteLinkPort")} {...resetProps("forceResoniteLinkPort", t("config.forceResoniteLinkPort"))}>
+                <InspectorNumberInput
+                  value={asNum(world.forceResoniteLinkPort)}
+                  onChange={portW("forceResoniteLinkPort")}
+                  min={1}
+                  max={65535}
+                  allowNegative={false}
+                  placeholder={t("config.resoniteLinkPortHint")}
+                />
               </FieldRow>
             </Stack>
           </CollapsibleSection>

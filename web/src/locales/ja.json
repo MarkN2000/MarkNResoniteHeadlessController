@@ -218,7 +218,10 @@
     "autoRecover": "自動復帰",
     "autoSleep": "自動スリープ",
     "hideFromPublicListing": "一覧から隠す",
-    "mobileFriendly": "モバイル対応"
+    "mobileFriendly": "モバイル対応",
+    "enableResoniteLink": "ResoniteLink 有効",
+    "forceResoniteLinkPort": "ResoniteLink ポート",
+    "resoniteLinkPortHint": "空＝自動"
   },
   "settings": {
     "passwordSection": "管理パスワード変更",
