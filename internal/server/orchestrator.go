@@ -65,7 +65,7 @@ type restartOrchestrator struct {
 	restartCfg   func() config.Restart
 	lastUsed     func() string
 	recordUsed   func(name string)
-	recordRestart func(trigger, at string) // 最終再起動の記録（§3.16(9)）
+	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)）
 
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。
 	minute           time.Duration // forceTimeout/actionTiming の「分」単位（本番 time.Minute）
@@ -93,7 +93,7 @@ func newRestartOrchestrator(s *Server) *restartOrchestrator {
 		},
 		lastUsed:         s.loadLastUsed,
 		recordUsed:       s.recordLastUsed,
-		recordRestart:    s.recordLastRestart,
+		recordStart:      s.recordLastStart,
 		minute:           time.Minute,
 		waitInterval:     10 * time.Second,
 		spawnDelay:       10 * time.Second,
@@ -376,8 +376,8 @@ func (o *restartOrchestrator) doRestart(name, triggerType string) {
 		return
 	}
 	o.recordUsed(name)
-	if o.recordRestart != nil {
-		o.recordRestart(triggerType, time.Now().Format(time.RFC3339)) // 最終再起動を記録（§3.16(9)）
+	if o.recordStart != nil {
+		o.recordStart(triggerType, time.Now().Format(time.RFC3339)) // 最終起動を記録（§3.16(9)）
 	}
 }
 

@@ -517,15 +517,15 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 ```
 GET  /api/v1/restart-config                  restart 設定を返す
 PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック）
-GET  /api/v1/restart-status                  次回予定 / 最終再起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
+GET  /api/v1/restart-status                  次回予定 / 最終起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
 POST /api/v1/restart/trigger {configName?}   手動「通常再起動」を即受付（非同期）。空=前回config
 POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続）
 ```
-- **進行状態の伝送はポーリング（実装・P8-5 で確定）**: UI が `restart-status` を `useVisiblePolling` で3秒ごと追従（表示中のみ）。restart-status は `inProgress`/`phase`(idle|preparing|waiting|announcing|restarting)/`restartTriggerType`/`restartConfigName`/`deadlineAt`/`lastRestartAt`/`lastRestartTrigger`/`nextScheduled*` を返す。SSE への進行フェーズ反映は将来拡張（MVP 非採用）。
+- **進行状態の伝送はポーリング（実装・P8-5 で確定）**: UI が `restart-status` を `useVisiblePolling` で3秒ごと追従（表示中のみ）。restart-status は `inProgress`/`phase`(idle|preparing|waiting|announcing|restarting)/`restartTriggerType`/`restartConfigName`/`deadlineAt`/`lastStartAt`/`lastStartTrigger`/`nextScheduled*` を返す。SSE への進行フェーズ反映は将来拡張（MVP 非採用）。
 
 **(7) UI 構成（スケジュールタブ・インスペクタ風・停止中も編集可）**
 `SplitColumns` で配置。**広い画面（xl以上）は2カラム＝左に運用/状態〔①②③〕・右に設定〔④⑤⑥〕／狭い画面は縦1カラム**にカードを積む:
-1. **ステータスカード**: 稼働時間・**次回予定再起動**（日時+config）・最終再起動（時刻/トリガー種別）・現在の進行状態・クラッシュ復帰状態。**再起動進行中は現在フェーズ（待機/告知）＋残り時間＋`[中止]`ボタンを表示**（中止後は「セッション設定は変更されたまま」と一言添える）。稼働時間/進行は稼働中のみ。
+1. **ステータスカード**: 稼働時間・**次回予定再起動**（日時+config）・最終起動（時刻/トリガー種別・手動起動を含む全起動）・現在の進行状態・クラッシュ復帰状態。**再起動進行中は現在フェーズ（待機/告知）＋残り時間＋`[中止]`ボタンを表示**（中止後は「セッション設定は変更されたまま」と一言添える）。稼働時間/進行は稼働中のみ。
 2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**・ボタン色は `severity="warning"`＝セッションタブの再起動と同色）。
 3. **予定リストカード**: 各行（有効トグル / 種別・時刻 / config / 編集✎ / 削除×〔**直接削除**＝未保存ゆえ保存前は取り消し可〕）＋`[＋新規]`・空時「予定がありません」。編集は**モーダル**（type 選択で日時欄を出し分け〔once=年月日+時分/weekly=曜日+時分/daily=時分〕・config `Select`〔#prev 番兵〕・ドラフト→`[OK]` で working 配列へ反映/`[キャンセル]` 破棄）。
    - **実装**: 新規 id は `scheduleModel.genId()`（`crypto.randomUUID` はセキュアコンテキスト限定＝LAN/HTTP で不可のため `getRandomValues`→`Math.random` にフォールバック・[[lan-http-no-secure-context-apis]]）。**インライン検証**（時/分の範囲＋once 暦実在＝JS Date 往復で 2/30 等を弾き [OK] 無効化、年下限 `MIN_YEAR=2000` は backend 準拠）。daily/weekly へ切替時は once 専用の year/month/day をクリアして保存JSONを汚さない。日付入力は `@mantine/dates` 不使用で `NumberInput`。
@@ -544,7 +544,7 @@ POST /api/v1/restart/cancel                  進行中の再起動を中止（�
 - **並行モデル=案A（mutex）**: 進行状態を小さな mutex で保護し、flow は goroutine、cancel は context（既存 cfgMu/driver.mu と同流儀）。仕様当初の「channel 所有の単一 goroutine」は **flow が最大60分のブロッキング I/O を抱えるため見送り**（worker 分離が結局必要で複雑化）。実コマンドの直列化は driver の execMu が担う。`restart-status` は GET（UI はポーリング）で公開。
 - **常駐ライフサイクル**: `Server.Start()` が scheduler・crash-monitor を bg ctx で起動し stop 関数を返す。`main` が SIGINT で `driver.Stop()` の前に stop()（予定発火を打ち切り・`orchestrator.setParent(bgCtx)` 経由で進行中の①②③を cancel）。
 
-**(9) 状態永続化**（実装）: **最終再起動（`lastRestartAt`／`lastRestartTrigger`=manual|scheduled|crash）のみ** `runtime-state.json` に追記する。recordLastUsed が消さないよう **read-modify-write で `lastUsedConfig` と共存**させ、`runtimeMu` で直列化（orchestrator/crash-monitor〔goroutine〕と handleStart〔HTTP〕の並行書き込み防止）。orchestrator/crash-monitor が再起動成功時に記録。**次回スケジュール再起動は予定から都度算出・稼働時間は driver の `StartedAt` 由来＝どちらも永続化せず導出**。
+**(9) 状態永続化**（実装・R10 で「最終起動」に拡張）: **最終起動（`lastStartAt`／`lastStartTrigger`=manual|scheduled|crash）のみ** `runtime-state.json` に追記する。recordLastUsed が消さないよう **read-modify-write で `lastUsedConfig` と共存**させ、`runtimeMu` で直列化（orchestrator/crash-monitor〔goroutine〕と handleStart〔HTTP〕の並行書き込み防止）。**あらゆる起動成功で1回記録**＝手動起動（`handleStart`・trigger=manual）／手動再起動・予定再起動（orchestrator・再起動/予定は `driver.Start` を直接呼ぶため二重記録なし）／クラッシュ復帰（crash-monitor・trigger=crash）。**次回スケジュール再起動は予定から都度算出・稼働時間は driver の `StartedAt` 由来＝どちらも永続化せず導出**。
 
 **(10) 既知の制約 / 将来拡張**
 - dynamicImpulse の到達はワールド側受け機構に依存（フル設定型で吸収）。

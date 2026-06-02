@@ -242,7 +242,7 @@
     "statusTitle": "Status",
     "uptime": "Uptime",
     "nextScheduled": "Next scheduled",
-    "lastRestart": "Last restart",
+    "lastStart": "Last start",
     "progress": "In progress",
     "crashRecovery": "Crash recovery",
     "remaining": "remaining",

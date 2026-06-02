@@ -45,9 +45,9 @@ export function StatusCard({
           : dim(t("schedule.none"))}
       </FieldRow>
 
-      <FieldRow label={t("schedule.lastRestart")}>
-        {s?.lastRestartAt
-          ? dim(`${formatDateTime(s.lastRestartAt)}・${t(triggerKey(s.lastRestartTrigger ?? "manual"))}`)
+      <FieldRow label={t("schedule.lastStart")}>
+        {s?.lastStartAt
+          ? dim(`${formatDateTime(s.lastStartAt)}・${t(triggerKey(s.lastStartTrigger ?? "manual"))}`)
           : dim(t("schedule.none"))}
       </FieldRow>
 

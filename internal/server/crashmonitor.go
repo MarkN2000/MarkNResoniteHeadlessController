@@ -21,7 +21,7 @@ type crashMonitor struct {
 	inProgress func() bool
 	lastUsed      func() string
 	start         func(name string) error // 直近 config で起動（resolveLaunch + driver.Start）
-	recordRestart func(trigger, at string) // 最終再起動の記録（§3.16(9)・trigger="crash"）
+	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)・trigger="crash"）
 	now           func() time.Time
 	windowUnit time.Duration // windowMin の単位（本番 time.Minute・テストで縮める seam）
 	signals    chan struct{}
@@ -48,7 +48,7 @@ func newCrashMonitor(s *Server) *crashMonitor {
 			}
 			return s.driver.Start(headlessPath, launchPath, name)
 		},
-		recordRestart: s.recordLastRestart,
+		recordStart: s.recordLastStart,
 		now:           time.Now,
 		windowUnit:    time.Minute,
 		signals:    make(chan struct{}, 4),
@@ -120,8 +120,8 @@ func (cm *crashMonitor) handleCrash() {
 		cm.logf("[crash] 自動復帰の起動に失敗（%s）: %v", name, err)
 		return
 	}
-	if cm.recordRestart != nil {
-		cm.recordRestart("crash", cm.now().Format(time.RFC3339))
+	if cm.recordStart != nil {
+		cm.recordStart("crash", cm.now().Format(time.RFC3339))
 	}
 	cm.logf("[crash] 自動復帰しました（config=%s）", name)
 }

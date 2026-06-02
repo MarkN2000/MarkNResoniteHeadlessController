@@ -242,7 +242,7 @@
     "statusTitle": "状態",
     "uptime": "稼働時間",
     "nextScheduled": "次回予定",
-    "lastRestart": "最終再起動",
+    "lastStart": "最終起動",
     "progress": "進行状態",
     "crashRecovery": "クラッシュ復帰",
     "remaining": "残り",

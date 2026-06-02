@@ -94,8 +94,8 @@ HTTP / SSE 層         … ルーティング・認証・(必要なら)軽い制
 ### 並行モデル（Goの要点）
 - プロセスハンドル・ログリングバッファ・再起動状態は**それぞれ単一のgoroutineが所有**し、他からは**channel経由のメッセージ**でのみ操作（"share memory by communicating"）。旧コードの3タイマー競合を構造的に排除。
 - 背景goroutine: stdout読取 / SSEブロードキャスト / **scheduler（予定発火）・crash-monitor（プロセス死活監視→自動復帰）**（§5.4–5.6）。（userZero 常時監視・メトリクス収集は不採用/将来）
-- **状態の永続化**: 最終再起動などを、ツール再起動後も保つ小コンポーネント（JSON状態ファイル）。
-- **実装メモ（§3.16・Phase 8）**: 再起動状態は上記「channel 所有」案ではなく **案A（mutex + per-flow goroutine + context cancel）** で実装（flow が最大60分のブロッキング I/O を抱え、channel 所有だと worker 分離が結局必要で複雑化するため）。実コマンド直列化は driver の execMu。永続化は **最終再起動（lastRestartAt/Trigger）のみ** `runtime-state.json` に追記（次回予定・稼働時間は導出）。
+- **状態の永続化**: 最終起動などを、ツール再起動後も保つ小コンポーネント（JSON状態ファイル）。
+- **実装メモ（§3.16・Phase 8）**: 再起動状態は上記「channel 所有」案ではなく **案A（mutex + per-flow goroutine + context cancel）** で実装（flow が最大60分のブロッキング I/O を抱え、channel 所有だと worker 分離が結局必要で複雑化するため）。実コマンド直列化は driver の execMu。永続化は **最終起動（lastStartAt/Trigger・手動起動も含む全起動）のみ** `runtime-state.json` に追記（次回予定・稼働時間は導出）。
 
 ---
 

@@ -129,14 +129,14 @@ func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"username": uname, "hasPassword": hasPw})
 }
 
-// --- runtime-state（last-used config / 最終再起動）---
-// 複数フィールドを持つため read-modify-write で保全する（recordLastUsed が lastRestart を消さない）。
+// --- runtime-state（last-used config / 最終起動）---
+// 複数フィールドを持つため read-modify-write で保全する（recordLastUsed が lastStart を消さない）。
 // orchestrator/crash-monitor（goroutine）と handleStart（HTTP）から並行に書かれるため runtimeMu で直列化。
 
 type runtimeState struct {
-	LastUsedConfig     string `json:"lastUsedConfig"`
-	LastRestartAt      string `json:"lastRestartAt,omitempty"`      // RFC3339・最終再起動時刻（§3.16(9)）
-	LastRestartTrigger string `json:"lastRestartTrigger,omitempty"` // manual | scheduled | crash
+	LastUsedConfig   string `json:"lastUsedConfig"`
+	LastStartAt      string `json:"lastStartAt,omitempty"`      // RFC3339・最終起動時刻（§3.16(9)・手動起動/再起動/予定/crash 共通）
+	LastStartTrigger string `json:"lastStartTrigger,omitempty"` // manual | scheduled | crash
 }
 
 func (s *Server) runtimeStatePath() string {
@@ -180,19 +180,20 @@ func (s *Server) recordLastUsed(name string) {
 	s.saveRuntimeStateLocked(st)
 }
 
-// recordLastRestart は最終再起動の時刻/トリガー種別を記録する（§3.16(9)・orchestrator/crash-monitor から）。
-func (s *Server) recordLastRestart(trigger, at string) {
+// recordLastStart は最終起動の時刻/トリガー種別を記録する（§3.16(9)・手動起動=handleStart /
+// 手動再起動・予定=orchestrator / crash=crash-monitor から）。
+func (s *Server) recordLastStart(trigger, at string) {
 	s.runtimeMu.Lock()
 	defer s.runtimeMu.Unlock()
 	st := s.loadRuntimeStateLocked()
-	st.LastRestartAt = at
-	st.LastRestartTrigger = trigger
+	st.LastStartAt = at
+	st.LastStartTrigger = trigger
 	s.saveRuntimeStateLocked(st)
 }
 
-func (s *Server) loadLastRestart() (at, trigger string) {
+func (s *Server) loadLastStart() (at, trigger string) {
 	s.runtimeMu.Lock()
 	defer s.runtimeMu.Unlock()
 	st := s.loadRuntimeStateLocked()
-	return st.LastRestartAt, st.LastRestartTrigger
+	return st.LastStartAt, st.LastStartTrigger
 }

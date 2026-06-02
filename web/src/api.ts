@@ -375,8 +375,8 @@ export interface RestartStatus {
   restartTriggerType?: string; // manual | scheduled（進行中のみ）
   restartConfigName?: string; // 進行中の対象 config
   deadlineAt: string | null; // ② 待機の締切（RFC3339）
-  lastRestartAt: string | null; // 最終再起動（RFC3339）
-  lastRestartTrigger?: string; // manual | scheduled | crash
+  lastStartAt: string | null; // 最終起動（RFC3339・手動起動/再起動/予定/crash 共通）
+  lastStartTrigger?: string; // manual | scheduled | crash
   nextScheduledAt: string | null; // 次回予定（RFC3339）
   nextScheduledConfigName: string;
   nextScheduledId: string;

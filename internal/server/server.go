@@ -43,7 +43,7 @@ type Server struct {
 	// auth は &cfgMu を共有する。レート制限状態は auth.mu（別ロック）。
 	cfgMu sync.RWMutex
 
-	// runtimeMu は runtime-state.json（last-used / 最終再起動）の read-modify-write を直列化する
+	// runtimeMu は runtime-state.json（last-used / 最終起動）の read-modify-write を直列化する
 	// （handleStart〔HTTP〕と orchestrator/crash-monitor〔goroutine〕からの並行書き込みを防ぐ）。
 	runtimeMu sync.Mutex
 }
@@ -247,6 +247,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.recordLastUsed(name)
+	s.recordLastStart("manual", time.Now().Format(time.RFC3339)) // 最終起動時刻（手動起動・§3.16(9)/R10）
 	writeOK(w, map[string]any{"accepted": true})
 }
 

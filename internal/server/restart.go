@@ -2,7 +2,7 @@ package server
 
 // スケジュール（Phase 8・§3.16）バックエンド: 自動再起動の設定/状態。
 // P8-1 はデータ構造 + 設定/状態API のみ。scheduler(P8-2)/orchestrator(P8-3)/crash-monitor(P8-4)
-// は後続フェーズで追加し、restart-status の next/lastRestart/進行状態を埋めていく。
+// は後続フェーズで追加し、restart-status の next/lastStart/進行状態を埋めていく。
 // cfg 書き換えは cfgMu 下・SaveTo 失敗はロールバック（settings.go と同方針）。
 
 import (
@@ -69,7 +69,7 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 
 // restartStatus は restart-status の応答。
 // 次回予定（NextScheduled*）は P8-2（scheduler）。進行状態（InProgress/Phase/Restart*）は
-// P8-3（orchestrator）。最終再起動（LastRestart）は永続化（P8-4・§3.16(9)）で埋める。
+// P8-3（orchestrator）。最終起動（LastStart）は永続化（P8-4・§3.16(9)）で埋める。
 type restartStatus struct {
 	Running              bool   `json:"running"`
 	UptimeSeconds        int64  `json:"uptimeSeconds"`
@@ -80,9 +80,9 @@ type restartStatus struct {
 	RestartTriggerType string  `json:"restartTriggerType,omitempty"` // manual | scheduled
 	RestartConfigName  string  `json:"restartConfigName,omitempty"`  // 進行中の対象 config（空=前回）
 	DeadlineAt         *string `json:"deadlineAt"`                   // ② 待機の締切（RFC3339）/ null
-	// 最終再起動（§3.16(9)・runtime-state.json 由来）。未記録なら null/空。
-	LastRestartAt      *string `json:"lastRestartAt"`                // RFC3339 / null
-	LastRestartTrigger string  `json:"lastRestartTrigger,omitempty"` // manual | scheduled | crash
+	// 最終起動（§3.16(9)・runtime-state.json 由来。手動起動/再起動/予定/crash 共通）。未記録なら null/空。
+	LastStartAt      *string `json:"lastStartAt"`                // RFC3339 / null
+	LastStartTrigger string  `json:"lastStartTrigger,omitempty"` // manual | scheduled | crash
 	// 次回予定再起動（有効予定の最も近い発火）。予定が無ければ全て null/空。
 	NextScheduledAt         *string `json:"nextScheduledAt"`         // RFC3339（サーバーローカルTZ）/ null=予定なし
 	NextScheduledConfigName string  `json:"nextScheduledConfigName"` // 空=前回config
@@ -115,11 +115,11 @@ func (s *Server) handleRestartStatus(w http.ResponseWriter, r *http.Request) {
 			out.DeadlineAt = &d
 		}
 	}
-	// 最終再起動（P8-5・§3.16(9)）。
-	if at, trigger := s.loadLastRestart(); at != "" {
+	// 最終起動（P8-5・§3.16(9)・手動起動を含む）。
+	if at, trigger := s.loadLastStart(); at != "" {
 		a := at
-		out.LastRestartAt = &a
-		out.LastRestartTrigger = trigger
+		out.LastStartAt = &a
+		out.LastStartTrigger = trigger
 	}
 	// 次回予定再起動（P8-2）。
 	if next, sc, ok := rc.NextScheduled(time.Now()); ok {
