@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Button, Divider, Group, Stack, Switch, Text } from "@mantine/core";
+import { ActionIcon, Button, Divider, Group, Stack, Switch, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import {
   CollapsibleSection,
   FieldRow,
-  InspectorButton,
   InspectorNumberInput,
   InspectorSelect,
   InspectorTextInput,
@@ -56,14 +55,16 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
     onChange(addWorld(cfg));
     setActive(worlds.length);
   };
-  const askRemove = () =>
+  // i 番目のワールドを削除（R5: 各タブの×から呼ぶ・index 引数化）。
+  const askRemove = (i: number) =>
     confirm.ask({
       title: t("config.removeWorld"),
-      message: t("config.confirmRemoveWorld", { name: asStr(world.sessionName) || `#${idx + 1}` }),
+      message: t("config.confirmRemoveWorld", { name: asStr(worlds[i]?.sessionName) || `#${i + 1}` }),
       danger: true,
       onConfirm: () => {
-        onChange(removeWorld(cfg, idx));
-        setActive(Math.max(0, idx - 1));
+        onChange(removeWorld(cfg, i));
+        // 削除位置が active より前なら active を 1 つ詰め、末尾削除に備えて新範囲へクランプ。
+        setActive((a) => Math.max(0, Math.min(i < a ? a - 1 : a, worlds.length - 2)));
       },
     });
 
@@ -74,17 +75,32 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
 
   return (
     <Stack gap={6}>
+      {/* ワールドタブ。各タブ＝選択ボタン＋×（R5・ConfigList と同方式でネストボタンを避ける）。
+          最後の1枚は × 非表示（唯一のワールドは削除不可）。 */}
       <Group gap={4} wrap="wrap">
         {worlds.map((w, i) => (
-          <Button
-            key={i}
-            size="xs"
-            variant={i === idx ? "filled" : "default"}
-            color="gray"
-            onClick={() => setActive(i)}
-          >
-            {worldLabel(w, i)}
-          </Button>
+          <Group key={i} gap={2} wrap="nowrap">
+            <Button
+              size="xs"
+              variant={i === idx ? "filled" : "default"}
+              color="gray"
+              onClick={() => setActive(i)}
+            >
+              {worldLabel(w, i)}
+            </Button>
+            {worlds.length > 1 && (
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="red"
+                aria-label={t("config.removeWorld")}
+                title={t("config.removeWorld")}
+                onClick={() => askRemove(i)}
+              >
+                ×
+              </ActionIcon>
+            )}
+          </Group>
         ))}
         <Button size="xs" variant="light" color="gray" onClick={onAdd} aria-label={t("config.addWorld")}>
           ＋
@@ -180,10 +196,6 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
               </FieldRow>
             </Stack>
           </CollapsibleSection>
-
-          <InspectorButton severity="danger" disabled={worlds.length <= 1} onClick={askRemove} mt={4}>
-            {t("config.removeWorld")}
-          </InspectorButton>
         </>
       )}
 
