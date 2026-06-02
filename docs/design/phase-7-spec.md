@@ -275,6 +275,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **縁取りは TextInput/PasswordInput のみ**。エリア境界・Button・ActionIcon・Select の縁取りは撤去（`AppShell withBorder={false}` 等）。
   - **サイドバー背景 = `#1a2a36`（dark cyan）**、**選択タブ = 文字 yellow(#f8f770) / 背景 `#2b2e26`（dark yellow）**、非選択タブ = 白(Light)。パレット外の暗色2色は `theme.ts` の `SURFACE` に集約。
   - ロゴ = 白(Light)。状態ドット（稼働中トップバー）= running 緑 / 遷移中 黄。
+  - **filled ボタンの文字コントラスト = theme `autoContrast`**（commit 16a4a69）。個別の `styles` で文字色を上書きせず、テーマ一括で背景に応じた可読色を自動付与（保存バー dirty 時の brand filled 等）。グローバル CSS で底上げ。
 - **i18n** = ブラウザ言語の**自動判定**（`navigator.languages` を prefix 一致）＋**選択式スイッチャ**（ログイン Select・⋮ メニュー）。対応言語の単一情報源 = `LANGUAGES`（言語追加 = locale JSON + resources + 1行）。手動切替は localStorage に保存し自動判定より優先。
 - **フォーカス/セッション表示 = 2行**（上=セッション名〔長→自動縮小・`<br>`改行→折返し＋半分サイズ・行数 clamp で頭打ち〕／下=小さく `present/users/max · accessLevel`）。トップバーのフォーカスボタンとプルダウンで共用（`SessionTwoLine`）。§3.2 のモックアップの 🎯/1行表記はこの2行・状態ドット形に置換。
 - **モバイル**: 1行トップバーで操作要素（☰/起動/⋮）は `flex-shrink:0`、config Select が `min-width:0` で幅を吸収（起動ボタンの文字が見切れない）。
@@ -286,7 +287,8 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 
 - **インスペクタ風部品**（Resonite シーンインスペクタ準拠・参考画像ベース）:
   - `InspectorCard` = カードヘッダ（中央=hero/yellow タイトル）＋**右隣に独立した別ボックスのアクション**（タイトルバーに重ねない）。本体は背景塗りなし（＝全体背景と同色）。
-  - `FieldRow` = 1行「項目名（左・色マーカー）｜値/入力欄（右）」。
+  - `FieldRow` = 1行「項目名（左・**色マーカー＝ハンドル**）｜値/入力欄（右）」。マーカーは Resonite シーンインスペクタ風ハンドル（種別色の縦バー＋白3本線）。**`onMarkerClick` を渡すとマーカーがボタン化**（hover で明色化〔`index.css` の `.mrhc-field-marker`〕・キーボード操作可）。
+  - **マーカー＝「既定値に戻す」**（commit bf61415）: マーカークリック→`ConfirmModal`「『{項目}』を既定値に戻しますか？」→**その項目だけ**既定値へリセット（フィールド単位の取り消し）。採用箇所＝コンフィグ（`GeneralSection`/`WorldsSection`・既定は `configModel.defaultConfig()`）＋スケジュールの設定カード（待機制御/事前アクション/クラッシュ復帰・既定は `scheduleModel.default*()`＝backend `config.DefaultRestart()` ミラー）。予定リスト/状態/手動カードは対象外（フィールド単位の既定が無いため）。i18n=`common.resetToDefault`/`resetConfirmTitle`/`resetConfirmMsg`。
   - `InspectorTextInput`/`InspectorNumberInput`/`InspectorTextarea`/`InspectorSelect` = 入力ラッパ。スタイル/サイズ/▼アイコンを内蔵。
   - `InspectorButton`（`severity="neutral|warning|danger"` で **gray/yellow/red** に色分け・色の単一情報源）、`RefreshButton`（ヘッダの ⟳）。
 - **配色/装飾ルール**: ヘッダ帯のみグレー、入力欄＝グレー fill、**縁取りは「キーボードで文字入力できる欄」のみ**（TextInput/NumberInput/Textarea）。Select は縁取りなし＋**▼ 1つ**（既定 chevron 置換）。読み取り専用はプレーン Text で区別。ボタン主アクション（適用）のみ cyan filled。
