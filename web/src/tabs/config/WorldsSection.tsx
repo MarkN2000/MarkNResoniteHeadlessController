@@ -18,6 +18,7 @@ import {
   arrayToCsv,
   asBool,
   asNum,
+  asNumOr,
   asStr,
   csvToArray,
   defaultWorld,
@@ -25,6 +26,15 @@ import {
   removeWorld,
   setWorld,
 } from "./configModel";
+
+// -1=無効 型フィールドの既定値（sample/default.json のスキーマ値・R6）。
+// 未設定なら既定を表示し、空欄にされたら -1（無効）へスナップして「必ず数値」を保つ。
+const SENTINEL_DEFAULTS: Record<string, number> = {
+  awayKickMinutes: -1,
+  idleRestartInterval: 1800,
+  forcedRestartInterval: -1,
+  autosaveInterval: -1,
+};
 import { BufferedTextInput, CustomSessionIdInput } from "./fields";
 
 // startWorlds[] のタブ式エディタ。タブ=1ワールド、＋で追加、最後の1枚は削除不可。
@@ -38,6 +48,8 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
 
   const setW = (key: string, value: unknown) => onChange(setWorld(cfg, idx, { ...world, [key]: value }));
   const numW = (key: string) => (v: number | string) => setW(key, v === "" ? "" : Number(v));
+  // -1=無効 型: 空欄は -1（無効）へスナップ＝map に "" を書かず必ず数値にする（R6）。
+  const sentinelW = (key: string) => (v: number | string) => setW(key, v === "" ? -1 : Number(v));
 
   // マーカークリック＝そのワールド項目を defaultWorld() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
@@ -164,17 +176,30 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
                   placeholder={t("config.csvPlaceholder")}
                 />
               </FieldRow>
+              {/* -1=無効 型（R6）: 未設定なら既定値を表示し、空欄は -1 へスナップ＝常に数値。 */}
               <FieldRow label={t("config.awayKickMinutes")} {...resetProps("awayKickMinutes", t("config.awayKickMinutes"))}>
-                <InspectorNumberInput value={asNum(world.awayKickMinutes)} onChange={numW("awayKickMinutes")} />
+                <InspectorNumberInput
+                  value={asNumOr(world.awayKickMinutes, SENTINEL_DEFAULTS.awayKickMinutes)}
+                  onChange={sentinelW("awayKickMinutes")}
+                />
               </FieldRow>
               <FieldRow label={t("config.idleRestartInterval")} {...resetProps("idleRestartInterval", t("config.idleRestartInterval"))}>
-                <InspectorNumberInput value={asNum(world.idleRestartInterval)} onChange={numW("idleRestartInterval")} />
+                <InspectorNumberInput
+                  value={asNumOr(world.idleRestartInterval, SENTINEL_DEFAULTS.idleRestartInterval)}
+                  onChange={sentinelW("idleRestartInterval")}
+                />
               </FieldRow>
               <FieldRow label={t("config.forcedRestartInterval")} {...resetProps("forcedRestartInterval", t("config.forcedRestartInterval"))}>
-                <InspectorNumberInput value={asNum(world.forcedRestartInterval)} onChange={numW("forcedRestartInterval")} />
+                <InspectorNumberInput
+                  value={asNumOr(world.forcedRestartInterval, SENTINEL_DEFAULTS.forcedRestartInterval)}
+                  onChange={sentinelW("forcedRestartInterval")}
+                />
               </FieldRow>
               <FieldRow label={t("config.autosaveInterval")} {...resetProps("autosaveInterval", t("config.autosaveInterval"))}>
-                <InspectorNumberInput value={asNum(world.autosaveInterval)} onChange={numW("autosaveInterval")} />
+                <InspectorNumberInput
+                  value={asNumOr(world.autosaveInterval, SENTINEL_DEFAULTS.autosaveInterval)}
+                  onChange={sentinelW("autosaveInterval")}
+                />
               </FieldRow>
               <FieldRow label={t("config.saveOnExit")} {...resetProps("saveOnExit", t("config.saveOnExit"))}>
                 <Switch checked={asBool(world.saveOnExit)} onChange={(e) => setW("saveOnExit", e.currentTarget.checked)} />

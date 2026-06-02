@@ -57,6 +57,9 @@ export const asStr = (v: unknown): string => (typeof v === "string" ? v : "");
 export const asBool = (v: unknown, fallback = false): boolean => (typeof v === "boolean" ? v : fallback);
 // NumberInput の value は number | "" を取る。数値以外は "" にして空欄表示。
 export const asNum = (v: unknown): number | "" => (typeof v === "number" ? v : "");
+// asNum と同じだが、未設定/非数値のとき "" ではなく fallback（数値）を返す。
+// -1=無効 型フィールド（awayKick/idleRestart/forced/autosave）が常に数値を表示するために使う（R6）。
+export const asNumOr = (v: unknown, fallback: number): number => (typeof v === "number" ? v : fallback);
 
 // 文字列配列を安全に取り出す（allowedUrlHosts 用）。
 export function getStringArray(v: unknown): string[] {

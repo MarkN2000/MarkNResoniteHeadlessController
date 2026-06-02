@@ -413,6 +413,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
   - 運用（**折りたたみ・既定=閉じ**＝R11）：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`・`forcedRestartInterval`・`autosaveInterval`（各 `-1=無効` 注記）・`saveOnExit`・`autoRecover`・`autoSleep`・`hideFromPublicListing`・`mobileFriendly`。
 - **折りたたみ共通コンポーネント（R11）**: `components/inspector/CollapsibleSection`（`title`＋`defaultOpen?`＋`▾/▴`＋Mantine `Collapse`・`aria-expanded`）。設定タブの上級折りたたみ（`AppSettingsSection`）を本コンポーネントに置換（挙動不変）＋ワールド運用群を折りたたみ既定で包む。R6/R13 の追加項目もこの折りたたみ内に置く土台。
 - **ワールド削除＝各タブの×（R5）**: ワールドタブを `Group[選択Button][× ActionIcon]`（`ConfigList` 行と同方式・ネストボタン回避）にし、各タブの×でそのワールドを削除（確認ダイアログ）。**最後の1枚は×非表示**（唯一のワールドは削除不可）。下部の「ワールド削除」ボタンは撤去。削除位置に応じてアクティブ index を補正。
+- **-1=無効フィールドを必ず数値に（R6）**: `awayKickMinutes`/`idleRestartInterval`/`forcedRestartInterval`/`autosaveInterval` は **未設定なら既定値を表示**（`asNumOr`・既定=スキーマ値 -1/1800/-1/-1）し、**空欄は -1（無効）へスナップ**（`sentinelW`＝map に `""` を書かない）。UI 方式は「数値入力＋一般ヒント `config.sentinelNote`」（トグルは不採用）。
 - **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`enableResoniteLink`・`forceResoniteLinkPort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。
 
 **安全/堅牢**
