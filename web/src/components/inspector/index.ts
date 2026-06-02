@@ -5,3 +5,4 @@ export { FieldRow } from "./FieldRow";
 export { InspectorTextInput, InspectorNumberInput, InspectorTextarea, InspectorSelect } from "./inputs";
 export { InspectorButton, type Severity } from "./InspectorButton";
 export { RefreshButton } from "./RefreshButton";
+export { CollapsibleSection } from "./CollapsibleSection";

@@ -3,6 +3,7 @@ import { Button, Divider, Group, Stack, Switch, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import {
+  CollapsibleSection,
   FieldRow,
   InspectorButton,
   InspectorNumberInput,
@@ -130,50 +131,55 @@ export function WorldsSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cf
             <CustomSessionIdInput key={idx} initial={asStr(world.customSessionId)} onChange={(v) => setW("customSessionId", v)} />
           </FieldRow>
 
-          <Divider my={4} color="dark.4" label={t("config.operationSection")} labelPosition="center" />
-          <Text size="xs" c="dimmed">
-            {t("config.sentinelNote")}
-          </Text>
-          {/* tags はバッファ付き入力（内部 state）でリセットが表示へ反映されないため対象外。 */}
-          <FieldRow label={t("config.tags")}>
-            <BufferedTextInput
-              key={idx}
-              initial={arrayToCsv(world.tags)}
-              parse={csvToArray}
-              onCommit={(v) => setW("tags", v)}
-              placeholder={t("config.csvPlaceholder")}
-            />
-          </FieldRow>
-          <FieldRow label={t("config.awayKickMinutes")} {...resetProps("awayKickMinutes", t("config.awayKickMinutes"))}>
-            <InspectorNumberInput value={asNum(world.awayKickMinutes)} onChange={numW("awayKickMinutes")} />
-          </FieldRow>
-          <FieldRow label={t("config.idleRestartInterval")} {...resetProps("idleRestartInterval", t("config.idleRestartInterval"))}>
-            <InspectorNumberInput value={asNum(world.idleRestartInterval)} onChange={numW("idleRestartInterval")} />
-          </FieldRow>
-          <FieldRow label={t("config.forcedRestartInterval")} {...resetProps("forcedRestartInterval", t("config.forcedRestartInterval"))}>
-            <InspectorNumberInput value={asNum(world.forcedRestartInterval)} onChange={numW("forcedRestartInterval")} />
-          </FieldRow>
-          <FieldRow label={t("config.autosaveInterval")} {...resetProps("autosaveInterval", t("config.autosaveInterval"))}>
-            <InspectorNumberInput value={asNum(world.autosaveInterval)} onChange={numW("autosaveInterval")} />
-          </FieldRow>
-          <FieldRow label={t("config.saveOnExit")} {...resetProps("saveOnExit", t("config.saveOnExit"))}>
-            <Switch checked={asBool(world.saveOnExit)} onChange={(e) => setW("saveOnExit", e.currentTarget.checked)} />
-          </FieldRow>
-          <FieldRow label={t("config.autoRecover")} {...resetProps("autoRecover", t("config.autoRecover"))}>
-            <Switch checked={asBool(world.autoRecover, true)} onChange={(e) => setW("autoRecover", e.currentTarget.checked)} />
-          </FieldRow>
-          <FieldRow label={t("config.autoSleep")} {...resetProps("autoSleep", t("config.autoSleep"))}>
-            <Switch checked={asBool(world.autoSleep, true)} onChange={(e) => setW("autoSleep", e.currentTarget.checked)} />
-          </FieldRow>
-          <FieldRow label={t("config.hideFromPublicListing")} {...resetProps("hideFromPublicListing", t("config.hideFromPublicListing"))}>
-            <Switch
-              checked={asBool(world.hideFromPublicListing)}
-              onChange={(e) => setW("hideFromPublicListing", e.currentTarget.checked)}
-            />
-          </FieldRow>
-          <FieldRow label={t("config.mobileFriendly")} {...resetProps("mobileFriendly", t("config.mobileFriendly"))}>
-            <Switch checked={asBool(world.mobileFriendly)} onChange={(e) => setW("mobileFriendly", e.currentTarget.checked)} />
-          </FieldRow>
+          <Divider my={4} color="dark.4" />
+          {/* 運用項目群は折りたたみ（既定=閉じ）。基本項目だけ常時表示しスマホの縦長を抑える（R11）。 */}
+          <CollapsibleSection title={t("config.operationSection")}>
+            <Stack gap={6}>
+              <Text size="xs" c="dimmed">
+                {t("config.sentinelNote")}
+              </Text>
+              {/* tags はバッファ付き入力（内部 state）でリセットが表示へ反映されないため対象外。 */}
+              <FieldRow label={t("config.tags")}>
+                <BufferedTextInput
+                  key={idx}
+                  initial={arrayToCsv(world.tags)}
+                  parse={csvToArray}
+                  onCommit={(v) => setW("tags", v)}
+                  placeholder={t("config.csvPlaceholder")}
+                />
+              </FieldRow>
+              <FieldRow label={t("config.awayKickMinutes")} {...resetProps("awayKickMinutes", t("config.awayKickMinutes"))}>
+                <InspectorNumberInput value={asNum(world.awayKickMinutes)} onChange={numW("awayKickMinutes")} />
+              </FieldRow>
+              <FieldRow label={t("config.idleRestartInterval")} {...resetProps("idleRestartInterval", t("config.idleRestartInterval"))}>
+                <InspectorNumberInput value={asNum(world.idleRestartInterval)} onChange={numW("idleRestartInterval")} />
+              </FieldRow>
+              <FieldRow label={t("config.forcedRestartInterval")} {...resetProps("forcedRestartInterval", t("config.forcedRestartInterval"))}>
+                <InspectorNumberInput value={asNum(world.forcedRestartInterval)} onChange={numW("forcedRestartInterval")} />
+              </FieldRow>
+              <FieldRow label={t("config.autosaveInterval")} {...resetProps("autosaveInterval", t("config.autosaveInterval"))}>
+                <InspectorNumberInput value={asNum(world.autosaveInterval)} onChange={numW("autosaveInterval")} />
+              </FieldRow>
+              <FieldRow label={t("config.saveOnExit")} {...resetProps("saveOnExit", t("config.saveOnExit"))}>
+                <Switch checked={asBool(world.saveOnExit)} onChange={(e) => setW("saveOnExit", e.currentTarget.checked)} />
+              </FieldRow>
+              <FieldRow label={t("config.autoRecover")} {...resetProps("autoRecover", t("config.autoRecover"))}>
+                <Switch checked={asBool(world.autoRecover, true)} onChange={(e) => setW("autoRecover", e.currentTarget.checked)} />
+              </FieldRow>
+              <FieldRow label={t("config.autoSleep")} {...resetProps("autoSleep", t("config.autoSleep"))}>
+                <Switch checked={asBool(world.autoSleep, true)} onChange={(e) => setW("autoSleep", e.currentTarget.checked)} />
+              </FieldRow>
+              <FieldRow label={t("config.hideFromPublicListing")} {...resetProps("hideFromPublicListing", t("config.hideFromPublicListing"))}>
+                <Switch
+                  checked={asBool(world.hideFromPublicListing)}
+                  onChange={(e) => setW("hideFromPublicListing", e.currentTarget.checked)}
+                />
+              </FieldRow>
+              <FieldRow label={t("config.mobileFriendly")} {...resetProps("mobileFriendly", t("config.mobileFriendly"))}>
+                <Switch checked={asBool(world.mobileFriendly)} onChange={(e) => setW("mobileFriendly", e.currentTarget.checked)} />
+              </FieldRow>
+            </Stack>
+          </CollapsibleSection>
 
           <InspectorButton severity="danger" disabled={worlds.length <= 1} onClick={askRemove} mt={4}>
             {t("config.removeWorld")}

@@ -410,7 +410,8 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 - config トップ（フォーム）：`comment`・`tickRate`・`maxConcurrentAssetTransfers`・`usernameOverride`・`dataFolder`・`cacheFolder`・`logsFolder`・`allowedUrlHosts`（add/remove リスト）・`autoSpawnItems`（カンマ→配列）＋アカウント欄。
 - 各ワールド（startWorlds[]・タブ・フォーム）
   - 基本：`isEnabled`（タブ有効/無効）・`sessionName`・`description`・`accessLevel`・`maxUsers`・`loadWorldPresetName`＋`loadWorldURL`（**両表示**・スキーマ上両立可・どちらが効くかは Resonite 依存＝URL 優先）・`customSessionId`（**prefix/suffix ビルダー**・`:` 分割/結合・自動補完=ボット名依存は将来）。
-  - 運用：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`・`forcedRestartInterval`・`autosaveInterval`（各 `-1=無効` 注記）・`saveOnExit`・`autoRecover`・`autoSleep`・`hideFromPublicListing`・`mobileFriendly`。
+  - 運用（**折りたたみ・既定=閉じ**＝R11）：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`・`forcedRestartInterval`・`autosaveInterval`（各 `-1=無効` 注記）・`saveOnExit`・`autoRecover`・`autoSleep`・`hideFromPublicListing`・`mobileFriendly`。
+- **折りたたみ共通コンポーネント（R11）**: `components/inspector/CollapsibleSection`（`title`＋`defaultOpen?`＋`▾/▴`＋Mantine `Collapse`・`aria-expanded`）。設定タブの上級折りたたみ（`AppSettingsSection`）を本コンポーネントに置換（挙動不変）＋ワールド運用群を折りたたみ既定で包む。R6/R13 の追加項目もこの折りたたみ内に置く土台。
 - **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`enableResoniteLink`・`forceResoniteLinkPort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。
 
 **安全/堅牢**

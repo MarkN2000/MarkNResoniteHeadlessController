@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { Box, Center, Collapse, Divider, Group, Loader, Stack, Text, UnstyledButton } from "@mantine/core";
+import { Center, Divider, Loader, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import type { AppSettings } from "../../api";
-import { FieldRow, InspectorCard, InspectorNumberInput, InspectorTextInput } from "../../components/inspector";
+import {
+  CollapsibleSection,
+  FieldRow,
+  InspectorCard,
+  InspectorNumberInput,
+  InspectorTextInput,
+} from "../../components/inspector";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { SaveButton } from "./SaveButton";
 
@@ -24,7 +30,6 @@ export function AppSettingsSection() {
   const [port, setPort] = useState<number | string>("");
   const [path, setPath] = useState("");
   const [dir, setDir] = useState("");
-  const [advanced, setAdvanced] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const apply = useAsyncAction();
 
@@ -81,28 +86,16 @@ export function AppSettingsSection() {
           <Note>{t("settings.headlessPathNote")}</Note>
 
           <Divider my={2} color="dark.4" />
-          <UnstyledButton onClick={() => setAdvanced((a) => !a)}>
-            <Group gap={4}>
-              <Text size="xs" c="dimmed">
-                {t("settings.advanced")}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {advanced ? "▴" : "▾"}
-              </Text>
-            </Group>
-          </UnstyledButton>
-          <Collapse in={advanced}>
-            <Box pt={4}>
-              <FieldRow label={t("settings.configDir")}>
-                <InspectorTextInput
-                  value={dir}
-                  onChange={(e) => setDir(e.currentTarget.value)}
-                  placeholder={t("settings.configDirPlaceholder")}
-                />
-              </FieldRow>
-              <Note>{t("settings.restartNote")}</Note>
-            </Box>
-          </Collapse>
+          <CollapsibleSection title={t("settings.advanced")}>
+            <FieldRow label={t("settings.configDir")}>
+              <InspectorTextInput
+                value={dir}
+                onChange={(e) => setDir(e.currentTarget.value)}
+                placeholder={t("settings.configDirPlaceholder")}
+              />
+            </FieldRow>
+            <Note>{t("settings.restartNote")}</Note>
+          </CollapsibleSection>
 
           <SaveButton label={t("settings.save")} onClick={save} disabled={!canSave} loading={apply.busy} />
         </Stack>
