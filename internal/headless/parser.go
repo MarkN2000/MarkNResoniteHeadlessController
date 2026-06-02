@@ -21,6 +21,10 @@ import (
 //   - `worldsLineRe` の `(.+?)` 名前: name に "Users:" 含むと誤分割。
 //     名前に「 Users: 」というスペース＋コロン列を入れるのは想定外で実用上問題なし。
 
+// userIDPat は Resonite UserID（"U-" + 英数/_/-）のトークンパターン。
+// listbans / login など UserID を抽出する箇所で共有し charset を一致させる（SanitizeToken とも整合）。
+const userIDPat = `U-[A-Za-z0-9_-]+`
+
 var (
 	// worlds: `[<idx>] <name padded>\tUsers: N\tPresent: N\tAccessLevel: L\tMaxUsers: N`
 	// 名前と Users の間は空白パディング、それ以降は TAB 区切りが実機観測。
@@ -35,7 +39,7 @@ var (
 	usersLineRe = regexp.MustCompile(`^([^\t]+)\tID:\s*([^\t]*)\tRole:\s+([^\t]+)\tPresent:\s+(True|False)\tPing:\s+(\d+)\s+ms\tFPS:\s+([0-9.]+)\tSilenced:\s+(True|False)$`)
 
 	// listbans: `[<idx>] Username: U UserID: U-... MachineIds: ...`
-	listbansLineRe = regexp.MustCompile(`^\[(\d+)\]\s+Username:\s+(\S+)\s+UserID:\s+(U-[A-Za-z0-9_-]+)\s+MachineIds:\s+(.*)$`)
+	listbansLineRe = regexp.MustCompile(`^\[(\d+)\]\s+Username:\s+(\S+)\s+UserID:\s+(` + userIDPat + `)\s+MachineIds:\s+(.*)$`)
 )
 
 // statusUnknownKeysWarned: status の未知 Key を「初回1回だけ」警告するため。

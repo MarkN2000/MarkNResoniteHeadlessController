@@ -52,8 +52,9 @@ const (
 )
 
 // loginUserIDRe は "Initializing SignalR: UserLogin: U-xxx" から UserID を抽出する
-// （実機ログ・fixtures 2026-05-28-lan-login で確認・v1 踏襲）。
-var loginUserIDRe = regexp.MustCompile(`Initializing SignalR: UserLogin:\s*(U-\S+)`)
+// （実機ログ・fixtures 2026-05-28-lan-login で確認・v1 踏襲）。UserID の charset は
+// listbans 等と共有の userIDPat（parser.go）に統一する。
+var loginUserIDRe = regexp.MustCompile(`Initializing SignalR: UserLogin:\s*(` + userIDPat + `)`)
 
 // Status はヘッドレスの現在状態。
 type Status struct {
@@ -345,7 +346,8 @@ func (d *Driver) decodeLine(raw []byte) string {
 // 「Initial Startup」のみ／失敗=試行はあるが成功確認なし。手動 login コマンドにも追従する。
 func (d *Driver) scanLogin(text string) {
 	switch {
-	case strings.HasPrefix(text, "Logging in as "):
+	case strings.Contains(text, "Logging in as "):
+		// Contains にして手動 login コマンド（応答行頭にプロンプト接頭辞が付き得る）にも追従する。
 		d.mu.Lock()
 		// 新規ログイン試行＝成功/UserID をリセットしてから試行フラグを立てる（再ログイン追従）。
 		d.loginAttempted = true
