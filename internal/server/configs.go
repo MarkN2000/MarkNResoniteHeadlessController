@@ -4,14 +4,21 @@ package server
 // ファイル操作は internal/hlconfig に委譲し、ここは薄い HTTP 層に留める。
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
 )
+
+// credResolveTimeout は認証情報保存時の UserID 解決（外部API）の上限（R12）。
+// 解決失敗でも保存は続行するため、保存全体を長く待たせない短めの上限にする。
+const credResolveTimeout = 5 * time.Second
 
 // --- Headless Config CRUD ---
 
@@ -86,18 +93,20 @@ func writeConfigErr(w http.ResponseWriter, err error) {
 
 // --- 中央既定アカウント（mrhc.config.json の HeadlessCredentials）---
 
-// handleCredentialsGet: GET /api/v1/headless-credentials → {username, hasPassword}（password 非返却）
+// handleCredentialsGet: GET /api/v1/headless-credentials → {username, hasPassword, userId}（password 非返却）
 func (s *Server) handleCredentialsGet(w http.ResponseWriter, r *http.Request) {
 	s.cfgMu.RLock()
 	defer s.cfgMu.RUnlock()
 	writeOK(w, map[string]any{
 		"username":    s.cfg.HeadlessCredentials.Username,
 		"hasPassword": s.cfg.HeadlessCredentials.Password != "",
+		"userId":      s.cfg.HeadlessCredentials.UserID, // 解決済 UserID（空=未解決・R12）
 	})
 }
 
 // handleCredentialsPut: PUT /api/v1/headless-credentials {username, password}
 // password 空なら既存を保持（username のみ更新）。mrhc.config.json に保存。
+// 保存時に username → UserID を解決して併せて保持する（R12・customSessionId prefix 等で再利用）。
 func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Username string `json:"username"`
@@ -107,26 +116,60 @@ func (s *Server) handleCredentialsPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正なリクエスト")
 		return
 	}
+
+	// 現在値を読み、UserID 再解決の要否を決める（cfgMu 外でネットワークを叩くための事前判定）。
+	s.cfgMu.RLock()
+	prevU, prevID := s.cfg.HeadlessCredentials.Username, s.cfg.HeadlessCredentials.UserID
+	s.cfgMu.RUnlock()
+	newUserID := s.resolveOwnerUserID(r.Context(), body.Username, prevU, prevID)
+
 	s.cfgMu.Lock()
 	// 変更前を退避し、SaveTo 失敗時は in-memory を巻き戻してディスクとの整合を保つ。
-	oldU, oldP := s.cfg.HeadlessCredentials.Username, s.cfg.HeadlessCredentials.Password
+	oldU, oldP, oldID := s.cfg.HeadlessCredentials.Username, s.cfg.HeadlessCredentials.Password, s.cfg.HeadlessCredentials.UserID
 	s.cfg.HeadlessCredentials.Username = body.Username
 	if body.Password != "" {
 		s.cfg.HeadlessCredentials.Password = body.Password
 	}
+	s.cfg.HeadlessCredentials.UserID = newUserID
 	saveErr := s.cfg.SaveTo(s.cfgPath)
 	if saveErr != nil {
 		s.cfg.HeadlessCredentials.Username = oldU
 		s.cfg.HeadlessCredentials.Password = oldP
+		s.cfg.HeadlessCredentials.UserID = oldID
 	}
 	uname := s.cfg.HeadlessCredentials.Username
 	hasPw := s.cfg.HeadlessCredentials.Password != ""
+	uid := s.cfg.HeadlessCredentials.UserID
 	s.cfgMu.Unlock()
 	if saveErr != nil {
 		writeErr(w, http.StatusInternalServerError, "save_failed", saveErr.Error())
 		return
 	}
-	writeOK(w, map[string]any{"username": uname, "hasPassword": hasPw})
+	writeOK(w, map[string]any{"username": uname, "hasPassword": hasPw, "userId": uid})
+}
+
+// resolveOwnerUserID は中央アカウント username から Resonite UserID を解決する（R12・cfgMu 外で呼ぶ）。
+//   - username が空 / メール形式（"@" を含む）→ "" （解決対象外）。
+//   - username が前回と不変かつ前回 UserID があれば再解決せず流用（保存のたびの無駄打ち回避）。
+//   - それ以外は公開API で解決。失敗（ネットワーク/未一致）は "" を返し、保存自体は続行させる。
+func (s *Server) resolveOwnerUserID(ctx context.Context, newUsername, prevUsername, prevUserID string) string {
+	u := strings.TrimSpace(newUsername)
+	if u == "" || strings.Contains(u, "@") {
+		return ""
+	}
+	if u == strings.TrimSpace(prevUsername) && prevUserID != "" {
+		return prevUserID
+	}
+	if s.resonite == nil {
+		return ""
+	}
+	rctx, cancel := context.WithTimeout(ctx, credResolveTimeout)
+	defer cancel()
+	id, err := s.resonite.ResolveUserID(rctx, u)
+	if err != nil {
+		return "" // 解決失敗でも保存は続行（UserID 空＝prefix は手入力フォールバック）
+	}
+	return id
 }
 
 // --- runtime-state（last-used config / 最終起動）---

@@ -89,6 +89,80 @@ func TestSearchUsers_EmptyTerm(t *testing.T) {
 	}
 }
 
+// ResolveUserID: 部分一致の配列から normalizedUsername 完全一致を選ぶ（R12）。
+func TestResolveUserID_ExactMatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/users/" || r.URL.Query().Get("name") != "MarkN" {
+			t.Errorf("unexpected request: %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		// 部分一致が複数返る中から normalizedUsername=="markn" の1件だけが正解。
+		w.Write([]byte(`[
+			{"id":"U-MarkN2","username":"MarkN_alt","normalizedUsername":"markn_alt"},
+			{"id":"U-MarkN","username":"MarkN","normalizedUsername":"markn"},
+			{"id":"U-Other","username":"MarkNeighbor","normalizedUsername":"markneighbor"}
+		]`))
+	}))
+	defer srv.Close()
+
+	id, err := NewClientWithBase(srv.URL).ResolveUserID(context.Background(), "MarkN")
+	if err != nil {
+		t.Fatalf("ResolveUserID: %v", err)
+	}
+	if id != "U-MarkN" {
+		t.Fatalf("want U-MarkN, got %q", id)
+	}
+}
+
+// 大文字小文字差は normalize（小文字化）で吸収して一致する。
+func TestResolveUserID_CaseInsensitive(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`[{"id":"U-Foo","username":"Foo","normalizedUsername":"foo"}]`))
+	}))
+	defer srv.Close()
+	id, _ := NewClientWithBase(srv.URL).ResolveUserID(context.Background(), "FOO")
+	if id != "U-Foo" {
+		t.Fatalf("case-insensitive match failed: %q", id)
+	}
+}
+
+// 完全一致が無い（部分一致のみ）→ "" を返す（誤った別人を選ばない）。
+func TestResolveUserID_NoExactMatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`[{"id":"U-Xa","username":"Xander","normalizedUsername":"xander"}]`))
+	}))
+	defer srv.Close()
+	id, err := NewClientWithBase(srv.URL).ResolveUserID(context.Background(), "Xan")
+	if err != nil || id != "" {
+		t.Fatalf("no exact match should be empty: id=%q err=%v", id, err)
+	}
+}
+
+// メール形式（"@" 含む）/ 空 / "U-" 始まりは API を叩かず "" を返す。
+func TestResolveUserID_SkipsEmailEmptyAndID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("must not hit the API for email/empty/ID input")
+	}))
+	defer srv.Close()
+	c := NewClientWithBase(srv.URL)
+	for _, in := range []string{"me@example.com", "   ", "U-MarkN"} {
+		if id, err := c.ResolveUserID(context.Background(), in); id != "" || err != nil {
+			t.Errorf("input %q: want empty, got id=%q err=%v", in, id, err)
+		}
+	}
+}
+
+// 非200（404 等）は "" を返す（エラーにしない）。
+func TestResolveUserID_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	id, err := NewClientWithBase(srv.URL).ResolveUserID(context.Background(), "ghost")
+	if err != nil || id != "" {
+		t.Fatalf("404 should be empty without error: id=%q err=%v", id, err)
+	}
+}
+
 func TestConvertIconURL(t *testing.T) {
 	cases := map[string]string{
 		"resdb:///deadbeef.webp":    "https://assets.resonite.com/deadbeef",

@@ -170,6 +170,68 @@ func TestCredentials_PutGet(t *testing.T) {
 	}
 }
 
+// PUT credentials が username→UserID を解決して保存・GET で返す（R12）。Resonite API は stub。
+func TestCredentials_ResolvesUserID(t *testing.T) {
+	apiHits := 0
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiHits++
+		// 名前検索に normalizedUsername 完全一致を含めて返す。
+		_, _ = w.Write([]byte(`[{"id":"U-MarkN","username":"MarkN","normalizedUsername":"markn"}]`))
+	}))
+	defer stub.Close()
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "mrhc.config.json")
+	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
+	cfg := &config.Config{
+		Version:           config.SchemaVersion,
+		AdminPasswordHash: string(hash),
+		SessionSecret:     "cfgtest-secret",
+		HeadlessConfigDir: filepath.Join(tmp, "configs"),
+	}
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		t.Fatal(err)
+	}
+	srv := New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClientWithBase(stub.URL), nil)
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	pw := testPassword
+
+	// username（非メール）→ 解決して UserID 保存。
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-credentials", pw, "application/json", `{"username":"MarkN","password":"pw"}`)
+	resp.Body.Close()
+	var c1 okEnv[map[string]any]
+	authGet(t, ts.URL+"/api/v1/headless-credentials", pw, &c1)
+	if c1.Data["userId"] != "U-MarkN" {
+		t.Fatalf("userId not resolved/stored: %+v", c1.Data)
+	}
+	// ディスクにも保存されている。
+	if disk, _ := os.ReadFile(cfgPath); !strings.Contains(string(disk), "U-MarkN") {
+		t.Fatalf("userId not persisted to disk")
+	}
+
+	// 同じ username で再保存（password だけ変更）→ 再解決せず API を叩かない（流用）。
+	hitsBefore := apiHits
+	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-credentials", pw, "application/json", `{"username":"MarkN","password":"pw2"}`)
+	resp.Body.Close()
+	if apiHits != hitsBefore {
+		t.Fatalf("unchanged username should not re-resolve (api hit %d→%d)", hitsBefore, apiHits)
+	}
+
+	// メール形式 → 解決対象外・UserID 空（API も叩かない）。
+	hitsBefore = apiHits
+	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-credentials", pw, "application/json", `{"username":"me@example.com","password":""}`)
+	resp.Body.Close()
+	var c3 okEnv[map[string]any]
+	authGet(t, ts.URL+"/api/v1/headless-credentials", pw, &c3)
+	if c3.Data["userId"] != "" {
+		t.Fatalf("email username should clear userId: %+v", c3.Data)
+	}
+	if apiHits != hitsBefore {
+		t.Fatalf("email username should not hit api")
+	}
+}
+
 // start-by-name: config 名で起動 → name 解決 → 一時 config 生成 → fakehl 起動 → last-used 記録
 func TestConfigs_StartByName(t *testing.T) {
 	tmp := t.TempDir()

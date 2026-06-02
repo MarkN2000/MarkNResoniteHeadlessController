@@ -128,6 +128,58 @@ func (c *Client) SearchUsers(ctx context.Context, term string) ([]User, error) {
 	return out, nil
 }
 
+// ResolveUserID は username（メール不可）を Resonite UserID（U-xxx）に解決する（R12）。
+// 名前検索 GET /users/?name=<username> の結果から **正規化ユーザー名の完全一致**を1件選んで id を返す。
+// 完全一致が無い / 結果ゼロ / 取得失敗は ""（エラーにしない＝呼び出し側は未解決として扱う）。
+// 部分一致しか返さない検索仕様のため、入力を Resonite と同じ normalize（小文字化）して厳密照合する。
+func (c *Client) ResolveUserID(ctx context.Context, username string) (string, error) {
+	username = strings.TrimSpace(username)
+	if username == "" || strings.HasPrefix(username, "U-") || strings.Contains(username, "@") {
+		return "", nil // 空 / 既に ID 形式 / メールは名前検索で解決できない＝対象外
+	}
+	url := c.baseURL + "/users/?name=" + neturl.QueryEscape(username)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", nil // 404 等は未解決扱い
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	if err != nil {
+		return "", err
+	}
+	var raws []apiUser
+	if err := json.Unmarshal(body, &raws); err != nil {
+		return "", err
+	}
+	want := normalizeUsername(username)
+	for _, r := range raws {
+		norm := r.NormalizedUsername
+		if norm == "" {
+			norm = normalizeUsername(r.Username)
+		}
+		if norm == want && r.ID != "" {
+			return r.ID, nil // 正規化名の完全一致
+		}
+	}
+	return "", nil // 完全一致なし
+}
+
+// normalizeUsername は Resonite の normalizedUsername に合わせた素朴な正規化（小文字化）。
+// 公開API の normalizedUsername は小文字化が主なので、無い場合のフォールバック照合に使う。
+func normalizeUsername(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
 // convertIconURL は Resonite の resdb:///<hash>.<ext> を https://assets.resonite.com/<hash> に
 // 正規化する。既に http(s) ならそのまま。それ以外（空・未知スキーム）は "" を返す。
 func convertIconURL(u string) string {

@@ -43,6 +43,9 @@ type Config struct {
 type HeadlessCredentials struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
+	// UserID は username から解決した Resonite UserID（U-xxx）。保存時に解決して保持し、
+	// customSessionId の prefix 自動入力など UserID が要る箇所で再利用する（R12）。空=未解決。
+	UserID string `json:"userId,omitempty"`
 }
 
 // HeadlessConfigDirOrDefault は headless config 保存ディレクトリを解決する。
