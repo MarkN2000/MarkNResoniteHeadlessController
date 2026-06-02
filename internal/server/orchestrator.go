@@ -5,9 +5,9 @@ package server
 // 並行モデル = 案A: 小さな mutex で進行状態を保護し、flow は goroutine、cancel は context
 // （既存 cfgMu/driver.mu と同じ流儀）。実コマンドの直列化は driver の execMu が担う。
 //
-// フロー（§3.16(1)）:
+// フロー（§3.16(1)・待機は2区間モデル R9）:
 //   0人 → 即再起動 / 居たら ①即セッション変更 → ②静かに待機（合計人数監視）
-//   → 締切 actionTiming 前に ③dynamicImpulse 告知1回 → ④強制停止→選択 config で起動
+//   → quiet 経過（＝締切 announce 前）で ③dynamicImpulse 告知1回 → ④強制停止→選択 config で起動
 // cancel は ①②③のみ可（④以降は不可）。セッション変更は自動復元しない（§3.16(1)）。
 
 import (
@@ -191,10 +191,11 @@ func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name, 
 		return
 	}
 
-	// ② 静かに待機（合計人数監視・締切 force）。③告知は締切 actionTiming 前に1回。
-	force := time.Duration(rc.WaitControl.ForceRestartTimeoutMin) * o.minute
-	action := time.Duration(rc.WaitControl.ActionTimingMin) * o.minute
-	deadline := time.Now().Add(force)
+	// ② 静かに待機（合計人数監視）。2区間モデル（R9）: 締切 = quiet+announce、
+	// ③告知は quiet 経過時点（＝締切の announce 前）に1回。
+	quiet := time.Duration(rc.WaitControl.QuietWaitMin) * o.minute
+	announce := time.Duration(rc.WaitControl.AnnounceWaitMin) * o.minute
+	deadline := time.Now().Add(quiet + announce)
 	o.setWaiting(deadline)
 	announced := false
 	ticker := time.NewTicker(o.waitInterval)
@@ -209,7 +210,7 @@ loop:
 		if o.driver.Status().State == headless.StateStopped {
 			break // フロー中にヘッドレスが落ちた → 締切を待たず即 ④ で復帰（Stop は空振り・Start で起動）
 		}
-		switch decideWait(total, err != nil, time.Until(deadline), action, announced, rc.PreActions.Announce.Enabled) {
+		switch decideWait(total, err != nil, time.Until(deadline), announce, announced, rc.PreActions.Announce.Enabled) {
 		case waitRestart:
 			break loop
 		case waitAnnounce:

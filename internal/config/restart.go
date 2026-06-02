@@ -33,10 +33,13 @@ type ScheduledRestart struct {
 	ConfigName string `json:"configName"`      // 空=前回起動と同じ config / 非空=その config 名
 }
 
-// WaitControl は「予告→空くまで待つ→締切で強制」のグローバル設定。
+// WaitControl は「静かに待つ→告知→さらに待つ→締切で強制」の2区間モデル（R9）。
+// 締切 = QuietWaitMin + AnnounceWaitMin。告知は QuietWaitMin 経過時点（＝締切の AnnounceWaitMin 前）に1回。
+// 2区間は互いに独立（相互依存の検証が不要＝旧 force/actionTiming の「告知≦強制」制約を撤廃）。
+// 在席0人化や③クラッシュ検知では締切を待たず早期に終端へ進む（orchestrator 側）。
 type WaitControl struct {
-	ForceRestartTimeoutMin int `json:"forceRestartTimeoutMin"` // 自然退出を待つ最大（分）。超過で強制
-	ActionTimingMin        int `json:"actionTimingMin"`        // 締切の何分前に告知するか
+	QuietWaitMin    int `json:"quietWaitMin"`    // 告知前に静かに待つ（分）
+	AnnounceWaitMin int `json:"announceWaitMin"` // 告知後に待つ（分）。この後に強制実行
 }
 
 // PreActions は再起動前に実行するアクション群。
@@ -70,11 +73,11 @@ type CrashRecovery struct {
 
 // DefaultRestart は restart 未設定時の既定値（§3.16）。
 // 告知は既定 OFF（itemUrl/tag はワールド依存で空のため）、セッション変更は maxusers=1 のみ ON、
-// クラッシュ復帰は ON（10分に3回で停止）、待機は最大60分・告知2分前。
+// クラッシュ復帰は ON（10分に3回で停止）、待機は静かに58分＋告知後2分（合計60分）。
 func DefaultRestart() Restart {
 	return Restart{
 		Scheduled:   []ScheduledRestart{},
-		WaitControl: WaitControl{ForceRestartTimeoutMin: 60, ActionTimingMin: 2},
+		WaitControl: WaitControl{QuietWaitMin: 58, AnnounceWaitMin: 2},
 		PreActions: PreActions{
 			Announce:       AnnounceAction{Enabled: false, Message: "まもなく再起動します"},
 			SessionChanges: SessionChanges{SetMaxUsersOne: true},
@@ -102,11 +105,12 @@ const (
 // 文字列は存在のみ見る軽い検証。configName の実在/フォーマットは呼び出し側（server 層）で扱う。
 func (r Restart) Validate() error {
 	wc := r.WaitControl
-	if wc.ForceRestartTimeoutMin < 1 || wc.ForceRestartTimeoutMin > 1440 {
-		return fmt.Errorf("最大待機時間は 1〜1440 分で指定してください")
+	// 2区間は互いに独立に検証（相互依存なし＝R9）。各 0〜1440 分。
+	if wc.QuietWaitMin < 0 || wc.QuietWaitMin > 1440 {
+		return fmt.Errorf("静かに待つ時間は 0〜1440 分で指定してください")
 	}
-	if wc.ActionTimingMin < 0 || wc.ActionTimingMin > wc.ForceRestartTimeoutMin {
-		return fmt.Errorf("告知タイミングは 0〜最大待機時間（分）で指定してください")
+	if wc.AnnounceWaitMin < 0 || wc.AnnounceWaitMin > 1440 {
+		return fmt.Errorf("告知後に待つ時間は 0〜1440 分で指定してください")
 	}
 	cr := r.CrashRecovery
 	if cr.MaxCrashes < 1 || cr.MaxCrashes > 100 {

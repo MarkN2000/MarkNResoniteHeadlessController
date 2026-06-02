@@ -19,7 +19,7 @@ func TestRestartConfig_GetDefault(t *testing.T) {
 		t.Fatalf("GET status=%d", code)
 	}
 	rc := got.Data
-	if rc.WaitControl.ForceRestartTimeoutMin != 60 || rc.WaitControl.ActionTimingMin != 2 {
+	if rc.WaitControl.QuietWaitMin != 58 || rc.WaitControl.AnnounceWaitMin != 2 {
 		t.Fatalf("既定 waitControl が想定外: %+v", rc.WaitControl)
 	}
 	if !rc.CrashRecovery.Enabled || rc.CrashRecovery.MaxCrashes != 3 || rc.CrashRecovery.WindowMinutes != 10 {
@@ -43,7 +43,7 @@ func TestRestartConfig_PutAndPersist(t *testing.T) {
 			{"id":"a","enabled":true,"type":"daily","hour":5,"minute":0,"configName":""},
 			{"id":"b","enabled":false,"type":"weekly","weekday":1,"hour":4,"minute":30,"configName":"night"}
 		],
-		"waitControl":{"forceRestartTimeoutMin":90,"actionTimingMin":3},
+		"waitControl":{"quietWaitMin":90,"announceWaitMin":3},
 		"preActions":{
 			"announce":{"enabled":true,"itemUrl":"resrec:///x","impulseTag":"MRHC.play","message":"再起動します"},
 			"sessionChanges":{"setPrivate":true,"setMaxUsersOne":false,"renameEnabled":false,"renameTo":""}
@@ -59,7 +59,7 @@ func TestRestartConfig_PutAndPersist(t *testing.T) {
 	// GET が反映を返す
 	var got okEnv[config.Restart]
 	authGet(t, ts.URL+"/api/v1/restart-config", pw, &got)
-	if len(got.Data.Scheduled) != 2 || got.Data.WaitControl.ForceRestartTimeoutMin != 90 {
+	if len(got.Data.Scheduled) != 2 || got.Data.WaitControl.QuietWaitMin != 90 {
 		t.Fatalf("PUT 後の GET が想定外: %+v", got.Data)
 	}
 	if got.Data.CrashRecovery.Enabled {
@@ -78,15 +78,15 @@ func TestRestartConfig_PutAndPersist(t *testing.T) {
 
 func TestRestartConfig_PutInvalid(t *testing.T) {
 	ts, pw, _ := newSettingsServer(t)
-	base := `"waitControl":{"forceRestartTimeoutMin":60,"actionTimingMin":2},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}`
+	base := `"waitControl":{"quietWaitMin":58,"announceWaitMin":2},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}`
 	cases := map[string]string{
-		"bad type":             `{"scheduled":[{"id":"a","enabled":true,"type":"monthly","hour":1,"minute":0}],` + base + `}`,
-		"hour out of range":    `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":24,"minute":0}],` + base + `}`,
-		"timeout out of range": `{"scheduled":[],"waitControl":{"forceRestartTimeoutMin":0,"actionTimingMin":0},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}}`,
-		"announce no tag":      `{"scheduled":[],"waitControl":{"forceRestartTimeoutMin":60,"actionTimingMin":2},"preActions":{"announce":{"enabled":true,"impulseTag":"","message":"x"}},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}}`,
-		"duplicate id":         `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":1,"minute":0},{"id":"a","enabled":true,"type":"daily","hour":2,"minute":0}],` + base + `}`,
-		"bad config name":      `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":1,"minute":0,"configName":"../escape"}],` + base + `}`,
-		"invalid calendar":     `{"scheduled":[{"id":"a","enabled":true,"type":"once","year":2026,"month":2,"day":30,"hour":1,"minute":0}],` + base + `}`,
+		"bad type":          `{"scheduled":[{"id":"a","enabled":true,"type":"monthly","hour":1,"minute":0}],` + base + `}`,
+		"hour out of range": `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":24,"minute":0}],` + base + `}`,
+		"wait out of range": `{"scheduled":[],"waitControl":{"quietWaitMin":1441,"announceWaitMin":0},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}}`,
+		"announce no tag":   `{"scheduled":[],"waitControl":{"quietWaitMin":58,"announceWaitMin":2},"preActions":{"announce":{"enabled":true,"impulseTag":"","message":"x"}},"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}}`,
+		"duplicate id":      `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":1,"minute":0},{"id":"a","enabled":true,"type":"daily","hour":2,"minute":0}],` + base + `}`,
+		"bad config name":   `{"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":1,"minute":0,"configName":"../escape"}],` + base + `}`,
+		"invalid calendar":  `{"scheduled":[{"id":"a","enabled":true,"type":"once","year":2026,"month":2,"day":30,"hour":1,"minute":0}],` + base + `}`,
 	}
 	for name, b := range cases {
 		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/restart-config", pw, "application/json", b)
@@ -142,7 +142,7 @@ func TestRestartStatus_NextScheduled(t *testing.T) {
 	ts, pw, _ := newSettingsServer(t)
 	body := `{
 		"scheduled":[{"id":"a","enabled":true,"type":"daily","hour":5,"minute":0,"configName":"night"}],
-		"waitControl":{"forceRestartTimeoutMin":60,"actionTimingMin":2},
+		"waitControl":{"quietWaitMin":58,"announceWaitMin":2},
 		"crashRecovery":{"enabled":true,"maxCrashes":3,"windowMinutes":10}
 	}`
 	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/restart-config", pw, "application/json", body)

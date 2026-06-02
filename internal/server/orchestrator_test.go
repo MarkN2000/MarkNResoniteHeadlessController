@@ -218,7 +218,7 @@ func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	fw := &fakeWorlds{present: 2} // 常に在席→締切で強制
 	rc := config.DefaultRestart()
-	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100, ActionTimingMin: 50} // 100ms/50ms（minute=1ms）
+	rc.WaitControl = config.WaitControl{QuietWaitMin: 50, AnnounceWaitMin: 50} // 締切=100ms・告知は残り50ms（minute=1ms）
 	rc.PreActions.SessionChanges = config.SessionChanges{SetPrivate: true, SetMaxUsersOne: true}
 	rc.PreActions.Announce = config.AnnounceAction{Enabled: true, ItemURL: "resrec:///x", ImpulseTag: "MRHC.play", Message: "再起動します"}
 	o := newTestOrch(d, fw, rc, "night")
@@ -248,7 +248,7 @@ func TestTrigger_CancelDuringWaiting(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	fw := &fakeWorlds{present: 2} // 在席し続ける→待機にとどまる
 	rc := config.DefaultRestart()
-	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0} // 実質止まらない
+	rc.WaitControl = config.WaitControl{QuietWaitMin: 100000, AnnounceWaitMin: 0} // 実質止まらない
 	rc.PreActions.Announce.Enabled = false
 	o := newTestOrch(d, fw, rc, "night")
 
@@ -271,7 +271,7 @@ func TestTrigger_DoubleRejected(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	fw := &fakeWorlds{present: 2}
 	rc := config.DefaultRestart()
-	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0}
+	rc.WaitControl = config.WaitControl{QuietWaitMin: 100000, AnnounceWaitMin: 0} // 実質止まらない
 	rc.PreActions.Announce.Enabled = false
 	o := newTestOrch(d, fw, rc, "night")
 
@@ -290,7 +290,7 @@ func TestTrigger_HeadlessStopsDuringWait(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	fw := &fakeWorlds{present: 2} // 在席し続ける→本来は締切まで待機
 	rc := config.DefaultRestart()
-	rc.WaitControl = config.WaitControl{ForceRestartTimeoutMin: 100000, ActionTimingMin: 0} // 実質止まらない締切
+	rc.WaitControl = config.WaitControl{QuietWaitMin: 100000, AnnounceWaitMin: 0} // 実質止まらない締切
 	rc.PreActions.Announce.Enabled = false
 	o := newTestOrch(d, fw, rc, "night")
 

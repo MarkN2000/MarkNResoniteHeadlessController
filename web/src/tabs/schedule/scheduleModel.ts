@@ -72,7 +72,7 @@ export function defaultScheduled(): ScheduledRestart {
 // 各 restart 設定の既定値（backend config.DefaultRestart() をミラー＝「既定値に戻す」のリセット先）。
 // 値を変えるときは internal/config/restart.go の DefaultRestart() と同期すること。
 export function defaultWaitControl(): RestartWaitControl {
-  return { forceRestartTimeoutMin: 60, actionTimingMin: 2 };
+  return { quietWaitMin: 58, announceWaitMin: 2 };
 }
 export function defaultCrashRecovery(): RestartCrashRecovery {
   return { enabled: true, maxCrashes: 3, windowMinutes: 10 };

@@ -464,11 +464,11 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
    ↓
 ① 即発火: セッション変更（Private化 / maxusers=1 / 改名）＝新規参加を静かに止める
    ↓
-② 静かに待機（最大 forceRestartTimeout＝既定60分・worlds の在席者(Present)合計を監視）
+② 静かに待機（2区間モデル R9・締切 = quietWaitMin + announceWaitMin＝既定 58+2=60分・worlds の在席者(Present)合計を監視）
    │   └─ 待機中に在席0人化 → 即再起動（③告知を待たない）
-   ↓ 締切の actionTiming（既定2分）前まで来てもまだ居る
+   ↓ quietWaitMin（既定58分）経過＝告知ライン（締切の announceWaitMin 前）に来てもまだ居る
 ③ 告知: dynamicImpulse を1回発信「まもなく再起動します」
-   ↓ actionTiming 経過
+   ↓ announceWaitMin（既定2分）経過＝締切
 ④ 強制再起動 → 停止 →（任意Steam=P9-B）→ 選択 config で起動
 ```
 境界条件・決定:
@@ -476,7 +476,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 - **セッション変更（①）はトリガー時に即発火**（新規参加を静かに止める）。**dynamicImpulse 告知（③）だけが締切前**＝静かに待ち、強制が近づいた時だけ告知する運用。
 - **二重起動防止**: 再起動進行中フラグでトリガーを排他（手動/scheduled/crash 同時を排他）。
 - **再起動の config** = 予定/手動で選択（既定は空文字 `""` = 直近起動と同じ config。`configName` を指定すればその config で起動）。
-- 待機・強制は `forceRestartTimeout`/`actionTiming` のグローバル値を使用。
+- 待機は **2区間モデル（R9）**＝`quietWaitMin`（告知前に静かに待つ）＋`announceWaitMin`（告知後に待つ）。締切 = 両者の和。告知は `quietWaitMin` 経過時点に1回。2区間は互いに独立（旧 `forceRestartTimeout`/`actionTiming` の「告知≦強制」相互依存を撤廃＝検証不要）。各 0〜1440 分。
 - **キャンセル**: 進行中（①②③＝停止④の前）のみ「中止」可能。中止すると再起動を取りやめ、ヘッドレスは稼働継続。**即発火済みのセッション変更（Private化等）は自動で戻さず、必要なら管理者がセッションタブで手動復元**（UI に「設定は変更されたまま」と添える）。scheduled をキャンセルしても**今回分のみ**＝次回は通常発火（予定は無効化しない）。④停止開始後は中止不可。
 - **実装（レビュー反映）**: ②待機中にヘッドレスが落ちた（クラッシュ/外部停止）場合は、締切（最大60分）を待たず**即 ④ で復帰**（Stop は空振り・Start で起動）。この間 crash-monitor は「進行中」を見て手を出さない（orchestrator が所有）。
 
@@ -505,7 +505,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
     { "id":"...", "enabled":true,  "type":"weekly", "weekday":1, "hour":4, "minute":0, "configName":"night" },
     { "id":"...", "enabled":false, "type":"once",   "year":2026,"month":6,"day":10,"hour":3,"minute":0, "configName":"" }
   ],
-  "waitControl":  { "forceRestartTimeoutMin": 60, "actionTimingMin": 2 },
+  "waitControl":  { "quietWaitMin": 58, "announceWaitMin": 2 },   // 2区間（R9）: 締切 = quiet+announce
   "preActions": {
     "announce":       { "enabled":true, "itemUrl":"resrec:///...", "impulseTag":"MRHC.play", "message":"まもなく再起動します" },
     "sessionChanges": { "setPrivate":false, "setMaxUsersOne":true, "renameEnabled":false, "renameTo":"" }
@@ -531,7 +531,7 @@ POST /api/v1/restart/cancel                  進行中の再起動を中止（�
 2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**・ボタン色は `severity="warning"`＝セッションタブの再起動と同色）。
 3. **予定リストカード**: 各行（有効トグル / 種別・時刻 / config / 編集✎ / 削除×〔**直接削除**＝未保存ゆえ保存前は取り消し可〕）＋`[＋新規]`・空時「予定がありません」。編集は**モーダル**（type 選択で日時欄を出し分け〔once=年月日+時分/weekly=曜日+時分/daily=時分〕・config `Select`〔#prev 番兵〕・ドラフト→`[OK]` で working 配列へ反映/`[キャンセル]` 破棄）。
    - **実装**: 新規 id は `scheduleModel.genId()`（`crypto.randomUUID` はセキュアコンテキスト限定＝LAN/HTTP で不可のため `getRandomValues`→`Math.random` にフォールバック・[[lan-http-no-secure-context-apis]]）。**インライン検証**（時/分の範囲＋once 暦実在＝JS Date 往復で 2/30 等を弾き [OK] 無効化、年下限 `MIN_YEAR=2000` は backend 準拠）。daily/weekly へ切替時は once 専用の year/month/day をクリアして保存JSONを汚さない。日付入力は `@mantine/dates` 不使用で `NumberInput`。
-4. **待機制御カード**: `forceRestartTimeoutMin` / `actionTimingMin`。
+4. **待機制御カード**（2区間モデル R9）: `quietWaitMin`（静かに待つ）/ `announceWaitMin`（告知後に待つ）。各 0〜1440・相互依存なし。
 5. **事前アクションカード**: 告知（有効 / itemUrl〔テンプレ選択+手動入力〕 / impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。message は任意（空可）。詳細は §3.16(2) 実装注記。
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。

@@ -338,8 +338,8 @@ export interface ScheduledRestart {
   configName: string; // 空=前回config
 }
 export interface RestartWaitControl {
-  forceRestartTimeoutMin: number;
-  actionTimingMin: number;
+  quietWaitMin: number; // 告知前に静かに待つ（分）
+  announceWaitMin: number; // 告知後に待つ（分）。締切 = quiet + announce（2区間モデル・R9）
 }
 export interface RestartAnnounce {
   enabled: boolean;

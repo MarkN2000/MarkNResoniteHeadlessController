@@ -4,7 +4,7 @@ import "testing"
 
 func TestDefaultRestart(t *testing.T) {
 	d := DefaultRestart()
-	if d.WaitControl.ForceRestartTimeoutMin != 60 || d.WaitControl.ActionTimingMin != 2 {
+	if d.WaitControl.QuietWaitMin != 58 || d.WaitControl.AnnounceWaitMin != 2 {
 		t.Fatalf("waitControl 既定が想定外: %+v", d.WaitControl)
 	}
 	if !d.CrashRecovery.Enabled || d.CrashRecovery.MaxCrashes != 3 || d.CrashRecovery.WindowMinutes != 10 {
@@ -23,7 +23,7 @@ func TestDefaultRestart(t *testing.T) {
 
 func TestRestartOrDefault(t *testing.T) {
 	c := &Config{} // Restart 未設定
-	if c.RestartOrDefault().WaitControl.ForceRestartTimeoutMin != 60 {
+	if c.RestartOrDefault().WaitControl.QuietWaitMin != 58 {
 		t.Fatal("未設定時に既定が返らない")
 	}
 	custom := DefaultRestart()
@@ -60,8 +60,9 @@ func TestRestartValidate(t *testing.T) {
 			t.Fatal("不正な設定が検証を通ってしまった")
 		}
 	}
-	bad(func(r *Restart) { r.WaitControl.ForceRestartTimeoutMin = 0 })
-	bad(func(r *Restart) { r.WaitControl.ActionTimingMin = 999 }) // > forceTimeout(60)
+	bad(func(r *Restart) { r.WaitControl.QuietWaitMin = 1441 })    // > 1440（範囲外）
+	bad(func(r *Restart) { r.WaitControl.AnnounceWaitMin = -1 })   // < 0（範囲外）
+	bad(func(r *Restart) { r.WaitControl.AnnounceWaitMin = 1441 }) // > 1440（範囲外）
 	bad(func(r *Restart) { r.CrashRecovery.MaxCrashes = 0 })
 	bad(func(r *Restart) { r.PreActions.Announce = AnnounceAction{Enabled: true, Message: "x"} }) // tag 空
 	bad(func(r *Restart) { r.PreActions.SessionChanges = SessionChanges{RenameEnabled: true} })   // 名前空

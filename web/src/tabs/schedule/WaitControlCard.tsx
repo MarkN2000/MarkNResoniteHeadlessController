@@ -16,7 +16,7 @@ export function WaitControlCard({
   onChange: (v: RestartWaitControl) => void;
 }) {
   const { t } = useTranslation();
-  // 空入力は各フィールドの最小値にフォールバック（force=1 / timing=0）＝無効な 0 状態を作らない。
+  // 空入力は 0 にフォールバック（2区間とも最小0＝相互依存なし・R9）。
   const num = (key: keyof RestartWaitControl, fallback: number) => (v: number | string) =>
     onChange({ ...value, [key]: v === "" ? fallback : Number(v) });
 
@@ -36,29 +36,29 @@ export function WaitControlCard({
     <InspectorCard title={t("schedule.waitTitle")}>
       <Stack gap="xs">
         <FieldRow
-          label={t("schedule.forceRestartTimeout")}
+          label={t("schedule.quietWait")}
           {...resetProps(
-            () => onChange({ ...value, forceRestartTimeoutMin: defaultWaitControl().forceRestartTimeoutMin }),
-            t("schedule.forceRestartTimeout"),
+            () => onChange({ ...value, quietWaitMin: defaultWaitControl().quietWaitMin }),
+            t("schedule.quietWait"),
           )}
         >
           <InspectorNumberInput
-            value={value.forceRestartTimeoutMin}
-            onChange={num("forceRestartTimeoutMin", 1)}
-            min={1}
+            value={value.quietWaitMin}
+            onChange={num("quietWaitMin", 0)}
+            min={0}
             allowNegative={false}
           />
         </FieldRow>
         <FieldRow
-          label={t("schedule.actionTiming")}
+          label={t("schedule.announceWait")}
           {...resetProps(
-            () => onChange({ ...value, actionTimingMin: defaultWaitControl().actionTimingMin }),
-            t("schedule.actionTiming"),
+            () => onChange({ ...value, announceWaitMin: defaultWaitControl().announceWaitMin }),
+            t("schedule.announceWait"),
           )}
         >
           <InspectorNumberInput
-            value={value.actionTimingMin}
-            onChange={num("actionTimingMin", 0)}
+            value={value.announceWaitMin}
+            onChange={num("announceWaitMin", 0)}
             min={0}
             allowNegative={false}
           />
