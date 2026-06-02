@@ -33,6 +33,8 @@
     "command": "Command"
   },
   "topbar": {
+    "gracefulStop": "Graceful stop",
+    "gracefulStopAccepted": "Graceful stop started (stops in ~2 min; cancel in the Schedule tab)",
     "forceStop": "Force stop",
     "checkUpdate": "Check for updates (soon)",
     "selectConfig": "Select config",
@@ -254,6 +256,7 @@
     "phaseWaiting": "Waiting for users to leave",
     "phaseAnnouncing": "Announcing",
     "phaseRestarting": "Restarting",
+    "phaseStopping": "Stopping",
     "triggerManual": "Manual",
     "triggerScheduled": "Scheduled",
     "triggerCrash": "Crash recovery",

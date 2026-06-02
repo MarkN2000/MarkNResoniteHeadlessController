@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, AppShell, Box, Button, Center, Group, NavLink, Stack, Text } from "@mantine/core";
 import * as api from "./api";
 import type { ConfigSummary, LogLine, Status, World } from "./api";
-import { notifyError } from "./lib/notify";
+import { notifyError, reportWriteResult } from "./lib/notify";
 import { TABS, type TabId } from "./nav";
 import { SURFACE } from "./theme";
 import { Login } from "./components/Login";
@@ -118,6 +118,13 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     else setSessions([]);
   }, [running, refreshSessions]);
 
+  // 通常停止（R7・無確認＋受理トースト）: ⋮ メニューから即受付。進行（待機/告知/停止中＋残り時間）と
+  // 中止はスケジュールタブの状態カードに表示される。強制停止が無確認なのに合わせ確認は挟まない
+  // （通常停止は2分猶予＋中止可で誤操作は復旧可能）。成功/失敗トーストは reportWriteResult が処理。
+  function onGracefulStop() {
+    void api.gracefulStop().then((r) => reportWriteResult(r, t("topbar.gracefulStopAccepted")));
+  }
+
   async function onStart() {
     if (!selectedConfig) return;
     // 起動失敗は write 操作とは別系統（WriteResult を通さない）。赤トーストで明示する（7-7 第1層）。
@@ -162,6 +169,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           onFocus={(idx) => setFocusedIdx(idx)}
           onRefreshSessions={refreshSessions}
           onStop={() => void api.stop()}
+          onGracefulStop={onGracefulStop}
           configs={configs}
           selectedConfig={selectedConfig}
           onSelectConfig={setSelectedConfig}

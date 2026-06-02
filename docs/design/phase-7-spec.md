@@ -521,8 +521,10 @@ GET  /api/v1/restart-config                  restart 設定を返す
 PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック）
 GET  /api/v1/restart-status                  次回予定 / 最終起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
 POST /api/v1/restart/trigger {configName?}   手動「通常再起動」を即受付（非同期）。空=前回config
-POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続）
+POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続。通常停止の中止にも共用）
+POST /api/v1/stop/graceful                   通常停止を即受付（非同期・R7）。事前アクション→固定2分→停止（起動しない）
 ```
+- **通常停止（R7）**: TopBar ⋮ の「通常停止」（強制停止の隣）から**無確認で即受付**（受理トースト「約2分後に停止・スケジュールタブで中止可」）。強制停止が無確認なのに揃え、かつ通常停止は2分猶予＋中止可で誤操作も復旧可能なため確認ダイアログは挟まない。orchestrator の統一フローを**終端=停止**で流用＝0人なら即停止／居たら ①セッション変更→③告知（即時）→固定2分→④停止（**起動しない・最終起動も記録しない**）。待機制御（②）は再起動の長時間設定ではなく**固定**（告知前0分＋告知後2分）。進行（待機/告知/`停止中`＋残り時間）と中止はスケジュールタブの状態カードに表示（`restartTriggerType="stop"` で終端フェーズを「停止中」表示）。事前アクション（セッション変更・告知）は再起動と同じ `preActions` 設定に従う（告知 OFF なら無告知＝セッション変更＋2分猶予のみ）。
 - **進行状態の伝送はポーリング（実装・P8-5 で確定）**: UI が `restart-status` を `useVisiblePolling` で3秒ごと追従（表示中のみ）。restart-status は `inProgress`/`phase`(idle|preparing|waiting|announcing|restarting)/`restartTriggerType`/`restartConfigName`/`deadlineAt`/`lastStartAt`/`lastStartTrigger`/`nextScheduled*` を返す。SSE への進行フェーズ反映は将来拡張（MVP 非採用）。
 
 **(7) UI 構成（スケジュールタブ・インスペクタ風・停止中も編集可）**

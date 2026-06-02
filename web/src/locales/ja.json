@@ -33,6 +33,8 @@
     "command": "コマンド"
   },
   "topbar": {
+    "gracefulStop": "通常停止",
+    "gracefulStopAccepted": "通常停止を開始しました（約2分後に停止・スケジュールタブで中止できます）",
     "forceStop": "強制停止",
     "checkUpdate": "更新を確認（準備中）",
     "selectConfig": "コンフィグを選択",
@@ -254,6 +256,7 @@
     "phaseWaiting": "退出待ち",
     "phaseAnnouncing": "告知中",
     "phaseRestarting": "再起動中",
+    "phaseStopping": "停止中",
     "triggerManual": "手動",
     "triggerScheduled": "予定",
     "triggerCrash": "クラッシュ復帰",

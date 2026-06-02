@@ -317,3 +317,58 @@ func TestCancel_WhenIdle(t *testing.T) {
 		t.Fatalf("idle の cancel は errNoRestartInProgress のはず: %v", err)
 	}
 }
+
+// --- 通常停止（R7・TriggerStop）---
+
+// 在席0人なら ①②③ を飛ばして即停止（起動しない）。
+func TestTriggerStop_ZeroUsersImmediate(t *testing.T) {
+	d := &fakeDriver{state: headless.StateRunning}
+	fw := &fakeWorlds{present: 0}
+	o := newTestOrch(d, fw, config.DefaultRestart(), "night")
+
+	if err := o.TriggerStop(); err != nil {
+		t.Fatalf("TriggerStop 失敗: %v", err)
+	}
+	waitUntil(t, func() bool { return !o.snapshot().inProgress }, 2*time.Second, "停止完了")
+
+	state, stops, starts, _ := d.snap()
+	if stops != 1 || starts != 0 || state != headless.StateStopped {
+		t.Fatalf("0人即時停止が想定外: state=%v stops=%d starts=%d（停止のみ・起動なしのはず）", state, stops, starts)
+	}
+	if len(fw.commands()) != 0 {
+		t.Fatalf("0人時は事前アクションを行わないはず: %v", fw.commands())
+	}
+}
+
+// 在席ありなら ①セッション変更を即発火 → 固定2分猶予 → 停止（起動しない）。
+func TestTriggerStop_WithUsers_SessionThenStop(t *testing.T) {
+	d := &fakeDriver{state: headless.StateRunning}
+	fw := &fakeWorlds{present: 2}
+	rc := config.DefaultRestart()
+	rc.PreActions.SessionChanges = config.SessionChanges{SetPrivate: true, SetMaxUsersOne: true}
+	rc.PreActions.Announce.Enabled = false // 告知時刻に依存しない決定的検証（告知共有は再起動 FullFlow で検証済み）
+	o := newTestOrch(d, fw, rc, "night")
+
+	if err := o.TriggerStop(); err != nil {
+		t.Fatalf("TriggerStop 失敗: %v", err)
+	}
+	waitUntil(t, func() bool { _, stops, _, _ := d.snap(); return stops == 1 }, 5*time.Second, "停止完了")
+	waitUntil(t, func() bool { return !o.snapshot().inProgress }, 2*time.Second, "進行終了")
+
+	cmds := fw.commands()
+	if !hasCmd(cmds, "accesslevel Private") || !hasCmd(cmds, "maxusers 1") {
+		t.Fatalf("① セッション変更が出ていない: %v", cmds)
+	}
+	if _, _, starts, _ := d.snap(); starts != 0 {
+		t.Fatalf("通常停止では起動しないはず: starts=%d", starts)
+	}
+}
+
+// 稼働していないときは停止フローに載せない。
+func TestTriggerStop_NotRunningRejected(t *testing.T) {
+	d := &fakeDriver{state: headless.StateStopped}
+	o := newTestOrch(d, &fakeWorlds{present: 0}, config.DefaultRestart(), "night")
+	if err := o.TriggerStop(); err != errRestartNotRunning {
+		t.Fatalf("非稼働の TriggerStop は errRestartNotRunning のはず: %v", err)
+	}
+}

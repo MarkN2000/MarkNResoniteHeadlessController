@@ -20,10 +20,11 @@ export function StatusCard({
   const inProgress = !!s?.inProgress;
   const cancellable = inProgress && isCancellablePhase(s!.phase);
 
-  // 進行状態の表示（フェーズ＋待機中は残り時間）。
+  // 進行状態の表示（フェーズ＋待機中は残り時間）。通常停止（R7）は終端フェーズを「停止中」に。
   let progressText = "—";
   if (inProgress && s) {
-    progressText = t(phaseKey(s.phase));
+    const stopping = s.phase === "restarting" && s.restartTriggerType === "stop";
+    progressText = stopping ? t("schedule.phaseStopping") : t(phaseKey(s.phase));
     if (s.deadlineAt && (s.phase === "waiting" || s.phase === "announcing")) {
       progressText += `（${t("schedule.remaining")} ${formatRemaining(s.deadlineAt)}）`;
     }

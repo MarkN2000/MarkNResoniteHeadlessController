@@ -16,6 +16,7 @@ interface TopBarProps {
   onFocus: (idx: number) => void;
   onRefreshSessions: () => void;
   onStop: () => void;
+  onGracefulStop: () => void;
   // 停止中
   configs: ConfigSummary[];
   selectedConfig: string | null;
@@ -98,6 +99,7 @@ export function TopBar(props: TopBarProps) {
       <Menu.Dropdown>
         {showForceStop && (
           <>
+            <Menu.Item onClick={props.onGracefulStop}>{t("topbar.gracefulStop")}</Menu.Item>
             <Menu.Item color="red" onClick={props.onStop}>
               {t("topbar.forceStop")}
             </Menu.Item>

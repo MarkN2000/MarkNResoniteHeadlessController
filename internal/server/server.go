@@ -92,9 +92,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/login", s.handleLogin)
 	mux.HandleFunc("POST /api/v1/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/v1/status", s.requireAuth(s.handleStatus))
-	mux.HandleFunc("POST /api/v1/start", s.requireAuth(s.handleStart))     // 状態変更=POST限定
-	mux.HandleFunc("POST /api/v1/stop", s.requireAuth(s.handleStop))       // 状態変更=POST限定
-	mux.HandleFunc("POST /api/v1/command", s.requireAuth(s.handleCommand)) // 副作用あり=POST限定
+	mux.HandleFunc("POST /api/v1/start", s.requireAuth(s.handleStart))                // 状態変更=POST限定
+	mux.HandleFunc("POST /api/v1/stop", s.requireAuth(s.handleStop))                  // 強制停止（即時）=POST限定
+	mux.HandleFunc("POST /api/v1/stop/graceful", s.requireAuth(s.handleGracefulStop)) // 通常停止（事前アクション→2分→停止・R7）
+	mux.HandleFunc("POST /api/v1/command", s.requireAuth(s.handleCommand))            // 副作用あり=POST限定
 	mux.HandleFunc("GET /api/v1/events", s.requireAuth(s.handleEvents))
 
 	// 構造化API（Phase 4: Exec/WorldsService を介して構造化データを返す）

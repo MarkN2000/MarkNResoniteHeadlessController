@@ -9,6 +9,9 @@ package server
 //   0人 → 即再起動 / 居たら ①即セッション変更 → ②静かに待機（合計人数監視）
 //   → quiet 経過（＝締切 announce 前）で ③dynamicImpulse 告知1回 → ④強制停止→選択 config で起動
 // cancel は ①②③のみ可（④以降は不可）。セッション変更は自動復元しない（§3.16(1)）。
+//
+// 通常停止（R7・TriggerStop）も同じ前段を共有し、終端だけ「停止のみ（起動しない）」に分岐する
+// ＝告知前0分＋告知後2分の固定猶予で停止（再起動の待機制御は使わない）。
 
 import (
 	"context"
@@ -137,7 +140,42 @@ func (o *restartOrchestrator) Trigger(triggerType, configName string) error {
 	}
 	o.mu.Unlock()
 
-	go o.run(ctx, rc, name, triggerType)
+	go o.run(ctx, rc, name, triggerType, false)
+	return nil
+}
+
+// TriggerStop は「通常停止」を非同期で開始する（R7）。再起動フローの前段（0人判定／①セッション変更／
+// ②待機／③告知）を共有し、終端だけ「停止のみ（起動しない）」に分岐する。停止は素早く行いたいので
+// 再起動の待機制御（最大長時間）は使わず、告知前0分＋告知後2分の固定猶予とする（告知は即時）。
+// 稼働中のみ・在席0人なら即停止・①③猶予中は Cancel 可。
+func (o *restartOrchestrator) TriggerStop() error {
+	if o.driver.Status().State != headless.StateRunning {
+		return errRestartNotRunning // 稼働していないものは停止フローに載せない
+	}
+	rc := o.restartCfg()
+	rc.WaitControl = config.WaitControl{QuietWaitMin: 0, AnnounceWaitMin: 2} // 固定2分（rc はコピーなので保存設定は不変）
+
+	o.mu.Lock()
+	if o.p.inProgress {
+		o.mu.Unlock()
+		return errRestartInProgress // 二重起動防止（再起動と共通の進行フラグ）
+	}
+	parent := o.parentCtx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	o.cancel = cancel
+	o.p = restartProgress{
+		inProgress:  true,
+		phase:       phasePreparing,
+		triggerType: "stop",
+		configName:  "", // 停止は起動しないので config 不要
+		startedAt:   time.Now(),
+	}
+	o.mu.Unlock()
+
+	go o.run(ctx, rc, "", "stop", true)
 	return nil
 }
 
@@ -171,13 +209,13 @@ func (o *restartOrchestrator) setParent(ctx context.Context) {
 	o.mu.Unlock()
 }
 
-func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name, triggerType string) {
+func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name, triggerType string, stopOnly bool) {
 	defer o.finish()
 
-	// 0人なら ①②③ を飛ばして即再起動。
+	// 0人なら ①②③ を飛ばして即終端（再起動 or 停止）。
 	if total, err := o.totalUsers(ctx); err == nil && total == 0 {
 		if o.enterRestarting() {
-			o.doRestart(name, triggerType)
+			o.doTerminal(name, triggerType, stopOnly)
 		}
 		return
 	}
@@ -230,10 +268,25 @@ loop:
 		}
 	}
 
-	// ④ 強制再起動（cancel 不可）。
+	// ④ 強制終端＝再起動 or 停止（cancel 不可）。
 	if o.enterRestarting() {
-		o.doRestart(name, triggerType)
+		o.doTerminal(name, triggerType, stopOnly)
 	}
+}
+
+// doTerminal は ④ の終端動作。stopOnly なら停止のみ（通常停止・R7）、そうでなければ停止→起動（再起動）。
+func (o *restartOrchestrator) doTerminal(name, triggerType string, stopOnly bool) {
+	if stopOnly {
+		o.doStop()
+		return
+	}
+	o.doRestart(name, triggerType)
+}
+
+// doStop は ④（通常停止）。停止して StateStopped を待つ。起動も最終起動記録もしない（cancel 不可）。
+func (o *restartOrchestrator) doStop() {
+	_ = o.driver.Stop() // 既に停止していれば ErrNotRunning（無視）
+	o.waitStopped()
 }
 
 // waitAction は ② のティックでの判断（decideWait の戻り）。
