@@ -26,6 +26,7 @@ import {
   removeWorld,
   setWorld,
 } from "./configModel";
+import { BufferedTextInput, CustomSessionIdInput } from "./fields";
 
 // -1=無効 型フィールドの既定値（sample/default.json のスキーマ値・R6）。
 // 未設定なら既定を表示し、空欄にされたら -1（無効）へスナップして「必ず数値」を保つ。
@@ -35,7 +36,6 @@ const SENTINEL_DEFAULTS: Record<string, number> = {
   forcedRestartInterval: -1,
   autosaveInterval: -1,
 };
-import { BufferedTextInput, CustomSessionIdInput } from "./fields";
 
 // startWorlds[] のタブ式エディタ。タブ=1ワールド、＋で追加、最後の1枚は削除不可。
 export function WorldsSection({
@@ -55,11 +55,13 @@ export function WorldsSection({
   const world: WorldMap = worlds[idx] ?? {};
 
   const setW = (key: string, value: unknown) => onChange(setWorld(cfg, idx, { ...world, [key]: value }));
-  const numW = (key: string) => (v: number | string) => setW(key, v === "" ? "" : Number(v));
-  // -1=無効 型: 空欄は -1（無効）へスナップ＝map に "" を書かず必ず数値にする（R6）。
-  const sentinelW = (key: string) => (v: number | string) => setW(key, v === "" ? -1 : Number(v));
-  // 任意ポート: 空欄は未設定（undefined＝保存JSONから省く＝null/自動）。数値はそのまま（R13）。
-  const portW = (key: string) => (v: number | string) => setW(key, v === "" ? undefined : Number(v));
+  // 数値フィールドの onChange ファクトリ。空欄のとき map に書く値だけが用途で異なる:
+  //   numW→""（既存）／ sentinelW→-1（-1=無効・空欄を "" にせず必ず数値・R6）／
+  //   portW→undefined（保存JSONから省く＝null/自動・R13）。
+  const numWith = (empty: unknown) => (key: string) => (v: number | string) => setW(key, v === "" ? empty : Number(v));
+  const numW = numWith("");
+  const sentinelW = numWith(-1);
+  const portW = numWith(undefined);
 
   // マーカークリック＝そのワールド項目を defaultWorld() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
@@ -166,8 +168,10 @@ export function WorldsSection({
           </FieldRow>
           {/* customSessionId はバッファ付き入力（内部 state）でリセットが表示へ反映されないため対象外。 */}
           <FieldRow label={t("config.customSessionId")} align="start">
-            {/* key に centralUserId を含め、UserID が後から届いても prefix 自動入力が反映されるよう再シード。
-                編集は毎キーストロークで map に commit 済のため、再マウントしても入力済の値は保持される。 */}
+            {/* key に centralUserId を含め、UserID が後着でも prefix 自動入力が反映されるよう再シード。
+                commit 済の prefix/suffix は initial（map 値）から復元される。ただし UserID 後着の瞬間に
+                「意図的に空にした prefix」は autoPrefix で再シードされ自動入力が復活し得る（後着は通常1回・
+                getCredentials の ~100ms 窓のみで実害は軽微）。 */}
             <CustomSessionIdInput
               key={`${idx}:${centralUserId ?? ""}`}
               initial={asStr(world.customSessionId)}
