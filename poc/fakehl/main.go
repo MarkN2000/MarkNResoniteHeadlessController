@@ -168,6 +168,7 @@ func main() {
 	ambientInterval := flag.Duration("ambient-interval", 3*time.Second, "ambient log interval")
 	worldsCount := flag.Int("worlds", 2, "initial worlds count")
 	banner := flag.Bool("banner", true, "print startup banner / 'World running' lines")
+	login := flag.Bool("login", true, "emit Resonite login success lines (false = anonymous startup)")
 	// MRHC は実ヘッドレスを `-HeadlessConfig <path>` で起動する。fakehl を MRHC の
 	// スタンドイン（UI 開発・稼働中モードの確認用）として起動できるよう受理し、
 	// 指定時はその headless config の startWorlds.sessionName を世界名に使う。
@@ -178,6 +179,15 @@ func main() {
 
 	if *banner {
 		fmt.Println("Fake Headless starting...")
+		// ログイン行は実機文言を踏襲（成功は "World running" より前に出る）。MRHC の Driver が
+		// これを解析して Resonite ログイン状態を /status に出す（成功=loggedIn / -login=false=匿名）。
+		if *login {
+			fmt.Println("Logging in as mrhc-demo")
+			fmt.Println("Initializing SignalR: UserLogin: U-MRHCdemo")
+			fmt.Println("Logged in successfully")
+		} else {
+			fmt.Println("Initializing SignalR: Initial Startup")
+		}
 		for i := range s.worlds {
 			fmt.Printf("World running... (%d: %s)\n", i, s.worlds[i].Name)
 		}

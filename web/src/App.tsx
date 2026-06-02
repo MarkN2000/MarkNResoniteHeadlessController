@@ -139,7 +139,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
-    if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} />;
+    if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} status={status} />;
     if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }

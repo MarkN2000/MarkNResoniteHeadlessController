@@ -4,12 +4,17 @@
 
 export type State = "stopped" | "starting" | "running" | "stopping";
 
+// Resonite アカウントのログイン状態（起動ログから検出・headless.LoginState のミラー）。
+export type ResoniteLoginState = "anonymous" | "loggedIn" | "failed";
+
 export interface Status {
   state: State;
   pid?: number;
   config?: string;
   startedAt?: string;
   ready: boolean;
+  loginState?: ResoniteLoginState; // anonymous|loggedIn|failed
+  loginUserId?: string; // 例 "U-xxxx"（loggedIn 時のみ・U- 付き）
 }
 
 export interface LogLine {
