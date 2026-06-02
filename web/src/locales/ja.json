@@ -90,7 +90,21 @@
     "confirmUnsilence": "{{user}} のミュートを解除しますか？",
     "confirmRestart": "このセッションを再起動しますか？",
     "confirmClose": "このセッションを閉じますか？",
-    "confirmSave": "このセッションを保存しますか？"
+    "confirmSave": "このセッションを保存しますか？",
+    "spawnImpulse": "スポーン / インパルス",
+    "spawnSection": "アイテムスポーン",
+    "spawnUrl": "URL",
+    "spawnUrlPlaceholder": "resrec:///...",
+    "spawnUrlHint": "res:// で始まる URL を入力してください",
+    "spawnActive": "アクティブ",
+    "spawnPersistent": "永続化",
+    "spawn": "スポーン",
+    "impulseSection": "ダイナミックインパルス",
+    "impulseTag": "タグ",
+    "impulseTagPlaceholder": "例: MRHC.play",
+    "impulseValue": "値",
+    "impulseValuePlaceholder": "（任意）",
+    "impulseSend": "送信"
   },
   "friends": {
     "source": "ユーザー検索",
@@ -344,6 +358,8 @@
     "unsilenceDone": "ミュート解除を実行しました",
     "roleDone": "権限を変更しました",
     "messageDone": "メッセージを送信しました",
-    "newSessionDone": "セッションを開きました"
+    "newSessionDone": "セッションを開きました",
+    "spawnDone": "アイテムをスポーンしました",
+    "impulseDone": "インパルスを送信しました"
   }
 }

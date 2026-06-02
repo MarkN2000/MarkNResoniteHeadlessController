@@ -112,6 +112,11 @@ POST /api/v1/sessions/{idx}/name            {"name":"..."}                  → 
 POST /api/v1/sessions/{idx}/description     {"description":"..."}           → description "<text>"
 POST /api/v1/sessions/{idx}/hidefromlisting {"hide":true}                   → hideFromListing <bool>
 
+# セッション内コンテンツ操作  — ExecGroup(focus idx → cmd)・R14
+POST /api/v1/sessions/{idx}/spawn   {"url":"...","active":true,"persistent":false} → spawn "<url>" <active> <persistent>（3引数・help 確定）
+POST /api/v1/sessions/{idx}/impulse {"tag":"MRHC.play","value":"..."}            → dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
+# ※ コマンド組み立ては headless.SpawnCmd / DynamicImpulseStringCmd（純関数）。告知③(§3.16(2))と共有。
+
 # セッションライフサイクル  — ExecGroup(focus idx → cmd)
 POST /api/v1/sessions/{idx}/restart                                         → restart
 POST /api/v1/sessions/{idx}/save                                           → save
@@ -296,7 +301,8 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **自分（ホスト）への危険操作を無効化（R3）**: `selfUserId`（`status.loginUserId`）と `u.id` が一致する行は **mute/kick/ban/権限プルダウンを `disabled`（グレーアウト）** にし **respawn+message のみ**許可（自 ban 等でセッションを壊す footgun 防止）。バッジ等は付けず**行レイアウトは不変**（disabled で灰色化のみ）。`selfUserId` は App→SessionTab→SessionUsers→UserCard と prop で配線。匿名訪問者(id 空)・匿名起動(loginUserId 空)は非該当＝従来どおり全操作可。
 - **確認ダイアログ**（`components/ConfirmModal`・ラベルは `common.*`）対象 = kick/ban/respawn/silence/unsilence ＋ save/restart/close。危険(kick/ban/close)は確定ボタン赤。メッセージは入力モーダル、適用はバッチ。
 - **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。**トースト＝7-7 第1層（§3.11）／自動 poll・Page Visibility＝7-7 残として実装済（§3.13）**。**status と users は B1（commit bdb54be）で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）に集約済**（focus 往復半減・一貫スナップショット）。`/status`・`/users` は部分再取得用に残置。
-- **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
+- **スポーン / インパルスカード（R14・`SpawnImpulseCard`）**: 左カラムのセッション設定カードの下に配置。①アイテムスポーン（URL〔`^res[-\w]*://` scheme 検証・不正/空は[スポーン]無効＋ヒント〕＋active〔既定ON〕/persistent〔既定OFF〕チェックボックス＋[スポーン]）／②ダイナミックインパルス（タグ〔必須〕＋値〔任意・空可〕＋[送信]）。**非破壊操作なので確認ダイアログなし**＝実行→受理トースト（方針A・respawn/message と同格）。`useAsyncAction` で busy/トースト集約。spawn/impulse は users/status を変えないため refetch しない。backend = `POST /sessions/{idx}/spawn`・`/impulse`（§2.4）。コマンド組み立ては `headless.SpawnCmd`/`DynamicImpulseStringCmd`（告知③と共有）。
+- **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定〔セッション設定＋スポーン/インパルス〕/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
 - **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
 - **残課題**: ~~write失敗が現状無音（M2/L4）~~ → **✅ 完了（7-7 第1層・§3.11・commit 61af3e2）**。`useAsyncAction`/`useConfirm` で `WriteResult` を拾い失敗を赤トーストで通知。`getData` が 409(not ready) を区別しない点(L5)のみ現状維持（将来整理）。
@@ -481,7 +487,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 - **実装（レビュー反映）**: ②待機中にヘッドレスが落ちた（クラッシュ/外部停止）場合は、締切（最大60分）を待たず**即 ④ で復帰**（Stop は空振り・Start で起動）。この間 crash-monitor は「進行中」を見て手を出さない（orchestrator が所有）。
 
 **(2) 事前アクション**
-- **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn <itemUrl> true` → `dynamicimpulsestring <tag> "<message>"`。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
+- **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn "<itemUrl>" true false` → `dynamicimpulsestring "<tag>" "<message>"`（R14 で `headless.SpawnCmd`/`DynamicImpulseStringCmd` 純関数に統一＝セッションの spawn/impulse 書き込み API と同一組み立て。spawn は help 確定の3引数〔旧 `spawn <url> true` の2引数を修正〕・告知アイテムは一時的なので persistent=false）。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
   - **実装**: **spawn → impulse の間に約10秒待機**（spawn したアイテムがワールド内で実体化してから impulse を送る・v1 `ITEM_SPAWN_DELAY` 踏襲・固定定数）。**2パス**で実行（全ワールド spawn → 10秒 sleep → 全ワールド impulse）。待機中は execMu を解放し他コマンドを妨げない。`itemUrl` 空なら spawn を省略し impulse のみ（常設受け機構前提）。
   - **実装（UI・5b-1 追補）**: `itemUrl` は **テンプレ選択（v1 main 由来の2種＝とらぞセッション閉店アナウンス/テキスト読み上げ）＋手動入力** の `Select`。テンプレ選択で `itemUrl`＋**共通タグ `MRHC.play`**（`ANNOUNCE_COMMON_TAG`）を自動設定し URL/タグ欄を隠す。手動入力時のみ URL/タグ欄を表示。**`tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
 - **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。

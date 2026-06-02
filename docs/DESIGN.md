@@ -219,7 +219,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 - アプリ設定: `GET/PUT /app-settings`（port / Resoniteパス / configDir）
 - ヘッドレスconfig: `GET /headless-configs`、`GET/PUT/DELETE /headless-configs/{name}`、`GET /headless-configs/last-used`、`GET/PUT /headless-credentials`（中央アカウント）
 - ランタイム取得（GET）: `GET /sessions`、`GET /sessions/{idx}/status|users|detail`、`GET /listbans`、`GET /friendrequests`
-- セッション操作（POST `/sessions/{idx}/…`・idx は path / 識別子・引数は body）: kick/ban/silence/unsilence/respawn/invite/role/message・accesslevel/maxusers/name/description/hidefromlisting・restart/save/close
+- セッション操作（POST `/sessions/{idx}/…`・idx は path / 識別子・引数は body）: kick/ban/silence/unsilence/respawn/invite/role/message・accesslevel/maxusers/name/description/hidefromlisting・spawn/impulse（R14）・restart/save/close
 - 新規セッション: `POST /sessions/start`（url / template）
 - フレンド/BAN（グローバル・focus不要）: `POST /friendrequests/accept`、`POST /friends/add|remove`、`POST /bans/unban`
 - Resonite 公開API プロキシ: `GET /resonite/users?q=`（ユーザー検索・無認証先）

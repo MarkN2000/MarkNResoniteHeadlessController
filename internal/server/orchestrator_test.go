@@ -233,10 +233,10 @@ func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 	if !hasCmd(cmds, "accesslevel Private") || !hasCmd(cmds, "maxusers 1") {
 		t.Fatalf("① セッション変更が出ていない: %v", cmds)
 	}
-	if !hasCmd(cmds, "spawn resrec:///x true") {
+	if !hasCmd(cmds, `spawn "resrec:///x" true false`) { // R14: 3引数・URL引用に統一
 		t.Fatalf("③ spawn が出ていない: %v", cmds)
 	}
-	if !hasCmd(cmds, `dynamicimpulsestring MRHC.play "再起動します"`) {
+	if !hasCmd(cmds, `dynamicimpulsestring "MRHC.play" "再起動します"`) { // R14: tag も引用に統一
 		t.Fatalf("③ dynamicimpulse が出ていない: %v", cmds)
 	}
 	if _, _, starts, label := d.snap(); starts != 1 || label != "day" {

@@ -90,7 +90,21 @@
     "confirmUnsilence": "Unsilence {{user}}?",
     "confirmRestart": "Restart this session?",
     "confirmClose": "Close this session?",
-    "confirmSave": "Save this session?"
+    "confirmSave": "Save this session?",
+    "spawnImpulse": "Spawn / Impulse",
+    "spawnSection": "Item spawn",
+    "spawnUrl": "URL",
+    "spawnUrlPlaceholder": "resrec:///...",
+    "spawnUrlHint": "Enter a URL starting with res://",
+    "spawnActive": "Active",
+    "spawnPersistent": "Persistent",
+    "spawn": "Spawn",
+    "impulseSection": "Dynamic impulse",
+    "impulseTag": "Tag",
+    "impulseTagPlaceholder": "e.g. MRHC.play",
+    "impulseValue": "Value",
+    "impulseValuePlaceholder": "(optional)",
+    "impulseSend": "Send"
   },
   "friends": {
     "source": "User search",
@@ -344,6 +358,8 @@
     "unsilenceDone": "Unsilenced",
     "roleDone": "Role updated",
     "messageDone": "Message sent",
-    "newSessionDone": "Session opened"
+    "newSessionDone": "Session opened",
+    "spawnDone": "Item spawned",
+    "impulseDone": "Impulse sent"
   }
 }

@@ -141,3 +141,51 @@ func TestSanitizeToken_RejectsNewlinesEverywhere(t *testing.T) {
 		}
 	}
 }
+
+// --- コマンドビルダー（R14） ---
+
+// SpawnCmd は 3 引数（url 引用 + active + persistent の bool リテラル）で組む。
+func TestSpawnCmd_ThreeArgs(t *testing.T) {
+	got := SpawnCmd("resrec:///U-MarkN/R-abc", true, false)
+	want := `spawn "resrec:///U-MarkN/R-abc" true false`
+	if got != want {
+		t.Fatalf("SpawnCmd = %q, want %q", got, want)
+	}
+	if SpawnCmd("x", false, true) != `spawn "x" false true` {
+		t.Fatalf("bool args not reflected: %q", SpawnCmd("x", false, true))
+	}
+}
+
+// URL に改行が混じってもコマンド注入にならない（QuoteArg で \n エスケープ＋単一行維持）。
+func TestSpawnCmd_NoInjection(t *testing.T) {
+	got := SpawnCmd("x\nshutdown", true, false)
+	if strings.ContainsAny(got, "\n\r") {
+		t.Fatalf("raw newline leaked into spawn command: %q", got)
+	}
+}
+
+// DynamicImpulseStringCmd は tag を引用（"." を含むタグも安全）し value をリッチテキスト整形する。
+func TestDynamicImpulseStringCmd_QuotesTagAndValue(t *testing.T) {
+	got := DynamicImpulseStringCmd("MRHC.play", "まもなく再起動します")
+	want := `dynamicimpulsestring "MRHC.play" "まもなく再起動します"`
+	if got != want {
+		t.Fatalf("DynamicImpulseStringCmd = %q, want %q", got, want)
+	}
+}
+
+// 値が空でも tag のみで有効なコマンドになる（impulse の value は任意）。
+func TestDynamicImpulseStringCmd_EmptyValue(t *testing.T) {
+	got := DynamicImpulseStringCmd("MRHC.play", "")
+	want := `dynamicimpulsestring "MRHC.play" ""`
+	if got != want {
+		t.Fatalf("empty value: %q, want %q", got, want)
+	}
+}
+
+// tag/value に改行が混じってもコマンド注入にならない。
+func TestDynamicImpulseStringCmd_NoInjection(t *testing.T) {
+	got := DynamicImpulseStringCmd("tag\nshutdown", "v\nshutdown")
+	if strings.ContainsAny(got, "\n\r") {
+		t.Fatalf("raw newline leaked into impulse command: %q", got)
+	}
+}

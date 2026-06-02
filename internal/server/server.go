@@ -143,6 +143,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/name", s.requireAuth(s.handleSessionName))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/description", s.requireAuth(s.handleSessionDescription))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/hidefromlisting", s.requireAuth(s.handleSessionHideFromListing))
+	// セッション内コンテンツ操作（focus idx → <cmd>・R14）
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/spawn", s.requireAuth(s.handleSessionSpawn))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/impulse", s.requireAuth(s.handleSessionImpulse))
 	// セッションライフサイクル（focus idx → <cmd>）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/restart", s.requireAuth(s.sessionCmdOp("restart", headless.WithTimeout(restartTimeout))))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/save", s.requireAuth(s.sessionCmdOp("save", headless.WithTimeout(saveTimeout))))

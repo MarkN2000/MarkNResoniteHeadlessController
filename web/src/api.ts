@@ -266,6 +266,14 @@ export const removeFriend = (user: string) => post(`/friends/remove`, { user });
 // 招待（フォーカス中セッションへ・focus 必要）
 export const inviteUser = (idx: number, user: string) => post(`/sessions/${idx}/invite`, { user });
 
+// セッション内コンテンツ操作（focus idx・R14）。
+//   spawn   → spawn "<url>" <active> <persistent>（アイテムをワールド root に生成）
+//   impulse → dynamicimpulsestring "<tag>" "<value>"（scene root へ impulse・tag 必須/value 任意）
+export const spawnItem = (idx: number, url: string, active: boolean, persistent: boolean) =>
+  post(`/sessions/${idx}/spawn`, { url, active, persistent });
+export const sendImpulse = (idx: number, tag: string, value: string) =>
+  post(`/sessions/${idx}/impulse`, { tag, value });
+
 // 新規セッション（稼働中に新ワールドを開始・focus 不要・backend timeout 60s）。
 //   url      → startworldurl "<url>"      / template → startWorldTemplate "<name>"
 // /start（プロセス起動）とは別物。結果は方針A で {executed:true}＝起動後に一覧を再取得して実状態を見せる。

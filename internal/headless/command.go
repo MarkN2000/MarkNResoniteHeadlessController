@@ -10,6 +10,7 @@ package headless
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -71,4 +72,23 @@ func SanitizeToken(s string) (string, error) {
 		return "", ErrInvalidToken
 	}
 	return s, nil
+}
+
+// --- コマンドビルダー（複数経路で共有する組み立て関数・R14） ---
+// セッションの spawn/impulse 書き込み API と orchestrator の告知③（§3.16(2)）が
+// 同一のコマンド文字列を組むための単一の真実。引用は command.go の方針（strip 方式）に従う。
+
+// SpawnCmd は `spawn <url> <active> <persistent>`（3引数・help 確定 2026-05-28）を組み立てる。
+// url は QuoteArg で無害化＋引用（record URL は空白/引用符を含まないが注入安全網として一貫適用）。
+// active=true でアイテムを有効状態で生成、persistent=true でワールド保存に含める。
+func SpawnCmd(url string, active, persistent bool) string {
+	return fmt.Sprintf("spawn %s %t %t", QuoteArg(url), active, persistent)
+}
+
+// DynamicImpulseStringCmd は `dynamicimpulsestring <tag> <value>` を組み立てる。
+// tag は "MRHC.play" のように "." を含み得るため SanitizeToken は使えず QuoteArg で引用する。
+// value は表示テキストになり得るため QuoteRichText（改行→<br>）で整形する。
+// コマンド名は小文字（Resonite はコマンド大小無視・告知③が実機で発火実証済の形を踏襲）。
+func DynamicImpulseStringCmd(tag, value string) string {
+	return fmt.Sprintf("dynamicimpulsestring %s %s", QuoteArg(tag), QuoteRichText(value))
 }

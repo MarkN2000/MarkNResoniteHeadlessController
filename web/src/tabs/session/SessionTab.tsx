@@ -7,6 +7,7 @@ import { SplitColumns } from "../../components/SplitColumns";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
 import { SessionSettings } from "./SessionSettings";
 import { SessionUsers } from "./SessionUsers";
+import { SpawnImpulseCard } from "./SpawnImpulseCard";
 
 // セッションタブ（フォーカス中 idx）。docs §3.3 #1 / §3.4。
 // 取得 = status + users（各エンドポイントが内部で focus idx → cmd）。
@@ -70,7 +71,12 @@ export function SessionTab({ idx, selfUserId }: { idx: number; selfUserId: strin
       {/* xl 未満=1カラム / xl 以上=設定(左)・ユーザー(右)の2カラム。両パネル560固定。 */}
       <Box pb="md">
         <SplitColumns
-          left={<SessionSettings idx={idx} status={status} onChanged={refetch} refreshing={loading} />}
+          left={
+            <Stack gap="lg">
+              <SessionSettings idx={idx} status={status} onChanged={refetch} refreshing={loading} />
+              <SpawnImpulseCard idx={idx} />
+            </Stack>
+          }
           right={<SessionUsers idx={idx} users={users} onChanged={refetch} selfUserId={selfUserId} />}
         />
       </Box>

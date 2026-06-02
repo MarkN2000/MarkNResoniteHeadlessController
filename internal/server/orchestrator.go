@@ -399,8 +399,10 @@ func (o *restartOrchestrator) applySessionChanges(ctx context.Context, sc config
 // itemUrl 空＝常設受け機構前提で spawn を省略し impulse のみ（§3.16(2)）。
 func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAction) {
 	if a.ItemURL != "" {
+		// 告知アイテムは一時的なので active=true / persistent=false（ワールド保存に残さない）。
+		spawnCmd := headless.SpawnCmd(a.ItemURL, true, false)
 		_ = o.worlds.ForEach(ctx, func(_ headless.World, scope headless.Scope) error {
-			_, _ = scope.Exec(fmt.Sprintf("spawn %s true", a.ItemURL), headless.WithTimeout(3*time.Second))
+			_, _ = scope.Exec(spawnCmd, headless.WithTimeout(3*time.Second))
 			return nil
 		})
 		// spawn したアイテムがワールド内で実体化してから impulse を送る（v1 ITEM_SPAWN_DELAY 踏襲）。
@@ -410,8 +412,9 @@ func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAct
 		case <-time.After(o.spawnDelay):
 		}
 	}
+	impulseCmd := headless.DynamicImpulseStringCmd(a.ImpulseTag, a.Message)
 	_ = o.worlds.ForEach(ctx, func(_ headless.World, scope headless.Scope) error {
-		_, _ = scope.Exec(fmt.Sprintf("dynamicimpulsestring %s %q", a.ImpulseTag, a.Message), headless.WithTimeout(2*time.Second))
+		_, _ = scope.Exec(impulseCmd, headless.WithTimeout(2*time.Second))
 		return nil
 	})
 }

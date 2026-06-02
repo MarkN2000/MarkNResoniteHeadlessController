@@ -81,6 +81,43 @@ func TestServer_Write_Start_AddsWorld(t *testing.T) {
 	}
 }
 
+// 正常系: セッション spawn（focus idx → spawn・R14）。方針A で executed=true。
+func TestServer_Write_Spawn(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/sessions/0/spawn", pw,
+		`{"url":"resrec:///U-MarkN/R-abc","active":true,"persistent":false}`)
+	if code != http.StatusOK || env.Data["executed"] != true {
+		t.Fatalf("spawn failed: code=%d env=%+v", code, env)
+	}
+}
+
+// 入力検証: spawn の url 空 → 400 missing_field。
+func TestServer_Write_Spawn_EmptyURL_400(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/sessions/0/spawn", pw, `{"url":""}`)
+	if code != http.StatusBadRequest || env.Error.Code != "missing_field" {
+		t.Fatalf("expected 400 missing_field, got code=%d env=%+v", code, env)
+	}
+}
+
+// 正常系: セッション impulse（focus idx → dynamicimpulsestring・R14）。value 空でも executed=true。
+func TestServer_Write_Impulse(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/sessions/0/impulse", pw, `{"tag":"MRHC.play","value":""}`)
+	if code != http.StatusOK || env.Data["executed"] != true {
+		t.Fatalf("impulse failed: code=%d env=%+v", code, env)
+	}
+}
+
+// 入力検証: impulse の tag 空 → 400 missing_field。
+func TestServer_Write_Impulse_EmptyTag_400(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/sessions/0/impulse", pw, `{"tag":"","value":"x"}`)
+	if code != http.StatusBadRequest || env.Error.Code != "missing_field" {
+		t.Fatalf("expected 400 missing_field, got code=%d env=%+v", code, env)
+	}
+}
+
 // 正常系: グローバル unban（focus 不要）。bans は空だが executed=true を返す（方針A）。
 func TestServer_Write_Unban(t *testing.T) {
 	ts, pw := newTestServer(t)

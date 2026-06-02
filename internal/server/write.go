@@ -262,6 +262,42 @@ func (s *Server) handleSessionHideFromListing(w http.ResponseWriter, r *http.Req
 	s.execSession(w, r, idx, fmt.Sprintf("hideFromListing %t", body.Hide))
 }
 
+// handleSessionSpawn: spawn "<url>" <active> <persistent>（R14・focus idx → cmd）
+// アイテムを record URL からフォーカス中ワールドに生成する。url 必須・active/persistent は bool。
+func (s *Server) handleSessionSpawn(w http.ResponseWriter, r *http.Request) {
+	idx, ok := reqIdx(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		URL        string `json:"url"`
+		Active     bool   `json:"active"`
+		Persistent bool   `json:"persistent"`
+	}
+	if !decodeBody(w, r, &body) || !requireField(w, "url", body.URL) {
+		return
+	}
+	s.execSession(w, r, idx, headless.SpawnCmd(body.URL, body.Active, body.Persistent))
+}
+
+// handleSessionImpulse: dynamicimpulsestring "<tag>" "<value>"（R14・focus idx → cmd）
+// scene root へタグ＋文字列値の impulse を送る。tag は必須、value は任意（空可＝
+// 受信アイテムが固定挙動で値を使わない場合がある。告知③と同条件）。
+func (s *Server) handleSessionImpulse(w http.ResponseWriter, r *http.Request) {
+	idx, ok := reqIdx(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Tag   string `json:"tag"`
+		Value string `json:"value"`
+	}
+	if !decodeBody(w, r, &body) || !requireField(w, "tag", body.Tag) {
+		return
+	}
+	s.execSession(w, r, idx, headless.DynamicImpulseStringCmd(body.Tag, body.Value))
+}
+
 // handleSessionStart: 稼働中に新規ワールドを開始（/start のプロセス起動とは別物）。
 //   - mode=url      → startworldurl "<url>"
 //   - mode=template → startWorldTemplate "<name>"（テンプレ名に空白があり得るため引用。要実機検証）
