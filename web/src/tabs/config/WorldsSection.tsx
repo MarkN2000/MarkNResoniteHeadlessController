@@ -9,6 +9,7 @@ import {
   InspectorSelect,
   InspectorTextInput,
   InspectorTextarea,
+  ROW_ICON_SIZE,
 } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -115,8 +116,8 @@ export function WorldsSection({
             </Button>
             {worlds.length > 1 && (
               <ActionIcon
-                size="sm"
-                variant="subtle"
+                size={ROW_ICON_SIZE}
+                variant="light"
                 color="red"
                 aria-label={t("config.removeWorld")}
                 title={t("config.removeWorld")}

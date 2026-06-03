@@ -1,7 +1,7 @@
 import { ActionIcon, Button, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import type { ConfigSummary } from "../../api";
-import { InspectorButton, InspectorCard } from "../../components/inspector";
+import { InspectorButton, InspectorCard, ROW_ICON_SIZE } from "../../components/inspector";
 
 // config 一覧（master）。各行 = 名前（クリックで編集）＋ 複製/削除。worldCount は出さない（名前のみ）。
 // 右パネル（ConfigEditor）と同じ InspectorCard で見た目を揃え、SplitColumns に並べる。
@@ -52,7 +52,7 @@ export function ConfigList({
                 {c.name}
               </Button>
               <ActionIcon
-                size="lg"
+                size={ROW_ICON_SIZE}
                 variant="light"
                 color="green"
                 title={t("config.duplicate")}
@@ -62,7 +62,7 @@ export function ConfigList({
                 ⧉
               </ActionIcon>
               <ActionIcon
-                size="lg"
+                size={ROW_ICON_SIZE}
                 variant="light"
                 color="red"
                 title={t("config.delete")}

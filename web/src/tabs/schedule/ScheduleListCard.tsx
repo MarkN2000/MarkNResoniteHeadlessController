@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionIcon, Group, Stack, Switch, Text } from "@mantine/core";
 import type { ConfigSummary, ScheduledRestart } from "../../api";
-import { InspectorButton, InspectorCard } from "../../components/inspector";
+import { InspectorButton, InspectorCard, ROW_ICON_SIZE } from "../../components/inspector";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { WEEKDAY_KEYS, defaultScheduled, formatScheduleTime, typeKey } from "./scheduleModel";
 
@@ -56,7 +56,7 @@ export function ScheduleListCard({
                 </Text>
               </div>
               <ActionIcon
-                size="lg"
+                size={ROW_ICON_SIZE}
                 variant="light"
                 color="gray"
                 title={t("schedule.editSchedule")}
@@ -66,7 +66,7 @@ export function ScheduleListCard({
                 ✎
               </ActionIcon>
               <ActionIcon
-                size="lg"
+                size={ROW_ICON_SIZE}
                 variant="light"
                 color="red"
                 title={t("schedule.deleteSchedule")}

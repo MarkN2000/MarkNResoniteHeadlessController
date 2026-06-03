@@ -37,6 +37,10 @@ export const SELECT_DOWN_ICON = (
   <span style={{ fontSize: 10, lineHeight: 1, color: "var(--mantine-color-dark-1)" }}>▼</span>
 );
 
+// 一覧/タブ行のアクションアイコン（削除×・複製⧉・編集✎）の共通サイズ。隣の Button size="xs"(30px) に
+// 高さを合わせる（ActionIcon の preset に 30 は無く lg=28px とずれるため数値指定）。30px の単一情報源。
+export const ROW_ICON_SIZE = 30;
+
 // 項目マーカー（ハンドル）の形状。背景色はボタン時のみ CSS クラス側で持つ（hover 切替を効かせるため）。
 const MARKER_SHAPE = {
   width: 15,
