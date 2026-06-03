@@ -9,19 +9,9 @@
   },
   "dashboard": {
     "start": "起動",
-    "stop": "停止",
     "logout": "ログアウト",
     "commandPlaceholder": "コマンド (例: worlds)",
-    "send": "送信",
-    "ready": "準備完了",
-    "clearLogs": "ログをクリア"
-  },
-  "state": {
-    "label": "状態",
-    "stopped": "停止中",
-    "starting": "起動中",
-    "running": "稼働中",
-    "stopping": "停止処理中"
+    "send": "送信"
   },
   "tabs": {
     "session": "セッション",
