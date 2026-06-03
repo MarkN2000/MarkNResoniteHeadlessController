@@ -399,23 +399,25 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 - トレードオフ：UI 非搭載のレア項目（下記）は**温存のみ・UI 編集不可**。必要時に後日フォーム化。
 
 **(D) レイアウト・CRUD**
-- 左=config 一覧レール（~260・名前＋worldCount バッジ・選択で右に読込・上部に [＋新規]）／右=エディタカード。狭幅は「config 選択プルダウン＋エディタ」に畳む（`SplitColumns` 流儀）。
-- 新規（name 入力→同梱デフォルト雛形）／複製（GET→別名 PUT）／削除（確認）／保存（dirty 追跡＋未保存ガード）。**リネーム非提供**（複製→旧削除で代替）。
-- **誤上書き防止**：新規/複製で**既存 name と衝突したら警告**（PUT が黙って上書きするため）。name は即時バリデーション。
+- 左=config 一覧レール（名前のみ・各行に複製⧉/削除×・選択で右に読込・上部に [＋新規]）／右=エディタカード。狭幅は「config 選択プルダウン＋エディタ」に畳む（`SplitColumns` 流儀）。一覧/タブ行のアクションアイコンは `ROW_ICON_SIZE`(=Button `xs` と同じ 30px) 共有で高さを揃える（C・`components/inspector`）。
+- 新規＝**インラインで空名ドラフト**（同梱デフォルト雛形・名前を入れるまで保存無効）／複製＝**インラインでクローン**（名前 `<元>-copy` を初期表示・編集可）／削除（確認）／保存（upsert・dirty 追跡＋未保存ガード）。**名前は ConfigEditor 先頭の編集欄**（D・識別子なので cfg 本文と別管理＝`draftName`）。**名前入力モーダルは廃止**（item4）。タイトルは「編集・作成」固定。
+- **リネーム＝Save As**（リネーム API 無し）：名前を別の新名にして保存すると**新規作成し元は残す**（旧名を指すスケジュール等の dangling 参照を回避）。
+- **誤上書き防止**：別の**既存 name へ保存しようとしたら上書き確認ダイアログ**（PUT が黙って上書きするため・Save As と一貫）。name は即時バリデーション（無効名は保存抑止・空欄はエラー文言を出さず抑止のみ）。
 
 **(B) アカウント**
 - config 毎に任意の `loginCredential`/`loginPassword` 欄（空=中央アカウント注入）。password マスク・空=変更なし。中央アカウント設定自体は設定タブ（次フェーズ）の領分。
 
 **(C) フィールド構成＝v1 同等（基本的に全フォーム化）**
-- config トップ（フォーム）：`comment`・`tickRate`・`maxConcurrentAssetTransfers`・`usernameOverride`・`dataFolder`・`cacheFolder`・`logsFolder`・`allowedUrlHosts`（add/remove リスト）・`autoSpawnItems`（カンマ→配列）＋アカウント欄。
+- config トップ（フォーム）：`comment`・`tickRate`・`maxConcurrentAssetTransfers`・`usernameOverride`・`dataFolder`・`cacheFolder`・`logsFolder`・`allowedUrlHosts`（add/remove リスト）・`autoSpawnItems`（カンマ→配列）＋アカウント欄。**点5：常時表示は `comment`（メモ）のみ**とし、他（`tickRate`〜`autoSpawnItems`＋アカウント）は**上級設定（`CollapsibleSection`・既定閉じ）へ畳む**。コンフィグ名（D）はメモと並ぶ基本項目として ConfigEditor 先頭に常時表示。
 - 各ワールド（startWorlds[]・タブ・フォーム）
   - 基本：`isEnabled`（タブ有効/無効）・`sessionName`・`description`・`accessLevel`・`maxUsers`・`loadWorldPresetName`＋`loadWorldURL`（**両表示**・スキーマ上両立可・どちらが効くかは Resonite 依存＝URL 優先）・`customSessionId`（**prefix/suffix ビルダー**・`:` 分割/結合・**prefix は中央アカウントの解決済 UserID を自動入力＝R12**・上書き可）。
-  - 運用（**折りたたみ・既定=閉じ**＝R11）：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`・`forcedRestartInterval`・`autosaveInterval`（各 `-1=無効` 注記）・`saveOnExit`・`autoRecover`・`autoSleep`・`hideFromPublicListing`・`mobileFriendly`。
-- **折りたたみ共通コンポーネント（R11）**: `components/inspector/CollapsibleSection`（`title`＋`defaultOpen?`＋`▾/▴`＋Mantine `Collapse`・`aria-expanded`）。設定タブの上級折りたたみ（`AppSettingsSection`）を本コンポーネントに置換（挙動不変）＋ワールド運用群を折りたたみ既定で包む。R6/R13 の追加項目もこの折りたたみ内に置く土台。
+  - 上級設定（**折りたたみ・既定=閉じ**・R11→**点5で再振り分け**）：`forcedRestartInterval`・`autosaveInterval`（`-1=無効` 注記）・`saveOnExit`・`autoRecover`・`mobileFriendly` の**5項目のみ**。
+  - **点5で基本へ繰り上げ**：`tags`（カンマ→配列）・`awayKickMinutes`・`idleRestartInterval`（`-1=無効` 注記）・`autoSleep`・`hideFromPublicListing`・`enableResoniteLink`/`forceResoniteLinkPort`（R13）。`-1=無効` 注記はセンチネル欄が基本(awayKick/idleRestart)と上級(forcedRestart/autosave)に分かれるため**両方に表示**。`customSessionId` は基本のまま。
+- **折りたたみ共通コンポーネント（R11）**: `components/inspector/CollapsibleSection`（`title`＋`defaultOpen?`＋`▾/▴`＋Mantine `Collapse`・`aria-expanded`）。設定タブの上級折りたたみ（`AppSettingsSection`）を本コンポーネントに置換（挙動不変）＋ワールド運用群を折りたたみ既定で包む。**点5でコンフィグタブの `GeneralSection`（メモ以外）にも適用**（基本/上級の最終振り分けは点5＝上記）。
 - **ワールド削除＝各タブの×（R5）**: ワールドタブを `Group[選択Button][× ActionIcon]`（`ConfigList` 行と同方式・ネストボタン回避）にし、各タブの×でそのワールドを削除（確認ダイアログ）。**最後の1枚は×非表示**（唯一のワールドは削除不可）。下部の「ワールド削除」ボタンは撤去。削除位置に応じてアクティブ index を補正。
-- **-1=無効フィールドを必ず数値に（R6）**: `awayKickMinutes`/`idleRestartInterval`/`forcedRestartInterval`/`autosaveInterval` は **未設定なら既定値を表示**（`asNumOr`・既定=スキーマ値 -1/1800/-1/-1）し、**空欄は -1（無効）へスナップ**（`sentinelW`＝map に `""` を書かない）。UI 方式は「数値入力＋一般ヒント `config.sentinelNote`」（トグルは不採用）。
+- **-1=無効フィールドを必ず数値に（R6）**: `awayKickMinutes`/`idleRestartInterval`/`forcedRestartInterval`/`autosaveInterval` は **未設定なら既定値を表示**（`asNumOr`・既定=スキーマ値 -1/1800/-1/-1）し、**空欄は -1（無効）へスナップ**（`sentinelW`＝map に `""` を書かない）。UI 方式は「数値入力＋一般ヒント `config.sentinelNote`」（トグルは不採用）。入力欄は `SentinelNumberInput`（`min=-1` を一元化・B）。なお数値欄は既定で**整数のみ＋範囲外を入力時点で抑止**（B・`InspectorNumberInput` 既定 `allowDecimal=false`/`clampBehavior=strict`）。
 - **customSessionId prefix 自動入力（R12）**: 中央アカウント保存時に `username→UserID` を解決（backend `resonite.ResolveUserID`・`normalizedUsername` 完全一致・メール/未一致は空・§2.x credentials）し `headless-credentials.userId` に保持。設定タブに **UserID を読み取り表示**＋アカウント名 placeholder から「/ メール」削除（解決成功率↑）。config タブは中央 UserID を取得し `CustomSessionIdInput` の `autoPrefix` に渡す＝**prefix が空なら自動シード（上書き可・表示のみ初期化で未編集なら map 未書込・編集時に commit）**。UserID が後着でも `key` 再シードで反映。
-- **ResoniteLink 項目（R13）**: 運用折りたたみ内に `enableResoniteLink`（Switch）＋`forceResoniteLinkPort`（数値・**空＝自動**＝`undefined` で保存JSONから省く・`portW`）を追加。port は `placeholder` で「空＝自動」を示す。常時表示（無効時も保存値は温存）。
+- **ResoniteLink 項目（R13）**: `enableResoniteLink`（Switch）＋`forceResoniteLinkPort`（数値・**空＝自動**＝`undefined` で保存JSONから省く・`portW`）。port は `placeholder` で「空＝自動」を示す。当初は運用折りたたみ内だが**点5で基本へ繰り上げ**。
 - **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。（`enableResoniteLink`/`forceResoniteLinkPort` は R13 でフォーム化＝下記）
 
 **安全/堅牢**
