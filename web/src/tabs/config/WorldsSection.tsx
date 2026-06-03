@@ -31,6 +31,9 @@ import { BufferedTextInput, CustomSessionIdInput, SentinelNumberInput } from "./
 
 // -1=無効 型フィールドの既定値（sample/default.json のスキーマ値・R6）。
 // 未設定なら既定を表示し、空欄にされたら -1（無効）へスナップして「必ず数値」を保つ。
+// 注: defaultWorld()（configModel.ts）が現在これらのキーを明示的に持つため、新規 config では
+// 常にキーが存在しこのフォールバックは不発火。発火するのは旧（キー欠落）コンフィグの表示用のみ
+// ＝旧データは headless 既定で動いていたため当時の値（awayKick=-1 等）で表示する。
 const SENTINEL_DEFAULTS: Record<string, number> = {
   awayKickMinutes: -1,
   idleRestartInterval: 1800,
@@ -64,6 +67,10 @@ export function WorldsSection({
   const numWith = (empty: unknown) => (key: string) => (v: number | string) => setW(key, v === "" ? empty : Number(v));
   const omitW = numWith(undefined);
   const sentinelW = numWith(-1);
+  // テキスト欄: 空文字（空白のみ含む）は null（未設定）として保存し「空欄を登録しない」。
+  // 未設定なら Resonite 既定が使われる（例: sessionName 空→ワールド名）。対象は JSON Schema 上
+  // いずれも null 許容（type に "null" を含む）。配列欄（tags/autoSpawnItems）は各 onCommit で空→null。
+  const setWText = (key: string, v: string) => setW(key, v.trim() === "" ? null : v);
 
   // マーカークリック＝そのワールド項目を defaultWorld() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
@@ -139,11 +146,17 @@ export function WorldsSection({
             <Switch checked={asBool(world.isEnabled, true)} onChange={(e) => setW("isEnabled", e.currentTarget.checked)} />
           </FieldRow>
           <FieldRow label={t("config.sessionName")} {...resetProps("sessionName", t("config.sessionName"))}>
-            <InspectorTextInput value={asStr(world.sessionName)} onChange={(e) => setW("sessionName", e.currentTarget.value)} />
+            <InspectorTextInput
+              value={asStr(world.sessionName)}
+              onChange={(e) => setWText("sessionName", e.currentTarget.value)}
+              placeholder={t("config.sessionNameHint")}
+            />
           </FieldRow>
           <FieldRow label={t("session.description")} align="start" {...resetProps("description", t("session.description"))}>
-            <InspectorTextarea value={asStr(world.description)} onChange={(e) => setW("description", e.currentTarget.value)} />
+            <InspectorTextarea value={asStr(world.description)} onChange={(e) => setWText("description", e.currentTarget.value)} />
           </FieldRow>
+          {/* 新規既定は defaultWorld() の accessLevel=Anyone。下の || "Private" は旧（キー欠落）
+              コンフィグの表示用フォールバックで、新規では不発火（既定値は雛形が単一の真実）。 */}
           <FieldRow label={t("session.accessLevel")} {...resetProps("accessLevel", t("session.accessLevel"))}>
             <InspectorSelect
               data={[...api.ACCESS_LEVELS]}
@@ -164,7 +177,7 @@ export function WorldsSection({
           <FieldRow label={t("config.loadWorldURL")} {...resetProps("loadWorldURL", t("config.loadWorldURL"))}>
             <InspectorTextInput
               value={asStr(world.loadWorldURL)}
-              onChange={(e) => setW("loadWorldURL", e.currentTarget.value)}
+              onChange={(e) => setWText("loadWorldURL", e.currentTarget.value)}
               placeholder="resrec://..."
             />
           </FieldRow>
@@ -178,7 +191,7 @@ export function WorldsSection({
               key={`${idx}:${centralUserId ?? ""}`}
               initial={asStr(world.customSessionId)}
               autoPrefix={centralUserId}
-              onChange={(v) => setW("customSessionId", v)}
+              onChange={(v) => setW("customSessionId", v || null)}
             />
           </FieldRow>
 
@@ -192,7 +205,7 @@ export function WorldsSection({
               key={idx}
               initial={arrayToCsv(world.tags)}
               parse={csvToArray}
-              onCommit={(v) => setW("tags", v)}
+              onCommit={(v) => setW("tags", Array.isArray(v) && v.length ? v : null)}
               placeholder={t("config.csvPlaceholder")}
             />
           </FieldRow>

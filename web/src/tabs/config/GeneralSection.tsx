@@ -15,6 +15,9 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
   const set = (key: string, value: unknown) => onChange({ ...cfg, [key]: value });
   // 数値欄: 空欄は undefined（保存JSONからキーを省く＝headless 既定）。"" を書くと数値型へ不整合になるため（M1）。
   const num = (key: string) => (v: number | string) => set(key, v === "" ? undefined : Number(v));
+  // テキスト欄: 空文字（空白のみ含む）は null（未設定）として保存し「空欄を登録しない」。
+  // 対象は JSON Schema 上いずれも null 許容。配列欄（allowedUrlHosts/autoSpawnItems）は各 onChange で空→null。
+  const setText = (key: string, v: string) => set(key, v.trim() === "" ? null : v);
 
   // マーカー（ハンドル）クリック＝その項目を defaultConfig() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
@@ -54,17 +57,17 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
           <FieldRow label={t("config.usernameOverride")} {...resetProps("usernameOverride", t("config.usernameOverride"))}>
             <InspectorTextInput
               value={asStr(cfg.usernameOverride)}
-              onChange={(e) => set("usernameOverride", e.currentTarget.value)}
+              onChange={(e) => setText("usernameOverride", e.currentTarget.value)}
             />
           </FieldRow>
           <FieldRow label={t("config.dataFolder")} {...resetProps("dataFolder", t("config.dataFolder"))}>
-            <InspectorTextInput value={asStr(cfg.dataFolder)} onChange={(e) => set("dataFolder", e.currentTarget.value)} />
+            <InspectorTextInput value={asStr(cfg.dataFolder)} onChange={(e) => setText("dataFolder", e.currentTarget.value)} />
           </FieldRow>
           <FieldRow label={t("config.cacheFolder")} {...resetProps("cacheFolder", t("config.cacheFolder"))}>
-            <InspectorTextInput value={asStr(cfg.cacheFolder)} onChange={(e) => set("cacheFolder", e.currentTarget.value)} />
+            <InspectorTextInput value={asStr(cfg.cacheFolder)} onChange={(e) => setText("cacheFolder", e.currentTarget.value)} />
           </FieldRow>
           <FieldRow label={t("config.logsFolder")} {...resetProps("logsFolder", t("config.logsFolder"))}>
-            <InspectorTextInput value={asStr(cfg.logsFolder)} onChange={(e) => set("logsFolder", e.currentTarget.value)} />
+            <InspectorTextInput value={asStr(cfg.logsFolder)} onChange={(e) => setText("logsFolder", e.currentTarget.value)} />
           </FieldRow>
           <FieldRow
             label={t("config.allowedHosts")}
@@ -73,7 +76,7 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
           >
             <HostListInput
               hosts={getStringArray(cfg.allowedUrlHosts)}
-              onChange={(h) => set("allowedUrlHosts", h)}
+              onChange={(h) => set("allowedUrlHosts", h.length ? h : null)}
               addLabel={t("config.add")}
               placeholder={t("config.hostPlaceholder")}
             />
@@ -83,7 +86,7 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
             <BufferedTextInput
               initial={arrayToCsv(cfg.autoSpawnItems)}
               parse={csvToArray}
-              onCommit={(v) => set("autoSpawnItems", v)}
+              onCommit={(v) => set("autoSpawnItems", Array.isArray(v) && v.length ? v : null)}
               placeholder={t("config.csvPlaceholder")}
             />
           </FieldRow>
