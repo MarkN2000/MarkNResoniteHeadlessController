@@ -6,27 +6,66 @@
 export type ConfigMap = Record<string, unknown>;
 export type WorldMap = Record<string, unknown>;
 
-// 1ワールドの雛形（accessLevel=Private＝安全側・loadWorldPresetName=Grid）。
+// 1ワールドの雛形。公式スキーマ全項目を明示的に持ち、UI 表示と保存 JSON を常に一致させる
+// （表示専用フォールバックに頼らない＝「見た目は値があるのに保存には無い」ズレを排除）。
+// 未設定を表す項目は null（有害な空文字は使わない）。決定値: accessLevel=Anyone・awayKickMinutes=5・
+// autoSleep/autoRecover=true・idleRestartInterval=1800・強制再起動/自動保存=-1(無効)。
 export function defaultWorld(): WorldMap {
   return {
     isEnabled: true,
-    sessionName: "",
-    description: "",
+    sessionName: null,
+    customSessionId: null,
+    description: null,
     maxUsers: 16,
-    accessLevel: "Private",
+    accessLevel: "Anyone",
+    useCustomJoinVerifier: false,
+    hideFromPublicListing: false,
+    tags: null,
+    mobileFriendly: false,
+    loadWorldURL: null,
     loadWorldPresetName: "Grid",
+    overrideCorrespondingWorldId: null,
+    forcePort: null,
+    enableResoniteLink: false,
+    forceResoniteLinkPort: null,
+    keepOriginalRoles: false,
+    defaultUserRoles: null,
+    roleCloudVariable: null,
+    allowUserCloudVariable: null,
+    denyUserCloudVariable: null,
+    requiredUserJoinCloudVariable: null,
+    requiredUserJoinCloudVariableDenyMessage: null,
+    awayKickMinutes: 5,
+    parentSessionIds: null,
+    autoInviteUsernames: null,
+    autoInviteMessage: null,
+    saveAsOwner: null,
+    autoRecover: true,
+    idleRestartInterval: 1800,
+    forcedRestartInterval: -1,
+    saveOnExit: false,
+    autosaveInterval: -1,
+    autoSleep: true,
   };
 }
 
 // 同梱デフォルト config の雛形（hlconfig.defaultConfigJSON 相当・creds 空＝中央注入）。
+// 公式スキーマのトップレベル全項目を明示（未設定は null）。$schema は保存時に backend が付与。
 export function defaultConfig(): ConfigMap {
   return {
     comment: "",
+    universeId: null,
     tickRate: 60,
     maxConcurrentAssetTransfers: 128,
+    usernameOverride: null,
     loginCredential: "",
     loginPassword: "",
     startWorlds: [defaultWorld()],
+    dataFolder: null,
+    cacheFolder: null,
+    logsFolder: null,
+    allowedUrlHosts: null,
+    autoSpawnItems: null,
   };
 }
 

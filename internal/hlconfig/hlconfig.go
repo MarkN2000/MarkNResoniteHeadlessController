@@ -213,23 +213,60 @@ func EnsureDefault(dir string) error {
 	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(defaultConfigJSON), 0o600)
 }
 
-// defaultConfigJSON は同梱デフォルト config。accessLevel=Private（最安全）・creds 空（中央注入）。
+// defaultConfigJSON は同梱デフォルト config。公式スキーマ全項目を明示し、UI 表示と保存値を一致させる
+// （フロント defaultWorld()/defaultConfig() と同方針）。accessLevel=Anyone・awayKickMinutes=5・
+// autoSleep/autoRecover=true・idleRestartInterval=1800・強制再起動/自動保存=-1(無効)・creds 空（中央注入）。
 const defaultConfigJSON = `{
   "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
-  "comment": "MRHC デフォルト設定（accessLevel=Private。Settings で Resonite アカウントを登録し、必要に応じて編集してください）",
+  "comment": "MRHC デフォルト設定（Settings で Resonite アカウントを登録し、必要に応じて編集してください）",
+  "universeId": null,
   "tickRate": 60.0,
   "maxConcurrentAssetTransfers": 128,
+  "usernameOverride": null,
   "loginCredential": "",
   "loginPassword": "",
   "startWorlds": [
     {
       "isEnabled": true,
-      "sessionName": "MRHC World",
-      "description": "",
+      "sessionName": null,
+      "customSessionId": null,
+      "description": null,
       "maxUsers": 16,
-      "accessLevel": "Private",
-      "loadWorldPresetName": "Grid"
+      "accessLevel": "Anyone",
+      "useCustomJoinVerifier": false,
+      "hideFromPublicListing": false,
+      "tags": null,
+      "mobileFriendly": false,
+      "loadWorldURL": null,
+      "loadWorldPresetName": "Grid",
+      "overrideCorrespondingWorldId": null,
+      "forcePort": null,
+      "enableResoniteLink": false,
+      "forceResoniteLinkPort": null,
+      "keepOriginalRoles": false,
+      "defaultUserRoles": null,
+      "roleCloudVariable": null,
+      "allowUserCloudVariable": null,
+      "denyUserCloudVariable": null,
+      "requiredUserJoinCloudVariable": null,
+      "requiredUserJoinCloudVariableDenyMessage": null,
+      "awayKickMinutes": 5.0,
+      "parentSessionIds": null,
+      "autoInviteUsernames": null,
+      "autoInviteMessage": null,
+      "saveAsOwner": null,
+      "autoRecover": true,
+      "idleRestartInterval": 1800,
+      "forcedRestartInterval": -1.0,
+      "saveOnExit": false,
+      "autosaveInterval": -1.0,
+      "autoSleep": true
     }
-  ]
+  ],
+  "dataFolder": null,
+  "cacheFolder": null,
+  "logsFolder": null,
+  "allowedUrlHosts": null,
+  "autoSpawnItems": null
 }
 `

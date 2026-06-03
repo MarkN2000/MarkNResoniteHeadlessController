@@ -227,8 +227,18 @@ func TestEnsureDefault(t *testing.T) {
 		t.Fatalf("default startWorlds wrong: %v", raw["startWorlds"])
 	}
 	w0 := sw[0].(map[string]any)
-	if w0["accessLevel"] != "Private" {
-		t.Fatalf("default accessLevel should be Private, got %v", w0["accessLevel"])
+	if w0["accessLevel"] != "Anyone" {
+		t.Fatalf("default accessLevel should be Anyone, got %v", w0["accessLevel"])
+	}
+	// 決定値が雛形に明示されていること（表示と保存値の一致を担保）。
+	if w0["awayKickMinutes"] != 5.0 {
+		t.Fatalf("default awayKickMinutes should be 5, got %v", w0["awayKickMinutes"])
+	}
+	if w0["autoSleep"] != true || w0["autoRecover"] != true {
+		t.Fatalf("default autoSleep/autoRecover should be true, got %v / %v", w0["autoSleep"], w0["autoRecover"])
+	}
+	if w0["idleRestartInterval"] != 1800.0 {
+		t.Fatalf("default idleRestartInterval should be 1800, got %v", w0["idleRestartInterval"])
 	}
 
 	// 既に config がある → 何もしない（default を再作成しない）

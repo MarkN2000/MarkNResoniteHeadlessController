@@ -79,7 +79,7 @@ PUT    /api/v1/headless-credentials        中央既定アカウント登録 {us
 - **保存型**: フロントが完成 JSON を送り、バックエンドは name サニタイズ・最小検証（有効JSON + startWorlds が配列）・`$schema` 付与・0600 保存
 - **name サニタイズ**: `^[A-Za-z0-9_\-]{1,64}$`（`/`・`\`・`.` 不可＝パストラバーサル防止）【必須】
 - **保存先**: `headlessConfigDir`（既定固定 `{dataDir}/headless-configs`、Settings で上級者のみ変更）
-- **同梱デフォルト**: 起動時に config dir が空なら `default.json`（accessLevel=Private・1ワールド・creds 空）を自動生成（`EnsureDefault`）
+- **同梱デフォルト**: 起動時に config dir が空なら `default.json`（accessLevel=Anyone・公式スキーマ全項目を明示・1ワールド・creds 空）を自動生成（`EnsureDefault`）。フロント `defaultConfig()`/`defaultWorld()` と同一方針（UI 表示＝保存値の一致／未設定は null）
 - **認証情報（起動時注入）**: config 自身の `loginCredential`/`loginPassword` が空なら、中央既定アカウント（`mrhc.config.json` の `headlessCredentials`）を注入。注入は**起動時**に行い、解決済み config を `{dataDir}/.run/{name}.json`（0600）へ生成して Resonite に渡す。保存済みファイルに password を焼き込まない（平文は中央設定 + 起動用一時のみ）
 - **読込マスク**: GET は `loginPassword=""`。PUT は password 空=既存保持・非空=per-config 上書き
 - **起動は config 名指定**: `POST /start {config: "<name>"}` → `headlessConfigDir` から解決。`driver.Start(headlessPath, launchPath, configLabel)` で Status には論理名を表示
@@ -421,7 +421,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 - **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。（`enableResoniteLink`/`forceResoniteLinkPort` は R13 でフォーム化＝下記）
 
 **安全/堅牢**
-- 新規 config の `accessLevel` 既定は **Private**（v1 の Anyone と違い安全側。no-config/誤 accessLevel は公開事故＝domain-facts §7）。
+- 新規 config の `accessLevel` 既定は **Anyone**（2026-06-03 変更。旧既定は安全側の Private だったが、ユーザー判断で公開既定に変更）。**雛形は公式スキーマ全項目を明示し、UI 表示＝保存値を一致させる方針**（旧来の「表示専用フォールバックで値を見せるが保存JSONにはキーが無い」ズレを排除。未設定は null）。no-config 起動や誤 accessLevel が公開事故になりうる点は domain-facts §7 のとおりで、**起動は config 必須**（無 config 起動ボタンを出さない）でカバーする。決定値の一覧は §3.14 末尾／`configModel.ts` コメント参照。
 - **未保存ガード**：dirty 時は **config 切替・新規作成・複製**で破棄確認を挟む（`guardDiscard` で3経路統一）。複製は保存状態（`original`）をクローン。同一 config 内のワールドタブ移動は保存単位が同じため不要。ワールド削除・config 削除は確認ダイアログ。**既知の制限**：コンフィグタブから**他タブへ離脱**すると未保存編集は警告なく失われる（アプリ横断の未保存ガードは未実装＝他タブ方針と整合・MVP 許容）。
 - **ワールドは最低1つ**（最後の1枚は削除不可）。
 - **稼働中の config 編集は再起動まで未反映**の注記。
@@ -432,7 +432,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **流用部品**：`components/inspector`（InspectorCard/FieldRow/InspectorSelect/InspectorTextInput/InspectorNumberInput/InspectorTextarea/InspectorButton/RefreshButton）・`hooks/useConfirm`＋`ConfirmModal`・`hooks/useAsyncAction`・`lib/notify`（結果トースト自動）・`SplitColumns`。
 
-**バックエンド**：改修ゼロ。GET `/headless-configs`（一覧）・GET `/headless-configs/{name}`（全文・pw マスク）・PUT（upsert）・DELETE。新規雛形はフロントが同梱デフォルト（Private・1ワールド・creds 空）を保持。
+**バックエンド**：改修ゼロ。GET `/headless-configs`（一覧）・GET `/headless-configs/{name}`（全文・pw マスク）・PUT（upsert）・DELETE。新規雛形はフロントが同梱デフォルト（Anyone・公式スキーマ全項目明示・1ワールド・creds 空）を保持。
 
 ### 3.15 設定タブ (7-5) で確定した実装事項
 
