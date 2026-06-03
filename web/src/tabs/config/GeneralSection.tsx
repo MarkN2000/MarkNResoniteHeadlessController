@@ -1,6 +1,6 @@
 import { Divider, Stack } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import { CollapsibleSection, FieldRow, InspectorNumberInput, InspectorTextInput } from "../../components/inspector";
+import { CollapsibleSection, FieldRow, InspectorNumberInput, InspectorTextarea, InspectorTextInput } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { ConfigMap } from "./configModel";
@@ -34,8 +34,10 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
 
   return (
     <Stack gap={6}>
-      <FieldRow label={t("config.comment")} {...resetProps("comment", t("config.comment"))}>
-        <InspectorTextInput value={asStr(cfg.comment)} onChange={(e) => set("comment", e.currentTarget.value)} />
+      <FieldRow label={t("config.comment")} align="start" {...resetProps("comment", t("config.comment"))}>
+        {/* メモは長文想定で autosize の Textarea（自動折り返し＋欄が縦に自動拡張）。
+            空は "" のまま＝Resonite 不使用の表示用メモなので null 正規化対象外。 */}
+        <InspectorTextarea value={asStr(cfg.comment)} onChange={(e) => set("comment", e.currentTarget.value)} minRows={1} />
       </FieldRow>
       {/* メモ以外（技術系＋アカウント）は上級設定へ畳む（点5）。WorldsSection と同じ CollapsibleSection・既定は閉じ。 */}
       <CollapsibleSection title={t("common.advancedSection")}>
