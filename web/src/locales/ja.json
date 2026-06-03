@@ -53,7 +53,8 @@
     "confirm": "実行",
     "resetToDefault": "既定値に戻す",
     "resetConfirmTitle": "既定値に戻す",
-    "resetConfirmMsg": "「{{field}}」を既定値に戻しますか？"
+    "resetConfirmMsg": "「{{field}}」を既定値に戻しますか？",
+    "advancedSection": "上級設定"
   },
   "session": {
     "settings": "セッション設定",
@@ -97,12 +98,12 @@
     "spawnUrlPlaceholder": "resrec:///...",
     "spawnUrlHint": "res:// で始まる URL を入力してください",
     "spawnActive": "アクティブ",
-    "spawnPersistent": "永続化",
+    "spawnPersistent": "パーシステント",
     "spawn": "スポーン",
-    "impulseSection": "ダイナミックインパルス",
+    "impulseSection": "ダイナミックインパルス（String）",
     "impulseTag": "タグ",
     "impulseTagPlaceholder": "例: MRHC.play",
-    "impulseValue": "値",
+    "impulseValue": "値（String）",
     "impulseValuePlaceholder": "（任意）",
     "impulseSend": "送信"
   },
@@ -207,7 +208,6 @@
     "loadWorldPresetName": "プリセット",
     "loadWorldURL": "URL",
     "customSessionId": "カスタムID",
-    "operationSection": "運用",
     "sentinelNote": "数値の -1 は「無効」を表します。",
     "tags": "タグ",
     "awayKickMinutes": "AFKキック(分)",

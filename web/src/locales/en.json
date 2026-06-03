@@ -53,7 +53,8 @@
     "confirm": "Confirm",
     "resetToDefault": "Reset to default",
     "resetConfirmTitle": "Reset to default",
-    "resetConfirmMsg": "Reset \"{{field}}\" to its default value?"
+    "resetConfirmMsg": "Reset \"{{field}}\" to its default value?",
+    "advancedSection": "Advanced"
   },
   "session": {
     "settings": "Session settings",
@@ -99,10 +100,10 @@
     "spawnActive": "Active",
     "spawnPersistent": "Persistent",
     "spawn": "Spawn",
-    "impulseSection": "Dynamic impulse",
+    "impulseSection": "Dynamic impulse (String)",
     "impulseTag": "Tag",
     "impulseTagPlaceholder": "e.g. MRHC.play",
-    "impulseValue": "Value",
+    "impulseValue": "Value (String)",
     "impulseValuePlaceholder": "(optional)",
     "impulseSend": "Send"
   },
@@ -207,7 +208,6 @@
     "loadWorldPresetName": "Preset",
     "loadWorldURL": "URL",
     "customSessionId": "Custom ID",
-    "operationSection": "Operation",
     "sentinelNote": "A value of -1 means \"disabled\".",
     "tags": "Tags",
     "awayKickMinutes": "AFK kick (min)",

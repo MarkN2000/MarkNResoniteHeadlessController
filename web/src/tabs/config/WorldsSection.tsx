@@ -183,7 +183,7 @@ export function WorldsSection({
 
           <Divider my={4} color="dark.4" />
           {/* 運用項目群は折りたたみ（既定=閉じ）。基本項目だけ常時表示しスマホの縦長を抑える（R11）。 */}
-          <CollapsibleSection title={t("config.operationSection")}>
+          <CollapsibleSection title={t("common.advancedSection")}>
             <Stack gap={6}>
               <Text size="xs" c="dimmed">
                 {t("config.sentinelNote")}
