@@ -11,7 +11,8 @@ import { BufferedTextInput, HostListInput } from "./fields";
 export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cfg: ConfigMap) => void }) {
   const { t } = useTranslation();
   const set = (key: string, value: unknown) => onChange({ ...cfg, [key]: value });
-  const num = (key: string) => (v: number | string) => set(key, v === "" ? "" : Number(v));
+  // 数値欄: 空欄は undefined（保存JSONからキーを省く＝headless 既定）。"" を書くと数値型へ不整合になるため（M1）。
+  const num = (key: string) => (v: number | string) => set(key, v === "" ? undefined : Number(v));
 
   // マーカー（ハンドル）クリック＝その項目を defaultConfig() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。

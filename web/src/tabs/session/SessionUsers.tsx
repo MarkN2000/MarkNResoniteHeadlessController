@@ -1,10 +1,11 @@
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Box, Button, Divider, Group, Modal, Stack, Text, Textarea } from "@mantine/core";
+import { Box, Divider, Group, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
 import type { UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, InspectorSelect } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { MessageModal } from "../../components/MessageModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
 
@@ -40,10 +41,9 @@ const CONFIRM_ACTIONS: Record<
 // 権限は選択した瞬間に即適用。respawn/silence/kick/ban は確認、message は入力モーダル。
 export function SessionUsers({ idx, users, onChanged, selfUserId }: Props) {
   const { t } = useTranslation();
-  const { busy, run } = useAsyncAction(onChanged); // 権限の即適用・メッセージ送信用
+  const { busy, run } = useAsyncAction(onChanged); // 権限の即適用用（メッセージ送信は MessageModal 内）
   const confirm = useConfirm();
   const [msgTo, setMsgTo] = useState<string | null>(null);
-  const [msg, setMsg] = useState("");
 
   // 確認が要る操作（respawn/silence/kick/ban）を共通ダイアログに乗せる。
   const askConfirm = (kind: ConfirmKind, user: string) => {
@@ -81,10 +81,7 @@ export function SessionUsers({ idx, users, onChanged, selfUserId }: Props) {
                   busy={busy}
                   isSelf={!!selfUserId && u.id === selfUserId}
                   onConfirm={(kind) => askConfirm(kind, u.name)}
-                  onMessage={() => {
-                    setMsg("");
-                    setMsgTo(u.name);
-                  }}
+                  onMessage={() => setMsgTo(u.name)}
                   onRun={run}
                 />
               </Fragment>
@@ -103,38 +100,7 @@ export function SessionUsers({ idx, users, onChanged, selfUserId }: Props) {
         onClose={confirm.close}
       />
 
-      <Modal
-        opened={msgTo !== null}
-        onClose={() => setMsgTo(null)}
-        title={t("session.messageTo", { user: msgTo ?? "" })}
-        centered
-      >
-        <Textarea
-          value={msg}
-          onChange={(e) => setMsg(e.currentTarget.value)}
-          placeholder={t("session.messagePlaceholder")}
-          autosize
-          minRows={3}
-        />
-        <Group justify="flex-end" gap="xs" mt="md">
-          <Button variant="default" onClick={() => setMsgTo(null)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            loading={busy}
-            disabled={!msg.trim()}
-            onClick={() => {
-              const to = msgTo;
-              const text = msg;
-              if (!to) return;
-              setMsgTo(null);
-              void run(() => api.messageUser(idx, to, text), t("toast.messageDone"));
-            }}
-          >
-            {t("session.send")}
-          </Button>
-        </Group>
-      </Modal>
+      <MessageModal idx={idx} target={msgTo} onClose={() => setMsgTo(null)} onSent={onChanged} />
     </>
   );
 }

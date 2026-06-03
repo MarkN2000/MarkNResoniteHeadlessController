@@ -39,7 +39,7 @@ const (
 	phasePreparing  = "preparing"  // ① セッション変更中
 	phaseWaiting    = "waiting"    // ② 退出待ち
 	phaseAnnouncing = "announcing" // ③ 告知中
-	phaseRestarting = "restarting" // ④ 停止→起動（cancel 不可）
+	phaseRestarting = "restarting" // ④ 終端＝停止→起動 or 停止のみ（R7・cancel 不可）
 )
 
 var (
@@ -54,7 +54,7 @@ var (
 type restartProgress struct {
 	inProgress  bool
 	phase       string
-	triggerType string // "manual" | "scheduled"
+	triggerType string // "manual" | "scheduled" | "stop"（R7 通常停止）
 	configName  string // 解決済みの対象 config（空ではない）
 	startedAt   time.Time
 	deadlineAt  time.Time // ② の締切（waiting/announcing 中のみ有効）
@@ -71,7 +71,7 @@ type restartOrchestrator struct {
 	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)）
 
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。
-	minute           time.Duration // forceTimeout/actionTiming の「分」単位（本番 time.Minute）
+	minute           time.Duration // quiet/announce 待機の「分」単位（本番 time.Minute）
 	waitInterval     time.Duration // ② の人数ポーリング間隔
 	spawnDelay       time.Duration // ③ spawn→impulse の待機（v1 踏襲・固定）
 	stopWaitTimeout  time.Duration // ④ stop 後 StateStopped を待つ最大

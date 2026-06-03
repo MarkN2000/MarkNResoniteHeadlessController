@@ -11,10 +11,7 @@ import {
 } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
-
-// URL の scheme 検証（v1 踏襲）: res:// / resrec:// / res-steam:// などで始まること。
-// 方針A 上、不正 URL でも backend は HTTP 200 を返し得る（＝無音失敗）ため、空振りをここで減らす。
-const URL_SCHEME = /^res[-\w]*:\/\//i;
+import { isResoniteUrl } from "../../lib/resoniteUrl";
 
 // 新規セッションの起動方法（URL / テンプレート）。起動は確認 → 実行 → onStarted（一覧再取得）。
 // 結果トーストは useConfirm（onConfirm が WriteResult を返す）で自動（7-7 第1層）。
@@ -24,7 +21,7 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
   const [url, setUrl] = useState("");
   const confirm = useConfirm();
 
-  const urlValid = URL_SCHEME.test(url.trim());
+  const urlValid = isResoniteUrl(url);
 
   // 起動の確認 → 実行 → onStarted。op は WriteResult を返すラッパ。confirm.busy が
   // ConfirmModal の loading を駆動（startworldurl は最大60s かかり得る）。

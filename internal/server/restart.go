@@ -77,7 +77,7 @@ type restartStatus struct {
 	InProgress           bool   `json:"inProgress"`
 	Phase                string `json:"phase"` // idle | preparing | waiting | announcing | restarting
 	// 進行中の再起動（InProgress=true のときのみ意味を持つ）。
-	RestartTriggerType string  `json:"restartTriggerType,omitempty"` // manual | scheduled
+	RestartTriggerType string  `json:"restartTriggerType,omitempty"` // manual | scheduled | stop
 	RestartConfigName  string  `json:"restartConfigName,omitempty"`  // 進行中の対象 config（空=前回）
 	DeadlineAt         *string `json:"deadlineAt"`                   // ② 待機の締切（RFC3339）/ null
 	// 最終起動（§3.16(9)・runtime-state.json 由来。手動起動/再起動/予定/crash 共通）。未記録なら null/空。

@@ -55,13 +55,14 @@ export function WorldsSection({
   const world: WorldMap = worlds[idx] ?? {};
 
   const setW = (key: string, value: unknown) => onChange(setWorld(cfg, idx, { ...world, [key]: value }));
-  // 数値フィールドの onChange ファクトリ。空欄のとき map に書く値だけが用途で異なる:
-  //   numW→""（既存）／ sentinelW→-1（-1=無効・空欄を "" にせず必ず数値・R6）／
-  //   portW→undefined（保存JSONから省く＝null/自動・R13）。
+  // 数値フィールドの onChange ファクトリ。空欄のとき map に書く値だけが異なる:
+  //   omitW→undefined（保存JSONからキーを省く＝headless 既定/自動。maxUsers・port）／
+  //   sentinelW→-1（-1=無効。空欄でも必ず数値を保つ・R6）。
+  // 空欄を "" で書くと保存JSONに文字列が混入し、headless が数値型を期待する箇所で不整合になるため、
+  // 数値欄は undefined（キー省略）か -1（無効）のどちらかに必ず正規化する（M1）。
   const numWith = (empty: unknown) => (key: string) => (v: number | string) => setW(key, v === "" ? empty : Number(v));
-  const numW = numWith("");
+  const omitW = numWith(undefined);
   const sentinelW = numWith(-1);
-  const portW = numWith(undefined);
 
   // マーカークリック＝そのワールド項目を defaultWorld() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
@@ -150,7 +151,7 @@ export function WorldsSection({
             />
           </FieldRow>
           <FieldRow label={t("session.maxUsers")} {...resetProps("maxUsers", t("session.maxUsers"))}>
-            <InspectorNumberInput value={asNum(world.maxUsers)} onChange={numW("maxUsers")} min={1} allowNegative={false} />
+            <InspectorNumberInput value={asNum(world.maxUsers)} onChange={omitW("maxUsers")} min={1} allowNegative={false} />
           </FieldRow>
           <FieldRow label={t("config.loadWorldPresetName")} {...resetProps("loadWorldPresetName", t("config.loadWorldPresetName"))}>
             <InspectorSelect
@@ -250,7 +251,7 @@ export function WorldsSection({
               <FieldRow label={t("config.forceResoniteLinkPort")} {...resetProps("forceResoniteLinkPort", t("config.forceResoniteLinkPort"))}>
                 <InspectorNumberInput
                   value={asNum(world.forceResoniteLinkPort)}
-                  onChange={portW("forceResoniteLinkPort")}
+                  onChange={omitW("forceResoniteLinkPort")}
                   min={1}
                   max={65535}
                   allowNegative={false}

@@ -4,10 +4,7 @@ import { Checkbox, Divider, Group, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
 import { FieldRow, InspectorButton, InspectorCard, InspectorTextInput } from "../../components/inspector";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
-
-// URL の scheme 検証（新規セッションタブ流用）: res:// / resrec:// などで始まること。
-// 方針A 上、不正 URL でも backend は HTTP 200 を返し得る（＝無音失敗）ため、空振りをここで減らす。
-const URL_SCHEME = /^res[-\w]*:\/\//i;
+import { isResoniteUrl } from "../../lib/resoniteUrl";
 
 // スポーン / インパルス（R14・フォーカス中セッションへ）。
 //   アイテムスポーン       = spawn "<url>" <active> <persistent>
@@ -23,7 +20,7 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
   const [tag, setTag] = useState("");
   const [value, setValue] = useState("");
 
-  const urlValid = URL_SCHEME.test(url.trim());
+  const urlValid = isResoniteUrl(url);
   const tagValid = tag.trim() !== "";
 
   return (

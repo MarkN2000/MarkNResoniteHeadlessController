@@ -1,10 +1,11 @@
 import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Avatar, Box, Button, Center, Divider, Group, Loader, Modal, Stack, Text, Textarea } from "@mantine/core";
+import { Avatar, Box, Center, Divider, Group, Loader, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
 import type { BanEntry, ResoniteUser, UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, RefreshButton } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { MessageModal } from "../../components/MessageModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { FriendSource } from "./FriendsTab";
@@ -33,10 +34,8 @@ interface UserRow {
 export function ResultList({ idx, source, requests, bans, searchResults, focusedUsers, selfUserId, loading, onRefetch }: Props) {
   const { t } = useTranslation();
   const accept = useAsyncAction(onRefetch); // 承認は内向き操作なので即時
-  const send = useAsyncAction(); // メッセージ送信（検索リストは変化しないので refetch なし・R1）
   const confirm = useConfirm();
   const [msgTo, setMsgTo] = useState<string | null>(null); // メッセージ入力モーダルの宛先（username）
-  const [msgText, setMsgText] = useState("");
 
   const title =
     source === "requests"
@@ -113,10 +112,7 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
       onConfirm: () => api.unban(u.id),
     });
   // メッセージは入力モーダル（確認ダイアログではなく本文入力・session タブと同方式）。
-  const openMessage = (username: string) => {
-    setMsgText("");
-    setMsgTo(username);
-  };
+  const openMessage = (username: string) => setMsgTo(username);
 
   let body: ReactNode;
   if (loading) {
@@ -181,38 +177,7 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
         onClose={confirm.close}
       />
 
-      <Modal
-        opened={msgTo !== null}
-        onClose={() => setMsgTo(null)}
-        title={t("session.messageTo", { user: msgTo ?? "" })}
-        centered
-      >
-        <Textarea
-          value={msgText}
-          onChange={(e) => setMsgText(e.currentTarget.value)}
-          placeholder={t("session.messagePlaceholder")}
-          autosize
-          minRows={3}
-        />
-        <Group justify="flex-end" gap="xs" mt="md">
-          <Button variant="default" onClick={() => setMsgTo(null)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            loading={send.busy}
-            disabled={!msgText.trim()}
-            onClick={() => {
-              const to = msgTo;
-              const text = msgText;
-              if (!to) return;
-              setMsgTo(null);
-              void send.run(() => api.messageUser(idx, to, text), t("toast.messageDone"));
-            }}
-          >
-            {t("session.send")}
-          </Button>
-        </Group>
-      </Modal>
+      <MessageModal idx={idx} target={msgTo} onClose={() => setMsgTo(null)} />
     </>
   );
 }
