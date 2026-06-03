@@ -34,11 +34,15 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const [loading, setLoading] = useState(false);
   const [nameModal, setNameModal] = useState<NameModalState | null>(null);
   const [centralUserId, setCentralUserId] = useState(""); // customSessionId prefix の自動入力元（R12）
+  const [draftName, setDraftName] = useState(""); // 編集可能なコンフィグ名＝保存(upsert/Save As)のターゲット
   const confirm = useConfirm();
   const apply = useAsyncAction();
 
-  // 新規/複製（original=null）は常に dirty。既存は working≠original で判定（キー順は in-place 編集で保持）。
-  const dirty = cfg !== null && (original === null || JSON.stringify(cfg) !== JSON.stringify(original));
+  // 新規/複製（original=null）は常に dirty。既存は working≠original または名前変更で判定（キー順は in-place 編集で保持）。
+  const dirty =
+    cfg !== null && (original === null || JSON.stringify(cfg) !== JSON.stringify(original) || draftName !== selected);
+  // 名前欄エラー（NAME_RE 不一致時のみ）。保存ガード＋ ConfigEditor の表示/活性に使う（検証は親に一元化）。
+  const nameError = cfg !== null && !NAME_RE.test(draftName.trim()) ? t("config.invalidName") : undefined;
 
   const refreshList = async () => {
     const l = await api.getConfigs();
@@ -56,6 +60,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
       return;
     }
     setSelected(name);
+    setDraftName(name);
     setCfg(m);
     setOriginal(m);
   };
@@ -90,16 +95,36 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     if (name !== selected) guardDiscard(() => void load(name));
   };
 
-  const save = () =>
-    apply.run(async () => {
-      if (!selected || !cfg) return { ok: true };
-      const r = await api.saveConfig(selected, cfg);
+  // 保存（アップサート・Save As）。リネーム専用 API は無いため、名前を別の新名にすると作成し元は残す。
+  //   name===selected: 同名上書き ／ name=新名: 作成（元は残す） … いずれも persist 直行。
+  //   name=別の既存名: 上書き確認を挟む。無効名は保存ガード（ボタンも disabled）。
+  const save = () => {
+    if (!cfg) return;
+    const body = cfg;
+    const name = draftName.trim();
+    if (!NAME_RE.test(name)) return;
+    const persist = async () => {
+      const r = await api.saveConfig(name, body);
       if (r.ok) {
-        setOriginal(cfg);
+        setSelected(name);
+        setDraftName(name);
+        setOriginal(body);
         await refreshList();
       }
       return r;
-    }, t("config.toastSaved"));
+    };
+    if (name !== selected && list.some((c) => c.name === name)) {
+      confirm.ask({
+        title: t("config.overwriteTitle"),
+        message: t("config.overwriteMessage", { name }),
+        danger: true,
+        success: t("config.toastSaved"),
+        onConfirm: persist,
+      });
+    } else {
+      void apply.run(persist, t("config.toastSaved"));
+    }
+  };
 
   const openNew = () => guardDiscard(() => setNameModal({ mode: "new", value: "" }));
   // 複製は一覧の行から（name 指定）。複製元の全文が要るので GET してからモーダルを開く。
@@ -132,6 +157,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
         ? (JSON.parse(JSON.stringify(nameModal.source)) as ConfigMap)
         : defaultConfig();
     setSelected(name);
+    setDraftName(name);
     setCfg(base);
     setOriginal(null); // 未保存 → dirty=true（保存で upsert）
     setNameModal(null);
@@ -141,6 +167,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     if (l[0]) void load(l[0].name);
     else {
       setSelected(null);
+      setDraftName("");
       setCfg(null);
       setOriginal(null);
     }
@@ -186,7 +213,9 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
             ) : cfg && selected ? (
               <ConfigEditor
                 key={selected}
-                name={selected}
+                draftName={draftName}
+                onDraftNameChange={setDraftName}
+                nameError={nameError}
                 cfg={cfg}
                 onChange={setCfg}
                 dirty={dirty}
