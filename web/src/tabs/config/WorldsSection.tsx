@@ -222,35 +222,10 @@ export function WorldsSection({
               onChange={sentinelW("idleRestartInterval")}
             />
           </FieldRow>
-          <FieldRow label={t("config.autoSleep")} {...resetProps("autoSleep", t("config.autoSleep"))}>
-            <Switch checked={asBool(world.autoSleep, true)} onChange={(e) => setW("autoSleep", e.currentTarget.checked)} />
-          </FieldRow>
-          <FieldRow label={t("config.hideFromPublicListing")} {...resetProps("hideFromPublicListing", t("config.hideFromPublicListing"))}>
-            <Switch
-              checked={asBool(world.hideFromPublicListing)}
-              onChange={(e) => setW("hideFromPublicListing", e.currentTarget.checked)}
-            />
-          </FieldRow>
-          {/* ResoniteLink（R13）。port は空＝自動（未設定）＝保存JSONから省く。 */}
-          <FieldRow label={t("config.enableResoniteLink")} {...resetProps("enableResoniteLink", t("config.enableResoniteLink"))}>
-            <Switch
-              checked={asBool(world.enableResoniteLink)}
-              onChange={(e) => setW("enableResoniteLink", e.currentTarget.checked)}
-            />
-          </FieldRow>
-          <FieldRow label={t("config.forceResoniteLinkPort")} {...resetProps("forceResoniteLinkPort", t("config.forceResoniteLinkPort"))}>
-            <InspectorNumberInput
-              value={asNum(world.forceResoniteLinkPort)}
-              onChange={omitW("forceResoniteLinkPort")}
-              min={1}
-              max={65535}
-              allowNegative={false}
-              placeholder={t("config.resoniteLinkPortHint")}
-            />
-          </FieldRow>
 
           <Divider my={4} color="dark.4" />
-          {/* set-once 系（強制再起動/自動保存/終了時保存/自動復帰/モバイル対応）は折りたたみ＝既定閉じ（点5）。 */}
+          {/* 上級設定（折りたたみ・既定閉じ）＝強制再起動/自動保存/終了時保存/自動復帰/モバイル対応
+              ＋自動スリープ/一覧から隠す/ResoniteLink（有効+ポート）。後者4つは基本から移動。 */}
           <CollapsibleSection title={t("common.advancedSection")}>
             <Stack gap={6}>
               {/* -1=無効 型（R6）の注記（上級のセンチネル欄＝強制再起動/自動保存 用）。 */}
@@ -275,8 +250,34 @@ export function WorldsSection({
               <FieldRow label={t("config.autoRecover")} {...resetProps("autoRecover", t("config.autoRecover"))}>
                 <Switch checked={asBool(world.autoRecover, true)} onChange={(e) => setW("autoRecover", e.currentTarget.checked)} />
               </FieldRow>
+              <FieldRow label={t("config.autoSleep")} {...resetProps("autoSleep", t("config.autoSleep"))}>
+                <Switch checked={asBool(world.autoSleep, true)} onChange={(e) => setW("autoSleep", e.currentTarget.checked)} />
+              </FieldRow>
               <FieldRow label={t("config.mobileFriendly")} {...resetProps("mobileFriendly", t("config.mobileFriendly"))}>
                 <Switch checked={asBool(world.mobileFriendly)} onChange={(e) => setW("mobileFriendly", e.currentTarget.checked)} />
+              </FieldRow>
+              <FieldRow label={t("config.hideFromPublicListing")} {...resetProps("hideFromPublicListing", t("config.hideFromPublicListing"))}>
+                <Switch
+                  checked={asBool(world.hideFromPublicListing)}
+                  onChange={(e) => setW("hideFromPublicListing", e.currentTarget.checked)}
+                />
+              </FieldRow>
+              {/* ResoniteLink（R13）。port は空＝自動（未設定）＝保存JSONから省く。 */}
+              <FieldRow label={t("config.enableResoniteLink")} {...resetProps("enableResoniteLink", t("config.enableResoniteLink"))}>
+                <Switch
+                  checked={asBool(world.enableResoniteLink)}
+                  onChange={(e) => setW("enableResoniteLink", e.currentTarget.checked)}
+                />
+              </FieldRow>
+              <FieldRow label={t("config.forceResoniteLinkPort")} {...resetProps("forceResoniteLinkPort", t("config.forceResoniteLinkPort"))}>
+                <InspectorNumberInput
+                  value={asNum(world.forceResoniteLinkPort)}
+                  onChange={omitW("forceResoniteLinkPort")}
+                  min={1}
+                  max={65535}
+                  allowNegative={false}
+                  placeholder={t("config.resoniteLinkPortHint")}
+                />
               </FieldRow>
             </Stack>
           </CollapsibleSection>
