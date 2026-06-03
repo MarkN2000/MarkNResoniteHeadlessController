@@ -41,7 +41,7 @@ Resonite Headless Controller を、要件からゼロ再定義して作り直す
 | 優先 | 内容 |
 |---|---|
 | Must | 起動/停止/再起動・コマンド送受信・ログ(SSE)・状態構造化・ユーザー操作・configエディタ・認証・単一バイナリ・CLIセットアップ |
-| Should | scheduled/userZero/手動 再起動（事前アクション=chatWarning）・**ヘッドレスのクラッシュ自動復帰**・フレンド/BAN一覧・CPU/メモリ表示(監視)・**ワールド検索(go.resonite.com スクレイピング・2026-05-31 判断修正で §Won't から格上げ・実装は将来)** |
+| Should | scheduled/userZero/手動 再起動（事前アクション=chatWarning）・**ヘッドレスのクラッシュ自動復帰**・フレンド/BAN一覧・CPU/メモリ表示(監視)・**ワールド検索(go.resonite.com スクレイピング・2026-05-31 §Won't から格上げ・2026-06-04 実装＝新規セッションタブで検索→起動)** |
 | Could | Steam更新(都度実行のみ・GuardはUI入力。§5.7)・外部連携の高度化・事前アクション拡張(itemSpawn等)・**MRHC自己更新=Lv1(バージョン表示＋GitHub更新通知＋DLリンク・差替は手動)** |
 | Won't (v1) | highLoad自動再起動・Steamのbuildid事前チェック・設定ファイル二重管理・PC起動時の自動起動(systemd/サービス) |
 

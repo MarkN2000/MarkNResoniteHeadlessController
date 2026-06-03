@@ -37,7 +37,7 @@ Phase 8 (自動再起動): 確定仕様=§3.16（2026-06-01 協議）
 Phase 9 (Resonite / Steam 統合):
   - ✅ P9-A: Resonite 公開API ユーザー検索（名/ID・無認証）＋フレンド申請/解除/招待（実装済・§3.10）
   - P9-B: Steam 更新（DepotDownloader 統一・2FA UI 入力→stdin・進捗 SSE）← 別計画・DESIGN §5.7
-  - ※ ワールド検索（go.resonite.com スクレイピング）は DESIGN Should（将来実装・2026-05-31 判断修正で §Won't から格上げ）。新規セッションは現状 URL/テンプレート方式（7-3）＋検索枠を予約（§3.12）
+  - ※ ワールド検索（go.resonite.com スクレイピング）= 2026-06-04 実装済（新規セッションタブ §3.12・上位24件→起動は既存 URL モード流用）
 ```
 
 ### 廃止した v1 機能（採用しない）
@@ -361,16 +361,18 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 
 ### 3.12 新規セッション (7-3) で確定した実装事項
 
-稼働中ヘッドレスに**ランタイムで新ワールドを開始**するタブ。バックエンド `POST /api/v1/sessions/start`（url/template・execGlobal・focus 不要・timeout 60s・commit 7bc6e9b）は実装済のため **フロントのみ**（7-2 / P9-A と同様）。コンポーネント = `web/src/tabs/newsession/`（NewSessionTab/StartPanel/WorldSearchPanel）。
+稼働中ヘッドレスに**ランタイムで新ワールドを開始**するタブ。起動バックエンド `POST /api/v1/sessions/start`（url/template・execGlobal・focus 不要・timeout 60s・commit 7bc6e9b）は実装済（StartPanel は**フロントのみ**）。ワールド検索（WorldSearchPanel）のみ後追いで**検索バックエンド1本**（`GET /api/v1/resonite/worlds`）を追加（2026-06-04）。コンポーネント = `web/src/tabs/newsession/`（NewSessionTab/StartPanel/WorldSearchPanel）。
 
-- **2セクション構成（v1 踏襲・レイアウト前方互換が主眼）**: `SplitColumns` で ① `StartPanel`（左=起動方法・機能）＋ ② `WorldSearchPanel`（右=検索して起動・**将来対応の disabled プレースホルダ**）。②を**今から枠だけ予約**することで、将来ワールド検索を実装してもレイアウトが変わらない（7-2 の「準備中(P9)」枠予約と同手法）。
+- **2セクション構成（v1 踏襲）**: `SplitColumns` で ① `StartPanel`（左=起動方法）＋ ② `WorldSearchPanel`（右=検索して起動・**2026-06-04 実装**・両枠で `onStarted` を共有）。
 - **起動方法 = URL ＋ テンプレートの2手段**（左カラム）。`InspectorCard` 内に `FieldRow` 2行（各行 値側に `Group([input][起動])`）。
   - **テンプレート = 固定3択** `Grid / Platform / Blank`（既定 Grid・`api.WORLD_TEMPLATES`・`InspectorSelect`）。v1 の `templateSuggestions` 踏襲。**他テンプレ名が現行 Resonite で使えるかは要実機採取**（§4）。
   - **URL** = `InspectorTextInput`（placeholder `resrec://...`）。**scheme をクライアント検証** `^res[-\w]*:\/\//i`（v1 踏襲）。空 or 不一致は [起動] を `disabled`、非空かつ不正時のみ下にヒント文。方針A 上、不正 URL でも backend は HTTP 200 を返し得る（＝無音失敗）ため空振りを減らす狙い。
   - **[起動]は2つともニュートラル灰**（`InspectorButton severity="neutral"`・§3.7「ボタン全般=Mid grey」踏襲。適用のような cyan filled にはしない＝ユーザー決定）。
 - **起動前に確認ダイアログあり**（`useConfirm` + `ConfirmModal`）。`confirm.busy` がモーダルの loading を駆動（startworldurl は最大60s かかり得る）。`onConfirm` が `WriteResult` を return → 結果トーストは 7-7 第1層基盤で自動（成功=緑 `toast.newSessionDone`／失敗=赤）。
 - **起動成功後はトップバーのセッション一覧を再取得**（`App.tsx` の `refreshSessions` を `onStarted` で渡す）→ 新ワールドがプルダウンに出現＝方針A の「再取得で実状態を見せる」。
-- **ワールド検索枠（右・将来実装）**: disabled 検索入力＋「準備中（将来対応）」注記＋グレーのスケルトン結果カード2枚（将来のサムネ＋名前グリッドの形）。**ワールド検索は 2026-05-31 の判断修正で DESIGN §Won't → Should に格上げ（実装は将来）**。移植元 = v1 の `go.resonite.com` HTML スクレイピング（`GET /world-search?term=` → `ol.listing li a.listing-item` から name/画像/`R-`レコードID/`U-`(or `G-`)所有者ID を抽出し `resrec:///<owner>/<record>` を生成）。公式 API にワールド検索は無いため go.resonite.com 依存（HTML 構造変更で壊れ得る点は受容）。**検索結果からの起動は既存 URL モード（`startworldurl "<resrec:// URL>"`）を流用**でき、追加バックエンドは"検索ソース1本"のみ。
+- **ワールド検索枠（右・2026-06-04 実装）**: キーワード入力（Enter可）→ `GET /api/v1/resonite/worlds?q=`（`internal/resonite.SearchWorlds`＝go.resonite.com プロキシ）→ 2カラムグリッド（サムネ `Image`／空はプレースホルダ＋名前＋所有者ID）。各カードに **[起動]**＝`useConfirm`+`ConfirmModal`→`startWorldURL(resoniteUrl)`→`onStarted`（左 StartPanel と同形）。状態は **loading / 結果 / 該当なし の3つ**（独立エラー状態なし＝`getData` の null→[] で失敗を「該当なし」に吸収・フレンド検索と同流儀）。`reqId` で連打/順序逆転ガード。
+  - **バックエンド**: `html.Parse`（`golang.org/x/net/html`・直接依存）＋再帰ヘルパ（findAll/findFirst/hasClass/textContent）で `a.listing-item` 走査。`href` 内 `/R-`＝レコードID・`/(U\|G)-`＝所有者ID、`h2.listing-item__heading` テキスト＝名前、`img` src＝サムネ（相対は origin で絶対化＝`convertIconURL` ではなく専用 `absolutize`）。`resrec:///<owner>/<record>` を生成。**上位24件**で打ち切り（サムネ読込/描画負荷抑制）。HTTP 定型は `SearchUsers`/`ResolveUserID` と共通 `Client.get(ctx,url,accept)` に集約。テスト=`worlds_test.go`（U-/G-両対応・サムネ有無・エンティティ名・壊れ要素スキップ・24件cap）。
+  - **公式 API にワールド検索は無いため go.resonite.com 依存（HTML 構造変更で壊れ得る点は受容）**。一次情報は `docs/resonite-domain-facts.md §ワールド検索`。
 - **開発支援**: fakehl は `startworldurl`/`startworldtemplate` を受理し新ワールドを worlds に追加済（スタンドインで一覧出現を確認可能）。
 - **既知の制約**: ① 不正 URL/未知テンプレは方針A で無音失敗になり得る（scheme 検証で軽減）。② 起動後の headless 自動 focus 挙動は未確定 → MVP は一覧再取得のみ（自動でセッションタブへ切替しない・将来検討）。
 

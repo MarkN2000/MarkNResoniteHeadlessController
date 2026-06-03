@@ -84,6 +84,16 @@ export interface ResoniteUser {
   iconUrl: string;
 }
 
+// go.resonite.com のワールド検索結果（internal/resonite.World）。resoniteUrl をそのまま
+// startWorldURL に渡して起動する。thumbnailUrl は https 絶対URL（空可）。
+export interface WorldResult {
+  name: string;
+  ownerId: string; // U-xxx または G-xxx
+  recordId: string; // R-xxx
+  resoniteUrl: string; // resrec:///<owner>/<record>
+  thumbnailUrl: string;
+}
+
 // UI ドロップダウン用の enum 候補（値の権威は Resonite・サーバーは値検証しない）。docs §2.4。
 export const ACCESS_LEVELS = [
   "Private",
@@ -195,6 +205,12 @@ export async function getListBans(): Promise<BanEntry[]> {
 // Resonite 公開API でユーザー検索（q が "U-" 始まりなら ID 検索・それ以外は名前検索）。
 export async function searchResoniteUsers(q: string): Promise<ResoniteUser[]> {
   return (await getData<ResoniteUser[]>(`/resonite/users?q=${encodeURIComponent(q)}`)) ?? [];
+}
+
+// go.resonite.com の公開ワールドを検索（HTML スクレイピング・上位24件）。
+// 失敗（不達・構造変化）は getData が null→[] に吸収＝「該当なし」表示になる。
+export async function searchResoniteWorlds(q: string): Promise<WorldResult[]> {
+  return (await getData<WorldResult[]>(`/resonite/worlds?q=${encodeURIComponent(q)}`)) ?? [];
 }
 
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---

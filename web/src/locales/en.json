@@ -147,10 +147,11 @@
     "confirmTitle": "Open a session",
     "confirmTemplate": "Open a session from template \"{{template}}\"?",
     "confirmUrl": "Open a session from this URL?",
+    "confirmWorld": "Open a session from \"{{name}}\"?",
     "keyword": "Keyword",
     "keywordPlaceholder": "World name",
     "search": "Search",
-    "searchSoon": "Coming later"
+    "noResults": "No results"
   },
   "config": {
     "listTitle": "Configs",

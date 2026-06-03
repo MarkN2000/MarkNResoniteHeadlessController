@@ -119,7 +119,11 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 - **認証**: 不要（`User-Agent` を付けるのみ）。✅ v1 実装＋2026-05-31 実機確認（`MarkN` 検索で4件取得）。
 - **ユーザーオブジェクト（使用フィールド）**: `id`(U-xxx) / `username`（無ければ `normalizedUsername`）/ `profile.iconUrl`。
 - **アバターURL**: `iconUrl` は `resdb:///<hash>.<ext>` 形式 → `https://assets.resonite.com/<hash>`（拡張子除去）に変換すると画像取得可。
-- **ワールド検索**: 公式 `api.resonite.com` には**ワールド検索が無い**（ユーザー検索のみ）。v1 は `go.resonite.com` の HTML スクレイピングで実現。DESIGN Should（2026-05-31 判断修正で §Won't から格上げ・実装は将来）。
+- **ワールド検索**: 公式 `api.resonite.com` には**ワールド検索が無い**（ユーザー検索のみ）。`go.resonite.com` の HTML スクレイピングで実現。✅ 2026-06-04 実装＋実機HTML確認。
+  - **取得**: `GET https://go.resonite.com/world?term=<q>`（サーバーレンダリングHTML・無認証・`User-Agent` のみ）。
+  - **抽出**: `ol.listing li a.listing-item` → `h2.listing-item__heading` テキスト=名前 / `href` 内 `/R-xxx`=レコードID / `/(U\|G)-xxx`=所有者ID / `img` src=サムネ（相対は `https://go.resonite.com` で絶対化）。
+  - **起動URL**: `resrec:///<owner>/<record>` を生成 → 既存 `startworldurl` 経路へ。**HTML 構造変更で壊れ得る点は受容**。失敗は「該当なし」に吸収（ユーザー検索と同流儀）。
+  - **配線**: `internal/resonite.SearchWorlds`（go.resonite.com プロキシ・上位24件）＋ `GET /api/v1/resonite/worlds?q=`。ブラウザ直叩きは CORS 不可なため必ずバックエンド経由。
 
 ---
 

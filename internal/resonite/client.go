@@ -1,10 +1,13 @@
-// Package resonite は Resonite 公開クラウドAPI（api.resonite.com）への薄いクライアント。
-// 現状はユーザー検索のみ（無認証・公開エンドポイント）。フレンド申請/招待の「相手探し」に使う。
-// world 検索（go.resonite.com）は対象外（docs/DESIGN.md §Won't）。
+// Package resonite は Resonite 公開クラウド（api.resonite.com）と公開ワールド一覧
+// （go.resonite.com）への薄い読み取りクライアント。無認証・公開エンドポイントのみ。
+//   - ユーザー検索（api.resonite.com/users・JSON）= フレンド申請/招待の「相手探し」
+//   - ワールド検索（go.resonite.com/world・HTML スクレイピング）= 新規セッションの起動元探し。
+//     公式APIにワールド検索が無いため go.resonite.com 依存（HTML 構造変更で壊れ得る）。worlds.go。
 //
-// エンドポイント（v1 実装・無認証で確認済）:
+// エンドポイント（無認証で確認済）:
 //   - 名前検索: GET /users/?name=<q>  → ユーザー配列
 //   - ID検索:   GET /users/<U-id>     → 単一ユーザー
+//   - ワールド検索: GET go.resonite.com/world?term=<q> → HTML（worlds.go でパース）
 package resonite
 
 import (
@@ -19,11 +22,12 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.resonite.com"
-	assetsBaseURL  = "https://assets.resonite.com"
-	userAgent      = "MRHC/2.0"
-	httpTimeout    = 8 * time.Second
-	maxBodyBytes   = 1 << 20 // 1 MiB（公開APIの応答は十分小さい・安全網）
+	defaultBaseURL       = "https://api.resonite.com"
+	defaultWorldsBaseURL = "https://go.resonite.com"
+	assetsBaseURL        = "https://assets.resonite.com"
+	userAgent            = "MRHC/2.0"
+	httpTimeout          = 8 * time.Second
+	maxBodyBytes         = 1 << 20 // 1 MiB（公開APIの応答は十分小さい・安全網）
 )
 
 // User は検索結果1件（UI に必要な最小限）。
@@ -33,20 +37,50 @@ type User struct {
 	IconURL  string `json:"iconUrl"` // https に正規化済（空可）
 }
 
-// Client は Resonite 公開API クライアント。baseURL はテストで差し替え可能。
+// Client は Resonite 公開クライアント。baseURL（api）/ worldsBaseURL（go）はテストで差し替え可能。
 type Client struct {
-	http    *http.Client
-	baseURL string
+	http          *http.Client
+	baseURL       string // api.resonite.com
+	worldsBaseURL string // go.resonite.com
 }
 
-// NewClient は本番用クライアント（api.resonite.com）を返す。
+// NewClient は本番用クライアント（api.resonite.com / go.resonite.com）を返す。
 func NewClient() *Client {
-	return &Client{http: &http.Client{Timeout: httpTimeout}, baseURL: defaultBaseURL}
+	return NewClientWithBases(defaultBaseURL, defaultWorldsBaseURL)
 }
 
-// NewClientWithBase はテスト用に baseURL を差し替えたクライアントを返す。
+// NewClientWithBase はテスト用に api baseURL を差し替える（worlds は既定）。
 func NewClientWithBase(base string) *Client {
-	return &Client{http: &http.Client{Timeout: httpTimeout}, baseURL: base}
+	return NewClientWithBases(base, defaultWorldsBaseURL)
+}
+
+// NewClientWithBases はテスト用に api / worlds 両 baseURL を差し替えたクライアントを返す。
+func NewClientWithBases(apiBase, worldsBase string) *Client {
+	return &Client{http: &http.Client{Timeout: httpTimeout}, baseURL: apiBase, worldsBaseURL: worldsBase}
+}
+
+// get は GET リクエストを送り、本文（最大 maxBodyBytes）・ステータス・エラーを返す共通実装。
+// accept は Accept ヘッダ（"application/json" / "text/html"）。ステータスの意味付け
+// （404=ゼロ件・非200=エラー等）は呼び出し側が行う。SearchUsers/ResolveUserID/SearchWorlds で共有。
+func (c *Client) get(ctx context.Context, url, accept string) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", accept)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+	return body, resp.StatusCode, nil
 }
 
 // apiUser は /users レスポンスのうち必要なフィールドだけ拾う。
@@ -78,29 +112,15 @@ func (c *Client) SearchUsers(ctx context.Context, term string) ([]User, error) {
 		url = c.baseURL + "/users/?name=" + neturl.QueryEscape(term)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, status, err := c.get(ctx, url, "application/json")
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
+	if status == http.StatusNotFound {
 		return nil, nil // ID検索で存在しない等 → 結果ゼロ
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("resonite api: status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
-	if err != nil {
-		return nil, err
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("resonite api: status %d", status)
 	}
 
 	var raws []apiUser
@@ -138,24 +158,12 @@ func (c *Client) ResolveUserID(ctx context.Context, username string) (string, er
 		return "", nil // 空 / 既に ID 形式 / メールは名前検索で解決できない＝対象外
 	}
 	url := c.baseURL + "/users/?name=" + neturl.QueryEscape(username)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, status, err := c.get(ctx, url, "application/json")
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if status != http.StatusOK {
 		return "", nil // 404 等は未解決扱い
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
-	if err != nil {
-		return "", err
 	}
 	var raws []apiUser
 	if err := json.Unmarshal(body, &raws); err != nil {

@@ -147,10 +147,11 @@
     "confirmTitle": "セッションを開く",
     "confirmTemplate": "{{template}} でセッションを開きますか？",
     "confirmUrl": "この URL でセッションを開きますか？",
+    "confirmWorld": "『{{name}}』でセッションを開きますか？",
     "keyword": "キーワード",
     "keywordPlaceholder": "ワールド名",
     "search": "検索",
-    "searchSoon": "準備中（将来対応）"
+    "noResults": "該当なし"
   },
   "config": {
     "listTitle": "コンフィグ",

@@ -161,6 +161,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Resonite 公開API（ユーザー検索）。フレンド申請/招待の相手探しに使う（無認証プロキシ・P9-A）。
 	mux.HandleFunc("GET /api/v1/resonite/users", s.requireAuth(s.handleResoniteUserSearch))
+	mux.HandleFunc("GET /api/v1/resonite/worlds", s.requireAuth(s.handleResoniteWorldSearch))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
@@ -447,6 +448,27 @@ func (s *Server) handleResoniteUserSearch(w http.ResponseWriter, r *http.Request
 		users = []resonite.User{} // null ではなく [] を返す
 	}
 	writeOK(w, users)
+}
+
+// handleResoniteWorldSearch: GET /api/v1/resonite/worlds?q=<term> → []resonite.World
+// go.resonite.com のワールド検索（HTML スクレイピング）への無認証プロキシ。公式APIにワールド
+// 検索が無いため go.resonite.com 依存（HTML 構造変更で壊れ得る）。ヘッドレス稼働は不要。
+// 検索失敗（不達・非200）は 502。フロントは getData の null→[] でゼロ件表示に吸収する。
+func (s *Server) handleResoniteWorldSearch(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		writeErr(w, http.StatusBadRequest, "missing_query", "検索語 q は必須です")
+		return
+	}
+	worlds, err := s.resonite.SearchWorlds(r.Context(), q)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "resonite_api_error", err.Error())
+		return
+	}
+	if worlds == nil {
+		worlds = []resonite.World{} // null ではなく [] を返す
+	}
+	writeOK(w, worlds)
 }
 
 // parseSessionIdx は /api/v1/sessions/{idx}/... のパスパラメータを int に変換する。
