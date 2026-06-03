@@ -14,7 +14,7 @@ export function ConfigEditor({
   nameError,
   cfg,
   onChange,
-  dirty,
+  canSave,
   saving,
   onSave,
   centralUserId,
@@ -24,7 +24,7 @@ export function ConfigEditor({
   nameError?: string;
   cfg: ConfigMap;
   onChange: (cfg: ConfigMap) => void;
-  dirty: boolean;
+  canSave: boolean; // 変更あり かつ 名前が有効（filled 表示＋活性の単一条件）
   saving: boolean;
   onSave: () => void;
   centralUserId?: string; // customSessionId prefix の自動入力元（R12）
@@ -36,6 +36,7 @@ export function ConfigEditor({
         <FieldRow label={t("config.nameLabel")}>
           <InspectorTextInput
             value={draftName}
+            placeholder="my-config"
             onChange={(e) => onDraftNameChange(e.currentTarget.value)}
             error={nameError}
           />
@@ -47,9 +48,9 @@ export function ConfigEditor({
         <Button
           fullWidth
           size="xs"
-          variant={dirty ? "filled" : "default"}
+          variant={canSave ? "filled" : "default"}
           color="brand"
-          disabled={!dirty || !!nameError}
+          disabled={!canSave}
           loading={saving}
           onClick={onSave}
         >

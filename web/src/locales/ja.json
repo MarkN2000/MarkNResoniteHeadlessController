@@ -165,11 +165,8 @@
   "config": {
     "listTitle": "コンフィグ",
     "new": "新規",
-    "newTitle": "新しいコンフィグ",
-    "duplicateTitle": "コンフィグを複製",
     "nameLabel": "コンフィグ名",
     "invalidName": "英数・_・- のみ、1〜64文字",
-    "nameCollision": "同名のコンフィグが既にあります",
     "editorTitle": "編集・作成",
     "overwriteTitle": "上書き保存",
     "overwriteMessage": "『{{name}}』は既にあります。上書きしますか？",

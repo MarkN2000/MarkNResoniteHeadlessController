@@ -165,11 +165,8 @@
   "config": {
     "listTitle": "Configs",
     "new": "New",
-    "newTitle": "New config",
-    "duplicateTitle": "Duplicate config",
     "nameLabel": "Config name",
     "invalidName": "Alphanumeric, _, - only; 1-64 chars",
-    "nameCollision": "A config with this name already exists",
     "editorTitle": "Edit / Create",
     "overwriteTitle": "Overwrite",
     "overwriteMessage": "\"{{name}}\" already exists. Overwrite?",

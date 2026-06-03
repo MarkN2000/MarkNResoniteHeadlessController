@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Center, Group, Loader, Modal, ScrollArea, Text, TextInput } from "@mantine/core";
+import { Box, Center, Loader, ScrollArea, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import type { ConfigSummary } from "../../api";
@@ -16,13 +16,6 @@ import { defaultConfig } from "./configModel";
 // config 名のバリデーション（backend の SanitizeName と同じ・パストラバーサル防止）。
 const NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-interface NameModalState {
-  mode: "new" | "duplicate";
-  value: string;
-  error?: string;
-  source?: ConfigMap; // 複製元の全文（行から複製時に GET したもの）
-}
-
 // コンフィグタブの container（§3.14）。一覧/読込/保存/複製/削除と未保存ガードを集約。
 // working map（cfg）を単一の真実とし、未知/レア項目はキーを落とさず温存される。
 export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }) {
@@ -32,23 +25,35 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const [cfg, setCfg] = useState<ConfigMap | null>(null);
   const [original, setOriginal] = useState<ConfigMap | null>(null);
   const [loading, setLoading] = useState(false);
-  const [nameModal, setNameModal] = useState<NameModalState | null>(null);
   const [centralUserId, setCentralUserId] = useState(""); // customSessionId prefix の自動入力元（R12）
   const [draftName, setDraftName] = useState(""); // 編集可能なコンフィグ名＝保存(upsert/Save As)のターゲット
+  const [formNonce, setFormNonce] = useState(0); // 編集セッションごとに++＝ConfigEditor の key（毎回再マウントしバッファ入力を再シード）
   const confirm = useConfirm();
   const apply = useAsyncAction();
 
   // 新規/複製（original=null）は常に dirty。既存は working≠original または名前変更で判定（キー順は in-place 編集で保持）。
   const dirty =
     cfg !== null && (original === null || JSON.stringify(cfg) !== JSON.stringify(original) || draftName !== selected);
-  // 名前欄エラー（NAME_RE 不一致時のみ）。保存ガード＋ ConfigEditor の表示/活性に使う（検証は親に一元化）。
-  const nameError = cfg !== null && !NAME_RE.test(draftName.trim()) ? t("config.invalidName") : undefined;
+  // 名前の検証は親に一元化。エラー文言は「入力済みで不正」な時だけ出す（空の新規欄を即赤にしない）。
+  const nameValid = NAME_RE.test(draftName.trim());
+  const nameError = draftName.trim() !== "" && !nameValid ? t("config.invalidName") : undefined;
+  const canSave = dirty && nameValid; // 保存ボタンの活性＝変更あり かつ 名前が有効
 
   const refreshList = async () => {
     const l = await api.getConfigs();
     setList(l);
     onConfigsChanged(); // トップバーの config 選択肢も更新
     return l;
+  };
+
+  // 編集セッションを初期化（読込/新規/複製/空 で共通）。formNonce を進めて ConfigEditor を再マウントし、
+  // バッファ付き入力（タグ/autoSpawn 等）を確実に再シードする。未保存ドラフトは selected=null。
+  const seedEditor = (sel: string | null, name: string, cfgVal: ConfigMap | null, orig: ConfigMap | null) => {
+    setSelected(sel);
+    setDraftName(name);
+    setCfg(cfgVal);
+    setOriginal(orig);
+    setFormNonce((n) => n + 1);
   };
 
   const load = async (name: string) => {
@@ -59,10 +64,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
       notifyError(t("config.loadFailed"));
       return;
     }
-    setSelected(name);
-    setDraftName(name);
-    setCfg(m);
-    setOriginal(m);
+    seedEditor(name, name, m, m);
   };
 
   // 初回: 一覧取得 → 先頭を読込。中央アカウントの解決済 UserID も取得（prefix 自動入力用・R12）。
@@ -126,8 +128,9 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     }
   };
 
-  const openNew = () => guardDiscard(() => setNameModal({ mode: "new", value: "" }));
-  // 複製は一覧の行から（name 指定）。複製元の全文が要るので GET してからモーダルを開く。
+  // 新規＝同梱デフォルト雛形の未保存ドラフト（名前は空＝インライン入力。保存で upsert/Save As）。
+  const openNew = () => guardDiscard(() => seedEditor(null, "", defaultConfig(), null));
+  // 複製＝複製元を GET してクローンした未保存ドラフト（名前は "<元>-copy" を初期表示・編集可）。
   const openDuplicate = (name: string) =>
     guardDiscard(() => {
       void (async () => {
@@ -136,41 +139,13 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
           notifyError(t("config.loadFailed"));
           return;
         }
-        setNameModal({ mode: "duplicate", value: `${name}-copy`, source: m });
+        seedEditor(null, `${name}-copy`, JSON.parse(JSON.stringify(m)) as ConfigMap, null);
       })();
     });
 
-  const confirmName = () => {
-    if (!nameModal) return;
-    const name = nameModal.value.trim();
-    if (!NAME_RE.test(name)) {
-      setNameModal({ ...nameModal, error: t("config.invalidName") });
-      return;
-    }
-    if (list.some((c) => c.name === name)) {
-      setNameModal({ ...nameModal, error: t("config.nameCollision") });
-      return;
-    }
-    // 複製は GET した複製元（source）をクローン。新規は同梱デフォルト雛形。
-    const base: ConfigMap =
-      nameModal.mode === "duplicate" && nameModal.source
-        ? (JSON.parse(JSON.stringify(nameModal.source)) as ConfigMap)
-        : defaultConfig();
-    setSelected(name);
-    setDraftName(name);
-    setCfg(base);
-    setOriginal(null); // 未保存 → dirty=true（保存で upsert）
-    setNameModal(null);
-  };
-
   const selectFirst = (l: ConfigSummary[]) => {
     if (l[0]) void load(l[0].name);
-    else {
-      setSelected(null);
-      setDraftName("");
-      setCfg(null);
-      setOriginal(null);
-    }
+    else seedEditor(null, "", null, null);
   };
 
   // 削除は一覧の行から（name 指定・行は保存済み config のみ）。選択中を消したら先頭へ繰り上げ。
@@ -210,15 +185,15 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
               <Center h={200}>
                 <Loader />
               </Center>
-            ) : cfg && selected ? (
+            ) : cfg ? (
               <ConfigEditor
-                key={selected}
+                key={formNonce}
                 draftName={draftName}
                 onDraftNameChange={setDraftName}
                 nameError={nameError}
                 cfg={cfg}
                 onChange={setCfg}
-                dirty={dirty}
+                canSave={canSave}
                 saving={apply.busy}
                 onSave={save}
                 centralUserId={centralUserId}
@@ -231,33 +206,6 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
           }
         />
       </Box>
-
-      <Modal
-        opened={nameModal !== null}
-        onClose={() => setNameModal(null)}
-        title={nameModal?.mode === "duplicate" ? t("config.duplicateTitle") : t("config.newTitle")}
-        centered
-      >
-        <TextInput
-          label={t("config.nameLabel")}
-          placeholder="my-config"
-          value={nameModal?.value ?? ""}
-          error={nameModal?.error}
-          data-autofocus
-          onChange={(e) => nameModal && setNameModal({ ...nameModal, value: e.currentTarget.value, error: undefined })}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") confirmName();
-          }}
-        />
-        <Group justify="flex-end" gap="xs" mt="md">
-          <Button variant="default" onClick={() => setNameModal(null)}>
-            {t("common.cancel")}
-          </Button>
-          <Button color="brand" onClick={confirmName}>
-            {t("common.confirm")}
-          </Button>
-        </Group>
-      </Modal>
 
       <ConfirmModal
         opened={confirm.request !== null}
