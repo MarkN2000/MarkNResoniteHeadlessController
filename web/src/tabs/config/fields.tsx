@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { ActionIcon, Group, Stack, Text } from "@mantine/core";
-import { InspectorTextInput } from "../../components/inspector";
+import type { NumberInputProps } from "@mantine/core";
+import { InspectorNumberInput, InspectorTextInput } from "../../components/inspector";
 import { joinCustomSessionId, splitCustomSessionId } from "./configModel";
+
+// -1=無効 のセンチネル数値入力。下限を -1 に固定（InspectorNumberInput の strict で -1 未満は打てない）。
+// 整数のみ・空欄→-1 の正規化は呼び出し側（WorldsSection の sentinelW）が担う。-1 の下限はここ1箇所。
+export function SentinelNumberInput(props: NumberInputProps) {
+  return <InspectorNumberInput min={-1} {...props} />;
+}
 
 // config 固有のフィールド widget。配列/結合値を文字列フォームで編集する際の「タイプ途中の状態」
 // 喪失を防ぐため内部 state を持つ（map へは確定値のみ書く）。呼び出し側は key で再シードする

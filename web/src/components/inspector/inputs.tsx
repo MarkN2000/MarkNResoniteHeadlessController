@@ -10,8 +10,20 @@ export function InspectorTextInput(props: TextInputProps) {
   return <TextInput size="xs" variant="filled" {...props} styles={FIELD_INPUT_STYLES} />;
 }
 
+// 数値欄は既定で「整数のみ（allowDecimal=false）」かつ「範囲外は入力させない（clampBehavior=strict）」。
+// Resonite/スケジュールの数値は実質すべて int のため既定を整数に統一する。両既定は {...props} の前に
+// 置き、呼び出し側で上書き可（例: 多桁 min の年フィールドは clampBehavior="blur" を渡す）。
 export function InspectorNumberInput(props: NumberInputProps) {
-  return <NumberInput size="xs" variant="filled" {...props} styles={FIELD_INPUT_STYLES} />;
+  return (
+    <NumberInput
+      size="xs"
+      variant="filled"
+      allowDecimal={false}
+      clampBehavior="strict"
+      {...props}
+      styles={FIELD_INPUT_STYLES}
+    />
+  );
 }
 
 export function InspectorTextarea(props: TextareaProps) {

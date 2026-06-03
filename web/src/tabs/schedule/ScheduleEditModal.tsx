@@ -90,6 +90,7 @@ export function ScheduleEditModal({
                   min={MIN_YEAR}
                   max={2100}
                   allowNegative={false}
+                  clampBehavior="blur"
                   style={{ flex: 1 }}
                 />
                 <Text size="sm" c="dimmed" style={dateUnitStyle}>

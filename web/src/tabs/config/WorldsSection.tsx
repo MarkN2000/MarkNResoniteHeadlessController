@@ -26,7 +26,7 @@ import {
   removeWorld,
   setWorld,
 } from "./configModel";
-import { BufferedTextInput, CustomSessionIdInput } from "./fields";
+import { BufferedTextInput, CustomSessionIdInput, SentinelNumberInput } from "./fields";
 
 // -1=無効 型フィールドの既定値（sample/default.json のスキーマ値・R6）。
 // 未設定なら既定を表示し、空欄にされたら -1（無効）へスナップして「必ず数値」を保つ。
@@ -200,25 +200,25 @@ export function WorldsSection({
               </FieldRow>
               {/* -1=無効 型（R6）: 未設定なら既定値を表示し、空欄は -1 へスナップ＝常に数値。 */}
               <FieldRow label={t("config.awayKickMinutes")} {...resetProps("awayKickMinutes", t("config.awayKickMinutes"))}>
-                <InspectorNumberInput
+                <SentinelNumberInput
                   value={asNumOr(world.awayKickMinutes, SENTINEL_DEFAULTS.awayKickMinutes)}
                   onChange={sentinelW("awayKickMinutes")}
                 />
               </FieldRow>
               <FieldRow label={t("config.idleRestartInterval")} {...resetProps("idleRestartInterval", t("config.idleRestartInterval"))}>
-                <InspectorNumberInput
+                <SentinelNumberInput
                   value={asNumOr(world.idleRestartInterval, SENTINEL_DEFAULTS.idleRestartInterval)}
                   onChange={sentinelW("idleRestartInterval")}
                 />
               </FieldRow>
               <FieldRow label={t("config.forcedRestartInterval")} {...resetProps("forcedRestartInterval", t("config.forcedRestartInterval"))}>
-                <InspectorNumberInput
+                <SentinelNumberInput
                   value={asNumOr(world.forcedRestartInterval, SENTINEL_DEFAULTS.forcedRestartInterval)}
                   onChange={sentinelW("forcedRestartInterval")}
                 />
               </FieldRow>
               <FieldRow label={t("config.autosaveInterval")} {...resetProps("autosaveInterval", t("config.autosaveInterval"))}>
-                <InspectorNumberInput
+                <SentinelNumberInput
                   value={asNumOr(world.autosaveInterval, SENTINEL_DEFAULTS.autosaveInterval)}
                   onChange={sentinelW("autosaveInterval")}
                 />
