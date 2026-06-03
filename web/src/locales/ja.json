@@ -151,7 +151,12 @@
     "keyword": "キーワード",
     "keywordPlaceholder": "ワールド名",
     "search": "検索",
-    "noResults": "該当なし"
+    "noResults": "該当なし",
+    "favorites": "お気に入り",
+    "showFavorites": "お気に入りを表示",
+    "addFavorite": "お気に入りに追加",
+    "removeFavorite": "お気に入りから削除",
+    "noFavorites": "お気に入りはありません"
   },
   "config": {
     "listTitle": "コンフィグ",

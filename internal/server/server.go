@@ -46,6 +46,10 @@ type Server struct {
 	// runtimeMu は runtime-state.json（last-used / 最終起動）の read-modify-write を直列化する
 	// （handleStart〔HTTP〕と orchestrator/crash-monitor〔goroutine〕からの並行書き込みを防ぐ）。
 	runtimeMu sync.Mutex
+
+	// favMu は favorites.json（ワールドお気に入り）の read-modify-write を直列化する
+	// （add/remove の並行リクエストでの取りこぼし・上書きを防ぐ）。
+	favMu sync.Mutex
 }
 
 func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *resonite.Client, webFS fs.FS) *Server {
@@ -162,6 +166,11 @@ func (s *Server) Handler() http.Handler {
 	// Resonite 公開API（ユーザー検索）。フレンド申請/招待の相手探しに使う（無認証プロキシ・P9-A）。
 	mux.HandleFunc("GET /api/v1/resonite/users", s.requireAuth(s.handleResoniteUserSearch))
 	mux.HandleFunc("GET /api/v1/resonite/worlds", s.requireAuth(s.handleResoniteWorldSearch))
+
+	// ワールドお気に入り（favorites.json・新規セッションの検索→保存／一覧）。
+	mux.HandleFunc("GET /api/v1/favorites", s.requireAuth(s.handleFavoritesList))
+	mux.HandleFunc("POST /api/v1/favorites", s.requireAuth(s.handleFavoriteAdd))
+	mux.HandleFunc("DELETE /api/v1/favorites/{recordId}", s.requireAuth(s.handleFavoriteRemove))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {

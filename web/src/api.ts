@@ -119,9 +119,10 @@ async function req(path: string, init?: RequestInit): Promise<Response> {
 }
 
 // 封筒から data を取り出す。失敗（HTTP エラー / ネットワーク不通）時は null。
-async function getData<T>(path: string): Promise<T | null> {
+// init を渡せば POST/DELETE 等でも更新後 data を取り出せる（お気に入り add/remove で利用）。
+async function getData<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
-    const res = await req(path);
+    const res = await req(path, init);
     if (!res.ok) return null;
     const j = await res.json();
     return (j.data ?? null) as T | null;
@@ -211,6 +212,21 @@ export async function searchResoniteUsers(q: string): Promise<ResoniteUser[]> {
 // 失敗（不達・構造変化）は getData が null→[] に吸収＝「該当なし」表示になる。
 export async function searchResoniteWorlds(q: string): Promise<WorldResult[]> {
   return (await getData<WorldResult[]>(`/resonite/worlds?q=${encodeURIComponent(q)}`)) ?? [];
+}
+
+// --- ワールドお気に入り（favorites.json・サーバー保存。add/remove は更新後一覧を返す） ---
+
+// 一覧取得（追加順）。失敗時は空配列。
+export async function getFavorites(): Promise<WorldResult[]> {
+  return (await getData<WorldResult[]>("/favorites")) ?? [];
+}
+// 追加（冪等）。更新後一覧を返す。失敗時は null（呼び出し側はローカル状態を維持）。
+export async function addFavorite(w: WorldResult): Promise<WorldResult[] | null> {
+  return getData<WorldResult[]>("/favorites", { method: "POST", body: JSON.stringify(w) });
+}
+// 削除（recordId 指定）。更新後一覧を返す。失敗時は null。
+export async function removeFavorite(recordId: string): Promise<WorldResult[] | null> {
+  return getData<WorldResult[]>(`/favorites/${encodeURIComponent(recordId)}`, { method: "DELETE" });
 }
 
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---

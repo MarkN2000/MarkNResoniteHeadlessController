@@ -151,7 +151,12 @@
     "keyword": "Keyword",
     "keywordPlaceholder": "World name",
     "search": "Search",
-    "noResults": "No results"
+    "noResults": "No results",
+    "favorites": "Favorites",
+    "showFavorites": "Show favorites",
+    "addFavorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
+    "noFavorites": "No favorites yet"
   },
   "config": {
     "listTitle": "Configs",

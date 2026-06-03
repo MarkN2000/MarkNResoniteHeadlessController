@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -187,26 +186,19 @@ func (s *Server) runtimeStatePath() string {
 }
 
 // loadRuntimeStateLocked / saveRuntimeStateLocked は runtimeMu 保持前提の素の read/write。
+// 実体は jsonstate.go の汎用ヘルパ（favorites と共有）。dataDir 未設定（テスト等）は no-op。
 func (s *Server) loadRuntimeStateLocked() runtimeState {
-	var st runtimeState
 	if s.dataDir == "" {
-		return st
+		return runtimeState{}
 	}
-	b, err := os.ReadFile(s.runtimeStatePath())
-	if err != nil {
-		return st
-	}
-	_ = json.Unmarshal(b, &st)
-	return st
+	return readJSONFile[runtimeState](s.runtimeStatePath())
 }
 
 func (s *Server) saveRuntimeStateLocked(st runtimeState) {
 	if s.dataDir == "" {
 		return
 	}
-	if b, err := json.MarshalIndent(st, "", "  "); err == nil {
-		_ = os.WriteFile(s.runtimeStatePath(), b, 0o600)
-	}
+	writeJSONFile(s.runtimeStatePath(), st)
 }
 
 func (s *Server) loadLastUsed() string {
