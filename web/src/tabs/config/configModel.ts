@@ -64,7 +64,7 @@ export function defaultConfig(): ConfigMap {
     dataFolder: null,
     cacheFolder: null,
     logsFolder: null,
-    allowedUrlHosts: null,
+    allowedUrlHosts: ["https://ttsapi.markn2000.com/"],
     autoSpawnItems: null,
   };
 }
