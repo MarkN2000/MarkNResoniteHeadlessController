@@ -29,7 +29,9 @@
     "checkUpdate": "更新を確認（準備中）",
     "selectConfig": "コンフィグを選択",
     "noConfig": "コンフィグタブで作成してください",
-    "noSession": "セッションなし"
+    "noSession": "セッションなし",
+    "starting": "起動中…",
+    "startingElapsed": "起動中… {{sec}}秒"
   },
   "placeholder": {
     "comingSoon": "このタブは次の段階で実装します",

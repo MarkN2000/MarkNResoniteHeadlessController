@@ -29,7 +29,9 @@
     "checkUpdate": "Check for updates (soon)",
     "selectConfig": "Select config",
     "noConfig": "Create one in the Config tab",
-    "noSession": "No session"
+    "noSession": "No session",
+    "starting": "Starting…",
+    "startingElapsed": "Starting… {{sec}}s"
   },
   "placeholder": {
     "comingSoon": "This tab will be built in a later step",

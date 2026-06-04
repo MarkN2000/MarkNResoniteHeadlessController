@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionIcon, Burger, Button, Group, Menu, Select, Text } from "@mantine/core";
+import { ActionIcon, Burger, Button, Group, Loader, Menu, Select, Text } from "@mantine/core";
 import type { ConfigSummary, Status, World } from "../api";
 import { LANGUAGES, setLanguage } from "../i18n";
 
@@ -82,14 +83,38 @@ function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: numbe
   );
 }
 
-// トップバー（2モード）。docs/design/phase-7-spec.md §3.2。
-//   稼働中: 🎯フォーカス切替 + ⋮（強制停止/更新[P9]/言語/ログアウト）
+// 起動中インジケータ（state==="starting" の間だけマウント）。経過秒は startedAt から算出し、
+// 自前の1秒 interval で更新する（このコンポーネントだけ再描画＝不要時はタイマーも止まる）。
+// startedAt 欠落時は秒を出さず「起動中…」のみ。クロックスキューで負値にならないよう 0 でクランプ。
+function StartingIndicator({ startedAt }: { startedAt?: string }) {
+  const { t } = useTranslation();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const sec = startedAt ? Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000)) : null;
+  return (
+    <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+      <Loader size="sm" />
+      <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {sec === null ? t("topbar.starting") : t("topbar.startingElapsed", { sec })}
+      </Text>
+    </Group>
+  );
+}
+
+// トップバー（3モード）。docs/design/phase-7-spec.md §3.2。
+//   稼働中: 🎯フォーカス切替 + ⋮（通常停止/強制停止・更新[P9]/言語/ログアウト）
+//   起動中: ⟳ 起動中… N秒 + ⋮（強制停止のみ・更新[P9]/言語/ログアウト）
 //   停止中: [起動] + config選択 + ⋮（更新[P9]/言語/ログアウト）
 export function TopBar(props: TopBarProps) {
   const { t, i18n } = useTranslation();
-  const stopped = (props.status?.state ?? "stopped") === "stopped";
+  const state = props.status?.state ?? "stopped";
+  const stopped = state === "stopped";
+  const starting = state === "starting";
 
-  const overflowMenu = (showForceStop: boolean) => (
+  const overflowMenu = (showForceStop: boolean, showGracefulStop: boolean) => (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
         <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0, marginLeft: "auto" }}>
@@ -99,7 +124,9 @@ export function TopBar(props: TopBarProps) {
       <Menu.Dropdown>
         {showForceStop && (
           <>
-            <Menu.Item onClick={props.onGracefulStop}>{t("topbar.gracefulStop")}</Menu.Item>
+            {showGracefulStop && (
+              <Menu.Item onClick={props.onGracefulStop}>{t("topbar.gracefulStop")}</Menu.Item>
+            )}
             <Menu.Item color="red" onClick={props.onStop}>
               {t("topbar.forceStop")}
             </Menu.Item>
@@ -155,6 +182,8 @@ export function TopBar(props: TopBarProps) {
             </Text>
           )}
         </>
+      ) : starting ? (
+        <StartingIndicator startedAt={props.status?.startedAt} />
       ) : (
         <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
           <Menu.Target>
@@ -183,7 +212,7 @@ export function TopBar(props: TopBarProps) {
         </Menu>
       )}
 
-      {overflowMenu(!stopped)}
+      {overflowMenu(!stopped, !stopped && !starting)}
     </Group>
   );
 }
