@@ -73,9 +73,74 @@ export function CustomSessionIdInput({
   );
 }
 
-// 文字列配列の add/remove リスト（配列の生 JSON 編集を避ける）。
-// allowedUrlHosts / autoInviteUsernames / inviteRequestHandlerUsernames / parentSessionIds で共用。
-// committed なリストは props 駆動（draft のみ内部 state）＝リセット/外部変更に追従できる。
+// 1行=セル配列の in-place 行エディタ（許可ホスト=1列・デフォルトロール=2列 等を統一）。
+// 既存項目もそのまま入力欄で、＋で空行追加・×で行削除・その場編集可。入力途中を保持するため内部 state
+// （buffered）で、変更のたびに onRowsChange(rows) を呼ぶ。空キー行の除外や保存形(string[]/object)への
+// 直列化は呼び出し側アダプタ（StringListInput / RolePairsInput）が担う。key で再シードする。
+export type CellSpec =
+  | { kind: "text"; placeholder?: string }
+  | { kind: "select"; options: readonly string[]; width?: number; addDefault: string };
+
+export function RowsEditor({
+  columns,
+  initialRows,
+  onRowsChange,
+  addLabel,
+}: {
+  columns: CellSpec[];
+  initialRows: string[][];
+  onRowsChange: (rows: string[][]) => void;
+  addLabel: string;
+}) {
+  const [rows, setRows] = useState<string[][]>(() => initialRows);
+  const commit = (next: string[][]) => {
+    setRows(next);
+    onRowsChange(next);
+  };
+  const update = (ri: number, ci: number, val: string) =>
+    commit(rows.map((r, i) => (i === ri ? r.map((c, j) => (j === ci ? val : c)) : r)));
+  const remove = (ri: number) => commit(rows.filter((_, i) => i !== ri));
+  // 新規行の初期値: text=空、select=addDefault。
+  const add = () => commit([...rows, columns.map((c) => (c.kind === "select" ? c.addDefault : ""))]);
+  return (
+    <Stack gap={4}>
+      {rows.map((row, ri) => (
+        <Group key={ri} gap={4} wrap="nowrap">
+          {columns.map((col, ci) =>
+            col.kind === "text" ? (
+              <Box key={ci} style={{ flex: 1, minWidth: 0 }}>
+                <InspectorTextInput
+                  value={row[ci] ?? ""}
+                  placeholder={col.placeholder}
+                  onChange={(e) => update(ri, ci, e.currentTarget.value)}
+                />
+              </Box>
+            ) : (
+              <Box key={ci} style={{ width: col.width ?? 120, flexShrink: 0 }}>
+                <InspectorSelect
+                  data={[...col.options]}
+                  value={row[ci] ?? col.addDefault}
+                  onChange={(v) => v && update(ri, ci, v)}
+                />
+              </Box>
+            ),
+          )}
+          <RowIconButton color="red" label="×" onClick={() => remove(ri)}>
+            ×
+          </RowIconButton>
+        </Group>
+      ))}
+      <Group gap={4} wrap="nowrap">
+        <ActionIcon size="lg" variant="light" color="gray" aria-label={addLabel} title={addLabel} onClick={add}>
+          ＋
+        </ActionIcon>
+      </Group>
+    </Stack>
+  );
+}
+
+// 文字列配列の行エディタ（1列）。allowedUrlHosts / autoInviteUsernames / inviteRequestHandlerUsernames /
+// parentSessionIds / ③の文字列配列で共用。先頭セル空（trim後）の行は除外。重複は許容（dedupしない）。
 export function StringListInput({
   items,
   onChange,
@@ -87,50 +152,19 @@ export function StringListInput({
   addLabel: string;
   placeholder: string;
 }) {
-  const [draft, setDraft] = useState("");
-  const add = () => {
-    const h = draft.trim();
-    if (!h) return;
-    onChange([...items, h]);
-    setDraft("");
-  };
   return (
-    <Stack gap={4}>
-      {items.map((h, i) => (
-        <Group key={i} gap={4} wrap="nowrap">
-          <Text size="xs" c="dark.0" style={{ flex: 1, minWidth: 0, wordBreak: "break-all" }}>
-            {h}
-          </Text>
-          <RowIconButton color="red" label="×" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
-            ×
-          </RowIconButton>
-        </Group>
-      ))}
-      <Group gap={4} wrap="nowrap">
-        <InspectorTextInput
-          value={draft}
-          placeholder={placeholder}
-          onChange={(e) => setDraft(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-        />
-        <ActionIcon size="lg" variant="light" color="gray" aria-label={addLabel} title={addLabel} onClick={add}>
-          ＋
-        </ActionIcon>
-      </Group>
-    </Stack>
+    <RowsEditor
+      columns={[{ kind: "text", placeholder }]}
+      initialRows={items.map((s) => [s])}
+      onRowsChange={(rows) => onChange(rows.map((r) => (r[0] ?? "").trim()).filter((s) => s !== ""))}
+      addLabel={addLabel}
+    />
   );
 }
 
-// defaultUserRoles 用: 「ユーザー名 → ロール」の追加式エディタ。値は { username: role } の object
-// （スキーマの additionalProperties:string）。ロールは標準5種(api.ROLES)から選択。
-// 空ユーザー名の行は確定 object から除外し、同名ユーザーは後勝ち（object 上書き）。新規行の既定ロールは
-// "Admin"（defaultUserRoles の主用途が管理者権限付与のため）。入力途中の行を保持するため内部 state
-// （確定値のみ onChange へ集約）。key で再シード。
+// defaultUserRoles 用の行エディタ（2列＝ユーザー名 text ＋ ロール select）。値は { user: role } の object
+// （スキーマの additionalProperties:string）。先頭セル（ユーザー名）空の行は除外・同名は後勝ち。
+// 新規行の既定ロールは "Admin"（主用途が管理者権限付与のため）。読み込み時の非文字列ロールは "Guest" に丸める。
 export function RolePairsInput({
   initial,
   onChange,
@@ -142,52 +176,27 @@ export function RolePairsInput({
   userPlaceholder: string;
   addLabel: string;
 }) {
-  const seed = (v: unknown): { user: string; role: string }[] =>
-    v && typeof v === "object" && !Array.isArray(v)
-      ? Object.entries(v as Record<string, unknown>).map(([user, role]) => ({
-          user,
-          role: typeof role === "string" ? role : "Guest",
-        }))
+  const initialRows: string[][] =
+    initial && typeof initial === "object" && !Array.isArray(initial)
+      ? Object.entries(initial as Record<string, unknown>).map(([u, r]) => [u, typeof r === "string" ? r : "Guest"])
       : [];
-  const [rows, setRows] = useState<{ user: string; role: string }[]>(() => seed(initial));
-  const commit = (next: { user: string; role: string }[]) => {
-    setRows(next);
-    const obj: Record<string, string> = {};
-    for (const r of next) {
-      const u = r.user.trim();
-      if (u) obj[u] = r.role; // 同名は後勝ち
-    }
-    onChange(Object.keys(obj).length ? obj : null);
-  };
-  const update = (i: number, patch: Partial<{ user: string; role: string }>) =>
-    commit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const remove = (i: number) => commit(rows.filter((_, idx) => idx !== i));
-  const add = () => commit([...rows, { user: "", role: "Admin" }]);
   return (
-    <Stack gap={4}>
-      {rows.map((r, i) => (
-        <Group key={i} gap={4} wrap="nowrap">
-          <Box style={{ flex: 1, minWidth: 0 }}>
-            <InspectorTextInput
-              value={r.user}
-              placeholder={userPlaceholder}
-              onChange={(e) => update(i, { user: e.currentTarget.value })}
-            />
-          </Box>
-          <Box style={{ width: 120, flexShrink: 0 }}>
-            <InspectorSelect data={[...api.ROLES]} value={r.role} onChange={(v) => v && update(i, { role: v })} />
-          </Box>
-          <RowIconButton color="red" label="×" onClick={() => remove(i)}>
-            ×
-          </RowIconButton>
-        </Group>
-      ))}
-      <Group gap={4} wrap="nowrap">
-        <ActionIcon size="lg" variant="light" color="gray" aria-label={addLabel} title={addLabel} onClick={add}>
-          ＋
-        </ActionIcon>
-      </Group>
-    </Stack>
+    <RowsEditor
+      columns={[
+        { kind: "text", placeholder: userPlaceholder },
+        { kind: "select", options: api.ROLES, width: 120, addDefault: "Admin" },
+      ]}
+      initialRows={initialRows}
+      onRowsChange={(rows) => {
+        const obj: Record<string, string> = {};
+        for (const r of rows) {
+          const u = (r[0] ?? "").trim();
+          if (u) obj[u] = r[1] ?? "Admin"; // 同名は後勝ち
+        }
+        onChange(Object.keys(obj).length ? obj : null);
+      }}
+      addLabel={addLabel}
+    />
   );
 }
 

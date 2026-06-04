@@ -229,12 +229,9 @@ export function WorldsSection({
               addLabel={t("config.add")}
             />
           </FieldRow>
-          <FieldRow
-            label={t("config.autoInviteUsernames")}
-            align="start"
-            {...resetProps("autoInviteUsernames", t("config.autoInviteUsernames"))}
-          >
+          <FieldRow label={t("config.autoInviteUsernames")} align="start">
             <StringListInput
+              key={idx}
               items={getStringArray(world.autoInviteUsernames)}
               onChange={(items) => setW("autoInviteUsernames", items.length ? items : null)}
               addLabel={t("config.add")}
@@ -286,12 +283,9 @@ export function WorldsSection({
                 />
               </FieldRow>
               {/* 招待リクエスト転送先（リスト追加式）。 */}
-              <FieldRow
-                label={t("config.inviteRequestHandlerUsernames")}
-                align="start"
-                {...resetProps("inviteRequestHandlerUsernames", t("config.inviteRequestHandlerUsernames"))}
-              >
+              <FieldRow label={t("config.inviteRequestHandlerUsernames")} align="start">
                 <StringListInput
+                  key={idx}
                   items={getStringArray(world.inviteRequestHandlerUsernames)}
                   onChange={(items) => setW("inviteRequestHandlerUsernames", items.length ? items : null)}
                   addLabel={t("config.add")}

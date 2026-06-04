@@ -74,11 +74,7 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
           <FieldRow label={t("config.logsFolder")} {...resetProps("logsFolder", t("config.logsFolder"))}>
             <InspectorTextInput value={asStr(cfg.logsFolder)} onChange={(e) => setText("logsFolder", e.currentTarget.value)} />
           </FieldRow>
-          <FieldRow
-            label={t("config.allowedHosts")}
-            align="start"
-            {...resetProps("allowedUrlHosts", t("config.allowedHosts"))}
-          >
+          <FieldRow label={t("config.allowedHosts")} align="start">
             <StringListInput
               items={getStringArray(cfg.allowedUrlHosts)}
               onChange={(h) => set("allowedUrlHosts", h.length ? h : null)}
