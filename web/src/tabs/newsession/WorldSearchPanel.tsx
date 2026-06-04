@@ -1,34 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionIcon, Box, Center, Group, Image, Loader, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Box, Center, Group, Image, Loader, SimpleGrid, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
 import type { WorldResult } from "../../api";
 import { FieldRow, InspectorButton, InspectorCard, InspectorTextInput } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
+import { StarButton } from "./StarButton";
 
 // ワールド検索 → 検索結果から起動／お気に入り保存（phase-7-spec §3.12）。
 // 検索 = go.resonite.com の公開ワールド（HTML スクレイピング・上位24件）。起動は既存 URL モード
 // （startWorldURL に resrec:// を渡す）を流用。お気に入りはサーバー保存（favorites.json）。
 // 検索ボタン隣の★トグルでお気に入り表示↔検索結果を切替。各カードの★/☆で登録/解除（無音）。
+// お気に入り state（favorites/isFavorited/onToggleFavorite）は親 NewSessionTab から受領（単一の真実源）。
 // onStarted = 起動成功後にトップバーのセッション一覧を再取得（StartPanel と同じ）。
-export function WorldSearchPanel({ onStarted }: { onStarted: () => void }) {
+export function WorldSearchPanel({
+  onStarted,
+  favorites,
+  isFavorited,
+  onToggleFavorite,
+}: {
+  onStarted: () => void;
+  favorites: WorldResult[];
+  isFavorited: (recordId: string) => boolean;
+  onToggleFavorite: (wld: WorldResult) => void;
+}) {
   const { t } = useTranslation();
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false); // 初回未検索 と 0件 を区別する
   const [searchResults, setSearchResults] = useState<WorldResult[]>([]);
-  const [favorites, setFavorites] = useState<WorldResult[]>([]);
   const [showingFavorites, setShowingFavorites] = useState(false);
   const reqId = useRef(0); // 連打/順序逆転で古い結果を捨てる stale ガード（FriendsTab 流用）
   const confirm = useConfirm();
-
-  // マウント時にお気に入りを取得（★の塗り判定とお気に入り表示に使う）。
-  useEffect(() => {
-    void api.getFavorites().then(setFavorites);
-  }, []);
-
-  const favSet = useMemo(() => new Set(favorites.map((f) => f.recordId)), [favorites]);
 
   const doSearch = async () => {
     const term = keyword.trim();
@@ -41,14 +45,6 @@ export function WorldSearchPanel({ onStarted }: { onStarted: () => void }) {
     if (id !== reqId.current) return; // 古い応答は破棄
     setSearchResults(r);
     setLoading(false);
-  };
-
-  // ★トグル: 登録↔解除（無音・更新後一覧で同期）。失敗(null)時はローカル状態維持。
-  const toggleFavorite = async (wld: WorldResult) => {
-    const updated = favSet.has(wld.recordId)
-      ? await api.removeFavorite(wld.recordId)
-      : await api.addFavorite(wld);
-    if (updated) setFavorites(updated);
   };
 
   // 起動の確認 → startWorldURL → onStarted（一覧再取得）。StartPanel.askStart と同形。
@@ -114,9 +110,9 @@ export function WorldSearchPanel({ onStarted }: { onStarted: () => void }) {
               <WorldCard
                 key={wld.resoniteUrl}
                 world={wld}
-                favorited={favSet.has(wld.recordId)}
+                favorited={isFavorited(wld.recordId)}
                 onStart={() => askStart(wld)}
-                onToggleFavorite={() => void toggleFavorite(wld)}
+                onToggleFavorite={() => onToggleFavorite(wld)}
               />
             ))}
           </SimpleGrid>
@@ -132,26 +128,6 @@ export function WorldSearchPanel({ onStarted }: { onStarted: () => void }) {
         onClose={confirm.close}
       />
     </InspectorCard>
-  );
-}
-
-// ★/☆ のコンパクトなトグルアイコン（RefreshButton と同じ ActionIcon 規約）。
-// active=登録済/表示中＝塗り★(黄)、未＝枠☆(灰)。絵文字なので aria-label/title 必須。
-function StarButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <ActionIcon
-      variant="light"
-      color={active ? "yellow" : "gray"}
-      size="lg"
-      radius="md"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-    >
-      <span style={{ fontSize: 18, color: active ? "var(--mantine-color-yellow-4)" : "var(--mantine-color-dark-0)" }}>
-        {active ? "★" : "☆"}
-      </span>
-    </ActionIcon>
   );
 }
 
@@ -174,6 +150,8 @@ function WorldCard({
   const { t } = useTranslation();
   const [imgError, setImgError] = useState(false);
   const showImg = !!world.thumbnailUrl && !imgError; // 空URL or 読込失敗はプレースホルダ
+  // 名前なしお気に入り（URL登録）は recordId を代替表示（所有者IDは2行目で識別補助）。
+  const displayName = world.name || world.recordId;
   const initial = (world.name || "?").slice(0, 1).toUpperCase();
 
   return (
@@ -201,8 +179,8 @@ function WorldCard({
         )}
       </Box>
       <Box style={{ minWidth: 0 }}>
-        <Text fw={600} truncate title={world.name}>
-          {world.name}
+        <Text fw={600} truncate title={displayName}>
+          {displayName}
         </Text>
         <Text size="xs" c="dimmed" truncate>
           {world.ownerId}

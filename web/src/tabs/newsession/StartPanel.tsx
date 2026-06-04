@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Group, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
+import type { WorldResult } from "../../api";
 import {
   FieldRow,
   InspectorButton,
@@ -11,17 +12,44 @@ import {
 } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
-import { isResoniteUrl } from "../../lib/resoniteUrl";
+import { isResoniteUrl, parseResrecUrl } from "../../lib/resoniteUrl";
+import { StarButton } from "./StarButton";
 
 // 新規セッションの起動方法（URL / テンプレート）。起動は確認 → 実行 → onStarted（一覧再取得）。
 // 結果トーストは useConfirm（onConfirm が WriteResult を返す）で自動（7-7 第1層）。
-export function StartPanel({ onStarted }: { onStarted: () => void }) {
+// お気に入り（isFavorited/onToggleFavorite）は親 NewSessionTab から受領（単一の真実源）。
+export function StartPanel({
+  onStarted,
+  isFavorited,
+  onToggleFavorite,
+}: {
+  onStarted: () => void;
+  isFavorited: (recordId: string) => boolean;
+  onToggleFavorite: (wld: WorldResult) => void;
+}) {
   const { t } = useTranslation();
   const [template, setTemplate] = useState<string>(api.WORLD_TEMPLATES[0]);
   const [url, setUrl] = useState("");
   const confirm = useConfirm();
 
   const urlValid = isResoniteUrl(url);
+
+  // お気に入り登録可能なのは resrec:///U|G-xxx/R-xxx 厳密形式のみ（他スキームは null＝★無効）。
+  const resrec = parseResrecUrl(url);
+  const favorited = resrec ? isFavorited(resrec.recordId) : false;
+
+  // URL からは name/thumbnailUrl を取得できないため空で保存（方針: 名前なしで保存）。
+  // resoniteUrl はパース結果から正規化生成し backend の検証に確実に一致させる。
+  const toggleFavorite = () => {
+    if (!resrec) return;
+    onToggleFavorite({
+      name: "",
+      ownerId: resrec.ownerId,
+      recordId: resrec.recordId,
+      resoniteUrl: `resrec:///${resrec.ownerId}/${resrec.recordId}`,
+      thumbnailUrl: "",
+    });
+  };
 
   // 起動の確認 → 実行 → onStarted。op は WriteResult を返すラッパ。confirm.busy が
   // ConfirmModal の loading を駆動（startworldurl は最大60s かかり得る）。
@@ -73,6 +101,18 @@ export function StartPanel({ onStarted }: { onStarted: () => void }) {
               >
                 {t("newSession.start")}
               </InspectorButton>
+              <StarButton
+                active={favorited}
+                disabled={!resrec}
+                onClick={toggleFavorite}
+                label={
+                  resrec
+                    ? favorited
+                      ? t("newSession.removeFavorite")
+                      : t("newSession.addFavorite")
+                    : t("newSession.favoriteUrlOnly")
+                }
+              />
             </Group>
             {url.trim() !== "" && !urlValid && (
               <Text size="xs" c="dimmed">

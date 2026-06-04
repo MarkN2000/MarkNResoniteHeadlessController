@@ -156,6 +156,7 @@
     "showFavorites": "Show favorites",
     "addFavorite": "Add to favorites",
     "removeFavorite": "Remove from favorites",
+    "favoriteUrlOnly": "Only resrec:/// URLs can be added to favorites",
     "noFavorites": "No favorites yet"
   },
   "config": {
