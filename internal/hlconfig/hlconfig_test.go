@@ -234,11 +234,21 @@ func TestEnsureDefault(t *testing.T) {
 	if w0["awayKickMinutes"] != 5.0 {
 		t.Fatalf("default awayKickMinutes should be 5, got %v", w0["awayKickMinutes"])
 	}
-	if w0["autoSleep"] != true || w0["autoRecover"] != true {
-		t.Fatalf("default autoSleep/autoRecover should be true, got %v / %v", w0["autoSleep"], w0["autoRecover"])
+	if w0["autoSleep"] != true {
+		t.Fatalf("default autoSleep should be true, got %v", w0["autoSleep"])
 	}
 	if w0["idleRestartInterval"] != 1800.0 {
 		t.Fatalf("default idleRestartInterval should be 1800, got %v", w0["idleRestartInterval"])
+	}
+	// ニッチ化に伴い雛形から外したワールド項目は default に存在しないこと（headless 既定へ委譲・スリム化）。
+	for _, k := range []string{"autoRecover", "mobileFriendly", "forcePort", "useCustomJoinVerifier"} {
+		if _, ok := w0[k]; ok {
+			t.Fatalf("%s should NOT be in default world template (slimmed to niche): %v", k, w0[k])
+		}
+	}
+	// トップレベルのニッチ項目（universeId）も雛形に無いこと。
+	if _, ok := raw["universeId"]; ok {
+		t.Fatalf("universeId should NOT be in default config template (slimmed to niche): %v", raw["universeId"])
 	}
 
 	// 既に config がある → 何もしない（default を再作成しない）

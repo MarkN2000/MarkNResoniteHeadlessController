@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ActionIcon, Group, Stack, Text } from "@mantine/core";
+import { ActionIcon, Box, Group, Stack, Text } from "@mantine/core";
 import type { NumberInputProps } from "@mantine/core";
-import { InspectorNumberInput, InspectorTextInput } from "../../components/inspector";
+import * as api from "../../api";
+import { InspectorNumberInput, InspectorSelect, InspectorTextarea, InspectorTextInput } from "../../components/inspector";
 import { joinCustomSessionId, splitCustomSessionId } from "./configModel";
 
 // -1=無効 のセンチネル数値入力。下限を -1 に固定（InspectorNumberInput の strict で -1 未満は打てない）。
@@ -72,15 +73,17 @@ export function CustomSessionIdInput({
   );
 }
 
-// allowedUrlHosts の add/remove リスト（配列の生 JSON 編集を避ける）。
-export function HostListInput({
-  hosts,
+// 文字列配列の add/remove リスト（配列の生 JSON 編集を避ける）。
+// allowedUrlHosts / autoInviteUsernames / inviteRequestHandlerUsernames / parentSessionIds で共用。
+// committed なリストは props 駆動（draft のみ内部 state）＝リセット/外部変更に追従できる。
+export function StringListInput({
+  items,
   onChange,
   addLabel,
   placeholder,
 }: {
-  hosts: string[];
-  onChange: (hosts: string[]) => void;
+  items: string[];
+  onChange: (items: string[]) => void;
   addLabel: string;
   placeholder: string;
 }) {
@@ -88,12 +91,12 @@ export function HostListInput({
   const add = () => {
     const h = draft.trim();
     if (!h) return;
-    onChange([...hosts, h]);
+    onChange([...items, h]);
     setDraft("");
   };
   return (
     <Stack gap={4}>
-      {hosts.map((h, i) => (
+      {items.map((h, i) => (
         <Group key={i} gap={4} wrap="nowrap">
           <Text size="xs" c="dark.0" style={{ flex: 1, minWidth: 0, wordBreak: "break-all" }}>
             {h}
@@ -103,7 +106,7 @@ export function HostListInput({
             variant="subtle"
             color="red"
             aria-label="×"
-            onClick={() => onChange(hosts.filter((_, idx) => idx !== i))}
+            onClick={() => onChange(items.filter((_, idx) => idx !== i))}
           >
             ×
           </ActionIcon>
@@ -126,5 +129,108 @@ export function HostListInput({
         </ActionIcon>
       </Group>
     </Stack>
+  );
+}
+
+// defaultUserRoles 用: 「ユーザー名 → ロール」の追加式エディタ。値は { username: role } の object
+// （スキーマの additionalProperties:string）。ロールは標準5種(api.ROLES)から選択。
+// 空ユーザー名の行は確定 object から除外し、同名ユーザーは後勝ち（object 上書き）。新規行の既定ロールは
+// 安全側の "Guest"。入力途中の行を保持するため内部 state（確定値のみ onChange へ集約）。key で再シード。
+export function RolePairsInput({
+  initial,
+  onChange,
+  userPlaceholder,
+  addLabel,
+}: {
+  initial: unknown;
+  onChange: (next: Record<string, string> | null) => void;
+  userPlaceholder: string;
+  addLabel: string;
+}) {
+  const seed = (v: unknown): { user: string; role: string }[] =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.entries(v as Record<string, unknown>).map(([user, role]) => ({
+          user,
+          role: typeof role === "string" ? role : "Guest",
+        }))
+      : [];
+  const [rows, setRows] = useState<{ user: string; role: string }[]>(() => seed(initial));
+  const commit = (next: { user: string; role: string }[]) => {
+    setRows(next);
+    const obj: Record<string, string> = {};
+    for (const r of next) {
+      const u = r.user.trim();
+      if (u) obj[u] = r.role; // 同名は後勝ち
+    }
+    onChange(Object.keys(obj).length ? obj : null);
+  };
+  const update = (i: number, patch: Partial<{ user: string; role: string }>) =>
+    commit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const remove = (i: number) => commit(rows.filter((_, idx) => idx !== i));
+  const add = () => commit([...rows, { user: "", role: "Guest" }]);
+  return (
+    <Stack gap={4}>
+      {rows.map((r, i) => (
+        <Group key={i} gap={4} wrap="nowrap">
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <InspectorTextInput
+              value={r.user}
+              placeholder={userPlaceholder}
+              onChange={(e) => update(i, { user: e.currentTarget.value })}
+            />
+          </Box>
+          <Box style={{ width: 120, flexShrink: 0 }}>
+            <InspectorSelect data={[...api.ROLES]} value={r.role} onChange={(v) => v && update(i, { role: v })} />
+          </Box>
+          <ActionIcon size="sm" variant="subtle" color="red" aria-label="×" onClick={() => remove(i)}>
+            ×
+          </ActionIcon>
+        </Group>
+      ))}
+      <Group gap={4} wrap="nowrap">
+        <ActionIcon size="lg" variant="light" color="gray" aria-label={addLabel} title={addLabel} onClick={add}>
+          ＋
+        </ActionIcon>
+      </Group>
+    </Stack>
+  );
+}
+
+// json 型／未知キー用: 生 JSON を編集。表示は内部 text、確定は JSON.parse して onCommit。
+// パース不可なら確定せず（最後の正常値を保持）エラー文言を出す。空文字は null として確定。
+// 内部 state のため key で再シードする（ワールド切替時など）。
+export function RawJsonInput({
+  initial,
+  onCommit,
+  invalidLabel,
+}: {
+  initial: unknown;
+  onCommit: (parsed: unknown) => void;
+  invalidLabel: string;
+}) {
+  const [text, setText] = useState(() => (initial == null ? "" : JSON.stringify(initial)));
+  const [error, setError] = useState<string | undefined>(undefined);
+  return (
+    <InspectorTextarea
+      value={text}
+      error={error}
+      minRows={1}
+      onChange={(e) => {
+        const v = e.currentTarget.value;
+        setText(v);
+        if (v.trim() === "") {
+          setError(undefined);
+          onCommit(null);
+          return;
+        }
+        try {
+          const parsed: unknown = JSON.parse(v);
+          setError(undefined);
+          onCommit(parsed);
+        } catch {
+          setError(invalidLabel); // 確定しない（最後の正常値を保持）
+        }
+      }}
+    />
   );
 }

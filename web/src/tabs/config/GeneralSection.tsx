@@ -5,7 +5,9 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { ConfigMap } from "./configModel";
 import { arrayToCsv, asNum, asStr, csvToArray, defaultConfig, getStringArray } from "./configModel";
-import { BufferedTextInput, HostListInput } from "./fields";
+import { BufferedTextInput, StringListInput } from "./fields";
+import { AdvancedFieldsEditor } from "./AdvancedFieldsEditor";
+import { TOP_DEDICATED_KEYS, TOP_NICHE_CATALOG } from "./fieldCatalog";
 
 // config トップレベル（全体設定）＋アカウントのフォーム。map のキーを直接読み書きする。
 // 基本は「メモ」のみ常時表示し、技術系（tickRate/フォルダ/ホスト等）とアカウントは上級設定へ畳む（点5）。
@@ -39,23 +41,24 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
             空は "" のまま＝Resonite 不使用の表示用メモなので null 正規化対象外。 */}
         <InspectorTextarea value={asStr(cfg.comment)} onChange={(e) => set("comment", e.currentTarget.value)} minRows={1} />
       </FieldRow>
-      {/* メモ以外（技術系＋アカウント）は上級設定へ畳む（点5）。WorldsSection と同じ CollapsibleSection・既定は閉じ。 */}
+      {/* tickRate / 最大同時転送は基本（一般）として常時表示。 */}
+      <FieldRow label={t("config.tickRate")} {...resetProps("tickRate", t("config.tickRate"))}>
+        <InspectorNumberInput value={asNum(cfg.tickRate)} onChange={num("tickRate")} min={1} allowNegative={false} />
+      </FieldRow>
+      <FieldRow
+        label={t("config.maxConcurrentAssetTransfers")}
+        {...resetProps("maxConcurrentAssetTransfers", t("config.maxConcurrentAssetTransfers"))}
+      >
+        <InspectorNumberInput
+          value={asNum(cfg.maxConcurrentAssetTransfers)}
+          onChange={num("maxConcurrentAssetTransfers")}
+          min={1}
+          allowNegative={false}
+        />
+      </FieldRow>
+      {/* 技術系（フォルダ/ホスト等）＋アカウントは上級設定へ畳む。WorldsSection と同じ CollapsibleSection・既定は閉じ。 */}
       <CollapsibleSection title={t("common.advancedSection")}>
         <Stack gap={6}>
-          <FieldRow label={t("config.tickRate")} {...resetProps("tickRate", t("config.tickRate"))}>
-            <InspectorNumberInput value={asNum(cfg.tickRate)} onChange={num("tickRate")} min={1} allowNegative={false} />
-          </FieldRow>
-          <FieldRow
-            label={t("config.maxConcurrentAssetTransfers")}
-            {...resetProps("maxConcurrentAssetTransfers", t("config.maxConcurrentAssetTransfers"))}
-          >
-            <InspectorNumberInput
-              value={asNum(cfg.maxConcurrentAssetTransfers)}
-              onChange={num("maxConcurrentAssetTransfers")}
-              min={1}
-              allowNegative={false}
-            />
-          </FieldRow>
           <FieldRow label={t("config.usernameOverride")} {...resetProps("usernameOverride", t("config.usernameOverride"))}>
             <InspectorTextInput
               value={asStr(cfg.usernameOverride)}
@@ -76,8 +79,8 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
             align="start"
             {...resetProps("allowedUrlHosts", t("config.allowedHosts"))}
           >
-            <HostListInput
-              hosts={getStringArray(cfg.allowedUrlHosts)}
+            <StringListInput
+              items={getStringArray(cfg.allowedUrlHosts)}
               onChange={(h) => set("allowedUrlHosts", h.length ? h : null)}
               addLabel={t("config.add")}
               placeholder={t("config.hostPlaceholder")}
@@ -109,6 +112,10 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
               placeholder={t("config.passwordHint")}
             />
           </FieldRow>
+          <Divider my={4} color="dark.4" />
+          {/* ③詳細フィールド（トップレベル）: 専用フォームに無い公式キー（universeId 等）を追加。
+              dedicated=TOP_DEDICATED_KEYS により $schema/startWorlds 等の構造キーは出さない。 */}
+          <AdvancedFieldsEditor obj={cfg} onChange={onChange} dedicated={TOP_DEDICATED_KEYS} catalog={TOP_NICHE_CATALOG} />
         </Stack>
       </CollapsibleSection>
 

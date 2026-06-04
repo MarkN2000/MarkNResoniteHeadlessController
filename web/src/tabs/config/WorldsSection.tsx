@@ -23,11 +23,14 @@ import {
   asStr,
   csvToArray,
   defaultWorld,
+  getStringArray,
   getWorlds,
   removeWorld,
   setWorld,
 } from "./configModel";
-import { BufferedTextInput, CustomSessionIdInput, SentinelNumberInput } from "./fields";
+import { BufferedTextInput, CustomSessionIdInput, RolePairsInput, SentinelNumberInput, StringListInput } from "./fields";
+import { AdvancedFieldsEditor } from "./AdvancedFieldsEditor";
+import { WORLD_DEDICATED_KEYS, WORLD_NICHE_CATALOG } from "./fieldCatalog";
 
 // -1=無効 型フィールドの既定値（sample/default.json のスキーマ値・R6）。
 // 未設定なら既定を表示し、空欄にされたら -1（無効）へスナップして「必ず数値」を保つ。
@@ -222,6 +225,39 @@ export function WorldsSection({
               onChange={sentinelW("idleRestartInterval")}
             />
           </FieldRow>
+          {/* ①一般（続き）: ロール事前割当・自動招待。 */}
+          <FieldRow label={t("config.defaultUserRoles")} align="start">
+            {/* RolePairsInput は内部 state（buffered）のため key={idx} で再シード・リセット対象外（tags と同方針）。 */}
+            <RolePairsInput
+              key={idx}
+              initial={world.defaultUserRoles}
+              onChange={(v) => setW("defaultUserRoles", v)}
+              userPlaceholder={t("config.rolesUserPlaceholder")}
+              addLabel={t("config.add")}
+            />
+          </FieldRow>
+          <FieldRow
+            label={t("config.autoInviteUsernames")}
+            align="start"
+            {...resetProps("autoInviteUsernames", t("config.autoInviteUsernames"))}
+          >
+            <StringListInput
+              items={getStringArray(world.autoInviteUsernames)}
+              onChange={(items) => setW("autoInviteUsernames", items.length ? items : null)}
+              addLabel={t("config.add")}
+              placeholder={t("config.userPlaceholder")}
+            />
+          </FieldRow>
+          <FieldRow
+            label={t("config.autoInviteMessage")}
+            align="start"
+            {...resetProps("autoInviteMessage", t("config.autoInviteMessage"))}
+          >
+            <InspectorTextarea
+              value={asStr(world.autoInviteMessage)}
+              onChange={(e) => setWText("autoInviteMessage", e.currentTarget.value)}
+            />
+          </FieldRow>
 
           <Divider my={4} color="dark.4" />
           {/* 上級設定（折りたたみ・既定閉じ）＝強制再起動/自動保存/終了時保存/自動復帰/モバイル対応
@@ -247,19 +283,38 @@ export function WorldsSection({
               <FieldRow label={t("config.saveOnExit")} {...resetProps("saveOnExit", t("config.saveOnExit"))}>
                 <Switch checked={asBool(world.saveOnExit)} onChange={(e) => setW("saveOnExit", e.currentTarget.checked)} />
               </FieldRow>
-              <FieldRow label={t("config.autoRecover")} {...resetProps("autoRecover", t("config.autoRecover"))}>
-                <Switch checked={asBool(world.autoRecover, true)} onChange={(e) => setW("autoRecover", e.currentTarget.checked)} />
-              </FieldRow>
               <FieldRow label={t("config.autoSleep")} {...resetProps("autoSleep", t("config.autoSleep"))}>
                 <Switch checked={asBool(world.autoSleep, true)} onChange={(e) => setW("autoSleep", e.currentTarget.checked)} />
-              </FieldRow>
-              <FieldRow label={t("config.mobileFriendly")} {...resetProps("mobileFriendly", t("config.mobileFriendly"))}>
-                <Switch checked={asBool(world.mobileFriendly)} onChange={(e) => setW("mobileFriendly", e.currentTarget.checked)} />
               </FieldRow>
               <FieldRow label={t("config.hideFromPublicListing")} {...resetProps("hideFromPublicListing", t("config.hideFromPublicListing"))}>
                 <Switch
                   checked={asBool(world.hideFromPublicListing)}
                   onChange={(e) => setW("hideFromPublicListing", e.currentTarget.checked)}
+                />
+              </FieldRow>
+              {/* 招待リクエスト転送先（リスト追加式）。 */}
+              <FieldRow
+                label={t("config.inviteRequestHandlerUsernames")}
+                align="start"
+                {...resetProps("inviteRequestHandlerUsernames", t("config.inviteRequestHandlerUsernames"))}
+              >
+                <StringListInput
+                  items={getStringArray(world.inviteRequestHandlerUsernames)}
+                  onChange={(items) => setW("inviteRequestHandlerUsernames", items.length ? items : null)}
+                  addLabel={t("config.add")}
+                  placeholder={t("config.userPlaceholder")}
+                />
+              </FieldRow>
+              {/* 保存者（未指定=null / LocalMachine / CloudUser）。"unset" は表示用センチネルで保存時 null。 */}
+              <FieldRow label={t("config.saveAsOwner")} {...resetProps("saveAsOwner", t("config.saveAsOwner"))}>
+                <InspectorSelect
+                  data={[
+                    { value: "unset", label: t("config.saveOwnerUnset") },
+                    { value: "LocalMachine", label: t("config.saveOwnerLocal") },
+                    { value: "CloudUser", label: t("config.saveOwnerCloud") },
+                  ]}
+                  value={asStr(world.saveAsOwner) || "unset"}
+                  onChange={(v) => setW("saveAsOwner", !v || v === "unset" ? null : v)}
                 />
               </FieldRow>
               {/* ResoniteLink（R13）。port は空＝自動（未設定）＝保存JSONから省く。 */}
@@ -279,6 +334,17 @@ export function WorldsSection({
                   placeholder={t("config.resoniteLinkPortHint")}
                 />
               </FieldRow>
+              <Divider my={4} color="dark.4" />
+              {/* ③詳細フィールド（ワールド）: 専用フォームに無い公式キー（forcePort/各クラウド変数/
+                  overrideCorrespondingWorldId/mobileFriendly/autoRecover 等）を追加。内部 state を持つ子
+                  （RawJsonInput）があるため key={idx} でワールド切替時に再マウント＝再シードする。 */}
+              <AdvancedFieldsEditor
+                key={idx}
+                obj={world}
+                onChange={(next) => onChange(setWorld(cfg, idx, next))}
+                dedicated={WORLD_DEDICATED_KEYS}
+                catalog={WORLD_NICHE_CATALOG}
+              />
             </Stack>
           </CollapsibleSection>
         </>

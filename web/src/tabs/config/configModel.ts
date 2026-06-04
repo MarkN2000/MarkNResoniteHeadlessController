@@ -6,55 +6,50 @@
 export type ConfigMap = Record<string, unknown>;
 export type WorldMap = Record<string, unknown>;
 
-// 1ワールドの雛形。公式スキーマ全項目を明示的に持ち、UI 表示と保存 JSON を常に一致させる
-// （表示専用フォールバックに頼らない＝「見た目は値があるのに保存には無い」ズレを排除）。
-// 未設定を表す項目は null（有害な空文字は使わない）。決定値: accessLevel=Anyone・awayKickMinutes=5・
-// autoSleep/autoRecover=true・idleRestartInterval=1800・強制再起動/自動保存=-1(無効)。
+// 1ワールドの雛形。専用フォーム（①一般＋②上級）が扱うキーだけを明示的に持つ。
+// 公式スキーマのうちニッチな項目（③）は雛形に入れず、「詳細フィールド」から必要時に追加する。
+// （map に存在するキーだけを行表示する設計のため、雛形に入れると新規 config で全ニッチ項目が
+//  最初から展開されてしまう＝スリム化。fieldCatalog.ts の WORLD_DEDICATED_KEYS と対応する。）
+// 専用フォームのキーは UI 表示と保存 JSON を常に一致させ、未設定は null（有害な空文字は使わない）。
+// 決定値: accessLevel=Anyone・awayKickMinutes=5・autoSleep=true・idleRestartInterval=1800・
+// 強制再起動/自動保存=-1(無効) はここ（①②）に残す。
+// 注: autoRecover はニッチ化に伴い雛形から外し headless 既定へ委譲（既定値 true は明示しない）。
 export function defaultWorld(): WorldMap {
   return {
+    // ①一般
     isEnabled: true,
     sessionName: null,
-    customSessionId: null,
     description: null,
-    maxUsers: 16,
     accessLevel: "Anyone",
-    useCustomJoinVerifier: false,
-    hideFromPublicListing: false,
-    tags: null,
-    mobileFriendly: false,
-    loadWorldURL: null,
+    maxUsers: 16,
     loadWorldPresetName: "Grid",
-    overrideCorrespondingWorldId: null,
-    forcePort: null,
-    enableResoniteLink: false,
-    forceResoniteLinkPort: null,
-    keepOriginalRoles: false,
-    defaultUserRoles: null,
-    roleCloudVariable: null,
-    allowUserCloudVariable: null,
-    denyUserCloudVariable: null,
-    requiredUserJoinCloudVariable: null,
-    requiredUserJoinCloudVariableDenyMessage: null,
+    loadWorldURL: null,
+    customSessionId: null,
+    tags: null,
     awayKickMinutes: 5,
-    parentSessionIds: null,
+    idleRestartInterval: 1800,
+    defaultUserRoles: null,
     autoInviteUsernames: null,
     autoInviteMessage: null,
-    saveAsOwner: null,
-    autoRecover: true,
-    idleRestartInterval: 1800,
+    // ②上級
     forcedRestartInterval: -1,
-    saveOnExit: false,
     autosaveInterval: -1,
+    saveOnExit: false,
     autoSleep: true,
+    hideFromPublicListing: false,
+    inviteRequestHandlerUsernames: null,
+    saveAsOwner: null,
+    enableResoniteLink: false,
+    forceResoniteLinkPort: null,
   };
 }
 
 // 同梱デフォルト config の雛形（hlconfig.defaultConfigJSON 相当・creds 空＝中央注入）。
-// 公式スキーマのトップレベル全項目を明示（未設定は null）。$schema は保存時に backend が付与。
+// 専用フォーム（①一般＋②上級）のトップレベルキーのみ明示（未設定は null）。universeId 等の
+// ニッチ項目は「詳細フィールド」から追加（スリム化）。$schema は保存時に backend が付与。
 export function defaultConfig(): ConfigMap {
   return {
     comment: "",
-    universeId: null,
     tickRate: 60,
     maxConcurrentAssetTransfers: 128,
     usernameOverride: null,

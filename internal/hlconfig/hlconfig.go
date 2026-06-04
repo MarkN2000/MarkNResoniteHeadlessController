@@ -213,13 +213,15 @@ func EnsureDefault(dir string) error {
 	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(defaultConfigJSON), 0o600)
 }
 
-// defaultConfigJSON は同梱デフォルト config。公式スキーマ全項目を明示し、UI 表示と保存値を一致させる
-// （フロント defaultWorld()/defaultConfig() と同方針）。accessLevel=Anyone・awayKickMinutes=5・
-// autoSleep/autoRecover=true・idleRestartInterval=1800・強制再起動/自動保存=-1(無効)・creds 空（中央注入）。
+// defaultConfigJSON は同梱デフォルト config。専用フォーム（①一般＋②上級）のキーのみ明示し、
+// UI 表示と保存値を一致させる（フロント defaultWorld()/defaultConfig() と同方針＝スリム化）。
+// ニッチ項目（universeId/forcePort/各クラウド変数/mobileFriendly/autoRecover 等）は「詳細フィールド」
+// から追加するため雛形には入れない。決定値: accessLevel=Anyone・awayKickMinutes=5・autoSleep=true・
+// idleRestartInterval=1800・強制再起動/自動保存=-1(無効)・creds 空（中央注入）。
+// 注: autoRecover は雛形から外し headless 既定へ委譲（既定値 true は明示しない）。
 const defaultConfigJSON = `{
   "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
   "comment": "MRHC デフォルト設定（Settings で Resonite アカウントを登録し、必要に応じて編集してください）",
-  "universeId": null,
   "tickRate": 60.0,
   "maxConcurrentAssetTransfers": 128,
   "usernameOverride": null,
@@ -229,38 +231,27 @@ const defaultConfigJSON = `{
     {
       "isEnabled": true,
       "sessionName": null,
-      "customSessionId": null,
       "description": null,
-      "maxUsers": 16,
       "accessLevel": "Anyone",
-      "useCustomJoinVerifier": false,
-      "hideFromPublicListing": false,
-      "tags": null,
-      "mobileFriendly": false,
-      "loadWorldURL": null,
+      "maxUsers": 16,
       "loadWorldPresetName": "Grid",
-      "overrideCorrespondingWorldId": null,
-      "forcePort": null,
-      "enableResoniteLink": false,
-      "forceResoniteLinkPort": null,
-      "keepOriginalRoles": false,
-      "defaultUserRoles": null,
-      "roleCloudVariable": null,
-      "allowUserCloudVariable": null,
-      "denyUserCloudVariable": null,
-      "requiredUserJoinCloudVariable": null,
-      "requiredUserJoinCloudVariableDenyMessage": null,
+      "loadWorldURL": null,
+      "customSessionId": null,
+      "tags": null,
       "awayKickMinutes": 5.0,
-      "parentSessionIds": null,
+      "idleRestartInterval": 1800,
+      "defaultUserRoles": null,
       "autoInviteUsernames": null,
       "autoInviteMessage": null,
-      "saveAsOwner": null,
-      "autoRecover": true,
-      "idleRestartInterval": 1800,
       "forcedRestartInterval": -1.0,
-      "saveOnExit": false,
       "autosaveInterval": -1.0,
-      "autoSleep": true
+      "saveOnExit": false,
+      "autoSleep": true,
+      "hideFromPublicListing": false,
+      "inviteRequestHandlerUsernames": null,
+      "saveAsOwner": null,
+      "enableResoniteLink": false,
+      "forceResoniteLinkPort": null
     }
   ],
   "dataFolder": null,
