@@ -129,7 +129,8 @@ export function StringListInput({
 // defaultUserRoles 用: 「ユーザー名 → ロール」の追加式エディタ。値は { username: role } の object
 // （スキーマの additionalProperties:string）。ロールは標準5種(api.ROLES)から選択。
 // 空ユーザー名の行は確定 object から除外し、同名ユーザーは後勝ち（object 上書き）。新規行の既定ロールは
-// 安全側の "Guest"。入力途中の行を保持するため内部 state（確定値のみ onChange へ集約）。key で再シード。
+// "Admin"（defaultUserRoles の主用途が管理者権限付与のため）。入力途中の行を保持するため内部 state
+// （確定値のみ onChange へ集約）。key で再シード。
 export function RolePairsInput({
   initial,
   onChange,
@@ -161,7 +162,7 @@ export function RolePairsInput({
   const update = (i: number, patch: Partial<{ user: string; role: string }>) =>
     commit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const remove = (i: number) => commit(rows.filter((_, idx) => idx !== i));
-  const add = () => commit([...rows, { user: "", role: "Guest" }]);
+  const add = () => commit([...rows, { user: "", role: "Admin" }]);
   return (
     <Stack gap={4}>
       {rows.map((r, i) => (
