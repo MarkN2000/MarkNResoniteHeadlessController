@@ -51,6 +51,10 @@ const (
 	LoginFailed    LoginState = "failed"    // ログイン試行はあったが成功確認なし
 )
 
+// FaultDuplicateInstance は別プロセスが同じ data path を占有していて起動できない要因
+// （孤児ヘッドレスの残存等＝DuplicateInstanceException）。検出時は自動復帰せず明確なエラーを出す。
+const FaultDuplicateInstance = "duplicate_instance"
+
 // loginUserIDRe は "Initializing SignalR: UserLogin: U-xxx" から UserID を抽出する
 // （実機ログ・fixtures 2026-05-28-lan-login で確認・v1 踏襲）。UserID の charset は
 // listbans 等と共有の userIDPat（parser.go）に統一する。
@@ -65,6 +69,7 @@ type Status struct {
 	Ready       bool       `json:"ready"`
 	LoginState  LoginState `json:"loginState"`            // anonymous|loggedIn|failed
 	LoginUserID string     `json:"loginUserId,omitempty"` // 例 "U-xxxx"（loggedIn 時のみ）
+	Fault       string     `json:"fault,omitempty"`       // 起動できない致命要因（duplicate_instance 等・自動復帰しない）
 }
 
 var (
@@ -113,6 +118,10 @@ type Driver struct {
 	loginAttempted bool   // "Logging in as ..." を観測
 	loginConfirmed bool   // "Logged in successfully" を観測
 	loginUserID    string // "UserLogin: U-xxx" の U- 付き UserID
+
+	// startFault は「起動できない致命的要因」（起動ログから検出・d.mu 保護）。"" = なし。
+	// 立っていれば waitExit は自動復帰(onUnexpectedExit)を呼ばず、Status.Fault で UI に通知する。
+	startFault string
 
 	// warmupStarted は "World running" 検出で warmup を一度だけ起動するためのガード（d.mu 保護）。
 	warmupStarted bool
@@ -166,7 +175,7 @@ func (d *Driver) statusLocked() Status {
 	}
 	return Status{
 		State: d.state, PID: d.pid, Config: d.cfgPath, StartedAt: startedAt, Ready: d.ready,
-		LoginState: d.loginStateLocked(), LoginUserID: d.loginUserID,
+		LoginState: d.loginStateLocked(), LoginUserID: d.loginUserID, Fault: d.startFault,
 	}
 }
 
@@ -252,6 +261,7 @@ func (d *Driver) Start(headlessPath, configPath, configLabel string) error {
 	d.loginAttempted = false
 	d.loginConfirmed = false
 	d.loginUserID = ""
+	d.startFault = ""
 	d.setStateLocked(StateStarting)
 	d.mu.Unlock()
 
@@ -286,6 +296,7 @@ func (d *Driver) readPipe(r io.Reader, kind string) {
 					if kind == "out" {
 						d.maybeReady(text)
 						d.scanLogin(text)
+						d.scanFault(text)
 						if c := d.activeCollector.Load(); c != nil {
 							c.appendLine(text)
 						}
@@ -367,6 +378,17 @@ func (d *Driver) scanLogin(text string) {
 	}
 }
 
+// scanFault は起動できない致命的要因を起動ログから検出する（孤児ヘッドレスの残存等で同一 data path を
+// 占有している場合の DuplicateInstanceException）。検出時は startFault を立て、waitExit が自動復帰を
+// 抑止して Status.Fault と明確なログで UI に通知する。
+func (d *Driver) scanFault(text string) {
+	if strings.Contains(text, "already running with same data path") || strings.Contains(text, "DuplicateInstanceException") {
+		d.mu.Lock()
+		d.startFault = FaultDuplicateInstance
+		d.mu.Unlock()
+	}
+}
+
 // maybeReady は readiness 合図 "World running..." を検出したら一度だけ warmup を起動する。
 // "Engine Ready" は実機では World 起動・コンソール REPL 稼働の約3.6秒前に出るため、readiness
 // 信号には採用しない（起動直後の最初の1コマンドが無視/Unknown 化する原因だった）。
@@ -428,16 +450,22 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	d.mu.Lock()
 	wasStopping := d.stopping
 	onExit := d.onUnexpectedExit
+	fault := d.startFault
 	d.cmd = nil
 	d.stdin = nil
 	d.pid = 0
 	d.ready = false
-	d.setStateLocked(StateStopped)
+	d.setStateLocked(StateStopped) // Status.Fault を含めて publish（停止と同時に UI へ要因が届く）
 	d.mu.Unlock()
 
-	if wasStopping {
+	switch {
+	case wasStopping:
 		d.publishLog("sys", "ヘッドレスを停止しました")
-	} else {
+	case fault == FaultDuplicateInstance:
+		// 別プロセスが同じ data path を占有（孤児ヘッドレスの残存等）。自動復帰しても同じ壁に
+		// 当たるだけなので onExit は呼ばず（クラッシュ復帰ループを回さない）、明確なログで通知する。
+		d.publishLog("sys", "起動失敗: 別のヘッドレスが同じデータパスで稼働中です（残存プロセスを停止してください）")
+	default:
 		d.publishLog("sys", fmt.Sprintf("ヘッドレスが終了しました（意図しない終了の可能性: %v）", err))
 		if onExit != nil {
 			onExit() // §5.6 クラッシュ自動復帰: crash-monitor へ非ブロッキング通知（mu 外で呼ぶ）

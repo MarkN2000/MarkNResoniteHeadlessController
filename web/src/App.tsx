@@ -55,6 +55,16 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const setupShown = useRef(false);
 
   const running = status?.state === "running";
+  // 起動できない致命要因（duplicate_instance 等）を SSE status で受けたら、新規発生時に1回だけ赤トースト。
+  // 起動失敗は非同期（プロセスが起動直後に落ちる）ため /start の応答では拾えず status.fault で通知される。
+  const lastFault = useRef("");
+  useEffect(() => {
+    const f = status?.fault ?? "";
+    if (f && f !== lastFault.current && f === "duplicate_instance") {
+      notifyError(t("toast.errDuplicateInstance"), t("toast.startFailTitle"));
+    }
+    lastFault.current = f;
+  }, [status, t]);
 
   // SSE（status + log）をシェル最上位で購読し、トップバーのモードとログを駆動。
   useEffect(() => {

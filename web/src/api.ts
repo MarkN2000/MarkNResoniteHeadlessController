@@ -15,6 +15,7 @@ export interface Status {
   ready: boolean;
   loginState?: ResoniteLoginState; // anonymous|loggedIn|failed
   loginUserId?: string; // 例 "U-xxxx"（loggedIn 時のみ・U- 付き）
+  fault?: string; // 起動できない致命要因（"duplicate_instance" 等・自動復帰しない）
 }
 
 export interface LogLine {

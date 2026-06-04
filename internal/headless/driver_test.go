@@ -2,6 +2,32 @@ package headless
 
 import "testing"
 
+// TestScanFault_DuplicateInstance は起動ログからの「同一 data path 競合」検出を検証する。
+// 文言は実機（2026-06-05 採取）の DuplicateInstanceException 由来。検出時 Status.Fault が立つ。
+func TestScanFault_DuplicateInstance(t *testing.T) {
+	if got := NewDriver(nil).Status().Fault; got != "" {
+		t.Fatalf("初期 Fault は空のはず: %q", got)
+	}
+	// data path 競合メッセージ。
+	d1 := NewDriver(nil)
+	d1.scanFault(`Another instance of is already running with same data path (C:\...\Headless\Data), shutting down...`)
+	if got := d1.Status().Fault; got != FaultDuplicateInstance {
+		t.Errorf("data path 競合で Fault=%q を期待, got %q", FaultDuplicateInstance, got)
+	}
+	// 例外名でも検出。
+	d2 := NewDriver(nil)
+	d2.scanFault("FrooxEngine will shutdown because: ... DuplicateInstanceException")
+	if got := d2.Status().Fault; got != FaultDuplicateInstance {
+		t.Errorf("DuplicateInstanceException で Fault=%q を期待, got %q", FaultDuplicateInstance, got)
+	}
+	// 無関係な行では立たない。
+	d3 := NewDriver(nil)
+	d3.scanFault("World running")
+	if got := d3.Status().Fault; got != "" {
+		t.Errorf("無関係行で Fault は空のはず, got %q", got)
+	}
+}
+
 // TestScanLogin_States は起動ログからの Resonite ログイン状態検出を検証する。
 // 文言は実機 fixtures（scripts/empirical-capture/fixtures/2026-05-28-lan-login/）由来。
 func TestScanLogin_States(t *testing.T) {

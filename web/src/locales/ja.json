@@ -385,6 +385,7 @@
     "errProcessGone": "ヘッドレスプロセスが終了しました",
     "errNetwork": "サーバーに接続できません",
     "errGeneric": "不明なエラーが発生しました",
+    "errDuplicateInstance": "別のヘッドレスが同じデータで稼働中です。残存プロセスを停止してから再度起動してください。",
     "acceptDone": "フレンド申請を承認しました",
     "unbanDone": "BAN解除を実行しました",
     "sendRequestDone": "フレンド申請を送信しました",

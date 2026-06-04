@@ -385,6 +385,7 @@
     "errProcessGone": "The headless process exited",
     "errNetwork": "Cannot reach the server",
     "errGeneric": "An unknown error occurred",
+    "errDuplicateInstance": "Another headless is running with the same data. Stop the leftover process and start again.",
     "acceptDone": "Friend request accepted",
     "unbanDone": "Unban executed",
     "sendRequestDone": "Friend request sent",
