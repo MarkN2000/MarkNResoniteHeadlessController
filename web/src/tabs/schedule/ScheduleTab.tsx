@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Center, Loader, ScrollArea, Stack } from "@mantine/core";
 import * as api from "../../api";
-import type { ConfigSummary, RestartConfig, RestartStatus } from "../../api";
+import type { ConfigSummary, RestartConfig, RestartStatus, ScheduledRestart, WriteResult } from "../../api";
 import { SplitColumns } from "../../components/SplitColumns";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -86,6 +86,21 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
       return r;
     }, t("schedule.toastSaved"));
 
+  // 予定リストはその場で即保存（一括「保存」から分離）。設定値は最後に保存した値(original)を使うので、
+  // 未保存の待機/事前アクション/クラッシュ復帰の編集は巻き込まない（それらは従来どおり一括保存）。
+  // トーストは呼び出し側（ScheduleListCard の useAsyncAction / useConfirm）が1回だけ出す（ここでは出さない）。
+  const persist = async (scheduled: ScheduledRestart[]): Promise<WriteResult> => {
+    if (!rc || !original) return { ok: true };
+    const persisted = { ...original, scheduled };
+    const r = await api.putRestartConfig(persisted);
+    if (r.ok) {
+      setOriginal(persisted);
+      setRc((cur) => (cur ? { ...cur, scheduled } : cur));
+      void refetch();
+    }
+    return r;
+  };
+
   // rc 更新ヘルパ（スライス単位の onChange を合成）。
   const patch = (p: Partial<RestartConfig>) => rc && setRc({ ...rc, ...p });
 
@@ -103,11 +118,7 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
             right={
               rc ? (
                 <Stack gap="lg">
-                  <ScheduleListCard
-                    schedules={rc.scheduled}
-                    configs={configs}
-                    onChange={(scheduled) => patch({ scheduled })}
-                  />
+                  <ScheduleListCard schedules={rc.scheduled} configs={configs} onPersist={persist} />
                   <WaitControlCard value={rc.waitControl} onChange={(waitControl) => patch({ waitControl })} />
                   <PreActionsCard value={rc.preActions} onChange={(preActions) => patch({ preActions })} />
                   <CrashRecoveryCard value={rc.crashRecovery} onChange={(crashRecovery) => patch({ crashRecovery })} />
