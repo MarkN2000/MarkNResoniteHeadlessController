@@ -13,7 +13,7 @@ import {
   InspectorTextInput,
   RefreshButton,
 } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
 
@@ -162,15 +162,7 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
         </Group>
       </Stack>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

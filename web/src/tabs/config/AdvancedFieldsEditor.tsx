@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { ActionIcon, Box, Group, Stack, Switch, Text } from "@mantine/core";
+import { Box, Group, Stack, Switch, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import { InspectorNumberInput, InspectorSelect, InspectorTextInput, RowIconButton } from "../../components/inspector";
+import {
+  AddIconButton,
+  InspectorNumberInput,
+  InspectorSelect,
+  InspectorTextInput,
+  RowIconButton,
+} from "../../components/inspector";
 import { asBool, asNum, asStr, getStringArray } from "./configModel";
 import type { FieldDef } from "./fieldCatalog";
 import { defForKey, extraKeysInOrder, initialValueFor } from "./fieldCatalog";
@@ -104,17 +110,7 @@ export function AdvancedFieldsEditor({
             onChange={setToAdd}
           />
         </Box>
-        <ActionIcon
-          size="lg"
-          variant="light"
-          color="gray"
-          aria-label={t("config.add")}
-          title={t("config.add")}
-          disabled={!toAdd}
-          onClick={add}
-        >
-          ＋
-        </ActionIcon>
+        <AddIconButton label={t("config.add")} disabled={!toAdd} onClick={add} />
       </Group>
       {/* 追加済みフィールドの行（左端×＝キー削除）。 */}
       {extraKeys.map((key) => (

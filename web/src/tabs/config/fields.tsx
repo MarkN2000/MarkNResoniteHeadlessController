@@ -1,8 +1,15 @@
 import { useState } from "react";
-import { ActionIcon, Box, Group, Stack, Text } from "@mantine/core";
+import { Box, Group, Stack, Text } from "@mantine/core";
 import type { NumberInputProps } from "@mantine/core";
 import * as api from "../../api";
-import { InspectorNumberInput, InspectorSelect, InspectorTextarea, InspectorTextInput, RowIconButton } from "../../components/inspector";
+import {
+  AddIconButton,
+  InspectorNumberInput,
+  InspectorSelect,
+  InspectorTextarea,
+  InspectorTextInput,
+  RowIconButton,
+} from "../../components/inspector";
 import { joinCustomSessionId, splitCustomSessionId } from "./configModel";
 
 // -1=無効 のセンチネル数値入力。下限を -1 に固定（InspectorNumberInput の strict で -1 未満は打てない）。
@@ -106,34 +113,34 @@ export function RowsEditor({
     <Stack gap={4}>
       {rows.map((row, ri) => (
         <Group key={ri} gap={4} wrap="nowrap">
-          {columns.map((col, ci) =>
-            col.kind === "text" ? (
-              <Box key={ci} style={{ flex: 1, minWidth: 0 }}>
-                <InspectorTextInput
-                  value={row[ci] ?? ""}
-                  placeholder={col.placeholder}
-                  onChange={(e) => update(ri, ci, e.currentTarget.value)}
-                />
-              </Box>
-            ) : (
+          {columns.map((col, ci) => {
+            if (col.kind === "text") {
+              return (
+                <Box key={ci} style={{ flex: 1, minWidth: 0 }}>
+                  <InspectorTextInput
+                    value={row[ci] ?? ""}
+                    placeholder={col.placeholder}
+                    onChange={(e) => update(ri, ci, e.currentTarget.value)}
+                  />
+                </Box>
+              );
+            }
+            // 候補外の値（既存 config のカスタムロール等）も表示できるよう data に補う。
+            const cur = row[ci] ?? col.addDefault;
+            const data = col.options.includes(cur) ? [...col.options] : [...col.options, cur];
+            return (
               <Box key={ci} style={{ width: col.width ?? 120, flexShrink: 0 }}>
-                <InspectorSelect
-                  data={[...col.options]}
-                  value={row[ci] ?? col.addDefault}
-                  onChange={(v) => v && update(ri, ci, v)}
-                />
+                <InspectorSelect data={data} value={cur} onChange={(v) => v && update(ri, ci, v)} />
               </Box>
-            ),
-          )}
+            );
+          })}
           <RowIconButton color="red" label="×" onClick={() => remove(ri)}>
             ×
           </RowIconButton>
         </Group>
       ))}
       <Group gap={4} wrap="nowrap">
-        <ActionIcon size="lg" variant="light" color="gray" aria-label={addLabel} title={addLabel} onClick={add}>
-          ＋
-        </ActionIcon>
+        <AddIconButton label={addLabel} onClick={add} />
       </Group>
     </Stack>
   );

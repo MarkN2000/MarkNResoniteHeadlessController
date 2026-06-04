@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import type { ConfigSummary } from "../../api";
 import { notifyError } from "../../lib/notify";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
 import { SplitColumns } from "../../components/SplitColumns";
@@ -207,15 +207,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
         />
       </Box>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </ScrollArea>
   );
 }

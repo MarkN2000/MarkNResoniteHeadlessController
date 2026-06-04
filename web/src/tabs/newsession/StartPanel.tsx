@@ -10,7 +10,7 @@ import {
   InspectorSelect,
   InspectorTextInput,
 } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { isResoniteUrl, parseResrecUrl } from "../../lib/resoniteUrl";
 import { StarButton } from "./StarButton";
@@ -123,14 +123,7 @@ export function StartPanel({
         </FieldRow>
       </Stack>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

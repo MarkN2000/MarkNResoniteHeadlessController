@@ -221,7 +221,6 @@
     "forceResoniteLinkPort": "ResoniteLink port",
     "resoniteLinkPortHint": "empty = auto",
     "defaultUserRoles": "Default roles",
-    "rolesUserPlaceholder": "Username",
     "autoInviteUsernames": "Auto-invite users",
     "autoInviteMessage": "Auto-invite message",
     "inviteRequestHandlerUsernames": "Invite request handlers",

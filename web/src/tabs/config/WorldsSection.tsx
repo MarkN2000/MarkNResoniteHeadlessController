@@ -11,7 +11,7 @@ import {
   InspectorTextarea,
   RowIconButton,
 } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { ConfigMap, WorldMap } from "./configModel";
 import {
@@ -225,7 +225,7 @@ export function WorldsSection({
               key={idx}
               initial={world.defaultUserRoles}
               onChange={(v) => setW("defaultUserRoles", v)}
-              userPlaceholder={t("config.rolesUserPlaceholder")}
+              userPlaceholder={t("config.userPlaceholder")}
               addLabel={t("config.add")}
             />
           </FieldRow>
@@ -337,15 +337,7 @@ export function WorldsSection({
         </>
       )}
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </Stack>
   );
 }

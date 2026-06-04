@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Stack, Switch, Text } from "@mantine/core";
 import type { RestartCrashRecovery } from "../../api";
 import { InspectorCard, FieldRow, InspectorNumberInput } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { defaultCrashRecovery } from "./scheduleModel";
 
@@ -73,15 +73,7 @@ export function CrashRecoveryCard({
           {t("schedule.crashNote")}
         </Text>
       </Stack>
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

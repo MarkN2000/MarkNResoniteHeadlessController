@@ -4,7 +4,7 @@ import { Box, Center, Loader, ScrollArea, Stack } from "@mantine/core";
 import * as api from "../../api";
 import type { ConfigSummary, RestartConfig, RestartStatus, ScheduledRestart, WriteResult } from "../../api";
 import { SplitColumns } from "../../components/SplitColumns";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
@@ -134,15 +134,7 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
         </Box>
       </ScrollArea>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </>
   );
 }

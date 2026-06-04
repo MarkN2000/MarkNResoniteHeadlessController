@@ -221,7 +221,6 @@
     "forceResoniteLinkPort": "ResoniteLink ポート",
     "resoniteLinkPortHint": "空＝自動",
     "defaultUserRoles": "デフォルトロール",
-    "rolesUserPlaceholder": "ユーザー名",
     "autoInviteUsernames": "自動招待ユーザー",
     "autoInviteMessage": "自動招待メッセージ",
     "inviteRequestHandlerUsernames": "招待リクエスト転送先",

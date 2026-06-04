@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Group, Stack, Switch, Text } from "@mantine/core";
 import type { ConfigSummary, ScheduledRestart, WriteResult } from "../../api";
 import { InspectorButton, InspectorCard, RowIconButton } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { ScheduleEditModal } from "./ScheduleEditModal";
@@ -99,15 +99,7 @@ export function ScheduleListCard({
         />
       )}
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

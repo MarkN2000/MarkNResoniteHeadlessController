@@ -4,7 +4,7 @@ import { Box, Center, Group, Image, Loader, SimpleGrid, Stack, Text } from "@man
 import * as api from "../../api";
 import type { WorldResult } from "../../api";
 import { FieldRow, InspectorButton, InspectorCard, InspectorTextInput } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { StarButton } from "./StarButton";
 
@@ -119,14 +119,7 @@ export function WorldSearchPanel({
         ) : null}
       </Stack>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

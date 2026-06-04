@@ -1,7 +1,7 @@
 import { Divider, Stack } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { CollapsibleSection, FieldRow, InspectorNumberInput, InspectorTextarea, InspectorTextInput } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { ConfigMap } from "./configModel";
 import { arrayToCsv, asNum, asStr, csvToArray, defaultConfig, getStringArray } from "./configModel";
@@ -115,15 +115,7 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
         </Stack>
       </CollapsibleSection>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </Stack>
   );
 }

@@ -4,7 +4,7 @@ import { Box, Divider, Group, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
 import type { UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, InspectorSelect } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { MessageModal } from "../../components/MessageModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -90,15 +90,7 @@ export function SessionUsers({ idx, users, onChanged, selfUserId }: Props) {
         )}
       </InspectorCard>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
 
       <MessageModal idx={idx} target={msgTo} onClose={() => setMsgTo(null)} onSent={onChanged} />
     </>

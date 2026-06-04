@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Stack, Text } from "@mantine/core";
 import type { RestartWaitControl } from "../../api";
 import { InspectorCard, FieldRow, InspectorNumberInput } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { defaultWaitControl } from "./scheduleModel";
 
@@ -67,15 +67,7 @@ export function WaitControlCard({
           {t("schedule.waitNote")}
         </Text>
       </Stack>
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

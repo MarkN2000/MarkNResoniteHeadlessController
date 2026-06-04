@@ -4,7 +4,7 @@ import { Avatar, Box, Center, Divider, Group, Loader, Stack, Text } from "@manti
 import * as api from "../../api";
 import type { BanEntry, ResoniteUser, UserInfo } from "../../api";
 import { InspectorButton, InspectorCard, RefreshButton } from "../../components/inspector";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { MessageModal } from "../../components/MessageModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -167,15 +167,7 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
         {body}
       </InspectorCard>
 
-      <ConfirmModal
-        opened={confirm.request !== null}
-        title={confirm.request?.title ?? ""}
-        message={confirm.request?.message}
-        danger={confirm.request?.danger}
-        loading={confirm.busy}
-        onConfirm={() => void confirm.confirm()}
-        onClose={confirm.close}
-      />
+      <ConfirmHost confirm={confirm} />
 
       <MessageModal idx={idx} target={msgTo} onClose={() => setMsgTo(null)} />
     </>
