@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionIcon, Button, Divider, Group, Stack, Switch, Text } from "@mantine/core";
+import { Button, Divider, Group, Stack, Switch, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import {
@@ -9,7 +9,7 @@ import {
   InspectorSelect,
   InspectorTextInput,
   InspectorTextarea,
-  ROW_ICON_SIZE,
+  RowIconButton,
 } from "../../components/inspector";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -125,16 +125,9 @@ export function WorldsSection({
               {worldLabel(w, i)}
             </Button>
             {worlds.length > 1 && (
-              <ActionIcon
-                size={ROW_ICON_SIZE}
-                variant="light"
-                color="red"
-                aria-label={t("config.removeWorld")}
-                title={t("config.removeWorld")}
-                onClick={() => askRemove(i)}
-              >
+              <RowIconButton color="red" label={t("config.removeWorld")} onClick={() => askRemove(i)}>
                 ×
-              </ActionIcon>
+              </RowIconButton>
             )}
           </Group>
         ))}

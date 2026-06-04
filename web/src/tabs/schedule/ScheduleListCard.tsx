@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionIcon, Group, Stack, Switch, Text } from "@mantine/core";
+import { Group, Stack, Switch, Text } from "@mantine/core";
 import type { ConfigSummary, ScheduledRestart } from "../../api";
-import { InspectorButton, InspectorCard, ROW_ICON_SIZE } from "../../components/inspector";
+import { InspectorButton, InspectorCard, RowIconButton } from "../../components/inspector";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { WEEKDAY_KEYS, defaultScheduled, formatScheduleTime, typeKey } from "./scheduleModel";
 
@@ -55,26 +55,12 @@ export function ScheduleListCard({
                   {s.configName || t("schedule.usePrevious")}
                 </Text>
               </div>
-              <ActionIcon
-                size={ROW_ICON_SIZE}
-                variant="light"
-                color="gray"
-                title={t("schedule.editSchedule")}
-                aria-label={t("schedule.editSchedule")}
-                onClick={() => setEditing({ ...s })}
-              >
+              <RowIconButton color="gray" label={t("schedule.editSchedule")} onClick={() => setEditing({ ...s })}>
                 ✎
-              </ActionIcon>
-              <ActionIcon
-                size={ROW_ICON_SIZE}
-                variant="light"
-                color="red"
-                title={t("schedule.deleteSchedule")}
-                aria-label={t("schedule.deleteSchedule")}
-                onClick={() => remove(s.id)}
-              >
+              </RowIconButton>
+              <RowIconButton color="red" label={t("schedule.deleteSchedule")} onClick={() => remove(s.id)}>
                 ×
-              </ActionIcon>
+              </RowIconButton>
             </Group>
           );
         })}

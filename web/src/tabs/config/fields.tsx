@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActionIcon, Box, Group, Stack, Text } from "@mantine/core";
 import type { NumberInputProps } from "@mantine/core";
 import * as api from "../../api";
-import { InspectorNumberInput, InspectorSelect, InspectorTextarea, InspectorTextInput } from "../../components/inspector";
+import { InspectorNumberInput, InspectorSelect, InspectorTextarea, InspectorTextInput, RowIconButton } from "../../components/inspector";
 import { joinCustomSessionId, splitCustomSessionId } from "./configModel";
 
 // -1=無効 のセンチネル数値入力。下限を -1 に固定（InspectorNumberInput の strict で -1 未満は打てない）。
@@ -101,15 +101,9 @@ export function StringListInput({
           <Text size="xs" c="dark.0" style={{ flex: 1, minWidth: 0, wordBreak: "break-all" }}>
             {h}
           </Text>
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            color="red"
-            aria-label="×"
-            onClick={() => onChange(items.filter((_, idx) => idx !== i))}
-          >
+          <RowIconButton color="red" label="×" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
             ×
-          </ActionIcon>
+          </RowIconButton>
         </Group>
       ))}
       <Group gap={4} wrap="nowrap">
@@ -182,9 +176,9 @@ export function RolePairsInput({
           <Box style={{ width: 120, flexShrink: 0 }}>
             <InspectorSelect data={[...api.ROLES]} value={r.role} onChange={(v) => v && update(i, { role: v })} />
           </Box>
-          <ActionIcon size="sm" variant="subtle" color="red" aria-label="×" onClick={() => remove(i)}>
+          <RowIconButton color="red" label="×" onClick={() => remove(i)}>
             ×
-          </ActionIcon>
+          </RowIconButton>
         </Group>
       ))}
       <Group gap={4} wrap="nowrap">

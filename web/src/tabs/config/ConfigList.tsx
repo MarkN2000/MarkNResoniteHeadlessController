@@ -1,7 +1,7 @@
-import { ActionIcon, Button, Group, Stack, Text } from "@mantine/core";
+import { Button, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import type { ConfigSummary } from "../../api";
-import { InspectorButton, InspectorCard, ROW_ICON_SIZE } from "../../components/inspector";
+import { InspectorButton, InspectorCard, RowIconButton } from "../../components/inspector";
 
 // config 一覧（master）。各行 = 名前（クリックで編集）＋ 複製/削除。worldCount は出さない（名前のみ）。
 // 右パネル（ConfigEditor）と同じ InspectorCard で見た目を揃え、SplitColumns に並べる。
@@ -51,26 +51,12 @@ export function ConfigList({
               >
                 {c.name}
               </Button>
-              <ActionIcon
-                size={ROW_ICON_SIZE}
-                variant="light"
-                color="green"
-                title={t("config.duplicate")}
-                aria-label={t("config.duplicate")}
-                onClick={() => onDuplicate(c.name)}
-              >
+              <RowIconButton color="green" label={t("config.duplicate")} onClick={() => onDuplicate(c.name)}>
                 ⧉
-              </ActionIcon>
-              <ActionIcon
-                size={ROW_ICON_SIZE}
-                variant="light"
-                color="red"
-                title={t("config.delete")}
-                aria-label={t("config.delete")}
-                onClick={() => onDelete(c.name)}
-              >
+              </RowIconButton>
+              <RowIconButton color="red" label={t("config.delete")} onClick={() => onDelete(c.name)}>
                 ×
-              </ActionIcon>
+              </RowIconButton>
             </Group>
           );
         })}

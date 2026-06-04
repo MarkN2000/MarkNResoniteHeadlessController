@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActionIcon, Box, Group, Stack, Switch, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import { InspectorNumberInput, InspectorSelect, InspectorTextInput } from "../../components/inspector";
+import { InspectorNumberInput, InspectorSelect, InspectorTextInput, RowIconButton } from "../../components/inspector";
 import { asBool, asNum, asStr, getStringArray } from "./configModel";
 import type { FieldDef } from "./fieldCatalog";
 import { defForKey, extraKeysInOrder, initialValueFor } from "./fieldCatalog";
@@ -120,16 +120,9 @@ export function AdvancedFieldsEditor({
       {extraKeys.map((key) => (
         <Group key={key} wrap="nowrap" gap="xs" align={isMultiline(key) ? "start" : "center"} style={{ minHeight: 34 }}>
           <Group gap={6} wrap="nowrap" style={{ width: 175, flexShrink: 0, paddingTop: isMultiline(key) ? 6 : 0 }}>
-            <ActionIcon
-              size="sm"
-              variant="subtle"
-              color="red"
-              aria-label={t("config.deleteField")}
-              title={t("config.deleteField")}
-              onClick={() => del(key)}
-            >
+            <RowIconButton color="red" label={t("config.deleteField")} onClick={() => del(key)}>
               ×
-            </ActionIcon>
+            </RowIconButton>
             <Text size="sm" c="dark.1" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {label(key)}
             </Text>
