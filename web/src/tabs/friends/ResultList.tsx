@@ -2,54 +2,61 @@ import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Avatar, Box, Center, Divider, Group, Loader, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
-import type { BanEntry, ResoniteUser, UserInfo } from "../../api";
+import type { BanEntry } from "../../api";
 import { InspectorButton, InspectorCard, RefreshButton } from "../../components/inspector";
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { MessageModal } from "../../components/MessageModal";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useConfirm } from "../../hooks/useConfirm";
-import type { FriendSource } from "./FriendsTab";
+import type { FriendSource, UserRow } from "./FriendsTab";
 
 interface Props {
   idx: number;
   source: FriendSource | null;
-  requests: string[];
+  rows: UserRow[]; // requests/focused/search の正規化済み行（bans 以外を統一）
   bans: BanEntry[];
-  searchResults: ResoniteUser[];
-  focusedUsers: UserInfo[];
-  selfUserId: string | null; // ヘッドレス自身(ホスト)の UserID。自分への申請/解除/招待を無効化（R2）
+  selfUserId: string | null; // ヘッドレス自身(ホスト)の UserID。自分への申請/解除/招待/モデレーションを無効化（R2/R1）
   loading: boolean;
   onRefetch: () => void; // 現ソースの再取得（操作後 / ⟳）
 }
 
-// 統一リストで扱うユーザー行の共通形（検索結果=ResoniteUser / フォーカス内=UserInfo を正規化）。
-interface UserRow {
-  id: string;
-  username: string;
-  iconUrl?: string;
-}
+// ソース別に「有効」な操作。グレーアウト方式なので全行で同じボタンを並べ、ここに無いものは disabled で出す。
+//   ban フラグは BAN / BAN解除 の両方を司る（id 必須＝id 無の行は別途自動グレー）。
+type ActionFlags = {
+  accept?: boolean;
+  sendRequest?: boolean;
+  invite?: boolean;
+  removeFriend?: boolean;
+  message?: boolean;
+  ban?: boolean;
+};
+const ENABLED: Record<"search" | "focused" | "requests", ActionFlags> = {
+  search: { sendRequest: true, invite: true, removeFriend: true, message: true, ban: true },
+  focused: { sendRequest: true, removeFriend: true, message: true, ban: true }, // 招待=在席中のため無効
+  requests: { accept: true, invite: true, message: true }, // 申請/解除/BAN系は無効（リクエスト文脈に不適）
+};
 
-// ② 統一結果リスト。①で選んだソース種別に応じて行を描画する（行内ボタン方式）。
-//   requests→[承認](即時) / bans→[解除](確認) / search・focused→[申請][解除](+search時[招待])（確認）。
-export function ResultList({ idx, source, requests, bans, searchResults, focusedUsers, selfUserId, loading, onRefetch }: Props) {
+// ② 統一結果リスト。①で選んだソースに応じて行を描画する（行内ボタン方式）。
+//   bans → 専用表示(BansBody)。それ以外 → 統一ユーザー行(UsersBody)＋ソース別 ENABLED でグレーアウト。
+export function ResultList({ idx, source, rows, bans, selfUserId, loading, onRefetch }: Props) {
   const { t } = useTranslation();
-  const accept = useAsyncAction(onRefetch); // 承認は内向き操作なので即時
+  const accept = useAsyncAction(onRefetch); // 承認は内向き操作なので即時＋再取得（リストから消える）
   const confirm = useConfirm();
   const [msgTo, setMsgTo] = useState<string | null>(null); // メッセージ入力モーダルの宛先（username）
 
+  const count = source === "bans" ? bans.length : rows.length;
   const title =
     source === "requests"
-      ? `${t("friends.requests")} (${requests.length})`
+      ? `${t("friends.requests")} (${count})`
       : source === "bans"
-        ? `${t("friends.bans")} (${bans.length})`
+        ? `${t("friends.bans")} (${count})`
         : source === "search"
-          ? `${t("friends.searchResults")} (${searchResults.length})`
+          ? `${t("friends.searchResults")} (${count})`
           : source === "focused"
-            ? `${t("friends.focusedUsers")} (${focusedUsers.length})`
+            ? `${t("friends.focusedUsers")} (${count})`
             : t("friends.result");
 
-  // unban は操作で項目がリストから消えるので確認 → 実行 → 再取得。メッセージは名前+userId。
-  // 結果を return することで confirm() がトーストを出す（失敗=赤 / 成功=success 緑）。
+  // unban（BAN一覧）は操作で項目が消えるので確認 → 実行 → 再取得。メッセージは名前+userId。
   const askUnban = (b: BanEntry) =>
     confirm.ask({
       title: t("friends.unbanTitle"),
@@ -63,9 +70,8 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
       },
     });
 
-  // 関係操作（申請/解除/招待）は外向きなので確認するが、search/focused のリストは
-  // 友達関係を表示しないため**操作後 refetch しない**（リストは変化しない・手動 ⟳ で更新）。
-  // fn の結果を返すと confirm() が成功/失敗トーストを出す。
+  // 関係操作（申請/解除/招待）は外向きなので確認するが、統一リストは友達関係を表示しないため
+  // **操作後 refetch しない**（リストは変化しない・手動 ⟳ で更新）。fn の結果を返すと confirm() がトーストを出す。
   const askUserOp = (
     labelKey: string,
     msgKey: string,
@@ -93,8 +99,7 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
   const askInvite = (u: string) =>
     askUserOp("friends.invite", "friends.confirmInvite", false, u, "toast.inviteDone", () => api.inviteUser(idx, u));
 
-  // モデレーション操作（検索結果・R1）。ban/unban は userId 駆動なので UserRow を受け取る。
-  // 検索リストは ban/unban で変化しないため操作後 refetch しない（トーストのみ）。
+  // モデレーション操作（R1）。ban/unban は userId 駆動なので UserRow を受け取る。
   const askBan = (u: UserRow) =>
     confirm.ask({
       title: t("friends.banTitle"),
@@ -111,8 +116,6 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
       success: t("toast.unbanDone"),
       onConfirm: () => api.unban(u.id),
     });
-  // メッセージは入力モーダル（確認ダイアログではなく本文入力・session タブと同方式）。
-  const openMessage = (username: string) => setMsgTo(username);
 
   let body: ReactNode;
   if (loading) {
@@ -123,31 +126,27 @@ export function ResultList({ idx, source, requests, bans, searchResults, focused
     );
   } else if (source === null) {
     body = <Empty text={t("friends.selectSource")} />;
-  } else if (source === "requests") {
-    body = (
-      <RequestsBody
-        requests={requests}
-        busy={accept.busy}
-        onAccept={(name) => void accept.run(() => api.acceptFriendRequest(name), t("toast.acceptDone"))}
-      />
-    );
   } else if (source === "bans") {
     body = <BansBody bans={bans} onUnban={askUnban} />;
   } else {
-    // search / focused を共通の UserRow に正規化して UsersBody で描画。
-    const users: UserRow[] =
-      source === "search" ? searchResults : focusedUsers.map((u) => ({ id: u.id, username: u.name }));
+    const emptyText =
+      source === "requests"
+        ? t("friends.noRequests")
+        : source === "focused"
+          ? t("friends.noFocusedUsers")
+          : t("friends.noResults");
     body = (
       <UsersBody
-        users={users}
-        showInvite={source === "search"} // 招待は在席者では無意味（実機 ambient のみ）→ search のみ
-        showModeration={source === "search"} // メッセージ/BAN/BAN解除 は検索結果のみ（R1・在席者はセッションタブ）
-        emptyText={source === "search" ? t("friends.noResults") : t("friends.noFocusedUsers")}
+        rows={rows}
+        enabled={ENABLED[source]}
+        emptyText={emptyText}
         selfUserId={selfUserId}
+        acceptBusy={accept.busy}
+        onAccept={(name) => void accept.run(() => api.acceptFriendRequest(name), t("toast.acceptDone"))}
         onSendRequest={askSendRequest}
         onRemoveFriend={askRemoveFriend}
         onInvite={askInvite}
-        onMessage={openMessage}
+        onMessage={(u) => setMsgTo(u)}
         onBan={askBan}
         onUnban={askUnbanById}
       />
@@ -182,36 +181,6 @@ function Empty({ text }: { text: string }) {
   );
 }
 
-function RequestsBody({
-  requests,
-  busy,
-  onAccept,
-}: {
-  requests: string[];
-  busy: boolean;
-  onAccept: (name: string) => void;
-}) {
-  const { t } = useTranslation();
-  if (requests.length === 0) return <Empty text={t("friends.noRequests")} />;
-  return (
-    <Stack gap="xs">
-      {requests.map((name, i) => (
-        <Fragment key={`${name}#${i}`}>
-          {i > 0 && <Divider color="dark.5" />}
-          <Group justify="space-between" wrap="nowrap" gap="xs">
-            <Text fw={600} truncate>
-              {name}
-            </Text>
-            <InspectorButton severity="neutral" disabled={busy} onClick={() => onAccept(name)}>
-              {t("friends.accept")}
-            </InspectorButton>
-          </Group>
-        </Fragment>
-      ))}
-    </Stack>
-  );
-}
-
 function BansBody({ bans, onUnban }: { bans: BanEntry[]; onUnban: (b: BanEntry) => void }) {
   const { t } = useTranslation();
   if (bans.length === 0) return <Empty text={t("friends.noBans")} />;
@@ -241,13 +210,16 @@ function BansBody({ bans, onUnban }: { bans: BanEntry[]; onUnban: (b: BanEntry) 
   );
 }
 
-// 検索結果 / フォーカス内ユーザーの共通描画。情報行（アバター＋名前＋id）＋操作行（申請/招待/解除）。
+// 統一ユーザー行: アバター(icon/頭文字)＋名前＋id ＋ 固定ボタン列。
+//   関係行 = 承認 / 申請 / 招待 / 解除 ・ モデレーション行 = ✉メッセージ / BAN / BAN解除。
+// 全行で同じ並びを描画し、enabled 外・自分(ホスト)・id 無 は disabled（グレーアウト）で見た目を統一する。
 function UsersBody({
-  users,
-  showInvite,
-  showModeration,
+  rows,
+  enabled,
   emptyText,
   selfUserId,
+  acceptBusy,
+  onAccept,
   onSendRequest,
   onRemoveFriend,
   onInvite,
@@ -255,11 +227,12 @@ function UsersBody({
   onBan,
   onUnban,
 }: {
-  users: UserRow[];
-  showInvite: boolean;
-  showModeration: boolean; // メッセージ/BAN/BAN解除 段を出すか（検索結果のみ・R1）
+  rows: UserRow[];
+  enabled: ActionFlags;
   emptyText: string;
-  selfUserId: string | null; // 自分(ホスト)＝申請/解除/招待/モデレーションを無効化（R2/R1・search/focused 共通）
+  selfUserId: string | null;
+  acceptBusy: boolean;
+  onAccept: (username: string) => void;
   onSendRequest: (username: string) => void;
   onRemoveFriend: (username: string) => void;
   onInvite: (username: string) => void;
@@ -268,62 +241,61 @@ function UsersBody({
   onUnban: (u: UserRow) => void; // unbanByID も userId 必須
 }) {
   const { t } = useTranslation();
-  if (users.length === 0) return <Empty text={emptyText} />;
+  if (rows.length === 0) return <Empty text={emptyText} />;
   return (
     <Stack gap="xs">
-      {users.map((u, i) => {
-        const isSelf = !!selfUserId && u.id === selfUserId; // 自分への申請/解除/招待は無意味→無効化
+      {rows.map((u, i) => {
+        const isSelf = !!selfUserId && u.id === selfUserId; // 自分への申請/解除/招待/モデレーションは無効化
+        const noId = !u.id; // id 必須の BAN/BAN解除 を自動グレー
         return (
-        <Fragment key={u.id || `${u.username}#${i}`}>
-          {i > 0 && <Divider color="dark.5" />}
-          <Box>
-            {/* 情報行: アバター + 名前 + id */}
-            <Group wrap="nowrap" gap="xs" mb={6}>
-              <Avatar src={u.iconUrl || undefined} radius="xl" size={32}>
-                {(u.username || "?").slice(0, 1).toUpperCase()}
-              </Avatar>
-              <Box style={{ minWidth: 0 }}>
-                <Text fw={600} truncate>
-                  {u.username || t("friends.unknownUser")}
-                </Text>
-                {u.id && (
-                  <Text size="xs" c="dimmed" truncate>
-                    {u.id}
+          <Fragment key={u.id || `${u.username}#${i}`}>
+            {i > 0 && <Divider color="dark.5" />}
+            <Box>
+              {/* 情報行: アバター + 名前 + id */}
+              <Group wrap="nowrap" gap="xs" mb={6}>
+                <Avatar src={u.iconUrl || undefined} radius="xl" size={32}>
+                  {(u.username || "?").slice(0, 1).toUpperCase()}
+                </Avatar>
+                <Box style={{ minWidth: 0 }}>
+                  <Text fw={600} truncate>
+                    {u.username || t("friends.unknownUser")}
                   </Text>
-                )}
-              </Box>
-            </Group>
-            {/* 関係操作行: 申請 / 招待 / 解除（モバイルで折返し）。自分(ホスト)は無効化（R2）。 */}
-            <Group gap={4} wrap="wrap">
-              <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onSendRequest(u.username)}>
-                {t("friends.sendRequest")}
-              </InspectorButton>
-              {showInvite && (
-                <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onInvite(u.username)}>
+                  {u.id && (
+                    <Text size="xs" c="dimmed" truncate>
+                      {u.id}
+                    </Text>
+                  )}
+                </Box>
+              </Group>
+              {/* 関係操作行: 承認 / 申請 / 招待 / 解除 */}
+              <Group gap={4} wrap="wrap">
+                <InspectorButton severity="neutral" disabled={!enabled.accept || acceptBusy} onClick={() => onAccept(u.username)}>
+                  {t("friends.accept")}
+                </InspectorButton>
+                <InspectorButton severity="neutral" disabled={!enabled.sendRequest || isSelf} onClick={() => onSendRequest(u.username)}>
+                  {t("friends.sendRequest")}
+                </InspectorButton>
+                <InspectorButton severity="neutral" disabled={!enabled.invite || isSelf} onClick={() => onInvite(u.username)}>
                   {t("friends.invite")}
                 </InspectorButton>
-              )}
-              <InspectorButton severity="danger" disabled={isSelf} onClick={() => onRemoveFriend(u.username)}>
-                {t("friends.removeFriend")}
-              </InspectorButton>
-            </Group>
-            {/* モデレーション行（検索結果のみ・R1）: メッセージ / BAN / BAN解除。
-                BAN/BAN解除 は userId 必須なので id 空の行は無効化。メッセージは username 駆動。 */}
-            {showModeration && (
+                <InspectorButton severity="danger" disabled={!enabled.removeFriend || isSelf} onClick={() => onRemoveFriend(u.username)}>
+                  {t("friends.removeFriend")}
+                </InspectorButton>
+              </Group>
+              {/* モデレーション行: ✉メッセージ / BAN / BAN解除 */}
               <Group gap={4} wrap="wrap" mt={4}>
-                <InspectorButton severity="neutral" disabled={isSelf} onClick={() => onMessage(u.username)}>
+                <InspectorButton severity="neutral" disabled={!enabled.message || isSelf} onClick={() => onMessage(u.username)}>
                   ✉ {t("friends.message")}
                 </InspectorButton>
-                <InspectorButton severity="danger" disabled={isSelf || !u.id} onClick={() => onBan(u)}>
+                <InspectorButton severity="danger" disabled={!enabled.ban || isSelf || noId} onClick={() => onBan(u)}>
                   {t("friends.ban")}
                 </InspectorButton>
-                <InspectorButton severity="danger" disabled={isSelf || !u.id} onClick={() => onUnban(u)}>
+                <InspectorButton severity="danger" disabled={!enabled.ban || isSelf || noId} onClick={() => onUnban(u)}>
                   {t("friends.banUnban")}
                 </InspectorButton>
               </Group>
-            )}
-          </Box>
-        </Fragment>
+            </Box>
+          </Fragment>
         );
       })}
     </Stack>
