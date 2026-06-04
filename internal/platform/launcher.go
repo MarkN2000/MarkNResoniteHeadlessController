@@ -16,6 +16,20 @@ import (
 //
 // 作業ディレクトリは常に Headless フォルダに設定する。
 func BuildHeadlessCommand(headlessPath, configPath string) *exec.Cmd {
+	// cmd.Dir を Headless フォルダに変える（下記）。そのため相対パスのままだと headless 側が
+	// 「自分の cwd(=Headless フォルダ)」基準で解決し、-HeadlessConfig は見つからず即終了
+	// （"Config file not found!"・自前ログも出ない）、exe/dll も取り違える。MRHC の現在の cwd
+	// 基準で絶対化してから組み立てる。Windows/Linux 共通: filepath.Abs は OS のセパレータと
+	// 現在の cwd で解決し、既に絶対なら正規化のみ（意味は不変）。
+	if abs, err := filepath.Abs(headlessPath); err == nil {
+		headlessPath = abs
+	}
+	if configPath != "" {
+		if abs, err := filepath.Abs(configPath); err == nil {
+			configPath = abs
+		}
+	}
+
 	headlessDir := filepath.Dir(headlessPath)
 
 	var cmd *exec.Cmd
