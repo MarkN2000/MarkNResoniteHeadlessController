@@ -9,7 +9,7 @@ name: release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]*' # バージョンタグのみ（v始まりの非バージョンタグで誤発火しない）
   workflow_dispatch:
 
 permissions:
@@ -83,8 +83,9 @@ jobs:
           path: ${{ env.ARTIFACT }}
           if-no-files-found: error
 
-  # タグ push のときだけ、全ターゲットのアーカイブ＋SHA256SUMS＋install.sh を 1 つのリリースに
-  # まとめて添付する（needs: build = 1 ターゲットでも失敗したら走らない＝不完全リリース防止）。
+  # タグでの実行（push・またはタグ ref を選んだ手動実行＝リリース再添付の手段）のときだけ、
+  # 全ターゲットのアーカイブ＋SHA256SUMS＋install.sh を 1 つのリリースにまとめて添付する
+  # （needs: build = 1 ターゲットでも失敗したら走らない＝不完全リリース防止）。
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
@@ -111,6 +112,7 @@ jobs:
           # セマンティックバージョンのプレリリースタグ（v2.0.0-rc.1 等・「-」を含む）は prerelease
           # として公開 → releases/latest の固定リンク（install.sh の取得先）を汚さない。
           prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true # タグ間のコミット一覧からリリースノートを自動生成
           fail_on_unmatched_files: true
           files: |
             dist/mrhc-linux-amd64.tar.gz

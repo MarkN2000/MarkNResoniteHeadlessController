@@ -49,7 +49,7 @@ Resonite Headless Controller を、要件からゼロ再定義して作り直す
 
 ## 3. 非機能要件
 
-- **配布**: ランタイム不要の単一実行ファイル（`mrhc` / `mrhc.exe`）。フロント静的資産は `embed.FS` で同梱。インストール=DLして実行。
+- **配布**: ランタイム不要の単一実行ファイル（`mrhc` / `mrhc.exe`）。フロント静的資産は `embed.FS` で同梱。インストール=アーカイブをDL→展開→実行（詳細は §8）。
 - **クロスプラットフォーム**: **Windows (x64) / Linux (x64・ARM64)** を対等にサポート。ARM Linux は Resonite が ARM で動作する環境（SBC・ARMサーバー等）向け。MRHC本体は **CGO 不要の純 Go** のため `GOARCH=arm64` のクロスビルドで対応。⚠️ ただしARMは「ビルドだけ」では完結しない: **(1) Resonite同梱dotnetはx64でARMでは使えず、システムに.NET 10ランタイムが別途必要** **(2) SteamCMDがARM非対応のため入手/更新はDepotDownloaderに統一**（§5.7）。OS/arch差（パス・文字コード・プロセス起動・dotnet所在・Resonite入手手段）は**プラットフォーム抽象層**に隔離。起動は Win=`Resonite.exe` / Linux=`dotnet Resonite.dll`（同一.NETアプリ）。
 - **前提ランタイム**: MRHC自体は単一Goバイナリで**ランタイム不要**。ヘッドレスは.NET 10で動く。**x86(Win/Linux)はResoniteが自前のランタイムを同梱**（`<install>/dotnet-runtime/dotnet`、実機確認済）するため**別途の.NET導入は不要**。⚠️ **ARM64は同梱dotnetがx64で使えないため、システムに.NET 10ランタイムが別途必要**（MRHCは同梱dotnetの実体アーキを確認し、不一致なら`~/.dotnet`→PATHの`dotnet`にフォールバック）。Linux起動は使用可能なdotnetで `dotnet Resonite.dll`。
 - **セキュリティ（LAN前提で右サイズ）**: §7参照。

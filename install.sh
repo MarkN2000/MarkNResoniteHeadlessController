@@ -5,7 +5,7 @@
 # 使い方（任意のフォルダで）:
 #   curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 #
-# - 依存は POSIX sh + curl + tar + uname のみ（distro 非依存・sudo 不要）。
+# - 依存は POSIX sh + curl + tar + uname + mktemp のみ（distro 非依存・sudo 不要）。
 # - 外部依存（freetype2 / ARM の .NET 10）の検出・導入案内は MRHC 本体が行う。
 # - 同じ場所で再実行するとバイナリだけが上書き＝更新になる
 #   （config 等はアーカイブに含まれないため保持される。MRHC は停止してから実行）。
@@ -19,8 +19,9 @@ set -eu
 
 main() {
     base="${MRHC_DOWNLOAD_BASE:-https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download}"
+    base="${base%/}" # 末尾スラッシュを除去（URL が // にならないように）
 
-    for cmd in curl tar uname; do
+    for cmd in curl tar uname mktemp; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             echo "エラー: $cmd が見つかりません。導入してから再実行してください。" >&2
             exit 1
@@ -53,16 +54,23 @@ main() {
     trap 'rm -f "$tmp"' EXIT
 
     echo "ダウンロード中: $url"
-    if [ -n "${MRHC_DOWNLOAD_BASE:-}" ]; then
-        # 差し替え時はローカル HTTP 等も許可（テスト用）
-        curl -fsSL -o "$tmp" "$url"
-    else
-        # 既定（GitHub）は https 以外を拒否
-        curl -fsSL --proto '=https' -o "$tmp" "$url"
+    # curl フラグは位置パラメータで組み立てる（POSIX sh に配列が無いため）。-#=進捗バー。
+    # 既定（GitHub）は https 以外を拒否・MRHC_DOWNLOAD_BASE 差し替え時はローカル HTTP 等も許可（テスト用）。
+    set -- -fL -# -o "$tmp" "$url"
+    if [ -z "${MRHC_DOWNLOAD_BASE:-}" ]; then
+        set -- --proto '=https' "$@"
+    fi
+    if ! curl "$@"; then
+        echo "エラー: ダウンロードに失敗しました: $url" >&2
+        echo "（リリースが未公開の可能性があります。確認: https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases ）" >&2
+        exit 1
     fi
 
     # tar が実行権を保持するため chmod +x は不要
-    tar -xzf "$tmp" -C .
+    if ! tar -xzf "$tmp" -C .; then
+        echo "エラー: 展開に失敗しました（ダウンロードが破損している可能性があります。再実行してください）。" >&2
+        exit 1
+    fi
 
     echo ""
     echo "展開しました: ./${name}/"
@@ -71,4 +79,6 @@ main() {
     echo "（初回はセットアップウィザードが起動します）"
 }
 
-main "$@"
+# 引数なしで呼ぶ（"$@" は bash 4.3 以前が sh の環境で set -u + 引数ゼロだと
+# unbound variable エラーになる既知バグがあり、引数は使わないため不要）
+main

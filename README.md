@@ -62,7 +62,7 @@ MRHC を**停止してから**、導入時と同じ場所で install.sh を再�
 - **Resoniteドメイン事実**（コンソールコマンド・出力書式・起動方法など）: [docs/resonite-domain-facts.md](docs/resonite-domain-facts.md)
 
 ## ステータス
-v1.0「歩く骨格」を実装中（CLIセットアップ・ヘッドレス起動/停止・ライブログ(SSE)・コマンド送信・認証・React/Mantine製UI・両OS単一バイナリが動作）。以降、段階的に機能を肉付け。
+v2 を実装中。コア機能は実装済み（CLIセットアップ・ヘッドレス起動/停止/再起動・ライブログ(SSE)・全タブの Web UI・スケジュール再起動・Steam（DepotDownloader）経由の Resonite 入手/更新・依存検出と導入案内・Windows / Linux 単一バイナリ）。残りは ARM 実機検証とリリース準備。
 
 ## ビルド / 開発
 前提: **Go 1.26+** と **Node 20+**。
