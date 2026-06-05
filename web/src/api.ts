@@ -375,7 +375,8 @@ export const putSteamConfig = (body: {
   installDir: string;
 }) => write("PUT", "/steam/config", body);
 
-// 更新の進行状態（internal/steam.Status）。state: idle|running|success|failed。
+// 更新の進行状態（internal/steam.Status・SSE steam-status / GET /steam/status と同形）。
+// 取得は SSE（steam-status）で行うため専用の GET ラッパは持たない（/steam/status は外部クライアント用に存在）。
 export interface SteamStatus {
   state: "idle" | "running" | "success" | "failed";
   percent: number;
@@ -384,9 +385,6 @@ export interface SteamStatus {
   startedAt?: string;
   finishedAt?: string;
   lastError?: string;
-}
-export async function getSteamStatus(): Promise<SteamStatus | null> {
-  return getData<SteamStatus>("/steam/status");
 }
 // 入手/更新を非同期開始（停止中のみ・稼働中は 409）。進捗は SSE /steam/events。
 export const steamDownload = () => post("/steam/download");
