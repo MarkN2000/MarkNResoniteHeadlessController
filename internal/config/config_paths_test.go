@@ -22,6 +22,9 @@ func TestInstallDirOrDefault(t *testing.T) {
 		{"Steam.InstallDir 空白は無視", Config{Steam: &Steam{InstallDir: "   "}}, def},
 		{"ResoniteHeadless から2つ上を導出", Config{ResoniteHeadless: headless}, fromHeadless},
 		{"両方あれば InstallDir 優先", Config{ResoniteHeadless: headless, Steam: &Steam{InstallDir: "/opt/Resonite"}}, "/opt/Resonite"},
+		// 非正規レイアウト（.../Headless/<bin> でない）の明示パスは 2つ上が install 根とズレる＝
+		// 既知の制約（doc 明記）。更新先を確実にしたい場合は Steam.InstallDir を明示する。意図的挙動を固定。
+		{"非正規パスは2つ上のまま(footgun・意図的)", Config{ResoniteHeadless: filepath.Join("only", "Resonite.exe")}, "."},
 	}
 	for _, c := range cases {
 		if got := c.cfg.InstallDirOrDefault(dataDir); got != c.want {

@@ -277,6 +277,8 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	// 既定パス（{dataDir}/resonite）にまだ Resonite が無い＝未DL のときは、
 	// 実行失敗の素っ気ないメッセージでなく取得導線を案内する（R-A）。
+	// この案内はユーザー起動（本ハンドラ）専用。orchestrator/crash 復帰は稼働中前提で
+	// 未DL は実質起こらないため、その経路は driver.Start の generic 失敗ログに委ねる。
 	if _, statErr := os.Stat(headlessPath); errors.Is(statErr, fs.ErrNotExist) {
 		writeErr(w, http.StatusConflict, "headless_not_installed",
 			"Resonite がまだダウンロードされていません。設定タブの『今すぐ更新』から取得してください。")

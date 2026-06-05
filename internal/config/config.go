@@ -46,7 +46,7 @@ type Steam struct {
 	Username   string `json:"username,omitempty"`   // Steam ユーザー名
 	Password   string `json:"password,omitempty"`   // Steam パスワード（ASCII・最大64文字・復元可能保存）
 	BranchCode string `json:"branchCode,omitempty"` // headless branch password（Patreon 配布・変動しうる）
-	InstallDir string `json:"installDir,omitempty"` // DL/更新先（空=ResoniteHeadless から導出/既定）
+	InstallDir string `json:"installDir,omitempty"` // DL/更新先（空=既定 {dataDir}/resonite を導出・InstallDirOrDefault）
 }
 
 // HeadlessCredentials は生成/起動する headless config に注入する既定の Resonite アカウント。
@@ -73,6 +73,10 @@ func (c *Config) HeadlessConfigDirOrDefault(dataDir string) string {
 // バンドル既定方針(R-A): パス未指定なら既存 Steam インストールの有無に関わらず {dataDir}/resonite を使う
 // （自己完結1フォルダ・二重管理の衝突回避・DL 前はパスが無い鶏卵問題の解消）。
 // 既存インストールを使いたい上級者は Steam.InstallDir か ResoniteHeadless を明示してオプトアウトする。
+//
+// ②の導出は ResoniteHeadless が正規レイアウト「.../Resonite/Headless/<bin>」である前提（2つ上＝install 根）。
+// 非正規な明示パス（例 /foo/Resonite.exe）では導出が install 根とズレ、更新（DL 先）と起動（明示パス）が
+// 食い違い得る。既存 install の更新先を確実にしたい場合は Steam.InstallDir を明示すること。
 // 純関数（OS 非依存・ファイルアクセスなし）。"~" 展開は利用側で行う。
 func (c *Config) InstallDirOrDefault(dataDir string) string {
 	if c.Steam != nil {
