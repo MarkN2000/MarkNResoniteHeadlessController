@@ -57,7 +57,7 @@ type Steam struct {
     Username   string `json:"username,omitempty"`
     Password   string `json:"password,omitempty"`   // 復元可能保存（0600・LAN前提）
     BranchCode string `json:"branchCode,omitempty"` // headless branch password（Patreon配布・変動）
-    InstallDir string `json:"installDir,omitempty"` // DL先（空=ResoniteHeadlessから導出/既定）
+    InstallDir string `json:"installDir,omitempty"` // DL先（空=既定 {dataDir}/resonite・R-A）
 }
 
 // config.Restart に追加（更新トグルはスケジュールタブで設定する＝Restart配下）
@@ -68,6 +68,17 @@ UpdateOnScheduledRestart bool `json:"updateOnScheduledRestart"`
   Steam 未設定なら実行時 no-op なので安全。既存保存 config（フィールド欠落）は false＝opt-in。
 - 公開 API（`steam/config`）は秘密を返さず `hasPassword`/`hasBranchCode` を返す。
 - PW は **ASCII 限定・最大 64 文字**（Steam 仕様）→ PUT で検証。
+
+### 4.1 既定パス導出（R-A）
+
+バンドル既定方針：**パス未指定なら既存 Steam インストールの有無に関わらず `{dataDir}/resonite` に新規 DL** する（自己完結 1 フォルダ・二重管理の衝突回避・DL 前はパスが無い鶏卵問題の解消）。既存インストールを使いたい上級者だけ `Steam.InstallDir`（設定 → Steam）か `ResoniteHeadless`（設定 → アプリ設定）を明示してオプトアウトする。
+
+- `config.InstallDirOrDefault(dataDir)`（純関数）：①明示 `Steam.InstallDir` → ②`ResoniteHeadless` の 2 つ上 → ③既定 `{dataDir}/resonite`。
+- `config.HeadlessPathOrDefault(dataDir, binaryName)`：①明示 `ResoniteHeadless` → ②`InstallDirOrDefault/Headless/<binaryName>`。`binaryName` は `platform.HeadlessBinaryName()`（Windows=`Resonite.exe` / 他=`Resonite.dll`）を DI。
+- `steamParams` は常に `InstallDirOrDefault` で install 先を埋めるため、**資格（ユーザー名/PW/branchCode）のいずれかが欠けたときだけ** `ErrSteamNotConfigured`（install 先は未設定理由にしない）。
+- `resolveLaunch` は `HeadlessPathOrDefault` で解決し、`handleStart` は解決後の実行ファイルが無い（未 DL）なら `headless_not_installed` で「設定 → 今すぐ更新」へ案内する。
+- 利用時に `platform.ExpandHome` で先頭 `~` を展開（`filepath.Abs` は `~` 非展開のため。config には入力どおり保存）。
+- セットアップウィザードは Resonite パスを尋ねない（未設定＝既定導出）。
 
 ## 5. DepotDownloader 本体の取得（acquire.go）
 
