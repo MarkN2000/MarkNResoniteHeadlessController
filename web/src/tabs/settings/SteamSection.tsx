@@ -189,6 +189,9 @@ export function SteamSection({ status }: { status: Status | null }) {
               placeholder={t("settings.steamInstallDirPlaceholder")}
             />
           </FieldRow>
+          <Text size="xs" c="dimmed">
+            {t("settings.steamInstallDirHint")}
+          </Text>
           <SaveButton label={t("settings.save")} onClick={onSave} disabled={!canSave} loading={save.busy} />
 
           <Divider my={4} color="dark.4" />

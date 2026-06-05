@@ -146,17 +146,19 @@ export async function getStatus(): Promise<Status | null> {
 }
 
 // 起動はコンフィグ名必須（無config起動はワールドが公開になるため backend が 400）。
-export async function start(config: string): Promise<{ ok: boolean; status: number; error?: string }> {
+export async function start(config: string): Promise<{ ok: boolean; status: number; error?: string; code?: string }> {
   const res = await req("/start", { method: "POST", body: JSON.stringify({ config }) });
   if (res.ok) return { ok: true, status: res.status };
   let error: string | undefined;
+  let code: string | undefined;
   try {
     const j = await res.json();
     error = j?.error?.message;
+    code = j?.error?.code;
   } catch {
     /* ignore */
   }
-  return { ok: false, status: res.status, error };
+  return { ok: false, status: res.status, error, code };
 }
 
 export async function stop(): Promise<void> {

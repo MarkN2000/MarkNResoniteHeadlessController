@@ -141,7 +141,12 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     // api.start は通信不通で throw し得るため try/catch で network も拾う。
     try {
       const r = await api.start(selectedConfig);
-      if (!r.ok) notifyError(r.error || t("toast.errGeneric"), t("toast.startFailTitle"));
+      if (!r.ok) {
+        // 未DL（既定パスに Resonite が無い）は専用文言で取得導線を案内（R-A）。
+        const msg =
+          r.code === "headless_not_installed" ? t("toast.errHeadlessNotInstalled") : r.error || t("toast.errGeneric");
+        notifyError(msg, t("toast.startFailTitle"));
+      }
     } catch {
       notifyError(t("toast.errNetwork"), t("toast.startFailTitle"));
     }

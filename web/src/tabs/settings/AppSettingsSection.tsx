@@ -81,7 +81,11 @@ export function AppSettingsSection() {
           <Note>{t("settings.restartNote")}</Note>
 
           <FieldRow label={t("settings.headlessPath")}>
-            <InspectorTextInput value={path} onChange={(e) => setPath(e.currentTarget.value)} />
+            <InspectorTextInput
+              value={path}
+              onChange={(e) => setPath(e.currentTarget.value)}
+              placeholder={t("settings.headlessPathPlaceholder")}
+            />
           </FieldRow>
           <Note>{t("settings.headlessPathNote")}</Note>
 
