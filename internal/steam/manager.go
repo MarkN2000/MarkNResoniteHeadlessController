@@ -209,6 +209,11 @@ func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
 		return fmt.Errorf("更新が停滞したため中断しました（%s 無進捗）", m.stallTimeout)
 	}
 	if runErr != nil {
+		// 親 ctx のキャンセル（ユーザー Cancel / shutdown）なら「中止」として明示する
+		// （stall は watchCtx のみを cancel するため runCtx.Err() は nil＝上の分岐で先に処理済み）。
+		if runCtx.Err() != nil {
+			return errors.New("更新を中止しました")
+		}
 		return runErr
 	}
 
