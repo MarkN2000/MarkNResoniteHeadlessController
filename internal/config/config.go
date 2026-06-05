@@ -68,6 +68,35 @@ func (c *Config) HeadlessConfigDirOrDefault(dataDir string) string {
 	return filepath.Join(dataDir, "headless-configs")
 }
 
+// InstallDirOrDefault は Resonite の入手/更新先（DepotDownloader の -dir 対象＝.../Resonite）を解決する。
+// 優先順: ①明示 Steam.InstallDir → ②ResoniteHeadless から導出（2つ上） → ③既定 {dataDir}/resonite。
+// バンドル既定方針(R-A): パス未指定なら既存 Steam インストールの有無に関わらず {dataDir}/resonite を使う
+// （自己完結1フォルダ・二重管理の衝突回避・DL 前はパスが無い鶏卵問題の解消）。
+// 既存インストールを使いたい上級者は Steam.InstallDir か ResoniteHeadless を明示してオプトアウトする。
+// 純関数（OS 非依存・ファイルアクセスなし）。"~" 展開は利用側で行う。
+func (c *Config) InstallDirOrDefault(dataDir string) string {
+	if c.Steam != nil {
+		if d := strings.TrimSpace(c.Steam.InstallDir); d != "" {
+			return d
+		}
+	}
+	if h := strings.TrimSpace(c.ResoniteHeadless); h != "" {
+		return filepath.Dir(filepath.Dir(h)) // .../Resonite/Headless/Resonite.xxx → .../Resonite
+	}
+	return filepath.Join(dataDir, "resonite")
+}
+
+// HeadlessPathOrDefault はヘッドレス実行ファイルのパスを解決する。
+// 明示 ResoniteHeadless があればそれを、無ければ InstallDirOrDefault/Headless/<binaryName> を導出する。
+// binaryName は OS 別（Windows=Resonite.exe / 他=Resonite.dll）を呼び出し側が注入する
+// （config を OS 非依存に保つための依存性注入）。純関数。"~" 展開は利用側で行う。
+func (c *Config) HeadlessPathOrDefault(dataDir, binaryName string) string {
+	if h := strings.TrimSpace(c.ResoniteHeadless); h != "" {
+		return h
+	}
+	return filepath.Join(c.InstallDirOrDefault(dataDir), "Headless", binaryName)
+}
+
 // SessionTTL はセッション有効期間を返す。未設定（0以下）なら既定30日。
 func (c *Config) SessionTTL() time.Duration {
 	h := c.SessionTTLHours
