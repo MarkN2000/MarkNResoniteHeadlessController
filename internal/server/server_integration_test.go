@@ -68,6 +68,9 @@ func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 	if err := drv.Start(fakehlPath, "", ""); err != nil {
 		t.Fatalf("start fakehl: %v", err)
 	}
+	// 起動直後に強制停止クリーンアップを登録する。readiness 失敗など以降のどの経路でも
+	// fakehl を孤児化させないため（Windows は親=テストバイナリ終了時に子を自動 kill しない）。
+	t.Cleanup(func() { stopFakehl(drv) })
 
 	// readiness を待つ
 	deadline := time.Now().Add(5 * time.Second)
@@ -78,26 +81,35 @@ func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	if !drv.Status().Ready {
-		_ = drv.SendCommand("shutdown")
 		t.Fatalf("fakehl never became ready")
 	}
 
 	srv := New(cfg, "", drv, resonite.NewClient(), nil) // webFS=nil → '/' ハンドラは未登録（テストでは不要）
 	ts = httptest.NewServer(srv.Handler())
-
-	t.Cleanup(func() {
-		ts.Close()
-		_ = drv.SendCommand("shutdown")
-		// 軽く待つ。fakehl は shutdown で即 os.Exit する。
-		deadline := time.Now().Add(2 * time.Second)
-		for time.Now().Before(deadline) {
-			if drv.Status().State == headless.StateStopped {
-				return
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
-	})
+	t.Cleanup(ts.Close) // LIFO: ts.Close → stopFakehl の順で走る
 	return ts, testPassword
+}
+
+// stopFakehl は fakehl を確実に終了させる（graceful shutdown → 猶予 → pid 強制終了）。
+// Windows では親(テストバイナリ)終了で子は死なないため、shutdown 取りこぼし・hang を pid kill で潰す
+// （孤児 fakehl の蓄積を防ぐ）。package server からは driver の cmd に触れないため Status().PID を使う。
+func stopFakehl(drv *headless.Driver) {
+	if drv.Status().State == headless.StateStopped {
+		return
+	}
+	_ = drv.SendCommand("shutdown") // fakehl は shutdown で即 os.Exit する
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if drv.Status().State == headless.StateStopped {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if pid := drv.Status().PID; pid > 0 {
+		if p, err := os.FindProcess(pid); err == nil {
+			_ = p.Kill()
+		}
+	}
 }
 
 // authGet は Bearer 認証付き GET → JSON decode → status を返す。
