@@ -136,6 +136,10 @@ func elfArch(path string) string {
 		return "amd64"
 	case 183: // EM_AARCH64
 		return "arm64"
+	case 3: // EM_386（32bit x86。Fedora 系の /usr/lib は 32bit のため判別必須・R-C）
+		return "386"
+	case 40: // EM_ARM（32bit ARM）
+		return "arm"
 	default:
 		return ""
 	}

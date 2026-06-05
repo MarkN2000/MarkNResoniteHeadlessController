@@ -105,11 +105,13 @@ func TestElfArch(t *testing.T) {
 	}{
 		{"x86_64 LE", elfHeader(62, 1), "amd64"},
 		{"aarch64 LE", elfHeader(183, 1), "arm64"},
-		{"x86_64 BE", elfHeader(62, 2), "amd64"},           // BigEndian 読み取り経路
-		{"aarch64 BE", elfHeader(183, 2), "arm64"},         // BigEndian 読み取り経路
-		{"unknown machine (EM_ARM)", elfHeader(40, 1), ""}, // マップ外は判定不能扱い
-		{"invalid EI_DATA", elfHeader(62, 0), ""},          // EI_DATA=0 は判定不能
-		{"x86_64 ELFCLASS32", elfClass32(62), "amd64"},     // 32bit でも e_machine は offset 18
+		{"x86_64 BE", elfHeader(62, 2), "amd64"},   // BigEndian 読み取り経路
+		{"aarch64 BE", elfHeader(183, 2), "arm64"}, // BigEndian 読み取り経路
+		{"i386 (EM_386)", elfHeader(3, 1), "386"},  // 32bit x86（Fedora /usr/lib 対策・R-C）
+		{"arm32 (EM_ARM)", elfHeader(40, 1), "arm"},
+		{"unknown machine (EM_RISCV)", elfHeader(243, 1), ""}, // マップ外は判定不能扱い
+		{"invalid EI_DATA", elfHeader(62, 0), ""},             // EI_DATA=0 は判定不能
+		{"x86_64 ELFCLASS32", elfClass32(62), "amd64"},        // 32bit でも e_machine は offset 18
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
