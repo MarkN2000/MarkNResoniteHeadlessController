@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,9 @@ type Server struct {
 	scheduler *restartScheduler    // 予定再起動の発火（Phase 8・P8-4a）
 	crashMon  *crashMonitor        // クラッシュ自動復帰（Phase 8・P8-4b）
 	steam     *steam.Manager       // Resonite 入手/更新（DepotDownloader・P9-B）
+
+	// checkDeps は依存検出（R-C）。本番は platform.CheckHeadlessDeps・テストで偽装する。
+	checkDeps func(goos, goarch, installDir string) []platform.DepIssue
 
 	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
@@ -70,6 +74,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		worlds:    headless.NewWorldsService(driver),
 		webFS:     webFS,
 		resonite:  reso,
+		checkDeps: platform.CheckHeadlessDeps,
 	}
 	s.auth = newAuthManager(cfg, &s.cfgMu)
 	s.restart = newRestartOrchestrator(s)
@@ -284,6 +289,11 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 			"Resonite がまだダウンロードされていません。設定タブの『今すぐ更新』から取得してください。")
 		return
 	}
+	// 依存不足の予防ガイド（R-C 経路③）: 起動は止めず、不足があれば sys ログで
+	// 導入コマンドを案内する（UI コンソールにクラッシュログと並んで原因が見える）。
+	// 検出はサブプロセス実行を含むため goroutine で行い start をブロックしない
+	// （sys ログの位置が起動ログと前後しても実用上問題ない）。
+	go s.publishDepGuide()
 	if err := s.driver.Start(headlessPath, launchPath, name); err != nil {
 		writeErr(w, http.StatusConflict, "start_failed", err.Error())
 		return
@@ -311,6 +321,25 @@ func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, er
 	runDir := filepath.Join(s.dataDir, ".run")
 	launchPath, err = hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
 	return headlessPath, launchPath, err
+}
+
+// publishDepGuide は不足依存（freetype2 / ARM の .NET 10）があれば sys ログへ
+// 導入ガイドを流す（R-C 経路③・handleStart 起点）。コマンドは案内するだけで
+// 実行しない（sudo を勝手に走らせない）。Windows は checkDeps が常に空＝no-op。
+// installDir の読取だけ cfgMu 下で行い、検出 I/O はロック外（steamParams と同じ流儀）。
+func (s *Server) publishDepGuide() {
+	s.cfgMu.RLock()
+	installDir := s.cfg.InstallDirOrDefault(s.dataDir)
+	s.cfgMu.RUnlock()
+	for _, issue := range s.checkDeps(runtime.GOOS, runtime.GOARCH, installDir) {
+		guide := issue.Fallback
+		if len(issue.Commands) > 0 {
+			guide = strings.Join(issue.Commands, " && ")
+		}
+		s.driver.PublishSys(fmt.Sprintf(
+			"依存不足: %s — 起動に失敗する場合はサーバー側で導入してください: %s",
+			issue.Title, guide))
+	}
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {

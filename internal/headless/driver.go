@@ -210,6 +210,12 @@ func (d *Driver) publishLog(kind, text string) {
 	d.logHub.Publish(line)
 }
 
+// PublishSys は MRHC 由来の通知を sys ログとして流す（外部パッケージ用の公開ラッパ）。
+// 依存不足の起動前ガイド（R-C・server の pre-start チェック）等、子プロセス出力では
+// ない行を UI コンソールへ出すために使う。停止中でも安全（history に積まれて
+// 再接続時の初期履歴にも含まれ、購読者がいなければ hub は no-op）。
+func (d *Driver) PublishSys(text string) { d.publishLog("sys", text) }
+
 // --- ライフサイクル ---
 
 // Start はヘッドレスを起動する。headlessPath が空ならエラー。
