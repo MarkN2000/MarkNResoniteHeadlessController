@@ -189,8 +189,8 @@ func (o *restartOrchestrator) Cancel() error {
 	if !o.p.inProgress {
 		return errNoRestartInProgress
 	}
-	if o.p.phase == phaseRestarting {
-		return errRestartNotCancellable
+	if o.p.phase == phaseRestarting || o.p.phase == phaseUpdating {
+		return errRestartNotCancellable // ④（更新中含む）は中止不可。更新の中断は /steam/cancel 側で行う
 	}
 	o.p.cancelled = true
 	if o.cancel != nil {
