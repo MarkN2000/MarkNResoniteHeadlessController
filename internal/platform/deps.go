@@ -19,6 +19,7 @@ type DepIssue struct {
 	Kind     string   // "freetype2" | "dotnet10"
 	Title    string   // 表示名
 	Commands []string // 導入コマンド（[Y/n] 実行・ログ提示の両方で使う。distro 不明時は空）
+	Fallback string   // Commands が空（distro 不明）のときの手動導入案内
 	Sudo     bool     // sudo を伴うか（文言出し分け用）
 }
 
@@ -89,6 +90,8 @@ func checkHeadlessDeps(p depProbe, goos, goarch, installDir string) []DepIssue {
 		}
 		if cmd := freetypeInstallCmd(osReleasePkgManager(p)); cmd != "" {
 			issue.Commands = []string{cmd}
+		} else {
+			issue.Fallback = "お使いのディストリビューションのパッケージマネージャで freetype2（Debian系では libfreetype6）を導入してください。"
 		}
 		issues = append(issues, issue)
 	}

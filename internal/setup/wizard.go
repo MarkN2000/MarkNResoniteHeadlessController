@@ -57,7 +57,12 @@ func RunWizard(cfgPath string) error {
 	}
 
 	fmt.Printf("\n設定を保存しました: %s\n", cfgPath)
-	fmt.Println("Resonite 本体はログイン後の Web UI（設定 → Steam）からダウンロードできます。")
+
+	// 依存チェック＋導入提案（R-C 経路①）。対話 [Y/n] はこのウィザード末尾だけ
+	// （通常起動はログ案内のみ＝サーバー起動をブロックしない）。
+	offerDeps(cfgPath, cfg, in, tty)
+
+	fmt.Println("\nResonite 本体はログイン後の Web UI（設定 → Steam）からダウンロードできます。")
 	return nil
 }
 

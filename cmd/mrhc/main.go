@@ -12,7 +12,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -67,6 +69,16 @@ func main() {
 		log.Fatalf("設定の読み込みに失敗しました: %v", err)
 	}
 
+	// 依存チェック（R-C 経路②）: 不足があればログで案内するだけで続行する
+	// （[Y/n] 対話は初回ウィザード末尾のみ＝起動をブロックしない）。Windows は常に no-op。
+	for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, cfg.InstallDirOrDefault(dir)) {
+		if len(issue.Commands) > 0 {
+			log.Printf("依存不足: %s / 導入コマンド: %s", issue.Title, strings.Join(issue.Commands, " && "))
+		} else {
+			log.Printf("依存不足: %s / %s", issue.Title, issue.Fallback)
+		}
+	}
+
 	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する。
 	configDir := cfg.HeadlessConfigDirOrDefault(dir)
 	if err := hlconfig.EnsureDefault(configDir); err != nil {
@@ -82,6 +94,14 @@ func main() {
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Port), Handler: srv.Handler()}
 	go func() {
 		fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)
+		// LAN アクセスと FW/ポート開放の案内（R-C・Linux のみ。Windows は OS が接続時に
+		// 自動でプロンプトを出す。IP は複数 NIC で混乱するため列挙しない）。
+		if runtime.GOOS == "linux" {
+			fmt.Printf("LAN内の別PCからは http://<このPCのIP>:%d でアクセスできます。\n", cfg.Port)
+			fmt.Printf("（接続できない場合はファイアウォールで TCP %d の開放が必要です。例:\n", cfg.Port)
+			fmt.Printf("  sudo firewall-cmd --permanent --add-port=%d/tcp && sudo firewall-cmd --reload\n", cfg.Port)
+			fmt.Printf("  / sudo ufw allow %d/tcp）\n", cfg.Port)
+		}
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("サーバー起動に失敗しました: %v", err)
 		}
