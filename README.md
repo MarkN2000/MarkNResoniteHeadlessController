@@ -21,6 +21,42 @@ Resonite ヘッドレスが動作する以下の環境に対応します（い�
 > - **Resonite の入手 / 更新は DepotDownloader**（SteamCMD は ARM 非対応）。MRHC が DepotDownloader を自動取得し、ダウンロードと実行権限付与（`chmod +x`）まで行います。
 > - ダウンロードには予備の Steam アカウント（Steam Guard オフ推奨）と、headless ベータコード（Resonite bot に `/headlessCode`）が必要です。
 
+## インストール
+
+> ⚠️ 以下のダウンロードリンクは **v2 の初回リリース公開後に有効**になります。
+
+### Linux
+
+置きたい場所（例: `~/servers`）で次の 1 行を実行します:
+
+```sh
+curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
+```
+
+実行した場所に `mrhc-linux-amd64/`（ARM では `mrhc-linux-arm64/`）フォルダが作られるので、その中で起動します:
+
+```sh
+cd mrhc-linux-amd64 && ./mrhc
+```
+
+初回はセットアップウィザード（管理パスワード等の対話入力）が起動します。
+
+手動で導入する場合は[最新リリース](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest)から `mrhc-linux-amd64.tar.gz` / `mrhc-linux-arm64.tar.gz` を取得し、好きな場所に展開してください。**tar.gz は実行権を保持しているため `chmod +x` は不要です。**
+
+### Windows
+
+[mrhc-windows-amd64.zip](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/mrhc-windows-amd64.zip) をダウンロード → 展開 → フォルダ内の `mrhc.exe` を実行。
+
+### 更新
+
+MRHC を**停止してから**、導入時と同じ場所で install.sh を再実行します（または tar.gz / zip を同じ場所に上書き展開）。設定・データはアーカイブに含まれないため、そのまま保持されます。
+
+> 展開フォルダの名前を変えている場合は再実行だと別フォルダが新規作成されるため、tar.gz を手動で展開して中身を上書きしてください。
+
+### データの置き場所
+
+設定・状態・ダウンロードした Resonite 本体は、すべて**実行ファイルと同じフォルダ内**に保存されます（フォルダごと移動・バックアップ可能）。別の場所に置きたい場合は `-data <dir>` で指定できます。
+
 ## ドキュメント
 - **設計書**: [docs/DESIGN.md](docs/DESIGN.md)
 - **Resoniteドメイン事実**（コンソールコマンド・出力書式・起動方法など）: [docs/resonite-domain-facts.md](docs/resonite-domain-facts.md)

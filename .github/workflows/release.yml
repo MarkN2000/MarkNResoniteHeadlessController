@@ -2,6 +2,10 @@ name: release
 
 # タグ push（v*）でリリース資産をビルド・添付。手動実行(workflow_dispatch)でも全ターゲットをビルドして
 # アーティファクトとして確認できる。
+#
+# 配布形態（R-E）: Linux=tar.gz / Windows=zip。中身はトップレベルフォルダ mrhc-<os>-<arch>/
+# （mrhc 本体＋README＋LICENSE）。tar は実行権を保持する（chmod +x 案内を不要にする）。
+# アセット名にバージョンを含めない＝ releases/latest/download/ の固定リンクが常に最新安定版を指す。
 on:
   push:
     tags:
@@ -9,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # リリース作成・資産アップロードに必要
+  contents: read
 
 jobs:
   build:
@@ -47,10 +51,30 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+        # version はタグ push 時はタグ名（例 v2.0.0）、workflow_dispatch 時はブランチ名が入る
+        # （開発ビルドの目印として有用）。
         run: |
-          out="mrhc-${GOOS}-${GOARCH}${{ matrix.ext }}"
-          go build -trimpath -ldflags="-s -w" -o "dist/${out}" ./cmd/mrhc
-          echo "ARTIFACT=dist/${out}" >> "$GITHUB_ENV"
+          mkdir -p "stage/mrhc-${GOOS}-${GOARCH}"
+          go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" \
+            -o "stage/mrhc-${GOOS}-${GOARCH}/mrhc${{ matrix.ext }}" ./cmd/mrhc
+
+      # --- アーカイブ化: トップレベルフォルダごと tar.gz(Linux) / zip(Windows) に固める ---
+      - name: Package archive
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          name="mrhc-${GOOS}-${GOARCH}"
+          cp README.md LICENSE "stage/${name}/"
+          mkdir -p dist
+          if [ "${GOOS}" = "windows" ]; then
+            (cd stage && zip -qr "../dist/${name}.zip" "${name}")
+            echo "ARTIFACT=dist/${name}.zip" >> "$GITHUB_ENV"
+          else
+            # --owner/--group: runner の uid/ユーザー名をアーカイブに残さない（sudo 展開時の事故防止）
+            tar --owner=0 --group=0 --numeric-owner -czf "dist/${name}.tar.gz" -C stage "${name}"
+            echo "ARTIFACT=dist/${name}.tar.gz" >> "$GITHUB_ENV"
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -59,9 +83,38 @@ jobs:
           path: ${{ env.ARTIFACT }}
           if-no-files-found: error
 
-      # タグ push のときだけ GitHub Release に資産を添付
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
+  # タグ push のときだけ、全ターゲットのアーカイブ＋SHA256SUMS＋install.sh を 1 つのリリースに
+  # まとめて添付する（needs: build = 1 ターゲットでも失敗したら走らない＝不完全リリース防止）。
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # リリース作成・資産アップロードに必要
+    steps:
+      - uses: actions/checkout@v4 # install.sh（タグ時点のもの）を添付するため
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mrhc-*
+          path: dist
+          merge-multiple: true
+
+      # ファイル名を明示列挙（パスプレフィックス無し）→ ユーザー側で sha256sum -c がそのまま通る
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: sha256sum mrhc-linux-amd64.tar.gz mrhc-linux-arm64.tar.gz mrhc-windows-amd64.zip > SHA256SUMS
+
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ARTIFACT }}
+          # セマンティックバージョンのプレリリースタグ（v2.0.0-rc.1 等・「-」を含む）は prerelease
+          # として公開 → releases/latest の固定リンク（install.sh の取得先）を汚さない。
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/mrhc-linux-amd64.tar.gz
+            dist/mrhc-linux-arm64.tar.gz
+            dist/mrhc-windows-amd64.zip
+            dist/SHA256SUMS
+            install.sh

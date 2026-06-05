@@ -27,9 +27,19 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/web"
 )
 
+// version はリリースビルド時に -ldflags "-X main.version=<タグ名>" で焼き込まれる
+// （release.yml）。未指定のローカルビルドは "dev" のまま。
+var version = "dev"
+
 func main() {
 	dataDir := flag.String("data", "", "データディレクトリ（config/state置き場。既定: 実行ファイルと同じ場所）")
+	showVersion := flag.Bool("version", false, "バージョンを表示して終了")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("mrhc " + version)
+		return
+	}
 
 	dir := *dataDir
 	if dir == "" {
@@ -88,7 +98,7 @@ func main() {
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Port), Handler: srv.Handler()}
 	go func() {
-		fmt.Printf("MRHC: http://localhost:%d を開いてください（管理パスワードでログイン）\n", cfg.Port)
+		fmt.Printf("MRHC %s: http://localhost:%d を開いてください（管理パスワードでログイン）\n", version, cfg.Port)
 		// LAN アクセスと FW/ポート開放の案内（R-C・Linux のみ。Windows は OS が接続時に
 		// 自動でプロンプトを出す。IP は複数 NIC で混乱するため列挙しない）。
 		if runtime.GOOS == "linux" {

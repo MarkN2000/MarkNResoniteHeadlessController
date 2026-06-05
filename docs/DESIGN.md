@@ -240,6 +240,15 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 ### ビルド
 - フロント: `vite build` → 静的成果物を Go の `embed.FS` に取り込み。
 - バックエンド: `go build`（`GOOS`/`GOARCH` で **`windows/amd64`・`linux/amd64`・`linux/arm64`（ARM Linux）の3ターゲット**をクロスビルド。CGO 不要の純 Go なので環境変数の切替だけで可）。CI（GitHub Actions: `.github/workflows/release.yml` のビルドマトリクス）で生成。
+- **バージョン埋め込み**: リリースビルドは `-ldflags "-X main.version=<タグ名>"` で焼き込み（ローカルビルドは `dev`）。`mrhc -version` と起動メッセージで確認可能。将来の自己更新 Lv1（UI 表示＋新版チェック）の土台。
+
+### 配布（R-E・実装済み）
+- **形態**: Linux=`tar.gz` / Windows=`zip`。中身はトップレベルフォルダ `mrhc-<os>-<arch>/`（`mrhc` 本体＋README＋LICENSE）。**tar が実行権を保持するため `chmod +x` 案内は不要**。
+- **アセット名にバージョンを含めない**（`mrhc-linux-amd64.tar.gz` 等）→ GitHub の `releases/latest/download/<asset>` **固定リンク**が常に最新安定版を指す。過去版は `releases/download/<tag>/` で取得可能。
+- **install.sh**（リポジトリルート＋リリースアセット）: `curl -fsSL .../releases/latest/download/install.sh | sh` の 1 行導入。POSIX sh のみ（curl/tar/uname・distro 非依存・sudo なし）。`uname -m` で amd64/arm64 判定（armv8l 等の 32bit ユーザーランドは明示エラー）→ 最新 tar.gz を**カレントディレクトリ**に展開 → 起動手順を案内。再実行＝バイナリ上書き更新（config 等はアーカイブ外なので保持）。依存導入は MRHC 本体の担当（R-C）。`MRHC_DOWNLOAD_BASE` でダウンロード元を差し替え可（特定タグ固定・テスト用）。
+- **SHA256SUMS** をリリースに添付（アーカイブ 3 つが対象。install.sh からの検証は v1 ではしない）。
+- **prerelease 自動判定**: タグ名に `-` を含む（例 `v2.0.0-rc.1`）と prerelease として公開 → `latest` 固定リンクを汚さない。
+- リリースは専用 job が全ターゲットの成果物を集約して一括添付（1 ターゲットでも失敗したらリリースしない＝不完全リリース防止）。.deb / AppImage は v1 スコープ外。
 
 ### CLIセットアップウィザード（Win/Linux完全共通）
 - 初回起動でconfig無しを検知 → 同一バイナリが対話プロンプト表示。
@@ -250,7 +259,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 ### 運用メモ
 - MRHC自体は**手動起動**（PC起動時の自動起動は対象外）。ヘッドレスのクラッシュ自動復帰は §5.6。
 - **DepotDownloader はベースセットアップに含めない**（Steam機能＝Resonite入手/更新を使う時だけMRHCが遅延DL。旧来の起動時自動DLの重さを回避。steamcmdはARM非対応のため廃止）。
-- **MRHC自己更新=Lv1**: UIに現バージョン表示＋**GitHubの最新リリースをチェックして「新版あり＋DLリンク」**を通知。差し替えは手動（新バイナリ上書き→MRHC再起動。設定・状態は別ファイルなので保持される）。自己置換(Lv2)は将来の任意拡張。
+- **MRHC自己更新=Lv1**: UIに現バージョン表示＋**GitHubの最新リリースをチェックして「新版あり＋DLリンク」**を通知。差し替えは手動（新バイナリ上書き→MRHC再起動。設定・状態は別ファイルなので保持される）。自己置換(Lv2)は将来の任意拡張。バージョン焼き込み（`-X main.version`・`-version` フラグ）は R-E で実装済み。
 - **ファイアウォール/ポート開放**の注意を案内（友人が繋がらない時の典型原因）。→ **実装済（R-C）**: 起動時メッセージでLANアクセスURL＋firewalld/ufw例を表示（Linuxのみ・Windowsは接続時にOSがプロンプト）。
 
 ---
