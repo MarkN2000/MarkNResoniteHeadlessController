@@ -104,11 +104,13 @@ DepotDownloader -app 2519830 -branch headless -branchpassword <code> \
 - **PW は stdin**（`-password` 引数は ps 露出のため不可。DD は `Console.IsInputRedirected` で `ReadLine`）。
 - 子プロセス管理は `headless.Driver` 下層を踏襲（3 パイプ・行単位読み・WaitGroup で drain 後 `Wait`）。
 - プロンプト検出（改行なし `Write` ＝末尾断片で出る → 既存 pending-tail と同型）:
-  - PW: `Enter account password for "<user>": ` → `password+"\n"` 投入
+  - PW: `Enter account password for "<user>": ` → `password+"\n"` 投入。**送信済みで再要求＝誤資格**とみなし
+    即 kill → `ErrAuthFailed`（5分 stall を待たず原因を明示・M1）。
   - 2FA(app/email): **v1 非対応＝明示エラー**（Guard オフ予備アカ前提・将来 UI）
 - 進捗パース（DD は `WriteLine` ＝行単位）:
-  - `NN.NN% <path>` → percent
-  - マイルストーン: `Using app branch` / `Downloading depot` / `Pre-allocating` / `Validating` / `Total downloaded`
+  - `NN.NN% <path>` → percent（進捗行はログに流さない）
+  - マイルストーン: `Using app branch` / `Downloading depot` / `Pre-allocating` / `Validating` / `Total downloaded`。
+    **マイルストーン行はログに重複させずマイルストーンのみ通知**し、dedup は manager 側で phase 変化時に行う（§9・M4）。
 - 成否: exit 0=成功 / 非0=失敗（`ContentDownloaderException` 行も拾う）。
 - 文字コード: DD 出力は UTF-8 想定（`enc=nil`）。Windows console の UTF-8 確証は Phase8 実機で最終確認。
 - ログに PW/code を出さない（コマンド表示時にマスク）。
@@ -120,10 +122,14 @@ DepotDownloader -app 2519830 -branch headless -branchpassword <code> \
 
 ```
 1. 進行中なら拒否（single-flight・mu）
-2. Steam 資格(A)・branchCode 未設定 → エラー
+2. Steam 資格(A)・branchCode 未設定 → エラー（install 先は常に導出されるため資格欠如のみが未設定・R-A）
 3. DD 本体確保（acquire・無ければ DL）
 4. DD 実行（入手＝更新は同一・差分再開可）・進捗を /steam/events へ
-5. 完了後 Resonite install 全体に chmod -R +x（Linux/ARM）
+5. **DL後検証（H2）**: `UpdateParams.VerifyRelPath`（=`Headless/<OSバイナリ>`・OS 名は server が DI）が
+   `InstallDir` 配下に在るか stat。無ければ失敗にする。ブランチコード誤りで headless depot が public
+   フォールバックすると exit 0 でも headless 実体が落ちないため、**ファイル存在で判定**する（良性の
+   `Error: Password was invalid for branch headless` は成功時にも出るので文字列マッチは使わない）。
+6. 完了後 Resonite install 全体に chmod -R +x（Linux/ARM）
 ```
 
 cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残り次回再開。
@@ -162,7 +168,13 @@ cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残�
 
 - 専用 `/steam/events`（headless `/events` と分離＝関心の分離）。
 - イベント: `steam-progress`（percent/phase/file）/ `steam-log`（DD stdout/stderr 行）/ `steam-result`（success/fail+message）。
-- `pubsub.Hub[T]` を共用。log はリングバッファで再接続時に履歴配信。
+- `pubsub.Hub[T]` を共用（**非ブロッキング＝満杯購読者にはドロップ**＝遅い1購読者が全体を詰まらせない）。
+  log/milestone はリングバッファ(500)で再接続時に履歴配信。
+- **マイルストーンは phase 変化時のみ publish/log（M4）**＝`Pre-allocating` が数百ファイル分続く洪水と、
+  リングからの早期マイルストーン（`Using app branch` 等）の追い出しを防ぐ。`lastEvent` は dedup 前に更新＝
+  stall ウォッチドッグは活動継続とみなす。
+- **終端 `steam-result` はドロップし得る**（非ブロッキング）。UI は更新中だけ `GET /steam/status` を
+  補助ポーリングし、終端(success/failed)の取りこぼしによる「更新中」固着を防ぐ（H1）。
 - orchestrator 起点の更新も同じ `/steam/events` に流れる。
 
 ## 10. セキュリティ
@@ -192,12 +204,19 @@ cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残�
 5. API ＋ SSE 結線
 6. UI `SteamSection` 実装（別途）
 
-## 13. 未確定・実機（Phase8）で確定する事項
+## 13. 実機で確定する事項（M-x64 で x64 確定済 / ARM は R-F）
 
-- `ddVersion` の固定値と各 asset の SHA-256（実調査で確定）。
-- stall タイムアウト既定 5 分の妥当性（実機の DL 速度で調整）。
-- DD プロンプト/成否/進捗の実 stdout 文言（regex 最終確定）。
-- Windows console 出力の文字コード（UTF-8 想定の確証）。
+**✅ M-x64（2026-06-05・実 Steam で本物 DL を Windows x64 で1回）で確定:**
+- `ddVersion`=3.4.0・各 asset SHA-256（windows/linux x64＋**arm64** すべて実 GitHub と一致）。
+- DD プロンプト/進捗/マイルストーン/成否の実 stdout（x64 で regex 妥当を確認）。**`Error: Password was
+  invalid for branch headless` は成功時にも出る良性ノイズ**（headless ブランチを持たない共有再頒布アプリ
+  向け）＝文字列マッチ禁止・exit コードで成否判定。Resonite 本体(2519830)/headless depot(2519832)は private
+  beta で成功。
+- Windows での実行・進捗パース動作（出力は UTF-8 想定で問題なし）。stall 5 分は妥当（x64 は約2分で完走）。
+
+**未確定（R-F・ARM 実機）:**
+- ARM で DD プロンプト/成否文言が x64 と同一か・`account.config` 実保存先（IsolatedStorage）。
+- ARM での `<dataDir>/resonite` への DL→system .NET10 起動→freetype2 込みの e2e。
 
 ## 14. 出典
 

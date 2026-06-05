@@ -446,7 +446,10 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 1. **管理パスワード変更**：現PW＋新PW＋確認 → `POST /password`。一致/空はクライアント検証（赤テキスト）、現PW誤り等は 7-7 トースト。
 2. **Resonite アカウント**（重要）：username/password（空=変更なし）。`config` で個別指定が無いとき各ワールドに注入される既定アカウント。**初回モーダル＋未設定バナーで設定を促す**（下記）。**稼働中はアカウント欄の下に Resonite ログイン状態を1行表示**（commit 48703b5/9d0e92c・「ログイン失敗が ready=true で隠れる」残課題の解消）: `/status` の `loginState`（ヘッドレス起動ログを Driver が解析＝`Logging in as`/`Logged in successfully`、実機 fixtures 由来）から、**ログイン済み（U- 付き UserID・緑）／ログイン失敗〔匿名で動作中・赤〕／匿名〔未設定・灰〕**。MRHC 保存アカウントとは独立に「実際にログインできているか」を表面化する（停止中は非表示）。UserID 表示は必ず `U-` を含める（UserID とユーザー名は別物）。
 3. **アプリ設定**：`port`（普通に表示・**MRHC再起動後反映**）・`resoniteHeadlessPath`（**次回ヘッドレス起動で反映**＝`handleStart` が cfg をライブ参照。**空＝既定 `{dataDir}/resonite/Headless/<OSバイナリ>` を導出**＝R-A・`config.HeadlessPathOrDefault`）＋折りたたみ「上級設定」に `headlessConfigDir`（再起動後反映）。**`encoding` は UI 非搭載**（両OS自動判定が実証済・逃げ道は config 手編集）。
-4. **DepotDownloader（Steam）設定**：将来枠の disabled プレースホルダ（7-2/7-3 と同じ予約手法・P9-B）。
+4. **DepotDownloader（Steam）設定**：実装済み（P9-B・`SteamSection`）。DL 用 Steam アカウント(A)の設定
+   （秘密は hasXxx 表示・空=維持）＋「今すぐ更新」（停止中のみ）＋ SSE `/steam/events` で進捗/ログ/結果の
+   ライブ表示・中止。既定 install 先は空＝`{dataDir}/resonite`（R-A）。詳細仕様は
+   `docs/design/steam-depotdownloader.md`（§6 runner・§7 manager・§9 SSE・§13 M-x64 確定事項）。
 
 **初回オンボーディング（App 全体にはみ出す）**
 - ログイン後 `GET /headless-credentials` を取得（`App` の `refreshCred`）。**未設定**（username 空 or password 無し）なら **初回モーダルを1回自動表示**（`setupShown` ref・「後で」で閉じ可・強制ブロックなし）＋**常設バナー**「Resonite アカウントが未設定です [設定する]」（`Alert` orange・全タブ表示）。
