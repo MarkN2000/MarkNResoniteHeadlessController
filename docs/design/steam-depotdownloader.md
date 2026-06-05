@@ -172,6 +172,8 @@ cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残�
 - ログに PW/code を出さない（マスク）。
 - `account.config`（remember-password トークン）は **.NET IsolatedStorage**（MRHC 管理外）。
   「同一 OS ユーザー・同一 DD バイナリで実行する限り有効」前提（消えても再ログインで復帰）。
+  **保存先は OS ユーザー単位で dataDir の外**＝MRHC の dataDir を削除してもこのトークンは残る
+  （共有マシン/アンインストール時のクリーンアップでは別途消去が要る・M-x64 で確認）。
 
 ## 11. テスト戦略
 
