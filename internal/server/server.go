@@ -22,6 +22,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
 
 type Server struct {
@@ -37,6 +38,7 @@ type Server struct {
 	restart   *restartOrchestrator // 自動再起動の進行管理（Phase 8・P8-3）
 	scheduler *restartScheduler    // 予定再起動の発火（Phase 8・P8-4a）
 	crashMon  *crashMonitor        // クラッシュ自動復帰（Phase 8・P8-4b）
+	steam     *steam.Manager       // Resonite 入手/更新（DepotDownloader・P9-B）
 
 	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
@@ -71,6 +73,11 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 	s.restart = newRestartOrchestrator(s)
 	s.scheduler = newRestartScheduler(s)
 	s.crashMon = newCrashMonitor(s)
+	toolsDir := ""
+	if dataDir != "" {
+		toolsDir = filepath.Join(dataDir, "tools")
+	}
+	s.steam = steam.NewManager(toolsDir)
 	return s
 }
 
@@ -80,6 +87,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 func (s *Server) Start() (stop func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.restart.setParent(ctx)                                  // 進行中フローを bg ctx の子に＝shutdown で ①②③ を cancel
+	s.steam.SetParent(ctx)                                    // 進行中の更新を bg ctx の子に＝shutdown で中断（P9-B）
 	s.driver.SetOnUnexpectedExit(s.crashMon.onUnexpectedExit) // クラッシュ検知を crash-monitor へ（P8-4b）
 	go s.scheduler.run(ctx)
 	go s.crashMon.run(ctx)
@@ -166,6 +174,14 @@ func (s *Server) Handler() http.Handler {
 	// Resonite 公開API（ユーザー検索）。フレンド申請/招待の相手探しに使う（無認証プロキシ・P9-A）。
 	mux.HandleFunc("GET /api/v1/resonite/users", s.requireAuth(s.handleResoniteUserSearch))
 	mux.HandleFunc("GET /api/v1/resonite/worlds", s.requireAuth(s.handleResoniteWorldSearch))
+
+	// Steam（DepotDownloader）: Resonite の入手/更新（P9-B）。更新は停止中のみ・長時間操作は非同期。
+	mux.HandleFunc("GET /api/v1/steam/config", s.requireAuth(s.handleSteamConfigGet))
+	mux.HandleFunc("PUT /api/v1/steam/config", s.requireAuth(s.handleSteamConfigPut))
+	mux.HandleFunc("POST /api/v1/steam/download", s.requireAuth(s.handleSteamDownload)) // 入手/更新を非同期開始
+	mux.HandleFunc("POST /api/v1/steam/cancel", s.requireAuth(s.handleSteamCancel))
+	mux.HandleFunc("GET /api/v1/steam/status", s.requireAuth(s.handleSteamStatus))
+	mux.HandleFunc("GET /api/v1/steam/events", s.requireAuth(s.handleSteamEvents)) // SSE（進捗/ログ/結果）
 
 	// ワールドお気に入り（favorites.json・新規セッションの検索→保存／一覧）。
 	mux.HandleFunc("GET /api/v1/favorites", s.requireAuth(s.handleFavoritesList))
