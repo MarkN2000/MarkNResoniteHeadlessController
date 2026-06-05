@@ -23,7 +23,7 @@ export function SettingsTab({
           <PasswordSection />
           <AccountSection onSaved={onCredentialsChanged} status={status} />
           <AppSettingsSection />
-          <SteamSection />
+          <SteamSection status={status} />
         </Stack>
       </Box>
     </ScrollArea>

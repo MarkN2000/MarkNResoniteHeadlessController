@@ -356,6 +356,43 @@ export const putAppSettings = (s: AppSettings) => write("PUT", "/app-settings", 
 export const changePassword = (currentPassword: string, newPassword: string) =>
   post("/password", { currentPassword, newPassword });
 
+// --- Steam（DepotDownloader）: Resonite の入手/更新（P9-B）---
+// 秘密（password/branchCode）は返さず hasXxx のみ。internal/server/steam.go。
+export interface SteamConfig {
+  username: string;
+  installDir: string;
+  hasPassword: boolean;
+  hasBranchCode: boolean;
+}
+export async function getSteamConfig(): Promise<SteamConfig | null> {
+  return getData<SteamConfig>("/steam/config");
+}
+// 保存（password/branchCode 空=既存維持）。
+export const putSteamConfig = (body: {
+  username: string;
+  password: string;
+  branchCode: string;
+  installDir: string;
+}) => write("PUT", "/steam/config", body);
+
+// 更新の進行状態（internal/steam.Status）。state: idle|running|success|failed。
+export interface SteamStatus {
+  state: "idle" | "running" | "success" | "failed";
+  percent: number;
+  phase?: string;
+  file?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  lastError?: string;
+}
+export async function getSteamStatus(): Promise<SteamStatus | null> {
+  return getData<SteamStatus>("/steam/status");
+}
+// 入手/更新を非同期開始（停止中のみ・稼働中は 409）。進捗は SSE /steam/events。
+export const steamDownload = () => post("/steam/download");
+// 進行中の更新を中止。
+export const steamCancel = () => post("/steam/cancel");
+
 // --- スケジュール（自動再起動）タブ（Phase 8・§3.16）---
 // restart 設定は単一オブジェクト（config.Restart のミラー）。完全オブジェクトを PUT する（pointer 設計前提）。
 
@@ -407,6 +444,7 @@ export interface RestartConfig {
   waitControl: RestartWaitControl;
   preActions: { announce: RestartAnnounce; sessionChanges: RestartSessionChanges };
   crashRecovery: RestartCrashRecovery;
+  updateOnScheduledRestart: boolean; // 予定再起動時に Resonite を更新（P9-B・Steam未設定なら no-op）
 }
 
 // restart-status の応答（internal/server.restartStatus）。
@@ -415,7 +453,7 @@ export interface RestartStatus {
   uptimeSeconds: number;
   crashRecoveryEnabled: boolean;
   inProgress: boolean;
-  phase: string; // idle | preparing | waiting | announcing | restarting
+  phase: string; // idle | preparing | waiting | announcing | updating | restarting
   restartTriggerType?: string; // manual | scheduled（進行中のみ）
   restartConfigName?: string; // 進行中の対象 config
   deadlineAt: string | null; // ② 待機の締切（RFC3339）

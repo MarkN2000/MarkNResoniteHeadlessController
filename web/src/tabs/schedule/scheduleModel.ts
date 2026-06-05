@@ -123,6 +123,8 @@ export function phaseKey(phase: string): string {
       return "schedule.phaseWaiting";
     case "announcing":
       return "schedule.phaseAnnouncing";
+    case "updating":
+      return "schedule.phaseUpdating";
     case "restarting":
       return "schedule.phaseRestarting";
     default:

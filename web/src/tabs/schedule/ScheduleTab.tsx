@@ -14,6 +14,7 @@ import { ScheduleListCard } from "./ScheduleListCard";
 import { WaitControlCard } from "./WaitControlCard";
 import { PreActionsCard } from "./PreActionsCard";
 import { CrashRecoveryCard } from "./CrashRecoveryCard";
+import { UpdateOnRestartCard } from "./UpdateOnRestartCard";
 import { SaveBar } from "./SaveBar";
 
 // スケジュール（自動再起動）タブ（Phase 8・§3.16(7)）。停止中でも設定編集可（手動再起動のみ稼働中）。
@@ -122,6 +123,10 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
                   <WaitControlCard value={rc.waitControl} onChange={(waitControl) => patch({ waitControl })} />
                   <PreActionsCard value={rc.preActions} onChange={(preActions) => patch({ preActions })} />
                   <CrashRecoveryCard value={rc.crashRecovery} onChange={(crashRecovery) => patch({ crashRecovery })} />
+                  <UpdateOnRestartCard
+                    value={rc.updateOnScheduledRestart}
+                    onChange={(updateOnScheduledRestart) => patch({ updateOnScheduledRestart })}
+                  />
                   <SaveBar dirty={dirty} saving={apply.busy} onSave={save} />
                 </Stack>
               ) : (
