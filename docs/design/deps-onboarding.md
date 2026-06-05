@@ -135,8 +135,12 @@ type DepIssue struct {
     Kind     string   // "freetype2" | "dotnet10"
     Title    string   // 表示名（例: "freetype2（Resonite のネイティブ依存）"）
     Commands []string // 導入コマンド（[Y/n] 実行・ログ提示の両方で使う。unknown distro は空）
-    Sudo     bool     // sudo を伴うか（文言出し分け用）
+    Fallback string   // Commands が空（distro 不明）のときの手動導入案内
 }
+
+// GuideText は導入ガイド本文（コマンドがあればラベル付き結合・無ければ Fallback）。
+// 経路②（起動時ログ）と経路③（sys ログ）の文言選択を 1 か所に集約する（実装後レビュー反映）。
+func (i DepIssue) GuideText() string
 
 // CheckHeadlessDeps はヘッドレス動作に必要な外部依存の不足を検出する。
 // Absent と確認できたものだけ返す（Present/Unknown は返さない＝案A）。

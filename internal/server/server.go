@@ -332,13 +332,9 @@ func (s *Server) publishDepGuide() {
 	installDir := s.cfg.InstallDirOrDefault(s.dataDir)
 	s.cfgMu.RUnlock()
 	for _, issue := range s.checkDeps(runtime.GOOS, runtime.GOARCH, installDir) {
-		guide := issue.Fallback
-		if len(issue.Commands) > 0 {
-			guide = strings.Join(issue.Commands, " && ")
-		}
 		s.driver.PublishSys(fmt.Sprintf(
-			"依存不足: %s — 起動に失敗する場合はサーバー側で導入してください: %s",
-			issue.Title, guide))
+			"依存不足: %s — 起動に失敗する場合はサーバー側での導入が必要です。%s",
+			issue.Title, issue.GuideText()))
 	}
 }
 

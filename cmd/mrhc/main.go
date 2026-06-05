@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -72,11 +71,7 @@ func main() {
 	// 依存チェック（R-C 経路②）: 不足があればログで案内するだけで続行する
 	// （[Y/n] 対話は初回ウィザード末尾のみ＝起動をブロックしない）。Windows は常に no-op。
 	for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, cfg.InstallDirOrDefault(dir)) {
-		if len(issue.Commands) > 0 {
-			log.Printf("依存不足: %s / 導入コマンド: %s", issue.Title, strings.Join(issue.Commands, " && "))
-		} else {
-			log.Printf("依存不足: %s / %s", issue.Title, issue.Fallback)
-		}
+		log.Printf("依存不足: %s / %s", issue.Title, issue.GuideText())
 	}
 
 	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する。

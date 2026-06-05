@@ -20,7 +20,15 @@ type DepIssue struct {
 	Title    string   // 表示名
 	Commands []string // 導入コマンド（[Y/n] 実行・ログ提示の両方で使う。distro 不明時は空）
 	Fallback string   // Commands が空（distro 不明）のときの手動導入案内
-	Sudo     bool     // sudo を伴うか（文言出し分け用）
+}
+
+// GuideText は導入ガイド本文（コマンドがあればラベル付きで結合・無ければ Fallback）。
+// 経路②（起動時ログ）と経路③（sys ログ）の文言選択を 1 か所に集約する。
+func (i DepIssue) GuideText() string {
+	if len(i.Commands) > 0 {
+		return "導入コマンド: " + strings.Join(i.Commands, " && ")
+	}
+	return i.Fallback
 }
 
 // dotnetInstallCmd は .NET 10 ランタイムの導入コマンド。
@@ -86,7 +94,6 @@ func checkHeadlessDeps(p depProbe, goos, goarch, installDir string) []DepIssue {
 		issue := DepIssue{
 			Kind:  "freetype2",
 			Title: "freetype2（Resonite のネイティブ依存）",
-			Sudo:  true,
 		}
 		if cmd := freetypeInstallCmd(osReleasePkgManager(p)); cmd != "" {
 			issue.Commands = []string{cmd}

@@ -48,7 +48,6 @@ func freetypeIssue() platform.DepIssue {
 		Kind:     "freetype2",
 		Title:    "freetype2（Resonite のネイティブ依存）",
 		Commands: []string{"sudo pacman -S freetype2"},
-		Sudo:     true,
 	}
 }
 

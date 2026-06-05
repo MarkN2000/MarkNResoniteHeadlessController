@@ -272,6 +272,18 @@ func TestFreetypeStatus(t *testing.T) {
 	})
 }
 
+// GuideText は経路②③共用のガイド本文（コマンド=ラベル付き結合 / 無ければ Fallback）。
+func TestDepIssueGuideText(t *testing.T) {
+	withCmd := DepIssue{Commands: []string{"sudo pacman -S freetype2"}}
+	if got := withCmd.GuideText(); got != "導入コマンド: sudo pacman -S freetype2" {
+		t.Errorf("GuideText() = %q", got)
+	}
+	fallback := DepIssue{Fallback: "手動で導入してください。"}
+	if got := fallback.GuideText(); got != "手動で導入してください。" {
+		t.Errorf("GuideText() = %q", got)
+	}
+}
+
 // --- CheckHeadlessDeps マトリクス ---
 
 func TestCheckHeadlessDepsMatrix(t *testing.T) {
@@ -319,17 +331,11 @@ func TestCheckHeadlessDepsMatrix(t *testing.T) {
 		if len(got[0].Commands) != 1 || got[0].Commands[0] != "sudo pacman -S freetype2" {
 			t.Errorf("cachyos→pacman コマンドが出るべき: %v", got[0].Commands)
 		}
-		if !got[0].Sudo {
-			t.Errorf("freetype2 は Sudo=true であるべき")
-		}
 	})
 	t.Run("linux/arm64 は freetype＋dotnet の両方", func(t *testing.T) {
 		got := checkHeadlessDeps(freetypeAbsentProbe(), "linux", "arm64", "/inst")
 		if len(got) != 2 || got[0].Kind != "freetype2" || got[1].Kind != "dotnet10" {
 			t.Fatalf("issues = %v, want [freetype2 dotnet10]", kinds(got))
-		}
-		if got[1].Sudo {
-			t.Errorf("dotnet10 は sudo 不要（dotnet-install.sh）")
 		}
 		if len(got[1].Commands) != 1 || !strings.Contains(got[1].Commands[0], "dotnet-install.sh") {
 			t.Errorf("dotnet-install.sh コマンドが出るべき: %v", got[1].Commands)
