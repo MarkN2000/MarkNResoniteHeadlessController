@@ -96,6 +96,23 @@ export function SteamSection({ status }: { status: Status | null }) {
     return () => es.close();
   }, [t]);
 
+  // SSE は満杯時に終端 result を取りこぼし得る（pubsub 非ブロッキング）。running 中だけ
+  // /steam/status を軽くポーリングし、終端（success/failed）への遷移を取りこぼさず UI 固着を防ぐ（H1）。
+  useEffect(() => {
+    if (st.state !== "running") return;
+    let alive = true;
+    const id = setInterval(async () => {
+      const s = await api.getSteamStatus();
+      if (!alive || !s || s.state === "running") return;
+      // SSE result を取りこぼしていた場合の保険として終端状態へ反映する。
+      setSt((prev) => (prev.state === "running" ? { ...prev, ...s } : prev));
+    }, 4000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [st.state]);
+
   const dirty =
     !!orig &&
     (username.trim() !== orig.username ||
