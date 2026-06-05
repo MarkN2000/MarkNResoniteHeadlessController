@@ -36,26 +36,28 @@ func RunWizard(cfgPath string) error {
 	}
 
 	port := promptPort(in, 8080)
-	headlessPath := promptHeadlessPath(in)
 
 	secret, err := config.RandomSecret(32)
 	if err != nil {
 		return err
 	}
 
+	// Resonite 本体のパスは尋ねない。未設定なら既定（{dataDir}/resonite）に導出され、
+	// ログイン後の Web UI（設定 → Steam）からダウンロード/更新できる（R-A）。
+	// 既に Steam 等で入れてある場合は設定タブでそのパスを指定すれば再利用できる。
 	cfg := &config.Config{
 		Version:           config.SchemaVersion,
 		AdminPasswordHash: string(hash),
 		SessionSecret:     secret,
 		SessionTTLHours:   config.DefaultSessionTTLHours,
 		Port:              port,
-		ResoniteHeadless:  headlessPath,
 	}
 	if err := cfg.SaveTo(cfgPath); err != nil {
 		return err
 	}
 
 	fmt.Printf("\n設定を保存しました: %s\n", cfgPath)
+	fmt.Println("Resonite 本体はログイン後の Web UI（設定 → Steam）からダウンロードできます。")
 	return nil
 }
 
@@ -140,15 +142,4 @@ func promptPort(in *bufio.Reader, def int) int {
 	}
 	fmt.Printf("無効な入力のため %d を使用します。\n", def)
 	return def
-}
-
-// promptHeadlessPath はResoniteヘッドレスのパスを任意で受け取る（空でスキップ可。
-// 後でWeb UI/設定からも変更できる）。
-func promptHeadlessPath(in *bufio.Reader) string {
-	fmt.Println("\nResoniteヘッドレスのパス（任意・空でスキップ、後で設定可）")
-	fmt.Println("  Windows例: C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe")
-	fmt.Println("  Linux例:   ~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll")
-	fmt.Print("パス: ")
-	line, _ := in.ReadString('\n')
-	return strings.TrimSpace(line)
 }
