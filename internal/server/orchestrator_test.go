@@ -310,6 +310,33 @@ func TestTrigger_HeadlessStopsDuringWait(t *testing.T) {
 	}
 }
 
+// beforeStart フック（P9-B）は ④ の「停止後・起動前」に triggerType 付きで呼ばれる。
+func TestDoRestart_BeforeStartHook(t *testing.T) {
+	d := &fakeDriver{state: headless.StateRunning}
+	fw := &fakeWorlds{present: 0} // 0人→即 doTerminal→doRestart
+	o := newTestOrch(d, fw, config.DefaultRestart(), "night")
+
+	var gotTrigger string
+	var atStops, atStarts int
+	o.beforeStart = func(_ context.Context, triggerType string) {
+		gotTrigger = triggerType
+		_, atStops, atStarts, _ = d.snap() // フック呼び出し時点のカウント
+	}
+
+	if err := o.Trigger("scheduled", ""); err != nil {
+		t.Fatalf("trigger: %v", err)
+	}
+	waitUntil(t, func() bool { _, _, starts, _ := d.snap(); return starts == 1 }, 2*time.Second, "起動完了")
+	waitUntil(t, func() bool { return !o.snapshot().inProgress }, 2*time.Second, "進行終了")
+
+	if gotTrigger != "scheduled" {
+		t.Fatalf("フックに渡る triggerType=%q want scheduled", gotTrigger)
+	}
+	if atStops != 1 || atStarts != 0 {
+		t.Fatalf("フックは停止後・起動前に呼ばれるべき: 呼び出し時 stops=%d starts=%d", atStops, atStarts)
+	}
+}
+
 func TestCancel_WhenIdle(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	o := newTestOrch(d, &fakeWorlds{}, config.DefaultRestart(), "night")

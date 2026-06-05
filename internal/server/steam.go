@@ -6,9 +6,11 @@ package server
 // 設計: docs/design/steam-depotdownloader.md §6/§8
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -201,6 +203,33 @@ func (s *Server) steamParams() (steam.UpdateParams, error) {
 		return steam.UpdateParams{}, steam.ErrSteamNotConfigured
 	}
 	return p, nil
+}
+
+// maybeScheduledUpdate は予定再起動の停止→起動の間に呼ばれる（orchestrator.beforeStart）。
+// triggerType=="scheduled" かつトグルON かつ Steam 設定済みのときだけ Resonite を更新する。
+// 更新が失敗しても起動は継続させる（可用性優先＝呼び出し側は本関数の後で必ず起動する・設計 §7）。
+// ctx は orchestrator の親 ctx（shutdown で更新も中断）。同期的に完了まで待つ。
+func (s *Server) maybeScheduledUpdate(ctx context.Context, triggerType string) {
+	if triggerType != "scheduled" {
+		return // 予定再起動のみ対象（手動/userZero/クラッシュ復帰は素早さ優先で挟まない）
+	}
+	s.cfgMu.RLock()
+	enabled := s.cfg.RestartOrDefault().UpdateOnScheduledRestart
+	s.cfgMu.RUnlock()
+	if !enabled {
+		return
+	}
+	params, err := s.steamParams()
+	if err != nil {
+		return // Steam 未設定 → 更新せず通常の再起動を続行
+	}
+	s.restart.setPhase(phaseUpdating)
+	log.Printf("[restart] 予定再起動: Resonite の更新を実行します")
+	if err := s.steam.Update(ctx, params); err != nil {
+		log.Printf("[restart] 予定再起動の更新に失敗（古い版のまま起動を継続）: %v", err)
+		return
+	}
+	log.Printf("[restart] 予定再起動: Resonite の更新が完了しました")
 }
 
 // deriveInstallDir は ResoniteHeadless パス（.../Resonite/Headless/Resonite.exe|dll）から

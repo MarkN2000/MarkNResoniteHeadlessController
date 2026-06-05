@@ -5,6 +5,7 @@ package server
 // （実ダウンロード/進行管理は internal/steam の単体・e2e で網羅）。
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -150,6 +151,48 @@ func TestSteamStatus_Idle(t *testing.T) {
 	}
 	if got.Data.State != "idle" {
 		t.Fatalf("初期状態は idle のはず: %q", got.Data.State)
+	}
+}
+
+// TestMaybeScheduledUpdate_NoopGating は更新を「走らせない」3条件を検証する（実DLしないことを担保）。
+// 実際に更新する経路（scheduled+ON+設定済み）は internal/steam の偽DD e2e で網羅する。
+func TestMaybeScheduledUpdate_NoopGating(t *testing.T) {
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "mrhc.config.json")
+	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
+	fullSteam := &config.Steam{Username: "u", Password: "p", BranchCode: "b", InstallDir: "/i"}
+
+	mk := func(steamCfg *config.Steam, toggle bool) *Server {
+		rc := config.DefaultRestart()
+		rc.UpdateOnScheduledRestart = toggle
+		cfg := &config.Config{
+			Version: config.SchemaVersion, AdminPasswordHash: string(hash),
+			SessionSecret: "x", Port: 8080,
+			ResoniteHeadless: "/s/Resonite/Headless/Resonite.dll",
+			Restart:          &rc, Steam: steamCfg,
+		}
+		if err := cfg.SaveTo(cfgPath); err != nil {
+			t.Fatal(err)
+		}
+		return New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
+	}
+
+	cases := []struct {
+		name    string
+		trigger string
+		steam   *config.Steam
+		toggle  bool
+	}{
+		{"manual は対象外", "manual", fullSteam, true},
+		{"トグル OFF は更新しない", "scheduled", fullSteam, false},
+		{"Steam 未設定は更新しない", "scheduled", nil, true},
+	}
+	for _, c := range cases {
+		s := mk(c.steam, c.toggle)
+		s.maybeScheduledUpdate(context.Background(), c.trigger)
+		if st := s.steam.Status().State; st != "idle" {
+			t.Errorf("%s: 更新が走ってしまった（state=%q・期待 idle）", c.name, st)
+		}
 	}
 }
 

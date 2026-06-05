@@ -39,6 +39,7 @@ const (
 	phasePreparing  = "preparing"  // ① セッション変更中
 	phaseWaiting    = "waiting"    // ② 退出待ち
 	phaseAnnouncing = "announcing" // ③ 告知中
+	phaseUpdating   = "updating"   // ④内 予定再起動時の Resonite 更新中（P9-B・停止後→起動前）
 	phaseRestarting = "restarting" // ④ 終端＝停止→起動 or 停止のみ（R7・cancel 不可）
 )
 
@@ -68,7 +69,8 @@ type restartOrchestrator struct {
 	restartCfg  func() config.Restart
 	lastUsed    func() string
 	recordUsed  func(name string)
-	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)）
+	recordStart func(trigger, at string)                      // 最終起動の記録（§3.16(9)）
+	beforeStart func(ctx context.Context, triggerType string) // ④ 停止後・起動前のフック（予定再起動時の更新・P9-B・nil可）
 
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。
 	minute           time.Duration // quiet/announce 待機の「分」単位（本番 time.Minute）
@@ -97,6 +99,7 @@ func newRestartOrchestrator(s *Server) *restartOrchestrator {
 		lastUsed:         s.loadLastUsed,
 		recordUsed:       s.recordLastUsed,
 		recordStart:      s.recordLastStart,
+		beforeStart:      s.maybeScheduledUpdate, // 予定再起動時の更新フック（P9-B）
 		minute:           time.Minute,
 		waitInterval:     10 * time.Second,
 		spawnDelay:       10 * time.Second,
@@ -207,6 +210,16 @@ func (o *restartOrchestrator) setParent(ctx context.Context) {
 	o.mu.Lock()
 	o.parentCtx = ctx
 	o.mu.Unlock()
+}
+
+// parent は現在の親 ctx を返す（beforeStart フックの更新 ctx に使う＝shutdown で更新も中断）。
+func (o *restartOrchestrator) parent() context.Context {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.parentCtx == nil {
+		return context.Background()
+	}
+	return o.parentCtx
 }
 
 func (o *restartOrchestrator) run(ctx context.Context, rc config.Restart, name, triggerType string, stopOnly bool) {
@@ -419,10 +432,14 @@ func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAct
 	})
 }
 
-// doRestart は ④ 停止→（StateStopped 待ち）→選択 config で起動。cancel 不可（ctx は渡さない）。
+// doRestart は ④ 停止→（StateStopped 待ち）→（予定再起動なら更新）→選択 config で起動。cancel 不可。
 func (o *restartOrchestrator) doRestart(name, triggerType string) {
 	_ = o.driver.Stop() // 既に停止していれば ErrNotRunning（無視）
 	o.waitStopped()
+	// 予定再起動なら停止完了後・起動前に Resonite を更新する（scheduled 限定・失敗でも起動継続・P9-B）。
+	if o.beforeStart != nil {
+		o.beforeStart(o.parent(), triggerType)
+	}
 	headlessPath, launchPath, err := o.resolve(name)
 	if err != nil {
 		log.Printf("[restart] config 解決に失敗（再起動を中断）: %v", err)
