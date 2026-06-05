@@ -35,7 +35,18 @@ type Config struct {
 	HeadlessCredentials HeadlessCredentials `json:"headlessCredentials,omitempty"`  // 既定の Resonite アカウント（起動時に各 config へ注入）
 	Encoding            string              `json:"encoding,omitempty"`             // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
 	Restart             *Restart            `json:"restart,omitempty"`              // 自動再起動設定（未設定=DefaultRestart・§3.16）
-	// 後続でSteam などを追加
+	Steam               *Steam              `json:"steam,omitempty"`                // Resonite入手/更新用 Steam アカウント(A)（DepotDownloader・P9-B）
+}
+
+// Steam は DepotDownloader による Resonite 入手/更新に使う「DL 用 Steam アカウント(A)」。
+// ヘッドレスの bot 身元である Resonite アカウント(B)＝HeadlessCredentials とは別物。
+// 秘密（Password/BranchCode）を含むため保存は 0600。公開 API では値を返さず hasXxx(bool) で表す。
+// 設計: docs/design/steam-depotdownloader.md
+type Steam struct {
+	Username   string `json:"username,omitempty"`   // Steam ユーザー名
+	Password   string `json:"password,omitempty"`   // Steam パスワード（ASCII・最大64文字・復元可能保存）
+	BranchCode string `json:"branchCode,omitempty"` // headless branch password（Patreon 配布・変動しうる）
+	InstallDir string `json:"installDir,omitempty"` // DL/更新先（空=ResoniteHeadless から導出/既定）
 }
 
 // HeadlessCredentials は生成/起動する headless config に注入する既定の Resonite アカウント。

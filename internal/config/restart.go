@@ -14,6 +14,11 @@ type Restart struct {
 	WaitControl   WaitControl        `json:"waitControl"`   // 全トリガー共通の待機制御
 	PreActions    PreActions         `json:"preActions"`    // 再起動前アクション
 	CrashRecovery CrashRecovery      `json:"crashRecovery"` // クラッシュ自動復帰
+	// UpdateOnScheduledRestart は「予定再起動時に Resonite を更新する」トグル（P9-B）。
+	// ON かつ Steam(A) 設定済みのとき、予定再起動の停止→起動の間に DepotDownloader で更新する
+	// （手動/userZero/クラッシュ復帰は対象外）。Steam 未設定なら no-op。
+	// 設計: docs/design/steam-depotdownloader.md §7
+	UpdateOnScheduledRestart bool `json:"updateOnScheduledRestart"`
 }
 
 // ScheduledRestart は1件の再起動予定。Type により使うフィールドが変わる（独自形式・cron不使用）。
@@ -74,6 +79,7 @@ type CrashRecovery struct {
 // DefaultRestart は restart 未設定時の既定値（§3.16）。
 // 告知は既定 OFF（itemUrl/tag はワールド依存で空のため）、セッション変更は maxusers=1 のみ ON、
 // クラッシュ復帰は ON（10分に3回で停止）、待機は静かに58分＋告知後2分（合計60分）。
+// 予定再起動時の更新は既定 ON（Steam 未設定なら no-op なので安全・P9-B）。
 func DefaultRestart() Restart {
 	return Restart{
 		Scheduled:   []ScheduledRestart{},
@@ -82,7 +88,8 @@ func DefaultRestart() Restart {
 			Announce:       AnnounceAction{Enabled: false, Message: "まもなく再起動します"},
 			SessionChanges: SessionChanges{SetMaxUsersOne: true},
 		},
-		CrashRecovery: CrashRecovery{Enabled: true, MaxCrashes: 3, WindowMinutes: 10},
+		CrashRecovery:            CrashRecovery{Enabled: true, MaxCrashes: 3, WindowMinutes: 10},
+		UpdateOnScheduledRestart: true,
 	}
 }
 
