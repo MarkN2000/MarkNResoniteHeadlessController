@@ -23,6 +23,7 @@ import (
 	"golang.org/x/text/transform"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/pubsub"
 )
 
 type State string
@@ -99,8 +100,8 @@ type Driver struct {
 	mu sync.Mutex
 
 	enc       encoding.Encoding // nil = UTF-8パススルー
-	logHub    *hub[LogLine]
-	statusHub *hub[Status]
+	logHub    *pubsub.Hub[LogLine]
+	statusHub *pubsub.Hub[Status]
 	history   []LogLine
 	seq       uint64
 
@@ -145,8 +146,8 @@ type Driver struct {
 func NewDriver(enc encoding.Encoding) *Driver {
 	return &Driver{
 		enc:       enc,
-		logHub:    newHub[LogLine](),
-		statusHub: newHub[Status](),
+		logHub:    pubsub.NewHub[LogLine](),
+		statusHub: pubsub.NewHub[Status](),
 		state:     StateStopped,
 	}
 }
@@ -194,7 +195,7 @@ func (d *Driver) loginStateLocked() LoginState {
 // setStateLocked は d.mu 保持中に呼ぶ。状態を更新し購読者へ通知する。
 func (d *Driver) setStateLocked(s State) {
 	d.state = s
-	d.statusHub.publish(d.statusLocked())
+	d.statusHub.Publish(d.statusLocked())
 }
 
 func (d *Driver) publishLog(kind, text string) {
@@ -206,7 +207,7 @@ func (d *Driver) publishLog(kind, text string) {
 		d.history = d.history[len(d.history)-logCapacity:]
 	}
 	d.mu.Unlock()
-	d.logHub.publish(line)
+	d.logHub.Publish(line)
 }
 
 // --- ライフサイクル ---
@@ -543,21 +544,21 @@ func (d *Driver) SendCommand(command string) error {
 // --- 購読（SSE用） ---
 
 func (d *Driver) SubscribeLog(buf int) (chan LogLine, []LogLine) {
-	ch := d.logHub.subscribe(buf)
+	ch := d.logHub.Subscribe(buf)
 	d.mu.Lock()
 	hist := append([]LogLine(nil), d.history...)
 	d.mu.Unlock()
 	return ch, hist
 }
 
-func (d *Driver) UnsubscribeLog(ch chan LogLine) { d.logHub.unsubscribe(ch) }
+func (d *Driver) UnsubscribeLog(ch chan LogLine) { d.logHub.Unsubscribe(ch) }
 
 func (d *Driver) SubscribeStatus(buf int) (chan Status, Status) {
-	ch := d.statusHub.subscribe(buf)
+	ch := d.statusHub.Subscribe(buf)
 	return ch, d.Status()
 }
 
-func (d *Driver) UnsubscribeStatus(ch chan Status) { d.statusHub.unsubscribe(ch) }
+func (d *Driver) UnsubscribeStatus(ch chan Status) { d.statusHub.Unsubscribe(ch) }
 
 // --- 構造化コマンド実行（案C'） ---
 // 詳細: docs/design/structured-driver.md
