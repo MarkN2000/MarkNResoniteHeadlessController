@@ -1,6 +1,7 @@
 // gen-test-config は Phase 6 e2e 検証用の mrhc.config.json を生成する小道具。
 // usage:
-//   gen-test-config <password> <resonitePath> <outpath>
+//
+//	gen-test-config <password> <installDir> <outpath>
 //
 // 出力: outpath に 0600 で書き込む。SessionSecret はランダム生成する。
 // 認証は Bearer パスワード（呼び出し元が <password> を保持して使う）。
@@ -19,21 +20,26 @@ import (
 
 // cfg は internal/config.Config の e2e 用サブセット（SchemaVersion=1 / 既定TTL=720h=30日）。
 type cfg struct {
-	Version           int    `json:"version"`
-	AdminPasswordHash string `json:"adminPasswordHash"`
-	SessionSecret     string `json:"sessionSecret"`
-	SessionTTLHours   int    `json:"sessionTtlHours,omitempty"`
-	Port              int    `json:"port"`
-	ResoniteHeadless  string `json:"resoniteHeadlessPath,omitempty"`
+	Version           int       `json:"version"`
+	AdminPasswordHash string    `json:"adminPasswordHash"`
+	SessionSecret     string    `json:"sessionSecret"`
+	SessionTTLHours   int       `json:"sessionTtlHours,omitempty"`
+	Port              int       `json:"port"`
+	Steam             *steamCfg `json:"steam,omitempty"`
+}
+
+// steamCfg は config.Steam の e2e 用サブセット（Resonite インストール先フォルダのみ）。
+type steamCfg struct {
+	InstallDir string `json:"installDir,omitempty"`
 }
 
 func main() {
 	if len(os.Args) < 4 {
-		fmt.Fprintln(os.Stderr, "usage: gen-test-config <password> <resonitePath> <outpath>")
+		fmt.Fprintln(os.Stderr, "usage: gen-test-config <password> <installDir> <outpath>")
 		os.Exit(2)
 	}
 	pw := os.Args[1]
-	resPath := os.Args[2]
+	installDir := os.Args[2]
 	out := os.Args[3]
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
@@ -48,7 +54,7 @@ func main() {
 		SessionSecret:     secret,
 		SessionTTLHours:   720,
 		Port:              8080,
-		ResoniteHeadless:  resPath,
+		Steam:             &steamCfg{InstallDir: installDir},
 	}
 	b, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {

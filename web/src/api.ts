@@ -346,7 +346,6 @@ export const putCredentials = (username: string, password: string) =>
 // アプリ設定（秘密・encoding を含まない公開サブセット）。internal/server/settings.go。
 export interface AppSettings {
   port: number;
-  resoniteHeadlessPath: string;
   headlessConfigDir: string;
 }
 export async function getAppSettings(): Promise<AppSettings | null> {

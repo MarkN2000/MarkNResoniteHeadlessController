@@ -1,6 +1,6 @@
 package server
 
-// R-A: 既定パス導出（ResoniteHeadless 未設定でも {dataDir}/resonite から起動/更新先を導出）と
+// R-A / 一本化: 既定パス導出（Steam.InstallDir 未設定でも {dataDir}/resonite から起動/更新先を導出）と
 // 未DL 時の親切エラーの回帰テスト。
 
 import (
@@ -17,7 +17,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 )
 
-// newPathServer は ResoniteHeadless 未設定の Server を返す（dataDir=tmp）。steam は任意で注入。
+// newPathServer は Steam.InstallDir 未設定の Server を返す（dataDir=tmp）。steam は任意で注入。
 func newPathServer(t *testing.T, steam *config.Steam) (s *Server, dataDir string) {
 	t.Helper()
 	tmp := t.TempDir()
@@ -37,7 +37,7 @@ func newPathServer(t *testing.T, steam *config.Steam) (s *Server, dataDir string
 	return New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil), tmp
 }
 
-// resolveLaunch は ResoniteHeadless 未設定なら {dataDir}/resonite/Headless/<OS バイナリ> を導出する。
+// resolveLaunch は Steam.InstallDir 未設定なら {dataDir}/resonite/Headless/<OS バイナリ> を導出する。
 func TestResolveLaunch_DerivesDefaultPath(t *testing.T) {
 	s, dataDir := newPathServer(t, nil)
 	// config 不在で launchPath は ErrNotFound になるが headlessPath は導出前に計算される。
@@ -70,7 +70,7 @@ func TestSteamParams_MissingCredentials(t *testing.T) {
 
 // 既定パスに Resonite が無い（未DL）状態の start は headless_not_installed を返す。
 func TestHandleStart_HeadlessNotInstalled(t *testing.T) {
-	ts, pw, _ := newConfigServer(t) // ResoniteHeadless 未設定・dataDir に resonite/ は無い
+	ts, pw, _ := newConfigServer(t) // Steam.InstallDir 未設定・dataDir に resonite/ は無い
 	// 起動できる config を1つ用意（これが無いと config_not_found で別経路になる）。
 	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/w", pw, "application/json",
 		`{"startWorlds":[{"sessionName":"W"}]}`)

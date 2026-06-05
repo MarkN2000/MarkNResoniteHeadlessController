@@ -182,7 +182,7 @@ func steamEventName(e steam.Event) string {
 }
 
 // steamParams は config から更新パラメータを組む。InstallDir は常に config.InstallDirOrDefault で
-// 解決する（明示→ResoniteHeadless から導出→既定 {dataDir}/resonite）ため install 先が未設定でも欠けない。
+// 解決する（明示 Steam.InstallDir→既定 {dataDir}/resonite）ため install 先が未設定でも欠けない。
 // 利用時に "~" を展開する（R-A）。資格（ユーザー名/パスワード/branchコード）のいずれかが欠ければ ErrSteamNotConfigured。
 func (s *Server) steamParams() (steam.UpdateParams, error) {
 	s.cfgMu.RLock()

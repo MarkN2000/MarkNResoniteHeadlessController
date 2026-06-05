@@ -179,7 +179,7 @@ type PreRestartAction interface {
 
 - **アプリ設定**（例 `mrhc.config.json`）:
   - `adminPasswordHash`（ハッシュ保存）、`sessionSecret`（自動生成・Cookie署名鍵の導出に使用）
-  - `port`、`resoniteHeadlessPath`、`headlessConfigDir`
+  - `port`、`headlessConfigDir`（Resonite の場所は `steam.installDir` に一本化）
   - `headlessCredentials`（Resoniteアカウント）
   - `restart`（トリガー/事前アクション/クラッシュ復帰設定）、`steam`（任意）
 - **配置場所**: アプリ設定・状態ファイルは**書き込み可能なデータディレクトリ**に置く（バイナリ隣 or 設定可能な data dir。Linuxの権限を考慮）。

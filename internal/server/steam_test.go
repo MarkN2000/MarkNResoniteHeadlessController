@@ -30,7 +30,6 @@ func newSteamServer(t *testing.T) (ts *httptest.Server, pw, cfgPath string) {
 		AdminPasswordHash: string(hash),
 		SessionSecret:     "steam-test-secret",
 		Port:              8080,
-		ResoniteHeadless:  "/steam/steamapps/common/Resonite/Headless/Resonite.dll",
 		HeadlessConfigDir: filepath.Join(tmp, "configs"),
 	}
 	if err := cfg.SaveTo(cfgPath); err != nil {
@@ -168,8 +167,7 @@ func TestMaybeScheduledUpdate_NoopGating(t *testing.T) {
 		cfg := &config.Config{
 			Version: config.SchemaVersion, AdminPasswordHash: string(hash),
 			SessionSecret: "x", Port: 8080,
-			ResoniteHeadless: "/s/Resonite/Headless/Resonite.dll",
-			Restart:          &rc, Steam: steamCfg,
+			Restart: &rc, Steam: steamCfg,
 		}
 		if err := cfg.SaveTo(cfgPath); err != nil {
 			t.Fatal(err)

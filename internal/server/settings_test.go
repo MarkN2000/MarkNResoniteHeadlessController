@@ -28,7 +28,6 @@ func newSettingsServer(t *testing.T) (ts *httptest.Server, pw, cfgPath string) {
 		AdminPasswordHash: string(hash),
 		SessionSecret:     "settings-test-secret",
 		Port:              8080,
-		ResoniteHeadless:  "/orig/Resonite",
 		HeadlessConfigDir: filepath.Join(tmp, "configs"),
 	}
 	if err := cfg.SaveTo(cfgPath); err != nil {
@@ -48,13 +47,13 @@ func TestAppSettings_GetPut(t *testing.T) {
 	if code := authGet(t, ts.URL+"/api/v1/app-settings", pw, &got); code != http.StatusOK {
 		t.Fatalf("GET status=%d", code)
 	}
-	if got.Data.Port != 8080 || got.Data.ResoniteHeadless != "/orig/Resonite" {
+	if got.Data.Port != 8080 {
 		t.Fatalf("GET 初期値が想定外: %+v", got.Data)
 	}
 
 	// PUT 更新
 	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/app-settings", pw, "application/json",
-		`{"port":9090,"resoniteHeadlessPath":"  /new/Resonite  ","headlessConfigDir":"/cfgs"}`)
+		`{"port":9090,"headlessConfigDir":"  /cfgs  "}`)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("PUT status=%d", resp.StatusCode)
 	}
@@ -63,7 +62,7 @@ func TestAppSettings_GetPut(t *testing.T) {
 	// GET が反映を返す（path は trim される）
 	var got2 okEnv[appSettings]
 	authGet(t, ts.URL+"/api/v1/app-settings", pw, &got2)
-	if got2.Data.Port != 9090 || got2.Data.ResoniteHeadless != "/new/Resonite" || got2.Data.HeadlessConfigDir != "/cfgs" {
+	if got2.Data.Port != 9090 || got2.Data.HeadlessConfigDir != "/cfgs" {
 		t.Fatalf("PUT 後の GET が想定外: %+v", got2.Data)
 	}
 
@@ -72,13 +71,13 @@ func TestAppSettings_GetPut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload: %v", err)
 	}
-	if reloaded.Port != 9090 || reloaded.ResoniteHeadless != "/new/Resonite" || reloaded.HeadlessConfigDir != "/cfgs" {
+	if reloaded.Port != 9090 || reloaded.HeadlessConfigDir != "/cfgs" {
 		t.Fatalf("ファイル未反映: %+v", reloaded)
 	}
 
 	// 不正ポートは 400
 	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/app-settings", pw, "application/json",
-		`{"port":0,"resoniteHeadlessPath":"/x","headlessConfigDir":""}`)
+		`{"port":0,"headlessConfigDir":""}`)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("port=0 で 400 にならない: %d", resp.StatusCode)
 	}

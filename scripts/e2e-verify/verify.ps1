@@ -12,7 +12,7 @@
 param(
     [string]$Password = "test-password-only-for-e2e",
     [int]$Port = 8080,
-    [string]$ResoniteExe = "C:\Program Files (x86)\Steam\steamapps\common\Resonite\Headless\Resonite.exe",
+    [string]$InstallDir = "C:\Program Files (x86)\Steam\steamapps\common\Resonite",
     [string]$TestConfig = "C:\app\MRHC\MarkNResoniteHeadlessController\scripts\empirical-capture\test-multi-world.json",
     [string]$OutDir = "C:\app\MRHC\MarkNResoniteHeadlessController\scripts\e2e-verify\results"
 )
@@ -44,7 +44,7 @@ if (-not $?) { Write-Output "BUILD FAIL"; exit 1 }
 $dataDir = Join-Path $runDir "data"
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 $cfgPath = Join-Path $dataDir "mrhc.config.json"
-& "$repo\bin\gen-test-config.exe" $Password $ResoniteExe $cfgPath | Out-Null
+& "$repo\bin\gen-test-config.exe" $Password $InstallDir $cfgPath | Out-Null
 Write-Output "config: $cfgPath"
 # 認証は Bearer パスワード（gen-test-config が config に bcrypt ハッシュを保存済）
 $authHeaders = @{ Authorization = "Bearer $Password" }

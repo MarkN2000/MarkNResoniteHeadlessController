@@ -22,13 +22,13 @@ function Note({ children }: { children: string }) {
   );
 }
 
-// アプリ設定（port / Resonite ヘッドレスパス / 上級: コンフィグ保存先）。encoding は UI 非搭載。
-// 反映: port・configDir = MRHC 再起動後 / Resonite パス = 次回ヘッドレス起動。
+// アプリ設定（port / 上級: コンフィグ保存先）。encoding は UI 非搭載。
+// Resonite のインストール場所は Steam セクション（installDir）に一本化したためここには無い。
+// 反映: port・configDir = MRHC 再起動後。
 export function AppSettingsSection() {
   const { t } = useTranslation();
   const [orig, setOrig] = useState<AppSettings | null>(null);
   const [port, setPort] = useState<number | string>("");
-  const [path, setPath] = useState("");
   const [dir, setDir] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
   const apply = useAsyncAction();
@@ -38,7 +38,6 @@ export function AppSettingsSection() {
     if (s) {
       setOrig(s);
       setPort(s.port);
-      setPath(s.resoniteHeadlessPath);
       setDir(s.headlessConfigDir);
       setLoadFailed(false);
     } else {
@@ -53,15 +52,12 @@ export function AppSettingsSection() {
   const portNum = Number(port);
   const portValid = Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
   const dirty =
-    !!orig &&
-    ((portValid && portNum !== orig.port) ||
-      path !== orig.resoniteHeadlessPath ||
-      dir !== orig.headlessConfigDir);
+    !!orig && ((portValid && portNum !== orig.port) || dir !== orig.headlessConfigDir);
   const canSave = portValid && dirty;
 
   const save = () =>
     apply.run(async () => {
-      const body: AppSettings = { port: portNum, resoniteHeadlessPath: path.trim(), headlessConfigDir: dir.trim() };
+      const body: AppSettings = { port: portNum, headlessConfigDir: dir.trim() };
       const r = await api.putAppSettings(body);
       if (r.ok) setOrig(body);
       return r;
@@ -79,15 +75,6 @@ export function AppSettingsSection() {
             <InspectorNumberInput value={port} onChange={setPort} min={1} max={65535} allowNegative={false} />
           </FieldRow>
           <Note>{t("settings.restartNote")}</Note>
-
-          <FieldRow label={t("settings.headlessPath")}>
-            <InspectorTextInput
-              value={path}
-              onChange={(e) => setPath(e.currentTarget.value)}
-              placeholder={t("settings.headlessPathPlaceholder")}
-            />
-          </FieldRow>
-          <Note>{t("settings.headlessPathNote")}</Note>
 
           <Divider my={2} color="dark.4" />
           <CollapsibleSection title={t("settings.advanced")}>

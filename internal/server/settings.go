@@ -56,9 +56,9 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 }
 
 // appSettings は GET/PUT で扱うアプリ設定の公開サブセット（秘密・encoding は含めない）。
+// Resonite のインストール場所は Steam セクション（installDir）に一本化したため、ここには含めない。
 type appSettings struct {
 	Port              int    `json:"port"`
-	ResoniteHeadless  string `json:"resoniteHeadlessPath"`
 	HeadlessConfigDir string `json:"headlessConfigDir"`
 }
 
@@ -67,16 +67,14 @@ func (s *Server) handleAppSettingsGet(w http.ResponseWriter, r *http.Request) {
 	s.cfgMu.RLock()
 	out := appSettings{
 		Port:              s.cfg.Port,
-		ResoniteHeadless:  s.cfg.ResoniteHeadless,
 		HeadlessConfigDir: s.cfg.HeadlessConfigDir,
 	}
 	s.cfgMu.RUnlock()
 	writeOK(w, out)
 }
 
-// handleAppSettingsPut: PUT /api/v1/app-settings {port, resoniteHeadlessPath, headlessConfigDir}
-// port/headlessConfigDir は MRHC 再起動後に反映（ポートバインド・configDir 解決は起動時）。
-// resoniteHeadlessPath は次回ヘッドレス起動で反映（handleStart が cfg をライブ参照）。
+// handleAppSettingsPut: PUT /api/v1/app-settings {port, headlessConfigDir}
+// いずれも MRHC 再起動後に反映（ポートバインド・configDir 解決は起動時）。
 func (s *Server) handleAppSettingsPut(w http.ResponseWriter, r *http.Request) {
 	var body appSettings
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -87,21 +85,19 @@ func (s *Server) handleAppSettingsPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "ポートは 1〜65535 で指定してください")
 		return
 	}
-	path := strings.TrimSpace(body.ResoniteHeadless)
 	dir := strings.TrimSpace(body.HeadlessConfigDir)
 	s.cfgMu.Lock()
-	oldPort, oldPath, oldDir := s.cfg.Port, s.cfg.ResoniteHeadless, s.cfg.HeadlessConfigDir
+	oldPort, oldDir := s.cfg.Port, s.cfg.HeadlessConfigDir
 	s.cfg.Port = body.Port
-	s.cfg.ResoniteHeadless = path
 	s.cfg.HeadlessConfigDir = dir
 	saveErr := s.cfg.SaveTo(s.cfgPath)
 	if saveErr != nil {
-		s.cfg.Port, s.cfg.ResoniteHeadless, s.cfg.HeadlessConfigDir = oldPort, oldPath, oldDir
+		s.cfg.Port, s.cfg.HeadlessConfigDir = oldPort, oldDir
 	}
 	s.cfgMu.Unlock()
 	if saveErr != nil {
 		writeErr(w, http.StatusInternalServerError, "save_failed", saveErr.Error())
 		return
 	}
-	writeOK(w, appSettings{Port: body.Port, ResoniteHeadless: path, HeadlessConfigDir: dir})
+	writeOK(w, appSettings{Port: body.Port, HeadlessConfigDir: dir})
 }

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 )
 
@@ -234,16 +236,37 @@ func TestCredentials_ResolvesUserID(t *testing.T) {
 
 // start-by-name: config 名で起動 → name 解決 → 一時 config 生成 → fakehl 起動 → last-used 記録
 func TestConfigs_StartByName(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		// 一本化後、非 Windows は installDir/Headless/Resonite.dll を dotnet 経由で起動するため、
+		// ネイティブ Go バイナリの fakehl を実行できない。パス導出自体は server_paths_test が
+		// OS 非依存に検証済みなので、ここは Windows（.exe 直接実行）でのみ実プロセス起動を検証する。
+		t.Skip("fakehl は .dll/dotnet 経由起動と非互換のため Windows のみ検証")
+	}
 	tmp := t.TempDir()
 	cfgPath := filepath.Join(tmp, "mrhc.config.json")
 	configDir := filepath.Join(tmp, "configs")
+	installDir := filepath.Join(tmp, "resonite")
+
+	// 一本化後は起動パスを installDir から導出するため、fakehl を installDir/Headless/<OS バイナリ名> に配置する。
+	headlessDir := filepath.Join(installDir, "Headless")
+	if err := os.MkdirAll(headlessDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fakehlBin, err := os.ReadFile(fakehlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(headlessDir, platform.HeadlessBinaryName()), fakehlBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
 	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
 	cfg := &config.Config{
 		Version:           config.SchemaVersion,
 		AdminPasswordHash: string(hash),
 		SessionSecret:     "start-secret",
 		HeadlessConfigDir: configDir,
-		ResoniteHeadless:  fakehlPath,
+		Steam:             &config.Steam{InstallDir: installDir},
 	}
 	if err := cfg.SaveTo(cfgPath); err != nil {
 		t.Fatal(err)

@@ -11,7 +11,7 @@
 ## 前提
 - Windows 11
 - Go 1.26+（PATH or `C:\Program Files\Go\bin`）
-- Resonite Headless（既定パス: `C:\Program Files (x86)\Steam\steamapps\common\Resonite\Headless\Resonite.exe`）
+- Resonite Headless（既定インストール先フォルダ: `C:\Program Files (x86)\Steam\steamapps\common\Resonite`）
 - web/dist が既に生成済（`cd web && npm install && npm run build`）
 - 本番 mrhc / Resonite が起動していないこと
 - ⚠️ PowerShell スクリプトは **UTF-8 BOM 付き**で保存すること（PS 5.1 が日本語コメントを ANSI 誤読すると parser エラー）
@@ -27,7 +27,7 @@
 .\scripts\e2e-verify\verify.ps1 `
     -Password "my-test-pw" `
     -Port 8081 `
-    -ResoniteExe "D:\Steam\..." `
+    -InstallDir "D:\Steam\steamapps\common\Resonite" `
     -TestConfig ".\my-test.json"
 ```
 

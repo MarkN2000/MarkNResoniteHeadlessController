@@ -294,11 +294,11 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 }
 
 // resolveLaunch は config 名から起動に必要な (headlessPath, launchPath) を解決する。
-// 中央 creds / Resonite パスは app-settings・credentials で実行時に書き換わるため cfgMu RLock 下で読み、
+// 中央 creds は credentials で実行時に書き換わるため cfgMu RLock 下で読み、
 // config の creds が空なら中央アカウントを注入した一時 config を ResolveForLaunch で生成する。
-// ResoniteHeadless 未設定なら既定（{dataDir}/resonite/Headless/<OS バイナリ>）を導出し、
-// 利用時に "~" を展開する（R-A）。handleStart と restart-orchestrator（P8-3）で共用する。
-// name の検証・空判定は呼び出し側の責務。
+// ヘッドレスパスは InstallDirOrDefault（Steam.InstallDir→既定 {dataDir}/resonite）から
+// /Headless/<OS バイナリ> を導出し、利用時に "~" を展開する（R-A）。
+// handleStart と restart-orchestrator（P8-3）で共用する。name の検証・空判定は呼び出し側の責務。
 func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, err error) {
 	s.cfgMu.RLock()
 	central := hlconfig.Credentials{
