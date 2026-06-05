@@ -9,9 +9,9 @@
 - **含む**: config スキーマ追加 / DepotDownloader 本体の自動取得（DL＋SHA-256検証＋chmod＋原子的rename）/
   DepotDownloader 実行（stdin 認証・進捗・成否）/ API / SSE 進捗 / 手動更新 /
   **予定再起動への自動更新統合**。
-- **含まない（隣接 Phase・別途）**: Phase2 `launcher.go` の ARM 分岐修正 / Phase3 検出ファースト /
-  Phase6 CLI セットアップ拡張 / Guard 2FA 入力 UI（将来）/ MRHC 自己更新 Lv1 /
-  ネイティブ依存（freetype2 等）の検出・案内（Phase3/6 と onboarding backlog で扱う）。
+- **含まない（隣接フェーズ・別ドキュメント）**: launcher の ARM 分岐修正（**R-B・実装済**＝同梱
+  dotnet の ELF arch 判定）/ 外部依存（freetype2 / .NET 10）の検出・案内（**R-C・実装済** →
+  [`deps-onboarding.md`](./deps-onboarding.md)）/ Guard 2FA 入力 UI（将来）/ MRHC 自己更新 Lv1。
 
 ## 1. 用語：2系統のアカウントを混同しない
 
