@@ -12,12 +12,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
 
@@ -180,26 +180,24 @@ func steamEventName(e steam.Event) string {
 	return "steam-" + e.Kind
 }
 
-// steamParams は config から更新パラメータを組む。InstallDir 未設定なら ResoniteHeadless から導出する。
-// 必須（ユーザー名/パスワード/branchコード/install先）が欠けていれば ErrSteamNotConfigured。
+// steamParams は config から更新パラメータを組む。InstallDir は常に config.InstallDirOrDefault で
+// 解決する（明示→ResoniteHeadless から導出→既定 {dataDir}/resonite）ため install 先が未設定でも欠けない。
+// 利用時に "~" を展開する（R-A）。資格（ユーザー名/パスワード/branchコード）のいずれかが欠ければ ErrSteamNotConfigured。
 func (s *Server) steamParams() (steam.UpdateParams, error) {
 	s.cfgMu.RLock()
 	var p steam.UpdateParams
 	if s.cfg.Steam != nil {
 		p = steam.UpdateParams{
-			InstallDir: s.cfg.Steam.InstallDir,
 			Username:   s.cfg.Steam.Username,
 			Password:   s.cfg.Steam.Password,
 			BranchCode: s.cfg.Steam.BranchCode,
 		}
 	}
-	resoHeadless := s.cfg.ResoniteHeadless
+	p.InstallDir = s.cfg.InstallDirOrDefault(s.dataDir)
 	s.cfgMu.RUnlock()
+	p.InstallDir = platform.ExpandHome(p.InstallDir)
 
-	if strings.TrimSpace(p.InstallDir) == "" {
-		p.InstallDir = deriveInstallDir(resoHeadless)
-	}
-	if p.Username == "" || p.Password == "" || p.BranchCode == "" || p.InstallDir == "" {
+	if p.Username == "" || p.Password == "" || p.BranchCode == "" {
 		return steam.UpdateParams{}, steam.ErrSteamNotConfigured
 	}
 	return p, nil
@@ -230,16 +228,6 @@ func (s *Server) maybeScheduledUpdate(ctx context.Context, triggerType string) {
 		return
 	}
 	log.Printf("[restart] 予定再起動: Resonite の更新が完了しました")
-}
-
-// deriveInstallDir は ResoniteHeadless パス（.../Resonite/Headless/Resonite.exe|dll）から
-// DepotDownloader の -dir 対象（Resonite インストール根 .../Resonite）を導出する。
-// 空なら "" を返す。最終的な妥当性は ARM 実機（Phase8）で確認する。
-func deriveInstallDir(resoniteHeadless string) string {
-	if strings.TrimSpace(resoniteHeadless) == "" {
-		return ""
-	}
-	return filepath.Dir(filepath.Dir(resoniteHeadless))
 }
 
 // validateSteamPassword は Steam 仕様（ASCII 限定・最大64文字）を検証する。

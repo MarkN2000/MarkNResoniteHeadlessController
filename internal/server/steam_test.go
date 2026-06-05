@@ -196,12 +196,4 @@ func TestMaybeScheduledUpdate_NoopGating(t *testing.T) {
 	}
 }
 
-func TestDeriveInstallDir(t *testing.T) {
-	in := filepath.Join("root", "Resonite", "Headless", "Resonite.dll")
-	if got, want := deriveInstallDir(in), filepath.Join("root", "Resonite"); got != want {
-		t.Errorf("deriveInstallDir(%q)=%q want %q", in, got, want)
-	}
-	if deriveInstallDir("") != "" || deriveInstallDir("   ") != "" {
-		t.Error("空入力は空を返すべき")
-	}
-}
+// InstallDir 導出の単体は config.TestInstallDirOrDefault へ移設（deriveInstallDir は config に統合）。

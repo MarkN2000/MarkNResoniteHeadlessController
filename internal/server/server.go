@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
@@ -273,6 +275,13 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
 		return
 	}
+	// 既定パス（{dataDir}/resonite）にまだ Resonite が無い＝未DL のときは、
+	// 実行失敗の素っ気ないメッセージでなく取得導線を案内する（R-A）。
+	if _, statErr := os.Stat(headlessPath); errors.Is(statErr, fs.ErrNotExist) {
+		writeErr(w, http.StatusConflict, "headless_not_installed",
+			"Resonite がまだダウンロードされていません。設定タブの『今すぐ更新』から取得してください。")
+		return
+	}
 	if err := s.driver.Start(headlessPath, launchPath, name); err != nil {
 		writeErr(w, http.StatusConflict, "start_failed", err.Error())
 		return
@@ -285,15 +294,18 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 // resolveLaunch は config 名から起動に必要な (headlessPath, launchPath) を解決する。
 // 中央 creds / Resonite パスは app-settings・credentials で実行時に書き換わるため cfgMu RLock 下で読み、
 // config の creds が空なら中央アカウントを注入した一時 config を ResolveForLaunch で生成する。
-// handleStart と restart-orchestrator（P8-3）で共用する。name の検証・空判定は呼び出し側の責務。
+// ResoniteHeadless 未設定なら既定（{dataDir}/resonite/Headless/<OS バイナリ>）を導出し、
+// 利用時に "~" を展開する（R-A）。handleStart と restart-orchestrator（P8-3）で共用する。
+// name の検証・空判定は呼び出し側の責務。
 func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, err error) {
 	s.cfgMu.RLock()
 	central := hlconfig.Credentials{
 		Username: s.cfg.HeadlessCredentials.Username,
 		Password: s.cfg.HeadlessCredentials.Password,
 	}
-	headlessPath = s.cfg.ResoniteHeadless
+	headlessPath = s.cfg.HeadlessPathOrDefault(s.dataDir, platform.HeadlessBinaryName())
 	s.cfgMu.RUnlock()
+	headlessPath = platform.ExpandHome(headlessPath)
 	runDir := filepath.Join(s.dataDir, ".run")
 	launchPath, err = hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
 	return headlessPath, launchPath, err
