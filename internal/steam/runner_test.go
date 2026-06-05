@@ -37,6 +37,13 @@ func fakeDDMain() {
 		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 		fmt.Fprint(os.Stdout, "Please enter your 2 factor auth code from your authenticator app: ")
 		select {} // 入力待ちで block。runner が 2FA を検出して kill する。
+	case "hang":
+		// パスワード受領後に1行だけ進捗を出して以降は沈黙＝無進捗で固まる。
+		// manager の cancel / stall ウォッチドッグ検証用（kill されるまで block）。
+		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+		fmt.Fprintln(os.Stdout, " 10.00% /Resonite/a")
+		select {}
 	default: // success
 		fmt.Fprintln(os.Stdout, "Using app branch: 'headless'.")
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
