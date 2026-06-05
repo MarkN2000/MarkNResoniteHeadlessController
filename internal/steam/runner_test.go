@@ -44,6 +44,13 @@ func fakeDDMain() {
 		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 		fmt.Fprintln(os.Stdout, " 10.00% /Resonite/a")
 		select {}
+	case "reprompt":
+		// パスワードを受領後、誤資格として再度パスワードを要求し入力待ちで block。
+		// runner が「2回目の要求＝認証失敗」を検出して kill することを検証する（M1）。
+		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
+		select {}
 	default: // success
 		fmt.Fprintln(os.Stdout, "Using app branch: 'headless'.")
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
@@ -118,6 +125,25 @@ func TestRunner_WrongPasswordFails(t *testing.T) {
 	}
 	if errors.Is(err, ErrTwoFactorRequired) {
 		t.Fatal("2FA エラーではないはず")
+	}
+}
+
+// TestRunner_AuthFailedFastFail はパスワード再要求（誤資格）を stall を待たず ErrAuthFailed にする（M1）。
+func TestRunner_AuthFailedFastFail(t *testing.T) {
+	t.Setenv("GO_FAKE_DD", "1")
+	t.Setenv("GO_FAKE_DD_MODE", "reprompt")
+
+	// 余裕のある timeout でも、再要求検出→即 kill で素早く返ることを確認する。
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	err := NewRunner().Run(ctx, fakeRunParams(), nil)
+	if !errors.Is(err, ErrAuthFailed) {
+		t.Fatalf("再要求は ErrAuthFailed を返すべき: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("即時失敗のはずが %v かかった（stall を待っていないか）", elapsed)
 	}
 }
 

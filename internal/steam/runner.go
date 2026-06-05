@@ -20,6 +20,10 @@ const ddReadChunk = 4096
 // v1 は 2FA 入力 UI を持たないため、Guard オフの予備アカウント運用を案内する（設計 §6）。
 var ErrTwoFactorRequired = errors.New("Steam の2要素認証(2FA)が要求されました。MRHC v1 は2FA未対応です（Steam Guard をオフにした予備アカウントを使用してください）")
 
+// ErrAuthFailed は投入したパスワードが拒否され DD が再度パスワードを要求した（＝誤資格）ことを表す。
+// 再要求にこれ以上応じても無限に失敗するため即終了し、5分の stall を待たずに原因を明示する（M1）。
+var ErrAuthFailed = errors.New("Steam のユーザー名またはパスワードが正しくない可能性があります")
+
 // RunParams は DepotDownloader 1回の実行に必要なパラメータ。
 type RunParams struct {
 	DDPath     string // DepotDownloader 実行ファイル（acquire 済み）
@@ -75,16 +79,23 @@ func (r *Runner) Run(ctx context.Context, p RunParams, onEvent func(Event)) erro
 	}
 
 	var twoFactor atomic.Bool
+	var authFailed atomic.Bool
 	var pwSent atomic.Bool
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func() { defer wg.Done(); r.readStdout(stdout, stdin, p.Password, &pwSent, &twoFactor, cmd, onEvent) }()
+	go func() {
+		defer wg.Done()
+		r.readStdout(stdout, stdin, p.Password, &pwSent, &twoFactor, &authFailed, cmd, onEvent)
+	}()
 	go func() { defer wg.Done(); r.readStderr(stderr, onEvent) }()
 	wg.Wait() // パイプを drain し切ってから Wait（末尾出力の取りこぼし防止）
 
 	waitErr := cmd.Wait()
 	if twoFactor.Load() {
 		return ErrTwoFactorRequired
+	}
+	if authFailed.Load() {
+		return ErrAuthFailed
 	}
 	if waitErr != nil {
 		return fmt.Errorf("DepotDownloader が失敗しました: %w", waitErr)
@@ -95,7 +106,7 @@ func (r *Runner) Run(ctx context.Context, p RunParams, onEvent func(Event)) erro
 // readStdout は子プロセスの stdout をチャンク読みし、確定行は進捗/マイルストーン/ログとして
 // onEvent へ流す。改行されない末尾断片（tail）はプロンプト候補として検査し、パスワード要求なら
 // stdin へ投入、2FA 要求なら子プロセスを止める。
-func (r *Runner) readStdout(stdout io.Reader, stdin io.WriteCloser, password string, pwSent, twoFactor *atomic.Bool, cmd *exec.Cmd, onEvent func(Event)) {
+func (r *Runner) readStdout(stdout io.Reader, stdin io.WriteCloser, password string, pwSent, twoFactor, authFailed *atomic.Bool, cmd *exec.Cmd, onEvent func(Event)) {
 	buf := make([]byte, ddReadChunk)
 	var lineBuf []byte
 	for {
@@ -119,6 +130,10 @@ func (r *Runner) readStdout(stdout io.Reader, stdin io.WriteCloser, password str
 					_, _ = io.WriteString(stdin, password+"\n")
 					// 処理済みプロンプト断片を破棄（直後の進捗行とグルーになるのを防ぐ）。
 					lineBuf = lineBuf[:0]
+				} else if authFailed.CompareAndSwap(false, true) && cmd.Process != nil {
+					// パスワード送信済みなのに再度要求＝投入したパスワードが拒否された（誤資格）。
+					// これ以上応じても失敗し続けるので即 kill し、stall を待たず ErrAuthFailed にする（M1）。
+					_ = cmd.Process.Kill()
 				}
 			case promptTwoFactor:
 				if twoFactor.CompareAndSwap(false, true) && cmd.Process != nil {
@@ -161,16 +176,20 @@ func (r *Runner) readStderr(stderr io.Reader, onEvent func(Event)) {
 }
 
 // emitLine は確定した stdout 1行を分類して onEvent へ流す。
-// 進捗行はログに流さない（行数が多くログを埋めるため）。マイルストーンはログ＋phase の両方。
+//   - 進捗行（`X% path`）はログに流さない（行数が多くログを埋めるため）。
+//   - マイルストーン行（`Pre-allocating <path>` 等）はファイル毎に大量に出るため、ログには
+//     重複させずマイルストーンのみ通知する（dedup は manager 側で phase 変化時だけに行う・M4）。
+//   - それ以外の行（接続/depot key/ログイン等）はログとして流す。
 func emitLine(line string, onEvent func(Event)) {
 	if pct, file, ok := parseProgress(line); ok {
 		emit(onEvent, Event{Kind: "progress", Percent: pct, File: file})
 		return
 	}
-	emit(onEvent, Event{Kind: "log", Text: line})
 	if ms, ok := detectMilestone(line); ok {
 		emit(onEvent, Event{Kind: "milestone", Text: ms})
+		return
 	}
+	emit(onEvent, Event{Kind: "log", Text: line})
 }
 
 func emit(onEvent func(Event), e Event) {

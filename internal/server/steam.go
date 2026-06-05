@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -196,6 +197,8 @@ func (s *Server) steamParams() (steam.UpdateParams, error) {
 	p.InstallDir = s.cfg.InstallDirOrDefault(s.dataDir)
 	s.cfgMu.RUnlock()
 	p.InstallDir = platform.ExpandHome(p.InstallDir)
+	// DL 後に headless 実体が取れたかを検査する相対パス（OS 名を DI・H2）。
+	p.VerifyRelPath = filepath.Join("Headless", platform.HeadlessBinaryName())
 
 	if p.Username == "" || p.Password == "" || p.BranchCode == "" {
 		return steam.UpdateParams{}, steam.ErrSteamNotConfigured

@@ -69,6 +69,11 @@ type UpdateParams struct {
 	Username   string
 	Password   string
 	BranchCode string
+	// VerifyRelPath は DL 成功後に InstallDir 配下で存在を確認する相対パス（例 "Headless/Resonite.exe"）。
+	// headless ブランチコードが誤りだと DD は public branch にフォールバックして exit 0 で終わるため、
+	// このファイルの有無で「headless 実体が取れたか」を判定する（良性の "Password was invalid" 文字列
+	// マッチは成功時にも出るため使わない・H2）。空なら検査しない（テスト等）。OS 名は server が DI する。
+	VerifyRelPath string
 }
 
 // NewManager は既定（GitHub 取得・実 DepotDownloader・停滞5分）の Manager を返す。
@@ -217,6 +222,15 @@ func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
 		return runErr
 	}
 
+	// DD が exit 0 でも、ブランチコード誤りだと headless depot が public フォールバックして
+	// headless 実体が落ちないことがある。期待ファイルの存在で「headless が取れたか」を確認する（H2）。
+	if p.VerifyRelPath != "" {
+		target := filepath.Join(p.InstallDir, p.VerifyRelPath)
+		if _, err := os.Stat(target); errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("ダウンロードは完了しましたが headless 本体が見つかりません（%s）。ブランチコードが正しいか確認してください", p.VerifyRelPath)
+		}
+	}
+
 	// DepotDownloader は実行権を付けないため、取得後に install 全体へ +x（Linux/ARM 必須）。
 	if runtime.GOOS != "windows" {
 		m.onEvent(Event{Kind: "log", Text: "実行権を付与中（chmod -R +x）"})
@@ -264,6 +278,13 @@ func (m *Manager) onEvent(e Event) {
 		m.st.Percent = e.Percent
 		m.st.File = e.File
 	case "milestone":
+		// 同一 phase の連続マイルストーン（Pre-allocating が数百ファイル分続く等）は
+		// publish/log しない＝SSE/ログの洪水と、500件リングからの早期マイルストーン追い出しを防ぐ（M4）。
+		// lastEvent は上で更新済みなので stall ウォッチドッグは正しく活動継続とみなす。
+		if e.Text == m.st.Phase {
+			m.mu.Unlock()
+			return
+		}
 		m.st.Phase = e.Text
 		m.appendLogLocked(e)
 	case "log":
