@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -172,6 +173,23 @@ func TestWizard_EOFAborts(t *testing.T) {
 				t.Errorf("中断メッセージが出ていない: %s", out.String())
 			}
 		})
+	}
+}
+
+// abortOr: 読取エラー（errInput）だけが中断扱いになり、実エラー（SaveTo 失敗等）は
+// そのまま伝播する（M1: EOF と誤報告しない）。
+func TestWizard_AbortOrDistinguishesErrors(t *testing.T) {
+	w, out := newTestWizard("")
+	_, readErr := readLine(bufio.NewReader(strings.NewReader(""))) // readLine 経由の実エラー形
+	if err := w.abortOr("ja", readErr); !errors.Is(err, ErrAborted) {
+		t.Errorf("読取エラーは ErrAborted になるべき: %v", err)
+	}
+	if !strings.Contains(out.String(), "セットアップを中断しました") {
+		t.Errorf("中断メッセージが出ていない: %s", out.String())
+	}
+	saveErr := errors.New("disk full")
+	if err := w.abortOr("ja", saveErr); !errors.Is(err, saveErr) || errors.Is(err, ErrAborted) {
+		t.Errorf("実エラーはそのまま伝播すべき: %v", err)
 	}
 }
 

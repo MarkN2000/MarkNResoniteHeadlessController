@@ -253,7 +253,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 ### CLIセットアップウィザード（Win/Linux完全共通・確定仕様: [docs/design/cli-onboarding.md](design/cli-onboarding.md)）
 - 初回起動でconfig無しを検知 → 同一バイナリが対話プロンプト表示。SSH越し可・ブラウザ不要・`.bat`/`.ps1`不要。
 - 流れ: **言語選択（ja/en・OS検出既定・configに保存=CLI/起動ログ/sys案内に適用）** → 管理パスワード → ポート → 保存 → 外部依存（freetype2/ARMの.NET10）の **[Y/n] 同意実行**（R-C・拒否でも続行）→ **Resoniteセットアップ（任意）**＝Steam資格＋ヘッドレスコード入力→その場でDL実行（Guardオフ必須の理由・手順を画面に明記）→ **「今すぐ起動しますか? [Y/n]」でそのままサーバー起動**（2回起動の廃止）。
-- 入力契約: 不正値→理由表示で再入力・EOF→中断（パイプ実行で無限ループしない）・空Enter=既定値。**Resoniteパスは聞かない**（未設定＝既定 `{dataDir}/resonite` に導出・R-A）。
+- 入力契約: 不正値→理由表示で再入力・EOF→中断（パイプ実行で無限ループしない）・空Enter=既定値。**Resoniteパスの入力は要求しない**（S5のインストール先は任意・空Enter=既定 `{dataDir}/resonite` に導出・R-A）。
 - 残り（セッション定義・再起動・ヘッドレス認証等）はログイン後の Web UI。
 
 ### 運用メモ

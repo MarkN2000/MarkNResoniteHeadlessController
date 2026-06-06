@@ -34,6 +34,11 @@ import (
 // 中断メッセージはウィザード自身が表示済みなので、呼び出し側は終了コードだけ扱えばよい。
 var ErrAborted = errors.New("setup aborted")
 
+// errInput は stdin の読取エラー（EOF 含む）を示す内部マーカー。
+// Run が「中断（abort=EOF メッセージ）」と「実エラー（SaveTo 失敗等→main が原因を表示）」を
+// 区別するために、読取系ヘルパはエラーを必ずこれで包む。
+var errInput = errors.New("input unavailable")
+
 // Wizard は初回セットアップの対話。フィールドはテストからの注入点（NewWizard が実環境を結線）。
 type Wizard struct {
 	In         io.Reader
@@ -93,7 +98,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	}
 	chosen, err := w.promptLang(in, lang)
 	if err != nil {
-		return nil, false, w.abort(lang)
+		return nil, false, w.abortOr(lang, err)
 	}
 	lang = chosen
 
@@ -106,7 +111,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	fmt.Fprintln(w.Out, i18n.T(lang, "wizard.pw.header"))
 	pw, err := w.readPasswordTwice(in, lang)
 	if err != nil {
-		return nil, false, w.abort(lang)
+		return nil, false, w.abortOr(lang, err)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	if err != nil {
@@ -118,7 +123,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	fmt.Fprintln(w.Out, i18n.T(lang, "wizard.port.header"))
 	port, err := w.promptPort(in, lang, 8080)
 	if err != nil {
-		return nil, false, w.abort(lang)
+		return nil, false, w.abortOr(lang, err)
 	}
 
 	secret, err := config.RandomSecret(32)
@@ -142,7 +147,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 
 	// S5: Resonite セットアップ（任意・Steam 資格入力→DL 実行）
 	if err := w.offerResonite(cfgPath, cfg, in, lang); err != nil {
-		return nil, false, w.abort(lang)
+		return nil, false, w.abortOr(lang, err) // 読取エラー=中断 / SaveTo 失敗等=実エラーのまま
 	}
 
 	// S6: 起動確認
@@ -151,7 +156,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	fmt.Fprintln(w.Out)
 	start, err := promptYN(in, w.Out, lang, i18n.T(lang, "wizard.start.prompt"))
 	if err != nil {
-		return nil, false, w.abort(lang)
+		return nil, false, w.abortOr(lang, err)
 	}
 	if !start {
 		exe := "./mrhc"
@@ -169,15 +174,24 @@ func (w *Wizard) abort(lang i18n.Lang) error {
 	return ErrAborted
 }
 
-// readLine は 1 行読み取って前後空白を落とす。EOF 等で行が得られなければ error。
+// readLine は 1 行読み取って前後空白を落とす。EOF 等で行が得られなければ errInput を返す。
 // 「改行なしの最終行 + EOF」は有効な回答として扱う（次の読みで EOF が返る）。
 func readLine(in *bufio.Reader) (string, error) {
 	line, err := in.ReadString('\n')
 	s := strings.TrimSpace(line)
 	if err != nil && s == "" {
-		return "", err
+		return "", fmt.Errorf("%w: %v", errInput, err)
 	}
 	return s, nil
+}
+
+// abortOr は読取エラー（errInput）なら中断メッセージ付きの ErrAborted に、
+// それ以外（SaveTo 失敗等）はそのまま返す（M1: 実エラーを EOF と誤報告しない）。
+func (w *Wizard) abortOr(lang i18n.Lang, err error) error {
+	if errors.Is(err, errInput) {
+		return w.abort(lang)
+	}
+	return err
 }
 
 // promptLang は S0 言語選択。言語確定前のため文言は両言語併記の固定文（カタログ外）。
@@ -232,10 +246,12 @@ func (w *Wizard) readPasswordTwice(in *bufio.Reader, lang i18n.Lang) (string, er
 func (w *Wizard) readSecret(in *bufio.Reader, prompt string) (string, error) {
 	fmt.Fprint(w.Out, prompt)
 	if w.TTY {
+		// 注意: tty では bufio をバイパスして端末から直読みする（伏せ字のため）。
+		// 先読みバッファ内のバイトは ReadPassword に届かない（対話入力では実害なし）。
 		b, err := term.ReadPassword(int(os.Stdin.Fd()))
 		fmt.Fprintln(w.Out)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%w: %v", errInput, err)
 		}
 		return strings.TrimSpace(string(b)), nil
 	}
@@ -297,8 +313,8 @@ func (w *Wizard) offerDeps(cfgPath string, cfg *config.Config, in *bufio.Reader,
 
 // offerResonite は S5: Resonite 本体のセットアップ（任意）。
 // Y なら Steam 資格を読み（S5a）、config へ保存して DL を実行する（S5b）。
-// 戻り値の error は EOF 等の読取エラーのみ（DL の失敗・中止はメッセージを出して nil ＝続行。
-// あとから Web UI で再試行できるため、ウィザードはブロックしない）。
+// 戻り値の error は読取エラー（errInput）と SaveTo 失敗のみ（DL の失敗・中止は
+// メッセージを出して nil ＝続行。あとから Web UI で再試行できるため、ウィザードはブロックしない）。
 func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Reader, lang i18n.Lang) error {
 	dataDir := filepath.Dir(cfgPath)
 
@@ -321,12 +337,18 @@ func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Rea
 			return nil // 空 Enter で中止（案内表示済み）
 		}
 
-		// 資格を config へ保存（DL の成否に関わらず Web UI から再利用できるように先に保存）
+		// 資格を config へ保存（DL の成否に関わらず Web UI から再利用できるように先に保存）。
+		// インストール先の空 Enter は「表示した既定値」の維持＝認証失敗→再入力の 2 周目では
+		// 前回の明示値を引き継ぐ（M2: 黙って既定導出に巻き戻さない）。
+		installDir := creds.installDir
+		if installDir == "" && cfg.Steam != nil {
+			installDir = cfg.Steam.InstallDir
+		}
 		cfg.Steam = &config.Steam{
 			Username:   creds.user,
 			Password:   creds.pw,
 			BranchCode: creds.code,
-			InstallDir: creds.installDir, // 空=既定導出（InstallDirOrDefault）
+			InstallDir: installDir, // 空=既定導出（InstallDirOrDefault）
 		}
 		if err := cfg.SaveTo(cfgPath); err != nil {
 			return err
@@ -480,7 +502,7 @@ func ResetPassword(cfgPath string) error {
 	in := bufio.NewReader(w.In)
 	lang := cfg.LangOrDefault()
 
-	fmt.Println(i18n.T(lang, "reset.header"))
+	fmt.Fprintln(w.Out, i18n.T(lang, "reset.header"))
 
 	pw, err := w.readPasswordTwice(in, lang)
 	if err != nil {
@@ -499,7 +521,7 @@ func ResetPassword(cfgPath string) error {
 	if err := cfg.SaveTo(cfgPath); err != nil {
 		return err
 	}
-	fmt.Println()
-	fmt.Println(i18n.T(lang, "reset.done"))
+	fmt.Fprintln(w.Out)
+	fmt.Fprintln(w.Out, i18n.T(lang, "reset.done"))
 	return nil
 }

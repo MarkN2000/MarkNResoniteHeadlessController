@@ -131,17 +131,19 @@ curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0 --ru
 ## 2. API 設計（`internal/platform/deps.go` 新設）
 
 ```go
-// DepIssue は不足している外部依存 1 件と導入手段。
+// DepIssue は不足している外部依存 1 件と導入手段（CLI改訂 2026-06-06 で i18n 対応の
+// データ専用構造に変更。表示文言はメソッドが config 言語で組み立てる）。
 type DepIssue struct {
     Kind     string   // "freetype2" | "dotnet10"
-    Title    string   // 表示名（例: "freetype2（Resonite のネイティブ依存）"）
     Commands []string // 導入コマンド（[Y/n] 実行・ログ提示の両方で使う。unknown distro は空）
-    Fallback string   // Commands が空（distro 不明）のときの手動導入案内
 }
 
-// GuideText は導入ガイド本文（コマンドがあればラベル付き結合・無ければ Fallback）。
+// Title は表示名（例: "freetype2（Resonite のネイティブ依存）"）。文言は i18n カタログ。
+func (i DepIssue) Title(lang i18n.Lang) string
+
+// GuideText は導入ガイド本文（コマンドがあればラベル付き結合・無ければ Kind 別の手動案内）。
 // 経路②（起動時ログ）と経路③（sys ログ）の文言選択を 1 か所に集約する（実装後レビュー反映）。
-func (i DepIssue) GuideText() string
+func (i DepIssue) GuideText(lang i18n.Lang) string
 
 // CheckHeadlessDeps はヘッドレス動作に必要な外部依存の不足を検出する。
 // Absent と確認できたものだけ返す（Present/Unknown は返さない＝案A）。
@@ -186,11 +188,12 @@ config 読込後・サーバー構築前に `CheckHeadlessDeps` を実行（inst
 
 ### 3.2 経路① — ウィザード末尾の [Y/n] 対話（`internal/setup/wizard.go`）
 
-`RunWizard` の**保存成功後**に検出＋対話を実行（途中 Ctrl-C でも config は残る）。
-ARM の初回フロー（install.sh → ./mrhc → ウィザード → 依存導入 → 再起動）がここで完結する。
+`Wizard.Run`（旧 `RunWizard`・CLI改訂で struct 化）の**保存成功後**に検出＋対話を実行
+（途中 Ctrl-C でも config は残る）。ARM の初回フロー（install.sh → ./mrhc → ウィザード →
+依存導入 → そのまま起動）がここで完結する（CLI改訂で「再起動」は不要になった）。
 
 - dataDir は `filepath.Dir(cfgPath)`・installDir は `cfg.InstallDirOrDefault(dataDir)`
-  （ウィザード生成 cfg は Steam=nil なので常に既定値）。`RunWizard` のシグネチャ変更は不要。
+  （ウィザード生成 cfg は Steam=nil なので常に既定値）。
 - ウィザード時点は Resonite 未 DL なので、ARM では system .NET 10 の有無がそのまま効く
   （正しい挙動: DL 後も同梱は x64 のため system が要る）。
 - **tty**: issue ごとにタイトル＋コマンドを表示し `[Y/n]`（既定=Y）。同意なら
@@ -202,11 +205,11 @@ ARM の初回フロー（install.sh → ./mrhc → ウィザード → 依存導
 
   ```go
   // run/recheck が nil なら実実装（bash -c 実行 / CheckHeadlessDeps 再走）。テストで注入。
-  func OfferDepInstall(issues []platform.DepIssue, in *bufio.Reader, tty bool,
-      run func(cmd string) error, recheck func(kind string) bool)
+  // CLI改訂（2026-06-06）で out/lang を注入化（i18n＋テストで出力検証可能に）。
+  // [Y/n] は不正値→再入力・EOF→残り issue 打ち切り（docs/design/cli-onboarding.md §1）。
+  func OfferDepInstall(issues []platform.DepIssue, in *bufio.Reader, out io.Writer, lang i18n.Lang,
+      tty bool, run func(cmd string) error, recheck func(kind string) bool)
   ```
-
-  出力は wizard の流儀どおり stdout 直書き。
 - 実装注意（L-6）: `in *bufio.Reader` の先読みバッファと bash 子プロセスへの stdin 直結は
   併用に癖がある（先読み済みバイトは子に届かない）。対話入力なら実害なし・コメントで残す。
 
@@ -228,19 +231,14 @@ ARM の初回フロー（install.sh → ./mrhc → ウィザード → 依存導
 - orchestrator / crash 復帰経路は対象外（稼働実績ありの前提・確定済み方針)。
 - pre-start 方式（クラッシュ検知連動でなく）= 単純・決定的・クラッシュ前に理由が見える。
 
-### 3.4 FW/ポート開放案内（`cmd/mrhc/main.go`・Linux のみ）
+### 3.4 FW/ポート開放案内
 
-起動時メッセージ（`http://localhost:<port> を開いてください`）の直後に追加:
-
-```
-LAN内の別PCからは http://<このPCのIP>:<port> でアクセスできます。
-（接続できない場合はファイアウォールで TCP <port> の開放が必要です。
- 例: sudo firewall-cmd --permanent --add-port=<port>/tcp && sudo firewall-cmd --reload
-     / sudo ufw allow <port>/tcp）
-```
-
-- IP の列挙はしない（複数 NIC で混乱するため固定文言）。Windows は OS が接続時に
-  自動でプロンプトを出すため対象外。
+> ⚠️ **本節は CLI オンボーディング改訂（2026-06-06）で上書き**: 起動バナーは LAN URL 主役に
+> 刷新され、FW 案内は **両 OS** 対応（Linux=firewalld/ufw のラベル付き例・Windows=初回
+> ダイアログ「アクセスを許可する」＋誤キャンセル時の復旧手順）になった。
+> 確定仕様・文言は [cli-onboarding.md](cli-onboarding.md) §3 S7/S9 と
+> `internal/i18n/catalog.go`（`banner.*`）が正本。
+> 「IP の列挙はしない（複数 NIC で混乱するため固定文言）」の方針は維持。
 
 ## 4. 文言（案・UI 文言は事実だけ簡潔に）
 

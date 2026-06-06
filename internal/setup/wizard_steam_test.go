@@ -252,6 +252,31 @@ func TestWizard_SteamInstallDirExplicit(t *testing.T) {
 	}
 }
 
+// 認証失敗→再入力の 2 周目で、1 周目に明示したインストール先が空 Enter で維持される（M2）。
+func TestWizard_SteamAuthRetryKeepsCustomInstallDir(t *testing.T) {
+	custom := filepath.Join(t.TempDir(), "myresonite")
+	fake := &fakeUpdate{results: []error{steam.ErrAuthFailed, nil}}
+	// 1周目: installDir=custom → 認証失敗 → 再入力 y → 2周目: installDir 空Enter
+	w, out := newTestWizard("\npw\npw\n\n\nuser1\npw1\ncode1\n" + custom + "\ny\nuser2\npw2\ncode2\n\n\n")
+	w.SteamUpdate = fake.fn
+	cfgPath := tmpCfgPath(t)
+	_, _, err := w.Run(cfgPath)
+	if err != nil {
+		t.Fatalf("Run: %v\nout=%s", err, out.String())
+	}
+	if fake.params[1].InstallDir != custom {
+		t.Errorf("2周目の InstallDir = %q, want %q（空Enter=表示した既定の維持）", fake.params[1].InstallDir, custom)
+	}
+	loaded, _ := config.LoadFrom(cfgPath)
+	if loaded.Steam.InstallDir != custom {
+		t.Errorf("config の InstallDir が巻き戻った: %q", loaded.Steam.InstallDir)
+	}
+	// 2周目のプロンプトにも前回値が既定として表示される
+	if !strings.Contains(out.String(), "["+custom+"]") {
+		t.Errorf("2周目の既定表示が前回値でない:\n%s", out.String())
+	}
+}
+
 // S5a 入力中の EOF → ErrAborted。
 func TestWizard_SteamEOFDuringCreds(t *testing.T) {
 	w, out := newTestWizard("\npw\npw\n\n\nuser1\n") // Steam PW で EOF

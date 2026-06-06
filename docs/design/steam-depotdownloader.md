@@ -78,7 +78,8 @@ UpdateOnScheduledRestart bool `json:"updateOnScheduledRestart"`
 - `steamParams` は常に `InstallDirOrDefault` で install 先を埋めるため、**資格（ユーザー名/PW/branchCode）のいずれかが欠けたときだけ** `ErrSteamNotConfigured`（install 先は未設定理由にしない）。
 - `resolveLaunch` は `HeadlessPathOrDefault` で解決し、`handleStart` は解決後の実行ファイルが無い（未 DL）なら `headless_not_installed` で「設定 → 今すぐ更新」へ案内する。
 - 利用時に `platform.ExpandHome` で先頭 `~` を展開（`filepath.Abs` は `~` 非展開のため。config には入力どおり保存）。
-- セットアップウィザードは Resonite パスを尋ねない（未設定＝既定導出）。
+- セットアップウィザードは Resonite パスの入力を要求しない（CLI改訂 2026-06-06: S5 の
+  インストール先プロンプトは任意・空 Enter=既定導出。[cli-onboarding.md](cli-onboarding.md) §3 S5a）。
 
 ## 5. DepotDownloader 本体の取得（acquire.go）
 
@@ -119,6 +120,9 @@ DepotDownloader -app 2519830 -branch headless -branchpassword <code> \
 ## 7. オーケストレーション（manager.go）
 
 `Manager.Update(ctx)` を単一入口にする（HTTP ハンドラと orchestrator が共用・single-flight）。
+第3の呼び出し元としてセットアップウィザード S5b（CLI改訂 2026-06-06・`realSteamUpdate` が
+独自に `NewManager` を生成）があるが、サーバー未起動段階のため single-flight の共有は不要
+（衝突は構造的にゼロ・[cli-onboarding.md](cli-onboarding.md) §2）。
 
 ```
 1. 進行中なら拒否（single-flight・mu）
