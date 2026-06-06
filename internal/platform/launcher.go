@@ -50,20 +50,43 @@ func BuildHeadlessCommand(headlessPath, configPath string) *exec.Cmd {
 			args = append(args, "-HeadlessConfig", configPath)
 		}
 		cmd = exec.Command(headlessPath, args...)
+		// MRHC が設置したローカルランタイム（<install>/dotnet-runtime）が要求を満たすときだけ
+		// DOTNET_ROOT で指す（Windows）。apphost は DOTNET_ROOT 設定時そこだけを見てシステムへ
+		// フォールバックしないため、「存在する」でなく「充足する」を条件にする。
+		// 満たさなければ env を触らない＝システム .NET（従来挙動・開発機や Steam クライアント
+		// 併用環境は不変）。
+		if req, ok := ReadRuntimeRequirement(headlessDir); ok {
+			installRoot := filepath.Dir(headlessDir)
+			if LocalRuntimeSatisfies(installRoot, req, runtime.GOARCH) {
+				cmd.Env = append(os.Environ(), "DOTNET_ROOT="+filepath.Join(installRoot, "dotnet-runtime"))
+			}
+		}
 	}
 	cmd.Dir = headlessDir
 	return cmd
 }
 
 // resolveDotnet は Resonite.dll を実行する dotnet のパスを解決する。
-// 同梱 dotnet（<install>/dotnet-runtime/dotnet）が実行 arch(goarch) と一致する時だけ採用し、
-// 一致しない場合（例: ARM 上で x64 同梱 dotnet）はシステムの dotnet にフォールバックする。
-// Resonite ヘッドレスの同梱 dotnet は x64 のため、ARM では同梱を掴むと "Exec format error" になる。
+// ローカル dotnet（<install>/dotnet-runtime/dotnet。MRHC が設置 or 公式ブートストラップが生成）が
+// 実行 arch(goarch) と一致し、かつ要求版を満たす時だけ採用し、それ以外はシステムの dotnet に
+// フォールバックする（arch 不一致の残骸を掴むと "Exec format error"・版不足は起動失敗になるため）。
 func resolveDotnet(headlessDir, goarch string) string {
-	if bundled, ok := bundledDotnetPath(headlessDir); ok && dotnetUsable(bundled, goarch) {
+	if bundled, ok := bundledDotnetPath(headlessDir); ok && dotnetUsable(bundled, goarch) && bundledSatisfies(headlessDir, goarch) {
 		return bundled
 	}
 	return systemDotnet()
+}
+
+// bundledSatisfies は要求（runtimeconfig.json）が読める場合に、ローカルランタイムが要求版を
+// 満たすかを判定する。読めない場合は従来どおり楽観（true）＝runtimeconfig の無い環境
+// （fakehl 等）で挙動を変えない。設置失敗で stale なローカルが残ったケースをここで弾き、
+// システム .NET へ正しく落とす。
+func bundledSatisfies(headlessDir, goarch string) bool {
+	req, ok := ReadRuntimeRequirement(headlessDir)
+	if !ok {
+		return true
+	}
+	return LocalRuntimeSatisfies(filepath.Dir(headlessDir), req, goarch)
 }
 
 // bundledDotnetPath はResonite同梱の dotnet 実行ファイルを探す。
