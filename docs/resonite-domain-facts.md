@@ -15,7 +15,7 @@
 | 起動 | `spawn(HEADLESS_EXECUTABLE, ['-HeadlessConfig', <configPath>], { cwd: dirname(exe) })` | processManager.ts:236-250 |
 | 実行ファイル | Windows=`Resonite.exe`。**Linux=`dotnet Resonite.dll`（要.NET10 Runtime、`Headless/`フォルダ内）**。両OSとも同一.NETアプリ。公式Wiki Setup参照 | config/index.ts / Wiki |
 | 既定パス(Linux) | `~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`（実機確認済）。Flatpak版は `~/.var/app/com.valvesoftware.Steam/.local/share/Steam/...` も候補 | 実機 |
-| dotnet(Linux) | **Resonite同梱**: `~/.local/share/Steam/steamapps/common/Resonite/dotnet-runtime/dotnet`（実機確認済）。**別途.NET導入は不要**。起動は `<同梱dotnet> Resonite.dll`、cwd=`Headless/` | 実機 |
+| dotnet(Linux) | ⚠️ **「同梱」は誤認と判明（2026-06-07 訂正・§4.6）**: `dotnet-runtime/` は depot に含まれず、初回のグラフィッククライアント起動時に `LinuxBootstrap.sh` が同梱 `dotnet-install.sh` で**生成**する。**DD 経由の素の DL 品には無い** → MRHC が自動設置（[dotnet-runtime.md](design/dotnet-runtime.md)）。起動は `<ローカルdotnet> Resonite.dll`、cwd=`Headless/` | DL品実地調査 2026-06-07 |
 | 既定パス(Win) | `C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` | 旧コード |
 | stdin送信 | コマンド文字列＋`\n` を **Shift_JISエンコード**して書き込み | processManager.ts:330 |
 | stdout復号 | utf8試行 → 失敗時shift_jis → 最終utf8 | processManager.ts:503-513 |
@@ -196,9 +196,27 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 - **DepotDownloader本体**: GitHubリリースに **self-contained 配布あり**（`DepotDownloader-linux-arm64.zip` / `-linux-x64` / `-windows-x64` / `-macos-arm64` 等、各~32MBで**.NET同梱＝別途.NET不要**）。小さい `DepotDownloader-framework.zip`(~2.7MB) は.NET必須なので**使わない**。→ MRHCが実行OS/archに合うself-contained版を自動DL（バージョン固定＋SHA-256検証）。
 - **Resonite既定パス**: Win=`C:/Program Files (x86)/Steam/steamapps/common/Resonite/Headless/Resonite.exe` / Linux=`~/.local/share/Steam/steamapps/common/Resonite/Headless/Resonite.dll`（Flatpak版 `~/.var/app/com.valvesoftware.Steam/...` も候補）。**Linuxは別パス → 抽象化必須**。
 
-### 4.6 ⚠️ ARMの.NETランタイム（重要な非対称）
-- **x86 Windows/Linux**: Resoniteが **dotnet-runtime を同梱**（`<install>/dotnet-runtime/dotnet`、実機確認済）→ 別途.NET不要。
-- **ARM64**: 同梱dotnetは **x64で使えない** → **システムに .NET 10 ランタイムが別途必要**（公式ARM Wiki前提）。MRHCは起動時、同梱dotnetの実体アーキを確認し、不一致なら `~/.dotnet`→PATHの `dotnet` にフォールバックする（[[arm-support-plan]] Phase2）。
+### 4.6 ⚠️ .NETランタイムは depot に無い（2026-06-07 全面訂正）
+
+旧記載「x86 は dotnet-runtime 同梱」は**誤認**だった。DL 品の実地調査（2026-06-07）で確定:
+
+- **depot（DD の DL 品）に .NET ランタイムは含まれない**（全 OS/arch）。公式の設置経路は初回の
+  グラフィッククライアント起動時のみ:
+  - Linux: ルートの `LinuxBootstrap.sh`（ResoBoot が Proton/Wine 検出時に実行）が**毎起動**
+    同梱 `dotnet-install.sh --channel 10.0 --runtime dotnet --install-dir $PWD/dotnet-runtime` を実行。
+  - Windows: `InstallScript.vdf` で Steam クライアントが
+    `Tools\Redist\dotnet-desktop-runtime-*.exe /silent` を実行（**この exe は DD の DL 品に無い**）。
+- 旧「実機確認済」は Steam クライアント＋初回起動済み環境の観測（マスクされていた）。
+- 要求版の正本は `Headless/Resonite.runtimeconfig.json`（`Microsoft.NETCore.App 10.0.0`・
+  デスクトップランタイム不要）。
+- → **MRHC が公式ビルドフィードから自動設置する**（DL後フック＋起動時ガード・全 OS/arch 共通。
+  確定仕様: [dotnet-runtime.md](design/dotnet-runtime.md)）。フィード実測（2026-06-07）:
+  `builds.dotnet.microsoft.com/dotnet/Runtime/<channel>/latest.version`（GA 前チャンネルは
+  prerelease を返す）・`dotnet-runtime-<ver>-<rid>.tar.gz|.zip`＋`.sha512`（win-x64 /
+  linux-x64 / linux-arm64 すべて実在・HTTP 200 確認）。
+- ARM64 の非対称は解消: linux-arm64 もネイティブランタイムが同経路で設置される。launcher は
+  ローカル（`<install>/dotnet-runtime`）の ELF arch・要求版充足を確認し、不一致/不足なら
+  `~/.dotnet`→PATH の `dotnet` にフォールバックする。
 
 ---
 
@@ -303,5 +321,5 @@ fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
   - 対策: プラットフォームに **Encoding抽象**（Win=コードページ/Linux=UTF-8）を実装。Windowsのコードページは `GetACP`/`GetConsoleOutputCP`(x/sys/windows)で取得し x/text/encoding で変換、または設定で上書き可能に。
   - 検証法: 起動ログは英語(ASCII)で顕在化しないため、`name "日本語テスト"`（stdin検証）→`worlds`/`status`（stdout検証）で日本語が往復するか確認する。
 - ⚠️ **`Headless/Config.json` は"ライブ"設定になりうる**: `-HeadlessConfig` を付けずに起動すると Headlessフォルダの `Config.json` を自動ロードする。実Windows機ではこれが**ユーザーの実アカウント認証＋実セッション定義**で、**no-config起動で実アカウントにログインし実セッションを開始してしまった**（**これはOS差ではなくConfig.jsonの内容差**。同一バイナリ・同一挙動で、Linux検証機はたまたまConfig.jsonが空だっただけ。Linuxでも実configを置けば同様にログイン＆実セッション起動する）。→ **MRHCは必ず明示的なconfigで起動し、テストでもno-configに依存しない**。
-- **Windows起動コマンド**: `Resonite.exe -HeadlessConfig <f>`（cwd=`Headless/`、直接実行）。.NETランタイムは同梱想定（Linux同様 dotnet-runtime/）。
+- **Windows起動コマンド**: `Resonite.exe -HeadlessConfig <f>`（cwd=`Headless/`、直接実行）。⚠️ .NETランタイムは**同梱されない**（§4.6 訂正参照）。apphost はシステム .NET または DOTNET_ROOT（MRHC がローカル設置時に設定）で解決する。
 - ⚠️ **単一インスタンス制約（実機確認）**: 同じ **Data path** で2つ目のヘッドレスを起動すると `DuplicateInstanceException` で**起動側が即終了**する（`A duplicate copy of FrooxEngine is running`）。→ MRHCは同一Data pathで**重複起動しない**こと（start前に稼働中チェック、クラッシュ復帰でも二重起動回避）。また、**コントローラをkillしてもヘッドレス子プロセスは生き残る(orphan)**ので、停止は必ず `shutdown` 送信→終了確認で行う（強制killは最終手段）。

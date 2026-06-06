@@ -43,7 +43,9 @@ internal/steam/
   acquire.go    … DD本体取得（版固定DL＋SHA＋展開＋chmod＋原子的rename・冪等skip）
   runner.go     … DD子プロセス実行（stdin認証・プロンプト検出・進捗/exit）。headless.Driver下層を踏襲
   progress.go   … 進捗行・プロンプト・マイルストーン検出の純関数（テスト対象）
+  dotnet.go     … run() の .NET ランタイム確保ステップ（判定/取得 seam・dotnet-runtime.md）
   types.go      … 型・sentinel error
+internal/dotnetruntime/       … .NET ランタイム取得・展開・原子的配置（公式フィード・dotnet-runtime.md）
 ```
 
 ## 4. config 追加
@@ -134,9 +136,16 @@ DepotDownloader -app 2519830 -branch headless -branchpassword <code> \
    フォールバックすると exit 0 でも headless 実体が落ちないため、**ファイル存在で判定**する（良性の
    `Error: Password was invalid for branch headless` は成功時にも出るので文字列マッチは使わない）。
 6. 完了後 Resonite install 全体に chmod -R +x（Linux/ARM）
+7. **.NET ランタイム確保**（steam/dotnet.go・2026-06-07 追加）: 要求（`Headless/Resonite.runtimeconfig.json`）
+   を満たすランタイムがローカル（`<install>/dotnet-runtime`）にもシステムにも無ければ、
+   internal/dotnetruntime が公式フィードから取得して設置する。失敗は更新失敗
+   （`dotnet_install_failed`）。確定仕様: [dotnet-runtime.md](dotnet-runtime.md)
 ```
 
 cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残り次回再開。
+ランタイム単独設置の入口 `Manager.InstallRuntime`（server の起動時ガード用・Steam 資格不要）も
+同じ single-flight スロット・SSE・Status を使う。`Status`/result に `RunKind: "update"|"runtime"` を
+持ち、表示層が「更新」/「ランタイム設置」を出し分ける。
 
 ### 予定再起動への統合（restart-orchestrator）
 
@@ -202,6 +211,7 @@ Go エラーの `.Error()`（ja）は変えない＝サーバーコンソール�
 | `acquire_failed` | ErrAcquireFailed | DD 本体取得の失敗 | 見出し locale＋`detail` 併記 |
 | `dd_failed` | ErrDDFailed / ErrDDStartFailed | DD 異常終了 / プロセス起動失敗 | 同上 |
 | `chmod_failed` | ErrChmodFailed | 実行権付与の失敗（非 Windows） | 同上 |
+| `dotnet_install_failed` | ErrDotnetInstallFailed | .NET ランタイム設置の失敗（[dotnet-runtime.md](dotnet-runtime.md)） | 同上 |
 
 - **detail** ＝「`<sentinel>: <内側>`」型エラーの内側原文（HTTP 404・exit status 等の機械情報）。
   ja は従来表示がそのまま再構成され、en は見出しだけ英語＋機械情報が読める。

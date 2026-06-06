@@ -1,5 +1,12 @@
 # R-C: 依存検出＋案内（deps onboarding）— 詳細仕様
 
+> ⚠️ **本仕様の .NET 10 部分（§1.2・§1.4・dotnet10 系の検出/対話/文言）は 2026-06-07 に
+> 自動設置（[dotnet-runtime.md](dotnet-runtime.md)）へ置換され実装からも撤去済み**。
+> 前提だった「x64 は Resonite 同梱 dotnet で完結」が誤認（depot に dotnet は含まれず、
+> 初回クライアント起動時に生成される）と判明したため。**存続するのは freetype2 のみ**
+> （sudo 必須＝自動化できない依存は案内方式が正しい姿。3 経路の配管は不変）。
+> `CheckHeadlessDeps` の installDir 引数も撤去（freetype2 には不要）。
+
 > P9-B の R-C（旧 Phase3改）。Linux（特に ARM）でヘッドレスの動作に必要な外部依存
 > （.NET 10 / freetype2）を検出し、不足時に導入を案内・支援する。
 > 2026-06-05 スコープ裁定＋設計レビュー（Plan agent）＋事実検証（Web）反映済み。
