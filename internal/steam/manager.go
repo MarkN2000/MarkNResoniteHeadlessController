@@ -23,6 +23,7 @@ type Manager struct {
 	toolsDir     string
 	stallTimeout time.Duration                                                  // 無進捗で打ち切る時間（既定5分）
 	ensureDD     func(ctx context.Context, onEvent func(Event)) (string, error) // DD本体を確保しパスを返す（テストで差し替え可）
+	dotnet       *runtimeEnsurer                                                // .NET ランタイム確保（判定/取得は seam・テストで差し替え可）
 	runner       *Runner
 
 	hub *pubsub.Hub[Event]
@@ -37,7 +38,8 @@ type Manager struct {
 
 // Status は更新の状態スナップショット（GET /steam/status・SSE 初期送出に使う）。
 type Status struct {
-	State       string     `json:"state"` // idle | running | success | failed
+	State       string     `json:"state"`             // idle | running | success | failed
+	RunKind     string     `json:"runKind,omitempty"` // update | runtime（run の種別。表示の出し分け用）
 	Percent     float64    `json:"percent"`
 	Phase       string     `json:"phase,omitempty"`
 	File        string     `json:"file,omitempty"`
@@ -53,6 +55,13 @@ const (
 	stateRunning = "running"
 	stateSuccess = "success"
 	stateFailed  = "failed"
+)
+
+// run の種別。runtime 単独設置（起動時ガード）が直前の更新結果を success に見せかける混線や、
+// 「起動しただけで更新が走った」誤解を、表示層が本値で出し分けて防ぐ。
+const (
+	runKindUpdate  = "update"
+	runKindRuntime = "runtime"
 )
 
 const steamLogCapacity = 500
@@ -102,6 +111,8 @@ func errorCode(err error) string {
 		return "dd_failed"
 	case errors.Is(err, ErrChmodFailed):
 		return "chmod_failed"
+	case errors.Is(err, ErrDotnetInstallFailed):
+		return "dotnet_install_failed"
 	default:
 		return ""
 	}
@@ -111,7 +122,7 @@ func errorCode(err error) string {
 // 取り出す。acquire/dd/chmod 系のみ＝見出しは locale 変換し、機械情報は原文で併記するため。
 // 自己完結型（auth/2FA/stalled/verify/cancelled）は locale 文言だけで足りるので "" を返す。
 func errorDetail(err error) string {
-	for _, s := range []error{ErrAcquireFailed, ErrDDStartFailed, ErrDDFailed, ErrChmodFailed} {
+	for _, s := range []error{ErrAcquireFailed, ErrDDStartFailed, ErrDDFailed, ErrChmodFailed, ErrDotnetInstallFailed} {
 		if errors.Is(err, s) {
 			if detail, ok := strings.CutPrefix(err.Error(), s.Error()+": "); ok {
 				return detail
@@ -150,6 +161,7 @@ func NewManager(toolsDir string) *Manager {
 	m.ensureDD = func(ctx context.Context, onEvent func(Event)) (string, error) {
 		return acq.Ensure(ctx, m.toolsDir, onEvent)
 	}
+	m.dotnet = newRuntimeEnsurer()
 	return m
 }
 
@@ -191,6 +203,21 @@ func (m *Manager) Start(p UpdateParams) error {
 	return nil
 }
 
+// InstallRuntime は .NET ランタイムの単独設置を同期実行する（server の起動時ガード用・
+// Steam 資格は不要）。更新と同じ single-flight スロット・SSE・Status を使う：
+// 書込先（<installDir>/dotnet-runtime）が更新内の設置ステップと同一資源のため、スロットを
+// 分けると排他漏れ・配信二重化が生じる。進行中の更新があれば ErrUpdateInProgress。
+// Cancel（/steam/cancel）でこの設置も中止できる。
+func (m *Manager) InstallRuntime(ctx context.Context, installDir string) error {
+	runCtx, err := m.beginRun(ctx, runKindRuntime)
+	if err != nil {
+		return err
+	}
+	err = m.dotnet.ensure(runCtx, installDir, m.onEvent)
+	m.finish(err)
+	return err
+}
+
 // Cancel は進行中の更新を中止する。
 func (m *Manager) Cancel() error {
 	m.mu.Lock()
@@ -225,11 +252,17 @@ func (m *Manager) Unsubscribe(ch chan Event) { m.hub.Unsubscribe(ch) }
 
 // --- 内部 ---
 
-// begin は single-flight スロットを確保し、状態を running にして実行用 ctx を返す。
+// begin は更新（DD 実行を伴う run）のスロットを確保する。Steam 資格の検証つき。
 func (m *Manager) begin(parent context.Context, p UpdateParams) (context.Context, error) {
 	if p.InstallDir == "" || p.Username == "" || p.Password == "" || p.BranchCode == "" {
 		return nil, ErrSteamNotConfigured
 	}
+	return m.beginRun(parent, runKindUpdate)
+}
+
+// beginRun は single-flight スロットを確保し、状態を running にして実行用 ctx を返す。
+// kind は Status/result に載せる run の種別（update / runtime）。
+func (m *Manager) beginRun(parent context.Context, kind string) (context.Context, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.st.State == stateRunning {
@@ -238,7 +271,7 @@ func (m *Manager) begin(parent context.Context, p UpdateParams) (context.Context
 	runCtx, cancel := context.WithCancel(parent)
 	m.cancelFn = cancel
 	now := time.Now()
-	m.st = Status{State: stateRunning, StartedAt: &now}
+	m.st = Status{State: stateRunning, RunKind: kind, StartedAt: &now}
 	// 前回 run の履歴は持ち越さない＝SSE の再接続/途中参加が今回の run のログだけをリプレイする
 	// （再接続時に古い run の行が混ざる・二重に見える問題の根治）。
 	m.logs = nil
@@ -307,7 +340,13 @@ func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
 			return fmt.Errorf("%w: %w", ErrChmodFailed, err)
 		}
 	}
-	return nil
+
+	// DD の DL 品に .NET ランタイムは含まれない（公式は初回クライアント起動時に設置）ため、
+	// 要求を満たすランタイムが無ければここで設置する。Resonite 更新で要求版が上がっても
+	// 新しい runtimeconfig.json がこの直前に落ちてくるため、ここで自動追従する。
+	// 失敗は更新失敗として扱う（設置が要るのに無い＝起動不能のまま「成功」は嘘になる。
+	// DD 成果物はディスク上に無傷で残り、起動時ガード（server）が再試行の回復経路になる）。
+	return m.dotnet.ensure(runCtx, p.InstallDir, m.onEvent)
 }
 
 // stallWatch は最後のイベントから stallTimeout 経過したら onStall を呼ぶ。
@@ -389,7 +428,7 @@ func (m *Manager) finish(err error) {
 		m.st.State = stateSuccess
 		m.st.Percent = 100
 	}
-	result := Event{Kind: "result"}
+	result := Event{Kind: "result", RunKind: m.st.RunKind}
 	if err != nil {
 		result.Text = err.Error()
 		result.Code = m.st.ErrorCode

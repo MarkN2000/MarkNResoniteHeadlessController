@@ -53,6 +53,7 @@ type Event struct {
 	File    string            `json:"file,omitempty"`    // progress: 対象パス
 	Code    string            `json:"code,omitempty"`    // result: エラー分類コード（errorCode 参照）
 	Detail  string            `json:"detail,omitempty"`  // result: 見出し（Code）を除いた診断詳細（HTTP 状態・exit 等）
+	RunKind string            `json:"runKind,omitempty"` // result: run の種別（update / runtime。表示の出し分け用）
 	MsgKey  string            `json:"msgKey,omitempty"`  // log: MRHC 生成行の文言キー
 	MsgArgs map[string]string `json:"msgArgs,omitempty"` // log: MsgKey の補間引数（名前付き）
 }
