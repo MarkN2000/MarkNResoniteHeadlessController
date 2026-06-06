@@ -14,12 +14,12 @@ Resonite ヘッドレスが動作する以下の環境に対応します（い�
 | Linux | x64 | `linux/amd64` | 文字コードは UTF-8 |
 | Linux (ARM) | ARM64 | `linux/arm64` | Raspberry Pi 等。Resonite が ARM Linux で動く環境向け。文字コードは UTF-8 |
 
-> **x64（Windows / Linux）**: Resonite 同梱の .NET ランタイムで起動するため、別途 .NET の導入は不要です。Resonite が Steam で導入済みなら、そのパスを指すだけで動きます。
+> **.NET ランタイムは自動で用意されます（全 OS / ARM 共通）**: Resonite のダウンロード品に .NET ランタイムは含まれませんが、MRHC が Resonite のダウンロード後（および起動時に不足を検知したとき）に公式ビルドから自動設置します（管理者権限不要・設置先は Resonite フォルダ内）。システムに .NET 10 が導入済みの場合はそれをそのまま使い、何も変更しません。
 >
-> **ARM（Linux ARM64）** は x64 と少し事情が異なり、MRHC が初回セットアップで導入を補助します:
-> - **.NET 10 ランタイムが別途必要**（Resonite 同梱の .NET は x64 のため ARM では使えません）。MRHC が未導入を検知したら導入手順を案内します。
-> - **Resonite の入手 / 更新は DepotDownloader**（SteamCMD は ARM 非対応）。MRHC が DepotDownloader を自動取得し、ダウンロードと実行権限付与（`chmod +x`）まで行います。
+> **Resonite の入手 / 更新は DepotDownloader**（SteamCMD は ARM 非対応のため全 OS で統一）:
+> - MRHC が DepotDownloader を自動取得し、ダウンロードと実行権限付与（`chmod +x`）まで行います。
 > - ダウンロードには予備の Steam アカウント（Steam Guard オフ推奨）と、headless ベータコード（Resonite bot に `/headlessCode`）が必要です。
+> - 既に Steam で Resonite を導入済みの場合は、設定でそのインストール先を指定して流用できます。
 
 ## インストール
 
