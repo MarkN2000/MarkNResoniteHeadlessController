@@ -146,9 +146,22 @@ export async function getStatus(): Promise<Status | null> {
 }
 
 // 起動はコンフィグ名必須（無config起動はワールドが公開になるため backend が 400）。
-export async function start(config: string): Promise<{ ok: boolean; status: number; error?: string; code?: string }> {
+// runtimePrepare=true は「.NET ランタイムを設置してから起動する」非同期受付
+// （進捗は steam SSE・結果はコンソールの sys ログ）。
+export async function start(
+  config: string,
+): Promise<{ ok: boolean; status: number; error?: string; code?: string; runtimePrepare?: boolean }> {
   const res = await req("/start", { method: "POST", body: JSON.stringify({ config }) });
-  if (res.ok) return { ok: true, status: res.status };
+  if (res.ok) {
+    let runtimePrepare: boolean | undefined;
+    try {
+      const j = await res.json();
+      if (j?.data?.runtimePrepare === true) runtimePrepare = true;
+    } catch {
+      /* ignore */
+    }
+    return { ok: true, status: res.status, runtimePrepare };
+  }
   let error: string | undefined;
   let code: string | undefined;
   try {
@@ -381,6 +394,7 @@ export const putSteamConfig = (body: {
 // running 中はこの GET でも状態を突き合わせ、終端（success/failed）の取りこぼしで UI が固着しないようにする（H1）。
 export interface SteamStatus {
   state: "idle" | "running" | "success" | "failed";
+  runKind?: "update" | "runtime"; // run の種別（runtime=.NET ランタイム単独設置。表示の出し分け用）
   percent: number;
   phase?: string;
   file?: string;

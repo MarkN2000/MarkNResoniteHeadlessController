@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, AppShell, Box, Button, Center, Group, NavLink, Stack, Text } from "@mantine/core";
 import * as api from "./api";
 import type { ConfigSummary, LogLine, Status, World } from "./api";
-import { notifyError, reportWriteResult } from "./lib/notify";
+import { notifyError, notifyInfo, reportWriteResult } from "./lib/notify";
 import { TABS, type TabId } from "./nav";
 import { SURFACE } from "./theme";
 import { Login } from "./components/Login";
@@ -146,6 +146,9 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         const msg =
           r.code === "headless_not_installed" ? t("toast.errHeadlessNotInstalled") : r.error || t("toast.errGeneric");
         notifyError(msg, t("toast.startFailTitle"));
+      } else if (r.runtimePrepare) {
+        // .NET ランタイムの設置を伴う起動受付（進捗は設定タブ・結果はコンソールの sys ログ）。
+        notifyInfo(t("toast.startRuntimePrepare"));
       }
     } catch {
       notifyError(t("toast.errNetwork"), t("toast.startFailTitle"));

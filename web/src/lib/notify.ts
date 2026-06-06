@@ -52,6 +52,11 @@ export function notifyError(message: string, title?: string): void {
   });
 }
 
+// 中立の情報トースト（失敗でも完了でもない経過の通知。例: ランタイム設置を伴う起動受付）。
+export function notifyInfo(message: string): void {
+  notifications.show({ color: "cyan", message, autoClose: 5000 });
+}
+
 // 実行チョークポイント（useAsyncAction.run / useConfirm.confirm）から呼ぶ。
 // r が WriteResult でなければ何もしない（成功/失敗の判定対象外）。
 export function reportWriteResult(r: unknown, success?: string): void {

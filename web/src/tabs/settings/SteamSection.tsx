@@ -12,7 +12,7 @@ import { SaveButton } from "./SaveButton";
 type LogEntry =
   | { kind: "text"; text: string }
   | { kind: "msg"; msgKey: string; msgArgs?: Record<string, string>; text?: string }
-  | { kind: "result"; code?: string; text?: string; detail?: string };
+  | { kind: "result"; code?: string; text?: string; detail?: string; runKind?: string };
 
 type Translator = ReturnType<typeof useTranslation>["t"];
 
@@ -27,15 +27,24 @@ const STEAM_ERR_KEYS: Record<string, string> = {
   acquire_failed: "settings.steamErrAcquireFailed",
   dd_failed: "settings.steamErrDDFailed",
   chmod_failed: "settings.steamErrChmodFailed",
+  dotnet_install_failed: "settings.steamErrDotnetInstall",
 };
 
 // backend の Event.MsgKey → locale キー（MRHC 生成ログ行）。未知キーは原文（ja）のまま表示。
+// milestoneDotnet はフロント生成（下の DOTNET_MILESTONE 変換）。
 const STEAM_LOG_KEYS: Record<string, string> = {
   ddFetch: "settings.steamLogFetch",
   ddFetched: "settings.steamLogFetched",
   shaOk: "settings.steamLogShaOk",
   chmodding: "settings.steamLogChmod",
+  dotnetInstall: "settings.steamLogDotnetInstall",
+  dotnetInstalled: "settings.steamLogDotnetInstalled",
+  milestoneDotnet: "settings.steamMilestoneDotnet",
 };
+
+// .NET ランタイム設置区間のマイルストーン名（backend の dotnetruntime.MilestoneInstalling と一致）。
+// 他のマイルストーンは DD 由来の英語原文をそのまま表示するが、これは MRHC 生成なので locale 変換する。
+const DOTNET_MILESTONE = "Installing .NET Runtime";
 
 // 失敗表示の文言。既知 code は locale（acquire/dd/chmod 系は detail＝診断詳細を併記）、
 // 未知/無 code は原文 → 汎用文言へフォールバック。
@@ -56,7 +65,8 @@ function logLineText(t: Translator, l: LogEntry): string {
       return key ? t(key, { ...l.msgArgs }) : (l.text ?? l.msgKey);
     }
     case "result":
-      if (!l.code && !l.text) return t("settings.steamResultSuccess");
+      if (!l.code && !l.text)
+        return l.runKind === "runtime" ? t("settings.steamRuntimeSuccess") : t("settings.steamResultSuccess");
       if (l.code === "cancelled") return steamErrText(t, l.code, l.text, l.detail); // 中止は失敗扱いにしない
       return `${t("settings.steamResultFailed")}: ${steamErrText(t, l.code, l.text, l.detail)}`;
   }
@@ -138,7 +148,10 @@ export function SteamSection({ status }: { status: Status | null }) {
       const d = JSON.parse((e as MessageEvent).data) as { text?: string };
       if (d.text) {
         setSt((s) => ({ ...s, phase: d.text }));
-        addLog({ kind: "text", text: d.text });
+        // MRHC 生成のマイルストーン（.NET 設置）は locale 変換できる msg として積む
+        addLog(
+          d.text === DOTNET_MILESTONE ? { kind: "msg", msgKey: "milestoneDotnet", text: d.text } : { kind: "text", text: d.text },
+        );
       }
     });
     es.addEventListener("steam-log", (e) => {
@@ -151,17 +164,23 @@ export function SteamSection({ status }: { status: Status | null }) {
       else if (d.text) addLog({ kind: "text", text: d.text });
     });
     es.addEventListener("steam-result", (e) => {
-      const d = JSON.parse((e as MessageEvent).data) as { text?: string; code?: string; detail?: string };
+      const d = JSON.parse((e as MessageEvent).data) as {
+        text?: string;
+        code?: string;
+        detail?: string;
+        runKind?: string;
+      };
       const failed = !!(d.code || d.text);
       setSt((s) => ({
         ...s,
         state: failed ? "failed" : "success",
+        runKind: (d.runKind as SteamStatus["runKind"]) ?? s.runKind,
         lastError: d.text || undefined,
         errorCode: d.code,
         errorDetail: d.detail,
         percent: failed ? s.percent : 100,
       }));
-      addLog({ kind: "result", code: d.code, text: d.text, detail: d.detail });
+      addLog({ kind: "result", code: d.code, text: d.text, detail: d.detail, runKind: d.runKind });
     });
     return () => es.close();
   }, []);
@@ -287,7 +306,13 @@ export function SteamSection({ status }: { status: Status | null }) {
             <Stack gap={6}>
               <Group justify="space-between" wrap="nowrap">
                 <Text size="xs" c="cyan.4" truncate>
-                  {st.phase ? `${t("settings.steamUpdating")} — ${st.phase}` : t("settings.steamUpdating")}
+                  {(() => {
+                    // runtime 単独設置（起動時ガード）は「更新中」でなく専用ラベル（RunKind 出し分け）
+                    const head =
+                      st.runKind === "runtime" ? t("settings.steamInstallingRuntime") : t("settings.steamUpdating");
+                    const phase = st.phase === DOTNET_MILESTONE ? t("settings.steamMilestoneDotnet") : st.phase;
+                    return phase ? `${head} — ${phase}` : head;
+                  })()}
                 </Text>
                 <Text size="xs" c="dimmed">
                   {Math.round(st.percent)}%
@@ -319,7 +344,7 @@ export function SteamSection({ status }: { status: Status | null }) {
               )}
               {st.state === "success" && (
                 <Text size="xs" c="teal.4" ta="center">
-                  {t("settings.steamResultSuccess")}
+                  {st.runKind === "runtime" ? t("settings.steamRuntimeSuccess") : t("settings.steamResultSuccess")}
                 </Text>
               )}
               {/* 中止（cancelled）はユーザー自身の操作＝失敗ではないので中立表示にする */}
