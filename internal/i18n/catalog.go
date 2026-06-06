@@ -206,6 +206,94 @@ var catalog = map[string]map[Lang]string{
 		En: "Press Ctrl+C to stop.",
 	},
 
+	// ── 依存検出（freetype2 / ARM の .NET 10・R-C）──────────────────
+	// Kind が閉じた集合（freetype2/dotnet10）のため "deps.<種別>.<Kind>" 形式で引く。
+	"deps.title.freetype2": {
+		Ja: "freetype2（Resonite のネイティブ依存）",
+		En: "freetype2 (native dependency of Resonite)",
+	},
+	"deps.title.dotnet10": {
+		Ja: ".NET 10 ランタイム（ARM Linux で必要）",
+		En: ".NET 10 runtime (required on ARM Linux)",
+	},
+	"deps.guide.commands": {
+		Ja: "導入コマンド: %s",
+		En: "Install command: %s",
+	},
+	"deps.fallback.freetype2": {
+		Ja: "お使いのディストリビューションのパッケージマネージャで freetype2（Debian系では libfreetype6）を導入してください。",
+		En: "Install freetype2 (libfreetype6 on Debian-based systems) using your distribution's package manager.",
+	},
+	"deps.fallback.dotnet10": {
+		Ja: "ARM Linux には .NET 10 ランタイムが必要です。公式の dotnet-install.sh で導入してください。",
+		En: "ARM Linux requires the .NET 10 runtime. Install it with the official dotnet-install.sh.",
+	},
+	// 経路②（毎起動のログ案内・main）
+	"deps.missingLog": {
+		Ja: "依存不足: %s / %s",
+		En: "Missing dependency: %s / %s",
+	},
+	// 経路③（起動時の Web コンソール sys 案内・server）
+	"deps.sysGuide": {
+		Ja: "依存不足: %s — 起動に失敗する場合はサーバー側での導入が必要です。%s",
+		En: "Missing dependency: %s — if startup fails, it must be installed on the server. %s",
+	},
+	// 経路①（ウィザード S4 の [Y/n] 対話・setup）
+	"deps.headline.freetype2": {
+		Ja: "⚠ Resonite の動作に必要な freetype2 が見つかりません。",
+		En: "⚠ freetype2 (required by Resonite) was not found.",
+	},
+	"deps.headline.dotnet10": {
+		Ja: "⚠ ARM Linux では .NET 10 ランタイムが必要ですが、見つかりません。",
+		En: "⚠ ARM Linux requires the .NET 10 runtime, but it was not found.",
+	},
+	"deps.cmdLabel": {
+		Ja: "  導入コマンド:",
+		En: "  Install command:",
+	},
+	"deps.cmdLabel.dotnet10": {
+		Ja: "  導入コマンド（sudo 不要・~/.dotnet に入ります）:",
+		En: "  Install command (no sudo required; installs to ~/.dotnet):",
+	},
+	"deps.runNow": {
+		Ja: "  今すぐ実行しますか? [Y/n]: ",
+		En: "  Run it now? [Y/n]: ",
+	},
+	"deps.skipped": {
+		Ja: "  スキップしました（上のコマンドは後で手動実行できます）。",
+		En: "  Skipped (you can run the command above manually later).",
+	},
+	"deps.verified": {
+		Ja: "  ✓ 導入を確認しました。",
+		En: "  ✓ Installation verified.",
+	},
+	"deps.notVerified": {
+		Ja: "  まだ確認できません（続行します）。",
+		En: "  Still not detected (continuing).",
+	},
+	"deps.runFailed": {
+		Ja: "  実行に失敗しました: %v",
+		En: "  Failed to run: %v",
+	},
+	"deps.runFailed.dotnet10": {
+		Ja: "  実行に失敗しました（curl と bash が必要です）: %v",
+		En: "  Failed to run (curl and bash are required): %v",
+	},
+	"deps.runManually": {
+		Ja: "  上のコマンドを手動で実行してください。",
+		En: "  Please run the command above manually.",
+	},
+
+	// ── reset-password サブコマンド ─────────────────────────────
+	"reset.header": {
+		Ja: "=== MRHC パスワード再設定 ===\n新しい管理パスワードを設定します。",
+		En: "=== MRHC Password Reset ===\nSet a new admin password.",
+	},
+	"reset.done": {
+		Ja: "パスワードを再設定しました。既存のログインセッションは全て無効になりました。",
+		En: "The password has been reset. All existing login sessions are now invalid.",
+	},
+
 	// ── main のエラー ───────────────────────────────────────────
 	"main.portInUse": {
 		Ja: "ポート %d は既に使用されています。他のソフトが使っていないか確認してください。",

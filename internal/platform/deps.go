@@ -12,23 +12,30 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 )
 
-// DepIssue は不足している外部依存 1 件と導入手段。
+// DepIssue は不足している外部依存 1 件と導入手段。表示文言は持たないデータ専用
+// （文言は Title/GuideText が config 言語で組み立てる。Kind は閉じた集合なので
+// カタログキーを "deps.title.<Kind>" 形式で引ける）。
 type DepIssue struct {
 	Kind     string   // "freetype2" | "dotnet10"
-	Title    string   // 表示名
 	Commands []string // 導入コマンド（[Y/n] 実行・ログ提示の両方で使う。distro 不明時は空）
-	Fallback string   // Commands が空（distro 不明）のときの手動導入案内
 }
 
-// GuideText は導入ガイド本文（コマンドがあればラベル付きで結合・無ければ Fallback）。
+// Title は表示名（例「freetype2（Resonite のネイティブ依存）」）。
+func (i DepIssue) Title(lang i18n.Lang) string {
+	return i18n.T(lang, "deps.title."+i.Kind)
+}
+
+// GuideText は導入ガイド本文（コマンドがあればラベル付きで結合・無ければ Kind 別の手動案内）。
 // 経路②（起動時ログ）と経路③（sys ログ）の文言選択を 1 か所に集約する。
-func (i DepIssue) GuideText() string {
+func (i DepIssue) GuideText(lang i18n.Lang) string {
 	if len(i.Commands) > 0 {
-		return "導入コマンド: " + strings.Join(i.Commands, " && ")
+		return i18n.T(lang, "deps.guide.commands", strings.Join(i.Commands, " && "))
 	}
-	return i.Fallback
+	return i18n.T(lang, "deps.fallback."+i.Kind)
 }
 
 // dotnetInstallCmd は .NET 10 ランタイムの導入コマンド。
@@ -91,25 +98,16 @@ func checkHeadlessDeps(p depProbe, goos, goarch, installDir string) []DepIssue {
 
 	var issues []DepIssue
 	if freetypeStatus(p, goarch) == depAbsent {
-		issue := DepIssue{
-			Kind:  "freetype2",
-			Title: "freetype2（Resonite のネイティブ依存）",
-		}
+		issue := DepIssue{Kind: "freetype2"}
 		if cmd := freetypeInstallCmd(osReleasePkgManager(p)); cmd != "" {
 			issue.Commands = []string{cmd}
-		} else {
-			issue.Fallback = "お使いのディストリビューションのパッケージマネージャで freetype2（Debian系では libfreetype6）を導入してください。"
-		}
+		} // distro 不明は Commands 空＝GuideText が手動導入の案内（fallback）を返す
 		issues = append(issues, issue)
 	}
 	// .NET 10 は linux/arm64 のみ（x64 は Resonite 同梱 dotnet で完結・実機実証済み。
 	// arm(32bit) は Resonite 自体が非対応のため対象外）。
 	if goarch == "arm64" && dotnet10Status(p, goarch, installDir) == depAbsent {
-		issues = append(issues, DepIssue{
-			Kind:     "dotnet10",
-			Title:    ".NET 10 ランタイム（ARM Linux で必要）",
-			Commands: []string{dotnetInstallCmd},
-		})
+		issues = append(issues, DepIssue{Kind: "dotnet10", Commands: []string{dotnetInstallCmd}})
 	}
 	return issues
 }

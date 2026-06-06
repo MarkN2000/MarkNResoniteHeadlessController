@@ -103,7 +103,7 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	// （[Y/n] 対話は初回ウィザード末尾のみ＝起動をブロックしない）。Windows は常に no-op。
 	if !fromWizard {
 		for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, cfg.InstallDirOrDefault(dir)) {
-			log.Printf("依存不足: %s / %s", issue.Title, issue.GuideText())
+			log.Print(i18n.T(lang, "deps.missingLog", issue.Title(lang), issue.GuideText(lang)))
 		}
 	}
 

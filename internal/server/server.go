@@ -23,6 +23,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
@@ -330,11 +331,10 @@ func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, er
 func (s *Server) publishDepGuide() {
 	s.cfgMu.RLock()
 	installDir := s.cfg.InstallDirOrDefault(s.dataDir)
+	lang := s.cfg.LangOrDefault()
 	s.cfgMu.RUnlock()
 	for _, issue := range s.checkDeps(runtime.GOOS, runtime.GOARCH, installDir) {
-		s.driver.PublishSys(fmt.Sprintf(
-			"依存不足: %s — 起動に失敗する場合はサーバー側での導入が必要です。%s",
-			issue.Title, issue.GuideText()))
+		s.driver.PublishSys(i18n.T(lang, "deps.sysGuide", issue.Title(lang), issue.GuideText(lang)))
 	}
 }
 

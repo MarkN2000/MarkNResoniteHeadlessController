@@ -138,7 +138,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	}
 
 	// S4: 依存チェック＋[Y/n] 導入提案（Linux のみ・不足時のみ表示）
-	w.offerDeps(cfgPath, cfg, in)
+	w.offerDeps(cfgPath, cfg, in, lang)
 
 	// S5: Resonite セットアップ（任意・Steam 資格入力→DL 実行）
 	if err := w.offerResonite(cfgPath, cfg, in, lang); err != nil {
@@ -149,7 +149,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	fmt.Fprintln(w.Out)
 	fmt.Fprintln(w.Out, i18n.T(lang, "wizard.saved", cfgPath))
 	fmt.Fprintln(w.Out)
-	start, err := w.promptYN(in, lang, i18n.T(lang, "wizard.start.prompt"))
+	start, err := promptYN(in, w.Out, lang, i18n.T(lang, "wizard.start.prompt"))
 	if err != nil {
 		return nil, false, w.abort(lang)
 	}
@@ -260,9 +260,10 @@ func (w *Wizard) promptPort(in *bufio.Reader, lang i18n.Lang, def int) (int, err
 }
 
 // promptYN は [Y/n] を尋ねる（空 Enter = Y）。不正は再入力・EOF はエラー。
-func (w *Wizard) promptYN(in *bufio.Reader, lang i18n.Lang, prompt string) (bool, error) {
+// ウィザード各所（S5/S6）と OfferDepInstall（S4）で共用する。
+func promptYN(in *bufio.Reader, out io.Writer, lang i18n.Lang, prompt string) (bool, error) {
 	for {
-		fmt.Fprint(w.Out, prompt)
+		fmt.Fprint(out, prompt)
 		s, err := readLine(in)
 		if err != nil {
 			return false, err
@@ -273,18 +274,18 @@ func (w *Wizard) promptYN(in *bufio.Reader, lang i18n.Lang, prompt string) (bool
 		case "n", "no":
 			return false, nil
 		default:
-			fmt.Fprintln(w.Out, i18n.T(lang, "common.yn.invalid"))
+			fmt.Fprintln(out, i18n.T(lang, "common.yn.invalid"))
 		}
 	}
 }
 
 // offerDeps はウィザード保存成功後の依存チェック＋導入提案（R-C 経路①）。
 // ウィザード生成 cfg は Steam=nil のため installDir は常に既定（{dataDir}/resonite）。
-func (w *Wizard) offerDeps(cfgPath string, cfg *config.Config, in *bufio.Reader) {
+func (w *Wizard) offerDeps(cfgPath string, cfg *config.Config, in *bufio.Reader, lang i18n.Lang) {
 	dataDir := filepath.Dir(cfgPath)
 	installDir := cfg.InstallDirOrDefault(dataDir)
 	check := func() []platform.DepIssue { return w.CheckDeps(installDir) }
-	OfferDepInstall(check(), in, w.TTY, nil, func(kind string) bool {
+	OfferDepInstall(check(), in, w.Out, lang, w.TTY, nil, func(kind string) bool {
 		for _, i := range check() {
 			if i.Kind == kind {
 				return false // まだ不足のまま
@@ -303,7 +304,7 @@ func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Rea
 
 	fmt.Fprintln(w.Out)
 	fmt.Fprintln(w.Out, i18n.T(lang, "wizard.resonite.header"))
-	yes, err := w.promptYN(in, lang, i18n.T(lang, "wizard.resonite.prompt"))
+	yes, err := promptYN(in, w.Out, lang, i18n.T(lang, "wizard.resonite.prompt"))
 	if err != nil {
 		return err
 	}
@@ -341,7 +342,7 @@ func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Rea
 			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.twoFactor"))
 			return nil
 		case errors.Is(err, steam.ErrAuthFailed):
-			retry, err2 := w.promptYN(in, lang, i18n.T(lang, "wizard.dl.authRetry"))
+			retry, err2 := promptYN(in, w.Out, lang, i18n.T(lang, "wizard.dl.authRetry"))
 			if err2 != nil {
 				return err2
 			}
@@ -479,8 +480,7 @@ func ResetPassword(cfgPath string) error {
 	in := bufio.NewReader(w.In)
 	lang := cfg.LangOrDefault()
 
-	fmt.Println("=== MRHC パスワード再設定 ===")
-	fmt.Println("新しい管理パスワードを設定します。")
+	fmt.Println(i18n.T(lang, "reset.header"))
 
 	pw, err := w.readPasswordTwice(in, lang)
 	if err != nil {
@@ -499,6 +499,7 @@ func ResetPassword(cfgPath string) error {
 	if err := cfg.SaveTo(cfgPath); err != nil {
 		return err
 	}
-	fmt.Println("\nパスワードを再設定しました。既存のログインセッションは全て無効になりました。")
+	fmt.Println()
+	fmt.Println(i18n.T(lang, "reset.done"))
 	return nil
 }

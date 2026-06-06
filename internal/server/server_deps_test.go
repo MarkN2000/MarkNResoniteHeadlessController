@@ -19,10 +19,8 @@ func TestPublishDepGuide_PublishesSysLog(t *testing.T) {
 	s.checkDeps = func(_, _, installDir string) []platform.DepIssue {
 		gotInstall = installDir
 		return []platform.DepIssue{
-			{Kind: "freetype2", Title: "freetype2（Resonite のネイティブ依存）",
-				Commands: []string{"sudo pacman -S freetype2"}},
-			{Kind: "dotnet10", Title: ".NET 10 ランタイム（ARM Linux で必要）",
-				Fallback: "手動で導入してください。"}, // Commands 空＝Fallback 経路
+			{Kind: "freetype2", Commands: []string{"sudo pacman -S freetype2"}},
+			{Kind: "dotnet10"}, // Commands 空＝fallback（手動案内）経路
 		}
 	}
 	ch, _ := s.driver.SubscribeLog(8)
@@ -34,8 +32,8 @@ func TestPublishDepGuide_PublishesSysLog(t *testing.T) {
 	if want := filepath.Join(dataDir, "resonite"); gotInstall != want {
 		t.Errorf("installDir=%q want %q", gotInstall, want)
 	}
-	// 2 件の issue がそれぞれ 1 行の sys ログになる（コマンドあり / Fallback）。
-	wants := []string{"sudo pacman -S freetype2", "手動で導入してください。"}
+	// 2 件の issue がそれぞれ 1 行の sys ログになる（コマンドあり / fallback=手動案内）。
+	wants := []string{"sudo pacman -S freetype2", "dotnet-install.sh"}
 	for i, want := range wants {
 		var line headless.LogLine
 		select {

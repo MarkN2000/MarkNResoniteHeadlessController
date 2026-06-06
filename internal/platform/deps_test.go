@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 )
 
 // --- テスト用の偽 probe ---
@@ -272,15 +274,25 @@ func TestFreetypeStatus(t *testing.T) {
 	})
 }
 
-// GuideText は経路②③共用のガイド本文（コマンド=ラベル付き結合 / 無ければ Fallback）。
+// GuideText は経路②③共用のガイド本文（コマンド=ラベル付き結合 / 無ければ Kind 別の手動案内）。
+// 文言は i18n カタログ（config 言語）から組み立てる。
 func TestDepIssueGuideText(t *testing.T) {
-	withCmd := DepIssue{Commands: []string{"sudo pacman -S freetype2"}}
-	if got := withCmd.GuideText(); got != "導入コマンド: sudo pacman -S freetype2" {
-		t.Errorf("GuideText() = %q", got)
+	withCmd := DepIssue{Kind: "freetype2", Commands: []string{"sudo pacman -S freetype2"}}
+	if got := withCmd.GuideText(i18n.Ja); got != "導入コマンド: sudo pacman -S freetype2" {
+		t.Errorf("GuideText(ja) = %q", got)
 	}
-	fallback := DepIssue{Fallback: "手動で導入してください。"}
-	if got := fallback.GuideText(); got != "手動で導入してください。" {
-		t.Errorf("GuideText() = %q", got)
+	if got := withCmd.GuideText(i18n.En); got != "Install command: sudo pacman -S freetype2" {
+		t.Errorf("GuideText(en) = %q", got)
+	}
+	fallback := DepIssue{Kind: "freetype2"} // Commands 空＝distro 不明
+	if got := fallback.GuideText(i18n.Ja); !strings.Contains(got, "パッケージマネージャ") {
+		t.Errorf("GuideText(ja, fallback) = %q", got)
+	}
+	if got := (DepIssue{Kind: "freetype2"}).Title(i18n.Ja); got != "freetype2（Resonite のネイティブ依存）" {
+		t.Errorf("Title(ja) = %q", got)
+	}
+	if got := (DepIssue{Kind: "dotnet10"}).Title(i18n.En); got != ".NET 10 runtime (required on ARM Linux)" {
+		t.Errorf("Title(en) = %q", got)
 	}
 }
 
