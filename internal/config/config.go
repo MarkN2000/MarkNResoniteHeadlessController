@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 )
 
 // FileName は設定ファイル名。データディレクトリ直下に置く。
@@ -33,6 +35,7 @@ type Config struct {
 	HeadlessConfigDir   string              `json:"headlessConfigDir,omitempty"`   // ヘッドレスconfig格納先（空=既定 {dataDir}/headless-configs）
 	HeadlessCredentials HeadlessCredentials `json:"headlessCredentials,omitempty"` // 既定の Resonite アカウント（起動時に各 config へ注入）
 	Encoding            string              `json:"encoding,omitempty"`            // コンソール文字コード上書き（空=OS既定。"utf-8"/"shift_jis"等）
+	Language            string              `json:"language,omitempty"`            // CLI/起動メッセージ/sys案内の表示言語（"ja"/"en"。空=ja・ウィザードS0が保存）
 	Restart             *Restart            `json:"restart,omitempty"`             // 自動再起動設定（未設定=DefaultRestart・§3.16）
 	Steam               *Steam              `json:"steam,omitempty"`               // Resonite入手/更新用 Steam アカウント(A)（DepotDownloader・P9-B）
 }
@@ -90,6 +93,16 @@ func (c *Config) InstallDirOrDefault(dataDir string) string {
 // （config を OS 非依存に保つための依存性注入）。純関数。"~" 展開は利用側で行う。
 func (c *Config) HeadlessPathOrDefault(dataDir, binaryName string) string {
 	return filepath.Join(c.InstallDirOrDefault(dataDir), "Headless", binaryName)
+}
+
+// LangOrDefault は CLI・起動メッセージ・sys 案内の表示言語を返す。
+// "en" 以外（空・未知の値）はすべて ja に倒す——language フィールドが無い既存 config の
+// 利用者は全員日本語話者のため（2026-06-06 ユーザー裁定）。新規はウィザード S0 が必ず明示保存する。
+func (c *Config) LangOrDefault() i18n.Lang {
+	if c.Language == string(i18n.En) {
+		return i18n.En
+	}
+	return i18n.Ja
 }
 
 // SessionTTL はセッション有効期間を返す。未設定（0以下）なら既定30日。
