@@ -419,6 +419,24 @@ func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Rea
 				return nil
 			}
 			continue
+		case errors.Is(err, steam.ErrVerifyMissing):
+			// ヘッドレス（branch）コード誤り＝DD は public へフォールバックして exit 0 でも
+			// headless 実体が取れない（H2）。資格の入力ミスなので認証失敗と同じく再入力へ
+			// 誘導する（DD は差分再開するため再実行コストは低い）。
+			retry, err2 := promptYN(in, w.Out, lang, i18n.T(lang, "wizard.dl.verifyRetry"))
+			if err2 != nil {
+				return err2
+			}
+			if !retry {
+				fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.retryLater"))
+				return nil
+			}
+			continue
+		case errors.Is(err, steam.ErrStalled):
+			// 停滞打切りは資格ミスではない（回線・サーバー側要因）ので再入力には誘導しない。
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.stalled"))
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.retryLater"))
+			return nil
 		default:
 			// ネットワーク断・Ctrl+C 中断・検証失敗など。DD は差分再開できるので
 			// あとから Web UI の「今すぐ更新」でやり直せる。

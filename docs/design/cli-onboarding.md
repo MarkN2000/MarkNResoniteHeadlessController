@@ -46,7 +46,11 @@ mrhc 実行
      │   ├ Y → S5a Steam資格（空Enterで中止可）→ 資格を config 保存 → S5b DL実行（進捗10%刻み）
      │   │      ├ 成功 → 続行
      │   │      ├ 認証失敗(ErrAuthFailed) → 再入力? [Y/n] → Y で S5a へ戻る
+     │   │      ├ ヘッドレスコード誤り(ErrVerifyMissing) → 再入力? [Y/n] → Y で S5a へ戻る
+     │   │      │    ※ exit 0 でも headless 実体なし＝public フォールバック検出（H2）。資格の
+     │   │      │      入力ミスなので認証失敗と同列・DD は差分再開のため再実行コストほぼゼロ
      │   │      ├ Steam Guard 有効(ErrTwoFactorRequired) → 専用案内（再入力に誘導しない）→ 続行
+     │   │      ├ 停滞打切り(ErrStalled) → 専用文言＋Web UI 再試行案内 → 続行（資格ミスではない）
      │   │      ├ Ctrl+C 中止(ErrCancelled/ctx) → 「ダウンロードを中止しました（…再利用されます）」→ 続行
      │   │      └ その他失敗 → 理由表示・Web UI 再試行案内 → 続行（DD は差分再開可）
      │   └ n → 続行
@@ -141,6 +145,10 @@ Resonite ヘッドレスを Steam からダウンロードします。必要な�
 ```
 - 成否判定は `Manager.Update` の戻り値（result イベントは pubsub 満杯時ドロップがあるため不使用）
 - DepotDownloader の利用者向け呼称は「ダウンロードツール」（固有名詞を初回画面に出さない）
+- 失敗分岐の文言: 認証失敗=`wizard.dl.authRetry`・ヘッドレスコード誤り=`wizard.dl.verifyRetry`
+  （いずれも再入力 [Y/n]）・停滞=`wizard.dl.stalled`・2FA=`wizard.dl.twoFactor`・中止=`wizard.dl.cancelled`・
+  その他=`wizard.dl.failed`（err 原文埋め込み。Go エラー文言は ja のため EN CLI では和文混じりが残る
+  既知制限＝`steam-depotdownloader.md` §9.1）
 
 ### S6 起動確認 — `wizard.saved` / `wizard.start.prompt`
 ```

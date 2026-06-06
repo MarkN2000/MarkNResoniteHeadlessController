@@ -190,6 +190,67 @@ func TestWizard_SteamAuthRetryDeclined(t *testing.T) {
 	}
 }
 
+// ヘッドレスコード誤り（verify_missing・H2）→ 認証失敗と同じく再入力 Y → 2回目の資格で成功。
+func TestWizard_SteamVerifyMissingRetry(t *testing.T) {
+	fake := &fakeUpdate{results: []error{steam.ErrVerifyMissing, nil}}
+	w, out := newTestWizard("\npw\npw\n\n\nuser1\npw1\ncode1\n\ny\nuser2\npw2\ncode2\n\n\n")
+	w.SteamUpdate = fake.fn
+	_, _, err := w.Run(tmpCfgPath(t))
+	if err != nil {
+		t.Fatalf("Run: %v\nout=%s", err, out.String())
+	}
+	if fake.calls != 2 {
+		t.Fatalf("SteamUpdate 呼び出し回数 = %d, want 2", fake.calls)
+	}
+	if fake.params[1].BranchCode != "code2" {
+		t.Errorf("2回目は再入力した資格を使うはず: %+v", fake.params[1])
+	}
+	if !strings.Contains(out.String(), "headless 本体を取得できませんでした") {
+		t.Errorf("ヘッドレスコード誤りの案内が出ていない:\n%s", out.String())
+	}
+}
+
+// ヘッドレスコード誤り → 再入力 n → 再試行案内を出して続行。
+func TestWizard_SteamVerifyMissingDeclined(t *testing.T) {
+	fake := &fakeUpdate{results: []error{steam.ErrVerifyMissing}}
+	w, out := newTestWizard("\npw\npw\n\n\nuser\nspw\ncode\n\nn\n\n")
+	w.SteamUpdate = fake.fn
+	_, startNow, err := w.Run(tmpCfgPath(t))
+	if err != nil {
+		t.Fatalf("Run: %v\nout=%s", err, out.String())
+	}
+	if !startNow {
+		t.Error("拒否後も S6 まで続行するはず")
+	}
+	if !strings.Contains(out.String(), "あとから Web UI（設定 → Steam）で再試行できます") {
+		t.Errorf("再試行の案内が出ていない:\n%s", out.String())
+	}
+}
+
+// 停滞打切り（stalled）→ 再入力に誘導せず専用文言＋再試行案内で続行。
+func TestWizard_SteamStalled(t *testing.T) {
+	fake := &fakeUpdate{results: []error{steam.ErrStalled}}
+	w, out := newTestWizard("\npw\npw\n\n\nuser\nspw\ncode\n\n\n") // 再入力プロンプトは消費しない
+	w.SteamUpdate = fake.fn
+	_, startNow, err := w.Run(tmpCfgPath(t))
+	if err != nil {
+		t.Fatalf("Run: %v\nout=%s", err, out.String())
+	}
+	if !startNow {
+		t.Error("停滞中断後も S6 まで続行するはず")
+	}
+	if fake.calls != 1 {
+		t.Errorf("再入力ループに入らないはず: calls=%d", fake.calls)
+	}
+	s := out.String()
+	if !strings.Contains(s, "停滞したため中断しました") {
+		t.Errorf("停滞の専用文言が出ていない:\n%s", s)
+	}
+	if strings.Contains(s, "もう一度入力しますか") {
+		t.Errorf("停滞で再入力に誘導してはいけない:\n%s", s)
+	}
+}
+
 // Steam Guard 有効（2FA 要求）→ 再入力に誘導せず専用案内で続行（M3）。
 func TestWizard_SteamTwoFactor(t *testing.T) {
 	fake := &fakeUpdate{results: []error{steam.ErrTwoFactorRequired}}

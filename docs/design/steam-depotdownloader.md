@@ -171,15 +171,50 @@ cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残�
 ## 9. SSE 設計
 
 - 専用 `/steam/events`（headless `/events` と分離＝関心の分離）。
-- イベント: `steam-progress`（percent/phase/file）/ `steam-log`（DD stdout/stderr 行）/ `steam-result`（success/fail+message）。
+- イベント: `steam-progress`（percent/file）/ `steam-log`（DD stdout/stderr 行・MRHC 生成行は
+  `msgKey/msgArgs` 付き）/ `steam-milestone`（phase）/ `steam-result`（失敗時 text+`code/detail`・§9.1）。
 - `pubsub.Hub[T]` を共用（**非ブロッキング＝満杯購読者にはドロップ**＝遅い1購読者が全体を詰まらせない）。
-  log/milestone はリングバッファ(500)で再接続時に履歴配信。
+  log/milestone はリングバッファ(500)で再接続時に履歴配信。**履歴は run 開始（begin）でクリア**＝
+  リプレイは常に現 run のみ（UI 側も接続毎の `steam-status` 受信でログ表示をリセットし、
+  自動再接続でも二重表示にならない）。
 - **マイルストーンは phase 変化時のみ publish/log（M4）**＝`Pre-allocating` が数百ファイル分続く洪水と、
   リングからの早期マイルストーン（`Using app branch` 等）の追い出しを防ぐ。`lastEvent` は dedup 前に更新＝
   stall ウォッチドッグは活動継続とみなす。
 - **終端 `steam-result` はドロップし得る**（非ブロッキング）。UI は更新中だけ `GET /steam/status` を
   補助ポーリングし、終端(success/failed)の取りこぼしによる「更新中」固着を防ぐ（H1）。
 - orchestrator 起点の更新も同じ `/steam/events` に流れる。
+
+## 9.1 エラーコードと表示ポリシー（2026-06-07）
+
+**分類は Go の sentinel＋code、表示文言は各表示層**に分離する（`headless_not_installed` と同じ流儀）。
+Go エラーの `.Error()`（ja）は変えない＝サーバーコンソールログと未知コードのフォールバック原文を兼ねる。
+`finish()` が `errorCode()/errorDetail()` で `Status.errorCode/errorDetail` と `steam-result` の
+`code/detail` に焼き込み、Web UI（SteamSection）が既知 code を locale 変換（ja/en）・未知/無 code は
+原文（lastError）→ 汎用文言へフォールバックする。CLI ウィザード S5b は sentinel を `errors.Is` で分岐。
+
+| code | sentinel | 発生 | 表示 |
+|---|---|---|---|
+| `cancelled` | ErrCancelled | ユーザー中止/shutdown（**acquire 段階の ctx 中断もここへ正規化**） | 中立表示（赤い「失敗」にしない） |
+| `auth_failed` | ErrAuthFailed | PW 再要求＝誤資格（M1） | 自己完結の locale 文言 |
+| `two_factor_required` | ErrTwoFactorRequired | Steam Guard オン | 同上 |
+| `stalled` | ErrStalled | stallTimeout 無進捗（正常終了との競合時＝runErr nil は成功扱い） | 同上 |
+| `verify_missing` | ErrVerifyMissing | exit 0 でも headless 実体なし＝branch コード誤り（H2） | 同上 |
+| `acquire_failed` | ErrAcquireFailed | DD 本体取得の失敗 | 見出し locale＋`detail` 併記 |
+| `dd_failed` | ErrDDFailed / ErrDDStartFailed | DD 異常終了 / プロセス起動失敗 | 同上 |
+| `chmod_failed` | ErrChmodFailed | 実行権付与の失敗（非 Windows） | 同上 |
+
+- **detail** ＝「`<sentinel>: <内側>`」型エラーの内側原文（HTTP 404・exit status 等の機械情報）。
+  ja は従来表示がそのまま再構成され、en は見出しだけ英語＋機械情報が読める。
+- sentinel の文言は**プレフィックス部のみ**とし、動的詳細は発生箇所で `%w` ラップして付加する規約
+  （`"%w: %w"` で内側のエラーチェーンも保持・go 1.20+）。
+- MRHC 生成のログ4行（DD 取得開始/完了・SHA OK・chmod 中）は `Event.msgKey/msgArgs`（名前付き引数）で
+  locale 変換。`Text`=ja 原文を併存（未知キーのフォールバック）。DD の生 stdout/stderr は原文（英語）のまま。
+- HTTP 層 code（`writeSteamErr`/`handleSteamConfigPut`）: `headless_running` / `steam_not_configured` /
+  `update_in_progress` / `no_update` / `steam_password_invalid` をフロント（notify.ts）が locale 変換。
+- **意識的スコープ外**: `ErrUnsupportedPlatform` は acquire_failed に縮退（配布は対象3プラットフォームのみで
+  実害僅少）・`save_failed`/汎用 `bad_request` はアプリ全体の流儀どおり原文フォールバック・サーバー
+  コンソールログ（log.Printf）は ja 固定・CLI ウィザード default 分岐（`wizard.dl.failed: %v`）は Go 原文が
+  ja のため EN CLI で和文混じりが残る（Go エラー文言を ja 維持する以上の既知制限）。
 
 ## 10. セキュリティ
 

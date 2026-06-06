@@ -164,6 +164,14 @@ var catalog = map[string]map[Lang]string{
 		Ja: "認証に失敗しました（パスワード誤り、または Steamガードが有効です）。Steam の情報をもう一度入力しますか? [Y/n]: ",
 		En: "Authentication failed (wrong password, or Steam Guard is enabled). Enter your Steam details again? [Y/n]: ",
 	},
+	"wizard.dl.verifyRetry": {
+		Ja: "ダウンロードは完了しましたが headless 本体を取得できませんでした（ヘッドレスコードが誤っている可能性があります）。Steam の情報をもう一度入力しますか? [Y/n]: ",
+		En: "The download finished but the headless binary was not retrieved (the headless code may be wrong). Enter your Steam details again? [Y/n]: ",
+	},
+	"wizard.dl.stalled": {
+		Ja: "✗ ダウンロードが停滞したため中断しました（しばらく進捗がありませんでした）。",
+		En: "✗ The download stalled (no progress for a while) and was aborted.",
+	},
 	"wizard.dl.failed": {
 		Ja: "✗ ダウンロードに失敗しました: %v",
 		En: "✗ Download failed: %v",
