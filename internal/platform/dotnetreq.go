@@ -200,6 +200,16 @@ func systemRuntimeSatisfies(p depProbe, goos, goarch string, req RuntimeRequirem
 	return listedRuntimeSatisfies(out, req)
 }
 
+// ManualDotnetInstallHint は自動設置に失敗したときに案内する手動導入手段（OS 別・事実のみ）。
+// Linux は公式 dotnet-install.sh（sudo 不要・~/.dotnet に入り launcher の systemDotnet が拾う）、
+// Windows は公式ダウンロードページ。
+func ManualDotnetInstallHint(goos, channel string) string {
+	if goos == "windows" {
+		return "https://dotnet.microsoft.com/download/dotnet/" + channel
+	}
+	return "curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel " + channel + " --runtime dotnet"
+}
+
 // listedRuntimeSatisfies は `dotnet --list-runtimes` の出力に要求を満たすベースランタイムが
 // あるかを判定する（純関数）。行形式: "Microsoft.NETCore.App 10.0.8 [/path/...]"。
 // prerelease 行は不充足扱い（LocalRuntimeSatisfies と同規則）。

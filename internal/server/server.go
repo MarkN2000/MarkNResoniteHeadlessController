@@ -47,6 +47,24 @@ type Server struct {
 	// checkDeps は依存検出（R-C）。本番は platform.CheckHeadlessDeps・テストで偽装する。
 	checkDeps func(goos, goarch, installDir string) []platform.DepIssue
 
+	// 起動時ガード（.NET ランタイム自動設置・docs/design/dotnet-runtime.md）の seam。
+	// system 判定は実マシンの dotnet・installRuntime はネットに依存するためテストで偽装する。
+	readRuntimeReq  func(headlessDir string) (platform.RuntimeRequirement, bool)
+	localSatisfies  func(installDir string, req platform.RuntimeRequirement, goarch string) bool
+	systemSatisfies func(goos, goarch string, req platform.RuntimeRequirement) bool
+	installRuntime  func(ctx context.Context, installDir string) error
+	steamRunning    func() bool // Steam 更新が進行中か（ガード経路の起動見送り判定）
+
+	// sysDotnetOK は「システム .NET が要求を満たす」と確認できた組のキャッシュ
+	// （installDir+要求版）。Steam クライアント併用等でローカル設置が恒久に無い環境が、
+	// 起動のたびに非同期経路＋ probe（最大10s のサブプロセス）へ落ちるのを防ぐ。
+	sysDotnetMu sync.Mutex
+	sysDotnetOK map[string]bool
+
+	// bgCtx は Start() が設定する背景 ctx（shutdown で中断）。ガード goroutine の親に使う。
+	bgMu  sync.Mutex
+	bgCtx context.Context
+
 	// cfgMu は cfg の実行時書き換え（credentials PUT / password 変更 / app-settings）と、
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
 	// auth は &cfgMu を共有する。レート制限状態は auth.mu（別ロック）。
@@ -86,6 +104,13 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		toolsDir = filepath.Join(dataDir, "tools")
 	}
 	s.steam = steam.NewManager(toolsDir)
+	s.readRuntimeReq = platform.ReadRuntimeRequirement
+	s.localSatisfies = platform.LocalRuntimeSatisfies
+	s.systemSatisfies = platform.SystemRuntimeSatisfies
+	s.installRuntime = func(ctx context.Context, installDir string) error {
+		return s.steam.InstallRuntime(ctx, installDir)
+	}
+	s.steamRunning = func() bool { return s.steam.Status().State == "running" }
 	return s
 }
 
@@ -94,6 +119,9 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 // best-effort で中止する（①②③のみ。④以降は仕様上 cancel 不可）。main から起動時に1回呼ぶ。
 func (s *Server) Start() (stop func()) {
 	ctx, cancel := context.WithCancel(context.Background())
+	s.bgMu.Lock()
+	s.bgCtx = ctx // 起動時ガード goroutine の親（shutdown で設置を中断）
+	s.bgMu.Unlock()
 	s.restart.setParent(ctx)                                  // 進行中フローを bg ctx の子に＝shutdown で ①②③ を cancel
 	s.steam.SetParent(ctx)                                    // 進行中の更新を bg ctx の子に＝shutdown で中断（P9-B）
 	s.driver.SetOnUnexpectedExit(s.crashMon.onUnexpectedExit) // クラッシュ検知を crash-monitor へ（P8-4b）
@@ -288,6 +316,21 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	if _, statErr := os.Stat(headlessPath); errors.Is(statErr, fs.ErrNotExist) {
 		writeErr(w, http.StatusConflict, "headless_not_installed",
 			"Resonite がまだダウンロードされていません。設定タブの『今すぐ更新』から取得してください。")
+		return
+	}
+	// 起動時ガード（.NET ランタイム自動設置）: 要求が読めてローカルが不充足なら、受付を返して
+	// goroutine で設置→起動する（数十MB の DL を HTTP 応答内で待たせない）。
+	// 判定はローカル列挙のみ（ms オーダー・オフライン安全）＝充足・判定不能（runtimeconfig 無し）・
+	// システム充足キャッシュ命中は従来どおりの同期起動で挙動不変。
+	if s.runtimeGuardNeeded(headlessPath) {
+		// 稼働中の start に accepted を返さない（同期経路では driver.Start の ErrAlreadyRunning が
+		// 409 を返す。その振る舞いをガード経路でも保つ）。
+		if s.driver.Status().State != headless.StateStopped {
+			writeErr(w, http.StatusConflict, "start_failed", headless.ErrAlreadyRunning.Error())
+			return
+		}
+		go s.startWithRuntimeGuard(name, headlessPath, launchPath)
+		writeOK(w, map[string]any{"accepted": true, "runtimePrepare": true})
 		return
 	}
 	// 依存不足の予防ガイド（R-C 経路③）: 起動は止めず、不足があれば sys ログで

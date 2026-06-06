@@ -301,6 +301,36 @@ var catalog = map[string]map[Lang]string{
 		En: "  Please run the command above manually.",
 	},
 
+	// ── .NET ランタイム自動設置（起動時ガード・server / docs/design/dotnet-runtime.md）──
+	"dotnet.sysInstalling": {
+		Ja: ".NET ランタイム（%s）が見つからないため設置します（進捗は設定タブの更新ログ）…",
+		En: "Installing the .NET runtime (%s) because it was not found (progress in the Settings tab update log)…",
+	},
+	"dotnet.sysInstalled": {
+		Ja: ".NET ランタイムの設置が完了しました。ヘッドレスを起動します。",
+		En: ".NET runtime installed. Starting the headless server.",
+	},
+	"dotnet.sysCancelled": {
+		Ja: ".NET ランタイムの設置を中止しました（起動も中止）。",
+		En: ".NET runtime installation cancelled (startup aborted).",
+	},
+	"dotnet.sysUpdateInProgress": {
+		Ja: "Steam 更新が進行中のため起動を見送りました。完了後にもう一度起動してください。",
+		En: "Startup deferred because a Steam update is in progress. Start again after it finishes.",
+	},
+	"dotnet.sysFailed": {
+		Ja: ".NET ランタイムの設置に失敗しました: %v — 手動導入: %s。起動を試行します…",
+		En: "Failed to install the .NET runtime: %v — manual install: %s. Attempting to start anyway…",
+	},
+	"dotnet.sysStartDeferred": {
+		Ja: "Steam 更新が始まったため起動を見送りました。更新完了後にもう一度起動してください。",
+		En: "Startup deferred because a Steam update has started. Start again after it finishes.",
+	},
+	"dotnet.sysStartFailed": {
+		Ja: "起動に失敗しました: %v",
+		En: "Failed to start: %v",
+	},
+
 	// ── reset-password サブコマンド ─────────────────────────────
 	"reset.header": {
 		Ja: "=== MRHC パスワード再設定 ===\n新しい管理パスワードを設定します。",
