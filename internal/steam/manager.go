@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,8 +21,8 @@ import (
 // 設計: docs/design/steam-depotdownloader.md §7
 type Manager struct {
 	toolsDir     string
-	stallTimeout time.Duration                                                // 無進捗で打ち切る時間（既定5分）
-	ensureDD     func(ctx context.Context, logf func(string)) (string, error) // DD本体を確保しパスを返す（テストで差し替え可）
+	stallTimeout time.Duration                                                  // 無進捗で打ち切る時間（既定5分）
+	ensureDD     func(ctx context.Context, onEvent func(Event)) (string, error) // DD本体を確保しパスを返す（テストで差し替え可）
 	runner       *Runner
 
 	hub *pubsub.Hub[Event]
@@ -36,13 +37,15 @@ type Manager struct {
 
 // Status は更新の状態スナップショット（GET /steam/status・SSE 初期送出に使う）。
 type Status struct {
-	State      string     `json:"state"` // idle | running | success | failed
-	Percent    float64    `json:"percent"`
-	Phase      string     `json:"phase,omitempty"`
-	File       string     `json:"file,omitempty"`
-	StartedAt  *time.Time `json:"startedAt,omitempty"`
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
-	LastError  string     `json:"lastError,omitempty"`
+	State       string     `json:"state"` // idle | running | success | failed
+	Percent     float64    `json:"percent"`
+	Phase       string     `json:"phase,omitempty"`
+	File        string     `json:"file,omitempty"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
+	LastError   string     `json:"lastError,omitempty"`   // エラー原文（ja・未知コードのフォールバック）
+	ErrorCode   string     `json:"errorCode,omitempty"`   // エラー分類コード（表示層が locale 変換・errorCode 参照）
+	ErrorDetail string     `json:"errorDetail,omitempty"` // 見出しを除いた診断詳細（errorDetail 参照）
 }
 
 const (
@@ -65,7 +68,59 @@ var (
 	// 文言は従来の非 sentinel エラーと同一（Web UI 表示は不変）。ウィザード S5b が
 	// 「失敗」と区別して専用文言を出すために sentinel 化した。
 	ErrCancelled = errors.New("更新を中止しました")
+	// ErrStalled は無進捗で打ち切られたことを表す（stallTimeout・文言はプレフィックス部のみ）。
+	ErrStalled = errors.New("更新が停滞したため中断しました")
+	// ErrVerifyMissing は DD exit 0 でも headless 実体が無いこと（＝ブランチコード誤りの
+	// public フォールバック・H2）を表す。文言はプレフィックス部のみ。
+	ErrVerifyMissing = errors.New("ダウンロードは完了しましたが headless 本体が見つかりません")
+	// ErrAcquireFailed は DD 本体の取得（acquire）に失敗したことを表す。
+	ErrAcquireFailed = errors.New("DepotDownloader の準備に失敗")
+	// ErrChmodFailed は取得後の実行権付与に失敗したことを表す（Linux/ARM）。
+	ErrChmodFailed = errors.New("実行権の付与に失敗")
 )
+
+// errorCode は err を表示層の locale 変換キーになる分類コードへ写す。文言（ja）でなくコードを
+// 公開することで Web UI が言語を選べる（headless_not_installed と同じ流儀）。未知のエラーは
+// "" ＝表示層は原文（LastError/Event.Text）へフォールバックする。中止系を最初に評価する。
+func errorCode(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrCancelled):
+		return "cancelled"
+	case errors.Is(err, ErrTwoFactorRequired):
+		return "two_factor_required"
+	case errors.Is(err, ErrAuthFailed):
+		return "auth_failed"
+	case errors.Is(err, ErrStalled):
+		return "stalled"
+	case errors.Is(err, ErrVerifyMissing):
+		return "verify_missing"
+	case errors.Is(err, ErrAcquireFailed):
+		return "acquire_failed"
+	case errors.Is(err, ErrDDStartFailed), errors.Is(err, ErrDDFailed):
+		return "dd_failed"
+	case errors.Is(err, ErrChmodFailed):
+		return "chmod_failed"
+	default:
+		return ""
+	}
+}
+
+// errorDetail は「<sentinel>: <内側>」型のエラーから内側の診断情報（HTTP 状態・exit code 等）を
+// 取り出す。acquire/dd/chmod 系のみ＝見出しは locale 変換し、機械情報は原文で併記するため。
+// 自己完結型（auth/2FA/stalled/verify/cancelled）は locale 文言だけで足りるので "" を返す。
+func errorDetail(err error) string {
+	for _, s := range []error{ErrAcquireFailed, ErrDDStartFailed, ErrDDFailed, ErrChmodFailed} {
+		if errors.Is(err, s) {
+			if detail, ok := strings.CutPrefix(err.Error(), s.Error()+": "); ok {
+				return detail
+			}
+			return ""
+		}
+	}
+	return ""
+}
 
 // UpdateParams は1回の入手/更新に必要なパラメータ（server が config から組む）。
 type UpdateParams struct {
@@ -92,8 +147,8 @@ func NewManager(toolsDir string) *Manager {
 		st:           Status{State: stateIdle},
 		parentCtx:    context.Background(),
 	}
-	m.ensureDD = func(ctx context.Context, logf func(string)) (string, error) {
-		return acq.Ensure(ctx, m.toolsDir, logf)
+	m.ensureDD = func(ctx context.Context, onEvent func(Event)) (string, error) {
+		return acq.Ensure(ctx, m.toolsDir, onEvent)
 	}
 	return m
 }
@@ -184,15 +239,23 @@ func (m *Manager) begin(parent context.Context, p UpdateParams) (context.Context
 	m.cancelFn = cancel
 	now := time.Now()
 	m.st = Status{State: stateRunning, StartedAt: &now}
+	// 前回 run の履歴は持ち越さない＝SSE の再接続/途中参加が今回の run のログだけをリプレイする
+	// （再接続時に古い run の行が混ざる・二重に見える問題の根治）。
+	m.logs = nil
 	m.lastEvent = now
 	return runCtx, nil
 }
 
 // run は acquire→DD実行→（非windowsは）chmod を行う。stall ウォッチドッグで無進捗を打ち切る。
 func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
-	ddPath, err := m.ensureDD(runCtx, func(s string) { m.onEvent(Event{Kind: "log", Text: s}) })
+	ddPath, err := m.ensureDD(runCtx, m.onEvent)
 	if err != nil {
-		return fmt.Errorf("DepotDownloader の準備に失敗: %w", err)
+		// acquire 段階の中断（ユーザー Cancel / shutdown）は ctx 起因の生エラーで返るため、
+		// runner 後の分岐（下）と同様にここでも「中止」へ正規化する（acquire_failed への誤分類防止）。
+		if runCtx.Err() != nil {
+			return ErrCancelled
+		}
+		return fmt.Errorf("%w: %w", ErrAcquireFailed, err)
 	}
 
 	// 進捗停滞ウォッチドッグ: 一定時間イベントが無ければ watchCtx を cancel（DD を kill）。
@@ -214,8 +277,10 @@ func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
 	stallMu.Lock()
 	wasStalled := stalled
 	stallMu.Unlock()
-	if wasStalled {
-		return fmt.Errorf("更新が停滞したため中断しました（%s 無進捗）", m.stallTimeout)
+	// runErr == nil は「ウォッチドッグ発火と同時に DD が正常終了していた」稀な競合＝実体は成功
+	// なので stalled にしない（成功を停滞と誤報告しない）。
+	if wasStalled && runErr != nil {
+		return fmt.Errorf("%w（%s 無進捗）", ErrStalled, m.stallTimeout)
 	}
 	if runErr != nil {
 		// 親 ctx のキャンセル（ユーザー Cancel / shutdown）なら「中止」として明示する
@@ -231,15 +296,15 @@ func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
 	if p.VerifyRelPath != "" {
 		target := filepath.Join(p.InstallDir, p.VerifyRelPath)
 		if _, err := os.Stat(target); errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("ダウンロードは完了しましたが headless 本体が見つかりません（%s）。ブランチコードが正しいか確認してください", p.VerifyRelPath)
+			return fmt.Errorf("%w（%s）。ブランチコードが正しいか確認してください", ErrVerifyMissing, p.VerifyRelPath)
 		}
 	}
 
 	// DepotDownloader は実行権を付けないため、取得後に install 全体へ +x（Linux/ARM 必須）。
 	if runtime.GOOS != "windows" {
-		m.onEvent(Event{Kind: "log", Text: "実行権を付与中（chmod -R +x）"})
+		m.onEvent(Event{Kind: "log", Text: "実行権を付与中（chmod -R +x）", MsgKey: "chmodding"})
 		if err := chmodTreeExec(p.InstallDir); err != nil {
-			return fmt.Errorf("実行権の付与に失敗: %w", err)
+			return fmt.Errorf("%w: %w", ErrChmodFailed, err)
 		}
 	}
 	return nil
@@ -318,6 +383,8 @@ func (m *Manager) finish(err error) {
 	if err != nil {
 		m.st.State = stateFailed
 		m.st.LastError = err.Error()
+		m.st.ErrorCode = errorCode(err)
+		m.st.ErrorDetail = errorDetail(err)
 	} else {
 		m.st.State = stateSuccess
 		m.st.Percent = 100
@@ -325,6 +392,8 @@ func (m *Manager) finish(err error) {
 	result := Event{Kind: "result"}
 	if err != nil {
 		result.Text = err.Error()
+		result.Code = m.st.ErrorCode
+		result.Detail = m.st.ErrorDetail
 	}
 	m.appendLogLocked(result)
 	m.mu.Unlock()

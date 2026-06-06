@@ -70,8 +70,8 @@ func NewAcquirer() *Acquirer {
 // Ensure は DepotDownloader 実行ファイルを用意してそのパスを返す（冪等）。
 // 確定パス {toolsDir}/depotdownloader/{version}/<exe> に既に在ればDLせずスキップ。
 // 無ければ固定版 self-contained を BaseURL からDL→SHA-256検証→展開→chmod→原子的rename する。
-// 進捗・ログは logf（nil 可）に通知する。
-func (a *Acquirer) Ensure(ctx context.Context, toolsDir string, logf func(string)) (string, error) {
+// 進捗・ログは onEvent（nil 可）に通知する（Text=ja 原文・MsgKey で表示層が locale 変換）。
+func (a *Acquirer) Ensure(ctx context.Context, toolsDir string, onEvent func(Event)) (string, error) {
 	asset, err := assetForPlatform(platformKey)
 	if err != nil {
 		return "", err
@@ -82,17 +82,20 @@ func (a *Acquirer) Ensure(ctx context.Context, toolsDir string, logf func(string
 		return destExe, nil // 取得済み（冪等スキップ）
 	}
 	url := a.BaseURL + "/" + asset.file
-	logmsg(logf, fmt.Sprintf("DepotDownloader %s を取得します（%s）", ddVersion, asset.file))
-	if err := a.downloadVerifyExtract(ctx, url, asset.sha256, asset.exe, destExe, logf); err != nil {
+	emit(onEvent, Event{
+		Kind: "log", Text: fmt.Sprintf("DepotDownloader %s を取得します（%s）", ddVersion, asset.file),
+		MsgKey: "ddFetch", MsgArgs: map[string]string{"version": ddVersion, "file": asset.file},
+	})
+	if err := a.downloadVerifyExtract(ctx, url, asset.sha256, asset.exe, destExe, onEvent); err != nil {
 		return "", err
 	}
-	logmsg(logf, "DepotDownloader の取得が完了しました")
+	emit(onEvent, Event{Kind: "log", Text: "DepotDownloader の取得が完了しました", MsgKey: "ddFetched"})
 	return destExe, nil
 }
 
 // downloadVerifyExtract は url の zip をDLし、SHA-256 を検証し、zip 内 entryName を destExe へ
 // 原子的に展開する（非windows は chmod 0755）。検証失敗・DL失敗時は確定ファイルも一時ファイルも残さない。
-func (a *Acquirer) downloadVerifyExtract(ctx context.Context, url, expectedSHA, entryName, destExe string, logf func(string)) error {
+func (a *Acquirer) downloadVerifyExtract(ctx context.Context, url, expectedSHA, entryName, destExe string, onEvent func(Event)) error {
 	destDir := filepath.Dir(destExe)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("ディレクトリ作成に失敗: %w", err)
@@ -117,7 +120,7 @@ func (a *Acquirer) downloadVerifyExtract(ctx context.Context, url, expectedSHA, 
 	if !strings.EqualFold(sum, expectedSHA) {
 		return fmt.Errorf("SHA-256 が一致しません（期待=%s 実際=%s）", expectedSHA, sum)
 	}
-	logmsg(logf, "SHA-256 検証 OK")
+	emit(onEvent, Event{Kind: "log", Text: "SHA-256 検証 OK", MsgKey: "shaOk"})
 
 	// zip から実行ファイルを destExe と同一ディレクトリの一時名へ展開→原子的 rename で確定。
 	tmpExe := destExe + ".tmp"
@@ -195,10 +198,4 @@ func writeZipEntry(f *zip.File, destPath string) error {
 		return fmt.Errorf("展開先のクローズに失敗: %w", closeErr)
 	}
 	return nil
-}
-
-func logmsg(logf func(string), s string) {
-	if logf != nil {
-		logf(s)
-	}
 }

@@ -36,21 +36,21 @@ func fakeDDMain() {
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
 		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 		fmt.Fprint(os.Stdout, "Please enter your 2 factor auth code from your authenticator app: ")
-		select {} // 入力待ちで block。runner が 2FA を検出して kill する。
+		blockUntilKilled() // 入力待ちで block。runner が 2FA を検出して kill する。
 	case "hang":
 		// パスワード受領後に1行だけ進捗を出して以降は沈黙＝無進捗で固まる。
 		// manager の cancel / stall ウォッチドッグ検証用（kill されるまで block）。
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
 		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 		fmt.Fprintln(os.Stdout, " 10.00% /Resonite/a")
-		select {}
+		blockUntilKilled()
 	case "reprompt":
 		// パスワードを受領後、誤資格として再度パスワードを要求し入力待ちで block。
 		// runner が「2回目の要求＝認証失敗」を検出して kill することを検証する（M1）。
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
 		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
-		select {}
+		blockUntilKilled()
 	default: // success
 		fmt.Fprintln(os.Stdout, "Using app branch: 'headless'.")
 		fmt.Fprint(os.Stdout, `Enter account password for "user": `)
@@ -64,6 +64,15 @@ func fakeDDMain() {
 		fmt.Fprintln(os.Stdout, " 100.00% /Resonite/b")
 		fmt.Fprintln(os.Stdout, "Total downloaded: 100 bytes (100 bytes uncompressed) from 1 depots")
 		os.Exit(0)
+	}
+}
+
+// blockUntilKilled は親（runner/manager）に kill されるまで block する。
+// `select {}` は全 goroutine 休止＝Go ランタイムの deadlock 検出で即 exit 2 になり
+// 「hang していない偽DD」になってしまうため、検出に掛からない time.Sleep ループを使う。
+func blockUntilKilled() {
+	for {
+		time.Sleep(time.Hour)
 	}
 }
 
@@ -170,6 +179,9 @@ func TestRunner_Failure(t *testing.T) {
 	err := NewRunner().Run(ctx, fakeRunParams(), nil)
 	if err == nil {
 		t.Fatal("exit 1 は失敗を返すべき")
+	}
+	if !errors.Is(err, ErrDDFailed) {
+		t.Errorf("異常終了は ErrDDFailed を返すべき（code=dd_failed の根拠）: %v", err)
 	}
 	if errors.Is(err, ErrTwoFactorRequired) {
 		t.Fatal("2FA エラーではないはず")

@@ -24,6 +24,15 @@ var ErrTwoFactorRequired = errors.New("Steam の2要素認証(2FA)が要求さ�
 // 再要求にこれ以上応じても無限に失敗するため即終了し、5分の stall を待たずに原因を明示する（M1）。
 var ErrAuthFailed = errors.New("Steam のユーザー名またはパスワードが正しくない可能性があります")
 
+// ErrDDStartFailed は DepotDownloader プロセスの起動自体に失敗したことを表す（実行ファイル欠落等）。
+// ErrDDFailed は起動後の異常終了（exit 非0）を表す。どちらも errorCode では "dd_failed" に写す。
+// 文言はプレフィックス部のみ（詳細は発生箇所で "%w: %w" ラップして付加する・エラーコード規約は
+// 設計 docs/design/steam-depotdownloader.md 参照）。
+var (
+	ErrDDStartFailed = errors.New("DepotDownloader の起動に失敗")
+	ErrDDFailed      = errors.New("DepotDownloader が失敗しました")
+)
+
 // RunParams は DepotDownloader 1回の実行に必要なパラメータ。
 type RunParams struct {
 	DDPath     string // DepotDownloader 実行ファイル（acquire 済み）
@@ -34,11 +43,18 @@ type RunParams struct {
 }
 
 // Event は DD 実行中に発生するイベント（manager が SSE へ流す）。
+// 表示文言の多言語化のため、エラーは Code（result）、MRHC 生成ログ行は MsgKey/MsgArgs を併せて
+// 持ち、表示層（Web UI）が locale 変換する。Text は従来どおりの原文（ja）＝未知 Code/MsgKey の
+// フォールバックとして常に残す。
 type Event struct {
-	Kind    string  `json:"kind"`              // "log" | "progress" | "milestone"
-	Text    string  `json:"text,omitempty"`    // log 行 / milestone 名
-	Percent float64 `json:"percent,omitempty"` // progress: 0..100
-	File    string  `json:"file,omitempty"`    // progress: 対象パス
+	Kind    string            `json:"kind"`              // "log" | "progress" | "milestone" | "result"
+	Text    string            `json:"text,omitempty"`    // log 行 / milestone 名 / result のエラー原文
+	Percent float64           `json:"percent,omitempty"` // progress: 0..100
+	File    string            `json:"file,omitempty"`    // progress: 対象パス
+	Code    string            `json:"code,omitempty"`    // result: エラー分類コード（errorCode 参照）
+	Detail  string            `json:"detail,omitempty"`  // result: 見出し（Code）を除いた診断詳細（HTTP 状態・exit 等）
+	MsgKey  string            `json:"msgKey,omitempty"`  // log: MRHC 生成行の文言キー
+	MsgArgs map[string]string `json:"msgArgs,omitempty"` // log: MsgKey の補間引数（名前付き）
 }
 
 // Runner は DepotDownloader を実行する。状態を持たないため使い回し可。
@@ -75,7 +91,7 @@ func (r *Runner) Run(ctx context.Context, p RunParams, onEvent func(Event)) erro
 		return err
 	}
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("DepotDownloader の起動に失敗: %w", err)
+		return fmt.Errorf("%w: %w", ErrDDStartFailed, err)
 	}
 
 	var twoFactor atomic.Bool
@@ -98,7 +114,7 @@ func (r *Runner) Run(ctx context.Context, p RunParams, onEvent func(Event)) erro
 		return ErrAuthFailed
 	}
 	if waitErr != nil {
-		return fmt.Errorf("DepotDownloader が失敗しました: %w", waitErr)
+		return fmt.Errorf("%w: %w", ErrDDFailed, waitErr)
 	}
 	return nil
 }

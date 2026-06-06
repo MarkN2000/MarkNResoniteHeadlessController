@@ -3,6 +3,7 @@ package steam
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,7 @@ import (
 func newTestManager(t *testing.T) *Manager {
 	t.Helper()
 	m := NewManager(t.TempDir())
-	m.ensureDD = func(ctx context.Context, logf func(string)) (string, error) {
+	m.ensureDD = func(ctx context.Context, onEvent func(Event)) (string, error) {
 		return os.Args[0], nil
 	}
 	return m
@@ -64,8 +65,11 @@ func TestManager_VerifyHeadlessMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("headless 実体が無ければ Update は失敗すべき（ブランチコード誤り検出・H2）")
 	}
-	if st := m.Status(); st.State != stateFailed {
-		t.Errorf("state=%q want failed", st.State)
+	if !errors.Is(err, ErrVerifyMissing) {
+		t.Errorf("ErrVerifyMissing を返すべき: %v", err)
+	}
+	if st := m.Status(); st.State != stateFailed || st.ErrorCode != "verify_missing" {
+		t.Errorf("state=%q errorCode=%q want failed/verify_missing", st.State, st.ErrorCode)
 	}
 }
 
@@ -168,6 +172,46 @@ func TestManager_CancelInProgress(t *testing.T) {
 		t.Fatalf("Cancel: %v", err)
 	}
 	waitState(t, m, stateFailed, 10*time.Second)
+	if st := m.Status(); st.ErrorCode != "cancelled" {
+		t.Errorf("errorCode=%q want cancelled", st.ErrorCode)
+	}
+}
+
+// TestManager_CancelDuringAcquire は acquire（DD本体DL）段階の Cancel も「中止」に正規化される
+// ことを確認する（acquire_failed への誤分類防止）。ensureDD は ctx が止まるまで block する。
+func TestManager_CancelDuringAcquire(t *testing.T) {
+	m := newTestManager(t)
+	m.ensureDD = func(ctx context.Context, onEvent func(Event)) (string, error) {
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
+
+	if err := m.Start(testParams(t)); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitState(t, m, stateRunning, 5*time.Second)
+	if err := m.Cancel(); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+	waitState(t, m, stateFailed, 10*time.Second)
+	st := m.Status()
+	if st.ErrorCode != "cancelled" {
+		t.Errorf("acquire 段階の中止は errorCode=cancelled になるべき: %q（lastError=%q）", st.ErrorCode, st.LastError)
+	}
+	// 終端 result イベント（履歴）にも code が乗る（SSE 再接続経路の担保）。
+	_, hist := m.Subscribe(1)
+	var sawResult bool
+	for _, e := range hist {
+		if e.Kind == "result" {
+			sawResult = true
+			if e.Code != "cancelled" {
+				t.Errorf("result イベントの code=%q want cancelled", e.Code)
+			}
+		}
+	}
+	if !sawResult {
+		t.Error("履歴に result イベントが無い")
+	}
 }
 
 func TestManager_StallTimeout(t *testing.T) {
@@ -181,8 +225,71 @@ func TestManager_StallTimeout(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	waitState(t, m, stateFailed, 10*time.Second)
-	if st := m.Status(); st.LastError == "" {
-		t.Error("停滞中断時は lastError が入るべき")
+	if st := m.Status(); st.LastError == "" || st.ErrorCode != "stalled" {
+		t.Errorf("停滞中断時は lastError と errorCode=stalled が入るべき（lastError=%q errorCode=%q）", st.LastError, st.ErrorCode)
+	}
+}
+
+// TestManager_BeginClearsLogs は run 開始時に前回 run の履歴を持ち越さない（SSE リプレイの混入防止）
+// ことを確認する。
+func TestManager_BeginClearsLogs(t *testing.T) {
+	m := newTestManager(t)
+	m.onEvent(Event{Kind: "log", Text: "old run line"})
+	if _, hist := m.Subscribe(1); len(hist) != 1 {
+		t.Fatalf("前提: 履歴1件のはず（%d件）", len(hist))
+	}
+	if _, err := m.begin(context.Background(), testParams(t)); err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	if _, hist := m.Subscribe(1); len(hist) != 0 {
+		t.Errorf("begin 後の履歴は空のはず（%d件）", len(hist))
+	}
+	m.finish(nil)
+}
+
+// TestErrorCode は sentinel→コードの対応（ラップ込み）を検証する。
+func TestErrorCode(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"nil", nil, ""},
+		{"cancelled", ErrCancelled, "cancelled"},
+		{"two_factor", ErrTwoFactorRequired, "two_factor_required"},
+		{"auth", ErrAuthFailed, "auth_failed"},
+		{"stalled wrapped", fmt.Errorf("%w（5m0s 無進捗）", ErrStalled), "stalled"},
+		{"verify wrapped", fmt.Errorf("%w（Headless/Resonite.exe）。ブランチコードが正しいか確認してください", ErrVerifyMissing), "verify_missing"},
+		{"acquire wrapped", fmt.Errorf("%w: %w", ErrAcquireFailed, errors.New("HTTP 404")), "acquire_failed"},
+		{"dd wrapped", fmt.Errorf("%w: %w", ErrDDFailed, errors.New("exit status 1")), "dd_failed"},
+		{"dd start wrapped", fmt.Errorf("%w: %w", ErrDDStartFailed, errors.New("exec format error")), "dd_failed"},
+		{"chmod wrapped", fmt.Errorf("%w: %w", ErrChmodFailed, errors.New("permission denied")), "chmod_failed"},
+		{"unknown", errors.New("something else"), ""},
+	}
+	for _, c := range cases {
+		if got := errorCode(c.err); got != c.want {
+			t.Errorf("%s: errorCode=%q want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// TestErrorDetail は「<sentinel>: <内側>」型からの診断詳細の抽出を検証する。
+func TestErrorDetail(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"acquire", fmt.Errorf("%w: %w", ErrAcquireFailed, errors.New("ダウンロードに失敗: HTTP 404")), "ダウンロードに失敗: HTTP 404"},
+		{"dd", fmt.Errorf("%w: %w", ErrDDFailed, errors.New("exit status 1")), "exit status 1"},
+		{"自己完結型は空", ErrAuthFailed, ""},
+		{"stalled は空", fmt.Errorf("%w（5m0s 無進捗）", ErrStalled), ""},
+		{"nil", nil, ""},
+	}
+	for _, c := range cases {
+		if got := errorDetail(c.err); got != c.want {
+			t.Errorf("%s: errorDetail=%q want %q", c.name, got, c.want)
+		}
 	}
 }
 
