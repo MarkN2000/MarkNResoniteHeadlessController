@@ -27,7 +27,7 @@ func newTestWizard(input string) (*Wizard, *bytes.Buffer) {
 		TTY:        false,
 		DetectLang: func() string { return "ja" },
 		PortInUse:  func(int) bool { return false }, // 既定=空き（実ポートを探りに行かない）
-		CheckDeps:  func(string) []platform.DepIssue { return nil },
+		CheckDeps:  func() []platform.DepIssue { return nil },
 		SteamUpdate: func(context.Context, string, steam.UpdateParams, func(steam.Event)) error {
 			panic("SteamUpdate が呼ばれるべきでないテストで呼ばれた")
 		},

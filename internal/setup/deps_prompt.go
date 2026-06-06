@@ -1,5 +1,6 @@
-// deps_prompt.go は不足依存（freetype2 / .NET 10）の導入をウィザード末尾で
+// deps_prompt.go は不足依存（freetype2）の導入をウィザード末尾で
 // 対話提案する（R-C 経路①）。検出は platform、対話は setup の責務。
+// .NET 10 の対話提案は自動設置（docs/design/dotnet-runtime.md）へ置換され撤去した。
 // 詳細仕様: docs/design/deps-onboarding.md §3.2・docs/design/cli-onboarding.md S4
 package setup
 
@@ -33,7 +34,7 @@ func OfferDepInstall(issues []platform.DepIssue, in *bufio.Reader, out io.Writer
 			fmt.Fprintln(out, "  "+issue.GuideText(lang)) // distro 不明＝手動導入の案内のみ
 			continue
 		}
-		fmt.Fprintln(out, depCmdLabel(lang, issue))
+		fmt.Fprintln(out, i18n.T(lang, "deps.cmdLabel"))
 		for _, c := range issue.Commands {
 			fmt.Fprintln(out, "    "+c)
 		}
@@ -49,7 +50,7 @@ func OfferDepInstall(issues []platform.DepIssue, in *bufio.Reader, out io.Writer
 			continue
 		}
 		if err := runAll(run, issue.Commands); err != nil {
-			fmt.Fprintln(out, depFailText(lang, issue, err))
+			fmt.Fprintln(out, i18n.T(lang, "deps.runFailed", err))
 			fmt.Fprintln(out, i18n.T(lang, "deps.runManually"))
 			continue
 		}
@@ -61,22 +62,6 @@ func OfferDepInstall(issues []platform.DepIssue, in *bufio.Reader, out io.Writer
 			}
 		}
 	}
-}
-
-// depCmdLabel は導入コマンドの前置きラベル（dotnet10 は sudo 不要の補足つき）。
-func depCmdLabel(lang i18n.Lang, issue platform.DepIssue) string {
-	if issue.Kind == "dotnet10" {
-		return i18n.T(lang, "deps.cmdLabel.dotnet10")
-	}
-	return i18n.T(lang, "deps.cmdLabel")
-}
-
-// depFailText は実行失敗の文言（dotnet-install.sh は curl と bash が前提）。
-func depFailText(lang i18n.Lang, issue platform.DepIssue, err error) string {
-	if issue.Kind == "dotnet10" {
-		return i18n.T(lang, "deps.runFailed.dotnet10", err)
-	}
-	return i18n.T(lang, "deps.runFailed", err)
 }
 
 func runAll(run func(string) error, cmds []string) error {

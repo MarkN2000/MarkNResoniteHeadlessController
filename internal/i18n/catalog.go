@@ -184,6 +184,16 @@ var catalog = map[string]map[Lang]string{
 		Ja: "ダウンロードを中止しました（途中までのデータは次回の更新で再利用されます）。",
 		En: "Download cancelled (partially downloaded data will be reused next time).",
 	},
+	"wizard.dl.dotnetInstalling": {
+		Ja: "  .NET ランタイムを設置中...",
+		En: "  Installing the .NET runtime...",
+	},
+	"wizard.dl.dotnetFailed": {
+		Ja: "✗ Resonite のダウンロードは完了しましたが、.NET ランタイムの設置に失敗しました: %v\n" +
+			"  ヘッドレスの起動時に自動で再試行されます。",
+		En: "✗ Resonite was downloaded, but installing the .NET runtime failed: %v\n" +
+			"  It will be retried automatically when the headless server starts.",
+	},
 
 	// ── 起動バナー（S7=ウィザード直後 / S9=通常起動）────────────────
 	"banner.running": {
@@ -223,15 +233,11 @@ var catalog = map[string]map[Lang]string{
 		En: "Press Ctrl+C to stop.",
 	},
 
-	// ── 依存検出（freetype2 / ARM の .NET 10・R-C）──────────────────
-	// Kind が閉じた集合（freetype2/dotnet10）のため "deps.<種別>.<Kind>" 形式で引く。
+	// ── 依存検出（freetype2・R-C。dotnet10 系キーは自動設置への置換で撤去済み）──
+	// Kind が閉じた集合（freetype2）のため "deps.<種別>.<Kind>" 形式で引く。
 	"deps.title.freetype2": {
 		Ja: "freetype2（Resonite のネイティブ依存）",
 		En: "freetype2 (native dependency of Resonite)",
-	},
-	"deps.title.dotnet10": {
-		Ja: ".NET 10 ランタイム（ARM Linux で必要）",
-		En: ".NET 10 runtime (required on ARM Linux)",
 	},
 	"deps.guide.commands": {
 		Ja: "導入コマンド: %s",
@@ -240,10 +246,6 @@ var catalog = map[string]map[Lang]string{
 	"deps.fallback.freetype2": {
 		Ja: "お使いのディストリビューションのパッケージマネージャで freetype2（Debian系では libfreetype6）を導入してください。",
 		En: "Install freetype2 (libfreetype6 on Debian-based systems) using your distribution's package manager.",
-	},
-	"deps.fallback.dotnet10": {
-		Ja: "ARM Linux には .NET 10 ランタイムが必要です。公式の dotnet-install.sh で導入してください。",
-		En: "ARM Linux requires the .NET 10 runtime. Install it with the official dotnet-install.sh.",
 	},
 	// 経路②（毎起動のログ案内・main）
 	"deps.missingLog": {
@@ -260,17 +262,9 @@ var catalog = map[string]map[Lang]string{
 		Ja: "⚠ Resonite の動作に必要な freetype2 が見つかりません。",
 		En: "⚠ freetype2 (required by Resonite) was not found.",
 	},
-	"deps.headline.dotnet10": {
-		Ja: "⚠ ARM Linux では .NET 10 ランタイムが必要ですが、見つかりません。",
-		En: "⚠ ARM Linux requires the .NET 10 runtime, but it was not found.",
-	},
 	"deps.cmdLabel": {
 		Ja: "  導入コマンド:",
 		En: "  Install command:",
-	},
-	"deps.cmdLabel.dotnet10": {
-		Ja: "  導入コマンド（sudo 不要・~/.dotnet に入ります）:",
-		En: "  Install command (no sudo required; installs to ~/.dotnet):",
 	},
 	"deps.runNow": {
 		Ja: "  今すぐ実行しますか? [Y/n]: ",
@@ -291,10 +285,6 @@ var catalog = map[string]map[Lang]string{
 	"deps.runFailed": {
 		Ja: "  実行に失敗しました: %v",
 		En: "  Failed to run: %v",
-	},
-	"deps.runFailed.dotnet10": {
-		Ja: "  実行に失敗しました（curl と bash が必要です）: %v",
-		En: "  Failed to run (curl and bash are required): %v",
 	},
 	"deps.runManually": {
 		Ja: "  上のコマンドを手動で実行してください。",

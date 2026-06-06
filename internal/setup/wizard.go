@@ -48,10 +48,10 @@ var errDLCancelled = errors.New("download cancelled")
 type Wizard struct {
 	In         io.Reader
 	Out        io.Writer
-	TTY        bool                                        // tty ならパスワードを伏せ字入力
-	DetectLang func() string                               // S0 言語選択の既定値の提案（"ja"/"en"）
-	PortInUse  func(port int) bool                         // S3 ポートの空き事前試験（true=使用中）
-	CheckDeps  func(installDir string) []platform.DepIssue // S4 依存検出（nil 返却=不足なし）
+	TTY        bool                       // tty ならパスワードを伏せ字入力
+	DetectLang func() string              // S0 言語選択の既定値の提案（"ja"/"en"）
+	PortInUse  func(port int) bool        // S3 ポートの空き事前試験（true=使用中）
+	CheckDeps  func() []platform.DepIssue // S4 依存検出（nil 返却=不足なし）
 	// SteamUpdate は S5b の DL 実行（実環境= steam.Manager.Update への結線）。
 	// イベントは onEvent へ転送される（進捗%の端末描画用）。
 	SteamUpdate func(ctx context.Context, toolsDir string, p steam.UpdateParams, onEvent func(steam.Event)) error
@@ -65,8 +65,8 @@ func NewWizard() *Wizard {
 		TTY:        term.IsTerminal(int(os.Stdin.Fd())),
 		DetectLang: platform.DetectLang,
 		PortInUse:  portInUse,
-		CheckDeps: func(installDir string) []platform.DepIssue {
-			return platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, installDir)
+		CheckDeps: func() []platform.DepIssue {
+			return platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH)
 		},
 		SteamUpdate: realSteamUpdate,
 	}
@@ -163,7 +163,7 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	}
 
 	// S4: 依存チェック＋[Y/n] 導入提案（Linux のみ・不足時のみ表示）
-	w.offerDeps(cfgPath, cfg, in, lang)
+	w.offerDeps(in, lang)
 
 	// S5: Resonite セットアップ（任意・Steam 資格入力→DL 実行）
 	if err := w.offerResonite(cfgPath, cfg, in, lang); err != nil {
@@ -337,14 +337,10 @@ func promptYNDef(in *bufio.Reader, out io.Writer, lang i18n.Lang, prompt string,
 	}
 }
 
-// offerDeps はウィザード保存成功後の依存チェック＋導入提案（R-C 経路①）。
-// ウィザード生成 cfg は Steam=nil のため installDir は常に既定（{dataDir}/resonite）。
-func (w *Wizard) offerDeps(cfgPath string, cfg *config.Config, in *bufio.Reader, lang i18n.Lang) {
-	dataDir := filepath.Dir(cfgPath)
-	installDir := cfg.InstallDirOrDefault(dataDir)
-	check := func() []platform.DepIssue { return w.CheckDeps(installDir) }
-	OfferDepInstall(check(), in, w.Out, lang, w.TTY, nil, func(kind string) bool {
-		for _, i := range check() {
+// offerDeps はウィザード保存成功後の依存チェック＋導入提案（R-C 経路①・freetype2 のみ）。
+func (w *Wizard) offerDeps(in *bufio.Reader, lang i18n.Lang) {
+	OfferDepInstall(w.CheckDeps(), in, w.Out, lang, w.TTY, nil, func(kind string) bool {
+		for _, i := range w.CheckDeps() {
 			if i.Kind == kind {
 				return false // まだ不足のまま
 			}
@@ -436,6 +432,11 @@ func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Rea
 			// 停滞打切りは資格ミスではない（回線・サーバー側要因）ので再入力には誘導しない。
 			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.stalled"))
 			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.retryLater"))
+			return nil
+		case errors.Is(err, steam.ErrDotnetInstallFailed):
+			// Resonite 本体の DL は完了している（資格ミスではない）。.NET ランタイムは
+			// ヘッドレス起動時のガードが自動で再試行するため、再入力には誘導しない。
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.dotnetFailed", err))
 			return nil
 		default:
 			// ネットワーク断・Ctrl+C 中断・検証失敗など。DD は差分再開できるので
@@ -537,6 +538,14 @@ func (w *Wizard) runSteamUpdate(dataDir string, cfg *config.Config, lang i18n.La
 		if preparing {
 			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.preparingDone"))
 			preparing = false
+		}
+		// DD 100% の後に走る .NET ランタイム設置区間は % が 0 から再カウントするため、
+		// 単調ガード（lastStep）のままだと完全に無言になる。区間ラベルを 1 行出して
+		// lastStep をリセットし、設置 DL の進捗も 10% 刻みで見えるようにする。
+		if e.Kind == "milestone" && e.Text == steam.MilestoneDotnetInstalling {
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.dotnetInstalling"))
+			lastStep = -10
+			return
 		}
 		if e.Kind == "progress" {
 			step := int(e.Percent) / 10 * 10

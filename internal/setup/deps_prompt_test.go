@@ -94,13 +94,13 @@ func TestOfferDepInstall(t *testing.T) {
 	})
 	t.Run("EOF は残りの issue も打ち切る（無限ループしない）", func(t *testing.T) {
 		rec := &recorder{}
-		two := []platform.DepIssue{freetypeIssue(), {Kind: "dotnet10", Commands: []string{"curl ... | bash"}}}
+		two := []platform.DepIssue{freetypeIssue(), {Kind: "freetype2", Commands: []string{"echo second-issue-cmd"}}}
 		out := offer(two, "", true, rec)
 		if len(rec.ran) != 0 {
 			t.Errorf("EOF で実行された: %v", rec.ran)
 		}
-		// 1 件目の提示はされるが 2 件目のヘッドラインは出ない（打ち切り）
-		if strings.Contains(out.String(), ".NET 10") {
+		// 1 件目の提示はされるが 2 件目のコマンドは出ない（打ち切り）
+		if strings.Contains(out.String(), "second-issue-cmd") {
 			t.Errorf("EOF 後に次の issue が提示された:\n%s", out.String())
 		}
 	})
@@ -119,8 +119,8 @@ func TestOfferDepInstall(t *testing.T) {
 	t.Run("実行失敗なら recheck しないで続行する", func(t *testing.T) {
 		rec := &recorder{runErr: errors.New("boom")}
 		two := []platform.DepIssue{freetypeIssue(), {
-			Kind:     "dotnet10",
-			Commands: []string{"curl ... | bash"},
+			Kind:     "freetype2",
+			Commands: []string{"echo second-issue-cmd"},
 		}}
 		out := offer(two, "y\ny\n", true, rec)
 		if len(rec.ran) != 2 {
@@ -129,9 +129,8 @@ func TestOfferDepInstall(t *testing.T) {
 		if len(rec.rechecked) != 0 {
 			t.Errorf("失敗時に recheck された: %v", rec.rechecked)
 		}
-		// dotnet10 の失敗は curl/bash 前提の補足つき
-		if !strings.Contains(out.String(), "curl と bash が必要です") {
-			t.Errorf("dotnet10 失敗の補足が出ていない:\n%s", out.String())
+		if !strings.Contains(out.String(), "実行に失敗しました") {
+			t.Errorf("失敗の文言が出ていない:\n%s", out.String())
 		}
 	})
 	t.Run("Commands 空（distro 不明）は案内だけで対話しない", func(t *testing.T) {

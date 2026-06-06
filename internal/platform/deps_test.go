@@ -92,98 +92,8 @@ func TestPkgManagerFromOSRelease(t *testing.T) {
 	}
 }
 
-// --- .NET 10 判定 ---
-
-func TestHasDotnet10(t *testing.T) {
-	cases := []struct {
-		name string
-		out  string
-		want bool
-	}{
-		{"10 あり", "Microsoft.NETCore.App 10.0.2 [/home/u/.dotnet/shared/Microsoft.NETCore.App]\n", true},
-		{"9 と 10 混在", "Microsoft.NETCore.App 9.0.7 [/p]\nMicrosoft.NETCore.App 10.0.0 [/p]\n", true},
-		{"9 のみ", "Microsoft.NETCore.App 9.0.7 [/p]\n", false},
-		// AspNetCore だけでは不足（ヘッドレスに必要なのはベースランタイム）
-		{"AspNetCore 10 のみ", "Microsoft.AspNetCore.App 10.0.0 [/p]\n", false},
-		{"空出力", "", false},
-		// 10.x の前方一致であって 100.x 等を誤検知しない（"10." 区切りで判定）
-		{"バージョン誤検知なし", "Microsoft.NETCore.App 100.0.0 [/p]\n", false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := hasDotnet10(tc.out); got != tc.want {
-				t.Errorf("hasDotnet10(%q) = %v, want %v", tc.out, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestDotnet10Status(t *testing.T) {
-	const homeDotnet = "/home/test/.dotnet/dotnet"
-	list10 := "Microsoft.NETCore.App 10.0.2 [/p]\n"
-	list9 := "Microsoft.NETCore.App 9.0.7 [/p]\n"
-
-	t.Run("同梱 dotnet が arch 一致なら present（list-runtimes 不要）", func(t *testing.T) {
-		p := emptyProbe()
-		p.stat = statOK("/inst/dotnet-runtime/dotnet")
-		p.elfArch = archOf(map[string]string{"/inst/dotnet-runtime/dotnet": "arm64"})
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depPresent {
-			t.Errorf("got %v, want depPresent", got)
-		}
-	})
-	t.Run("同梱が他 arch（x64）ならシステム側へフォールバック→どこにも無く absent", func(t *testing.T) {
-		p := emptyProbe()
-		p.stat = statOK("/inst/dotnet-runtime/dotnet")
-		p.elfArch = archOf(map[string]string{"/inst/dotnet-runtime/dotnet": "amd64"})
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depAbsent {
-			t.Errorf("got %v, want depAbsent", got)
-		}
-	})
-	t.Run("~/.dotnet の dotnet に 10 があれば present", func(t *testing.T) {
-		p := emptyProbe()
-		p.stat = statOK(homeDotnet)
-		p.runCmd = func(_ time.Duration, name string, args ...string) (string, error) {
-			if name != homeDotnet {
-				t.Errorf("~/.dotnet を最優先で実行すべき: %q", name)
-			}
-			return list10, nil
-		}
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depPresent {
-			t.Errorf("got %v, want depPresent", got)
-		}
-	})
-	t.Run("PATH の dotnet に 10 が無ければ absent", func(t *testing.T) {
-		p := emptyProbe()
-		p.lookPath = func(string) (string, error) { return "/usr/bin/dotnet", nil }
-		p.runCmd = func(_ time.Duration, _ string, _ ...string) (string, error) { return list9, nil }
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depAbsent {
-			t.Errorf("got %v, want depAbsent", got)
-		}
-	})
-	t.Run("候補がどこにも無ければ absent", func(t *testing.T) {
-		p := emptyProbe()
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depAbsent {
-			t.Errorf("got %v, want depAbsent", got)
-		}
-	})
-	t.Run("~/.dotnet が他 arch（x64 誤導入）なら absent", func(t *testing.T) {
-		p := emptyProbe()
-		p.stat = statOK(homeDotnet)
-		p.elfArch = archOf(map[string]string{homeDotnet: "amd64"})
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depAbsent {
-			t.Errorf("got %v, want depAbsent", got)
-		}
-	})
-	t.Run("候補は在るが実行失敗なら unknown（黙る）", func(t *testing.T) {
-		p := emptyProbe()
-		p.stat = statOK(homeDotnet)
-		if got := dotnet10Status(p, "arm64", "/inst"); got != depUnknown {
-			t.Errorf("got %v, want depUnknown", got)
-		}
-	})
-}
-
 // --- freetype2 判定 ---
+// （旧 dotnet10 判定のテストは dotnetreq_test.go の SystemRuntimeSatisfies 系へ一般化移設）
 
 func TestLdconfigCandidates(t *testing.T) {
 	out := "813 libs found in cache `/etc/ld.so.cache'\n" +
@@ -291,7 +201,7 @@ func TestDepIssueGuideText(t *testing.T) {
 	if got := (DepIssue{Kind: "freetype2"}).Title(i18n.Ja); got != "freetype2（Resonite のネイティブ依存）" {
 		t.Errorf("Title(ja) = %q", got)
 	}
-	if got := (DepIssue{Kind: "dotnet10"}).Title(i18n.En); got != ".NET 10 runtime (required on ARM Linux)" {
+	if got := (DepIssue{Kind: "freetype2"}).Title(i18n.En); got != "freetype2 (native dependency of Resonite)" {
 		t.Errorf("Title(en) = %q", got)
 	}
 }
@@ -331,12 +241,12 @@ func TestCheckHeadlessDepsMatrix(t *testing.T) {
 	}
 
 	t.Run("windows は常に nil", func(t *testing.T) {
-		if got := checkHeadlessDeps(freetypeAbsentProbe(), "windows", "amd64", "C:\\x"); got != nil {
+		if got := checkHeadlessDeps(freetypeAbsentProbe(), "windows", "amd64"); got != nil {
 			t.Errorf("windows で issue が出た: %v", got)
 		}
 	})
-	t.Run("linux/amd64 は freetype のみ（dotnet はチェックしない）", func(t *testing.T) {
-		got := checkHeadlessDeps(freetypeAbsentProbe(), "linux", "amd64", "/inst")
+	t.Run("linux/amd64 は freetype のみ（dotnet は自動設置側の責務）", func(t *testing.T) {
+		got := checkHeadlessDeps(freetypeAbsentProbe(), "linux", "amd64")
 		if len(got) != 1 || got[0].Kind != "freetype2" {
 			t.Fatalf("issues = %v, want [freetype2]", kinds(got))
 		}
@@ -344,52 +254,37 @@ func TestCheckHeadlessDepsMatrix(t *testing.T) {
 			t.Errorf("cachyos→pacman コマンドが出るべき: %v", got[0].Commands)
 		}
 	})
-	t.Run("linux/arm64 は freetype＋dotnet の両方", func(t *testing.T) {
-		got := checkHeadlessDeps(freetypeAbsentProbe(), "linux", "arm64", "/inst")
-		if len(got) != 2 || got[0].Kind != "freetype2" || got[1].Kind != "dotnet10" {
-			t.Fatalf("issues = %v, want [freetype2 dotnet10]", kinds(got))
-		}
-		if len(got[1].Commands) != 1 || !strings.Contains(got[1].Commands[0], "dotnet-install.sh") {
-			t.Errorf("dotnet-install.sh コマンドが出るべき: %v", got[1].Commands)
-		}
-	})
-	t.Run("linux/arm64 同梱 usable dotnet で dotnet issue 抑制（~ 展開込み）", func(t *testing.T) {
-		p := freetypeAbsentProbe()
-		// installDir="~/resonite" → home 展開後の同梱 dotnet が arm64
-		bundled := "/home/test/resonite/dotnet-runtime/dotnet"
-		p.stat = statOK(bundled)
-		p.elfArch = archOf(map[string]string{bundled: "arm64"})
-		got := checkHeadlessDeps(p, "linux", "arm64", "~/resonite")
+	t.Run("linux/arm64 も freetype のみ", func(t *testing.T) {
+		got := checkHeadlessDeps(freetypeAbsentProbe(), "linux", "arm64")
 		if len(got) != 1 || got[0].Kind != "freetype2" {
-			t.Fatalf("issues = %v, want [freetype2]（dotnet は同梱で充足）", kinds(got))
+			t.Fatalf("issues = %v, want [freetype2]", kinds(got))
 		}
 	})
-	t.Run("freetype present＋dotnet present なら issue ゼロ", func(t *testing.T) {
+	t.Run("freetype present なら issue ゼロ", func(t *testing.T) {
 		p := freetypeAbsentProbe()
 		const soPath = "/usr/lib/libfreetype.so.6"
-		const homeDotnet = "/home/test/.dotnet/dotnet"
 		p.runCmd = func(_ time.Duration, name string, _ ...string) (string, error) {
 			if name == "/sbin/ldconfig" {
 				return "\tlibfreetype.so.6 (libc6,AArch64) => " + soPath + "\n", nil
 			}
-			return "Microsoft.NETCore.App 10.0.2 [/p]\n", nil
+			return "", errors.New("not found")
 		}
-		p.stat = statOK(soPath, homeDotnet)
-		p.elfArch = archOf(map[string]string{soPath: "arm64", homeDotnet: "arm64"})
-		if got := checkHeadlessDeps(p, "linux", "arm64", "/inst"); len(got) != 0 {
+		p.stat = statOK(soPath)
+		p.elfArch = archOf(map[string]string{soPath: "arm64"})
+		if got := checkHeadlessDeps(p, "linux", "arm64"); len(got) != 0 {
 			t.Errorf("issues = %v, want []", kinds(got))
 		}
 	})
 	t.Run("distro 不明なら freetype の Commands は空（汎用文言は呼び出し側）", func(t *testing.T) {
 		p := freetypeAbsentProbe()
 		p.readFile = func(string) ([]byte, error) { return nil, fs.ErrNotExist }
-		got := checkHeadlessDeps(p, "linux", "amd64", "/inst")
+		got := checkHeadlessDeps(p, "linux", "amd64")
 		if len(got) != 1 || len(got[0].Commands) != 0 {
 			t.Fatalf("issues = %v, Commands は空であるべき: %+v", kinds(got), got)
 		}
 	})
 	t.Run("unknown（検出不能）は黙る＝issue ゼロ", func(t *testing.T) {
-		if got := checkHeadlessDeps(emptyProbe(), "linux", "amd64", "/inst"); len(got) != 0 {
+		if got := checkHeadlessDeps(emptyProbe(), "linux", "amd64"); len(got) != 0 {
 			t.Errorf("issues = %v, want []（案A）", kinds(got))
 		}
 	})

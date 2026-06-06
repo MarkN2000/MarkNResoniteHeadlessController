@@ -5,7 +5,6 @@ package server
 // driver の log hub（＝UI コンソール）へ乗ることを検証する。
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,13 +13,11 @@ import (
 )
 
 func TestPublishDepGuide_PublishesSysLog(t *testing.T) {
-	s, dataDir := newPathServer(t, nil)
-	var gotInstall string
-	s.checkDeps = func(_, _, installDir string) []platform.DepIssue {
-		gotInstall = installDir
+	s, _ := newPathServer(t, nil)
+	s.checkDeps = func(_, _ string) []platform.DepIssue {
 		return []platform.DepIssue{
 			{Kind: "freetype2", Commands: []string{"sudo pacman -S freetype2"}},
-			{Kind: "dotnet10"}, // Commands 空＝fallback（手動案内）経路
+			{Kind: "freetype2"}, // Commands 空＝fallback（手動案内）経路
 		}
 	}
 	ch, _ := s.driver.SubscribeLog(8)
@@ -28,12 +25,8 @@ func TestPublishDepGuide_PublishesSysLog(t *testing.T) {
 
 	s.publishDepGuide()
 
-	// installDir は既定（{dataDir}/resonite）が導出されて渡る。
-	if want := filepath.Join(dataDir, "resonite"); gotInstall != want {
-		t.Errorf("installDir=%q want %q", gotInstall, want)
-	}
 	// 2 件の issue がそれぞれ 1 行の sys ログになる（コマンドあり / fallback=手動案内）。
-	wants := []string{"sudo pacman -S freetype2", "dotnet-install.sh"}
+	wants := []string{"sudo pacman -S freetype2", "libfreetype6"}
 	for i, want := range wants {
 		var line headless.LogLine
 		select {
@@ -53,7 +46,7 @@ func TestPublishDepGuide_PublishesSysLog(t *testing.T) {
 // 不足ゼロなら何も流さない（Windows は checkDeps が常に空＝この経路）。
 func TestPublishDepGuide_NoIssuesNoLog(t *testing.T) {
 	s, _ := newPathServer(t, nil)
-	s.checkDeps = func(_, _, _ string) []platform.DepIssue { return nil }
+	s.checkDeps = func(_, _ string) []platform.DepIssue { return nil }
 	ch, _ := s.driver.SubscribeLog(8)
 	defer s.driver.UnsubscribeLog(ch)
 

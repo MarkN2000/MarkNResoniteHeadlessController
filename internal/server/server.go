@@ -45,7 +45,7 @@ type Server struct {
 	steam     *steam.Manager       // Resonite 入手/更新（DepotDownloader・P9-B）
 
 	// checkDeps は依存検出（R-C）。本番は platform.CheckHeadlessDeps・テストで偽装する。
-	checkDeps func(goos, goarch, installDir string) []platform.DepIssue
+	checkDeps func(goos, goarch string) []platform.DepIssue
 
 	// 起動時ガード（.NET ランタイム自動設置・docs/design/dotnet-runtime.md）の seam。
 	// system 判定は実マシンの dotnet・installRuntime はネットに依存するためテストで偽装する。
@@ -367,16 +367,13 @@ func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, er
 	return headlessPath, launchPath, err
 }
 
-// publishDepGuide は不足依存（freetype2 / ARM の .NET 10）があれば sys ログへ
-// 導入ガイドを流す（R-C 経路③・handleStart 起点）。コマンドは案内するだけで
-// 実行しない（sudo を勝手に走らせない）。Windows は checkDeps が常に空＝no-op。
-// installDir の読取だけ cfgMu 下で行い、検出 I/O はロック外（steamParams と同じ流儀）。
+// publishDepGuide は不足依存（freetype2）があれば sys ログへ導入ガイドを流す
+// （R-C 経路③・handleStart 起点）。コマンドは案内するだけで実行しない
+// （sudo を勝手に走らせない）。Windows は checkDeps が常に空＝no-op。
+// .NET ランタイムは自動設置（dotnetguard.go）が担うためここでは見ない。
 func (s *Server) publishDepGuide() {
-	s.cfgMu.RLock()
-	installDir := s.cfg.InstallDirOrDefault(s.dataDir)
-	lang := s.cfg.LangOrDefault()
-	s.cfgMu.RUnlock()
-	for _, issue := range s.checkDeps(runtime.GOOS, runtime.GOARCH, installDir) {
+	lang := s.langSnapshot()
+	for _, issue := range s.checkDeps(runtime.GOOS, runtime.GOARCH) {
 		s.driver.PublishSys(i18n.T(lang, "deps.sysGuide", issue.Title(lang), issue.GuideText(lang)))
 	}
 }

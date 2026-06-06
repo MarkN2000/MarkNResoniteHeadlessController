@@ -105,8 +105,9 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 
 	// 依存チェック（R-C 経路②）: 不足があればログで案内するだけで続行する
 	// （[Y/n] 対話は初回ウィザード末尾のみ＝起動をブロックしない）。Windows は常に no-op。
+	// .NET ランタイムはここでは見ない（DL 後フック＋起動時ガードの自動設置が担う）。
 	if !fromWizard {
-		for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, cfg.InstallDirOrDefault(dir)) {
+		for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH) {
 			log.Print(i18n.T(lang, "deps.missingLog", issue.Title(lang), issue.GuideText(lang)))
 		}
 	}
