@@ -49,6 +49,11 @@ var catalog = map[string]map[Lang]string{
 		Ja: "1〜65535 の数値を入力してください。",
 		En: "Please enter a number between 1 and 65535.",
 	},
+	// 唯一の既定 N プロンプト（使用中と分かっているポートをうっかり確定しない安全側）
+	"wizard.port.inUse": {
+		Ja: "ポート %d は現在使用中のようです。このまま使いますか?（あとで空く予定なら Y） [y/N]: ",
+		En: "Port %d appears to be in use. Use it anyway? (choose Y if it will be free later) [y/N]: ",
+	},
 	"wizard.saved": {
 		Ja: "設定を保存しました: %s",
 		En: "Settings saved to: %s",
@@ -300,8 +305,10 @@ var catalog = map[string]map[Lang]string{
 
 	// ── main のエラー ───────────────────────────────────────────
 	"main.portInUse": {
-		Ja: "ポート %d は既に使用されています。他のソフトが使っていないか確認してください。",
-		En: "Port %d is already in use. Check if another program is using it.",
+		Ja: "ポート %d は既に使用されています。他のソフトが使っていないか確認してください。\n" +
+			"ポートを変えるには mrhc.config.json の \"port\" を編集してください。",
+		En: "Port %d is already in use. Check if another program is using it.\n" +
+			"To change the port, edit \"port\" in mrhc.config.json.",
 	},
 	"main.listenFailed": {
 		Ja: "サーバー起動に失敗しました: %v",

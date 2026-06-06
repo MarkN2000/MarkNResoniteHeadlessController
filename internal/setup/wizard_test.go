@@ -26,6 +26,7 @@ func newTestWizard(input string) (*Wizard, *bytes.Buffer) {
 		Out:        out,
 		TTY:        false,
 		DetectLang: func() string { return "ja" },
+		PortInUse:  func(int) bool { return false }, // 既定=空き（実ポートを探りに行かない）
 		CheckDeps:  func(string) []platform.DepIssue { return nil },
 		SteamUpdate: func(context.Context, string, steam.UpdateParams, func(steam.Event)) error {
 			panic("SteamUpdate が呼ばれるべきでないテストで呼ばれた")
@@ -118,6 +119,48 @@ func TestWizard_PortInvalidThenValid(t *testing.T) {
 	}
 	if c := strings.Count(out.String(), "1〜65535"); c != 2 {
 		t.Errorf("ポート再入力の案内が %d 回（want 2）: %s", c, out.String())
+	}
+}
+
+// S3 使用中ポート → 警告 [y/N]。空 Enter=N でポート再入力に戻り、別ポートで進める。
+func TestWizard_PortInUseRetry(t *testing.T) {
+	w, out := newTestWizard("\npw\npw\n\n\n8090\nn\n\n") // port空=8080→使用中→空=N→8090 / S5=n / S6=Y
+	w.PortInUse = func(p int) bool { return p == 8080 }
+	cfg, _, err := w.Run(tmpCfgPath(t))
+	if err != nil {
+		t.Fatalf("Run: %v\nout=%s", err, out.String())
+	}
+	if cfg.Port != 8090 {
+		t.Errorf("Port = %d, want 8090", cfg.Port)
+	}
+	if !strings.Contains(out.String(), "ポート 8080 は現在使用中のようです") {
+		t.Errorf("使用中の警告が出ていない: %s", out.String())
+	}
+}
+
+// S3 使用中ポート → y でそのまま採用（あとで空く予定のケース）。
+func TestWizard_PortInUseForceUse(t *testing.T) {
+	w, _ := newTestWizard("\npw\npw\n\ny\nn\n\n") // port空=8080→使用中→y / S5=n / S6=Y
+	w.PortInUse = func(int) bool { return true }
+	cfg, _, err := w.Run(tmpCfgPath(t))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if cfg.Port != 8080 {
+		t.Errorf("Port = %d, want 8080", cfg.Port)
+	}
+}
+
+// 使用中警告の [y/N] で EOF → 中断（無限ループしない）。
+func TestWizard_PortInUseEOFAborts(t *testing.T) {
+	w, out := newTestWizard("\npw\npw\n\n") // port空=8080→使用中→EOF
+	w.PortInUse = func(int) bool { return true }
+	_, _, err := w.Run(tmpCfgPath(t))
+	if !errors.Is(err, ErrAborted) {
+		t.Fatalf("err = %v, want ErrAborted", err)
+	}
+	if !strings.Contains(out.String(), "セットアップを中断しました") {
+		t.Errorf("中断メッセージが出ていない: %s", out.String())
 	}
 }
 

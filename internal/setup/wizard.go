@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -49,6 +50,7 @@ type Wizard struct {
 	Out        io.Writer
 	TTY        bool                                        // tty ならパスワードを伏せ字入力
 	DetectLang func() string                               // S0 言語選択の既定値の提案（"ja"/"en"）
+	PortInUse  func(port int) bool                         // S3 ポートの空き事前試験（true=使用中）
 	CheckDeps  func(installDir string) []platform.DepIssue // S4 依存検出（nil 返却=不足なし）
 	// SteamUpdate は S5b の DL 実行（実環境= steam.Manager.Update への結線）。
 	// イベントは onEvent へ転送される（進捗%の端末描画用）。
@@ -62,11 +64,25 @@ func NewWizard() *Wizard {
 		Out:        os.Stdout,
 		TTY:        term.IsTerminal(int(os.Stdin.Fd())),
 		DetectLang: platform.DetectLang,
+		PortInUse:  portInUse,
 		CheckDeps: func(installDir string) []platform.DepIssue {
 			return platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, installDir)
 		},
 		SteamUpdate: realSteamUpdate,
 	}
+}
+
+// portInUse は S3 の空き事前試験。Listen が成功すれば空き、失敗のうち「使用中」
+// （IsAddrInUse）だけを true とする。権限不足など他の失敗は S3 では黙って通し、
+// 起動時の listenFailed 文言に任せる（チェックはあくまで早期警告のベストエフォート。
+// 3GB の DL を完走した後に「ポート使用中」で死ぬ事故を入力時点で防ぐのが目的）。
+func portInUse(port int) bool {
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+	if err == nil {
+		_ = ln.Close()
+		return false
+	}
+	return platform.IsAddrInUse(err)
 }
 
 // realSteamUpdate は steam.Manager で実 DL を行い、進捗イベントを onEvent へ転送する。
@@ -269,19 +285,39 @@ func (w *Wizard) promptPort(in *bufio.Reader, lang i18n.Lang, def int) (int, err
 		if err != nil {
 			return 0, err
 		}
-		if s == "" {
-			return def, nil
+		p := def
+		if s != "" {
+			v, convErr := strconv.Atoi(s)
+			if convErr != nil || v <= 0 || v >= 65536 {
+				fmt.Fprintln(w.Out, i18n.T(lang, "wizard.port.invalid"))
+				continue
+			}
+			p = v
 		}
-		if p, convErr := strconv.Atoi(s); convErr == nil && p > 0 && p < 65536 {
-			return p, nil
+		// 使用中なら警告して確認する。ここだけ既定 N（空 Enter=ポート再入力に戻る）＝
+		// 使用中と分かっているポートをうっかり確定しない安全側。
+		if w.PortInUse != nil && w.PortInUse(p) {
+			useAnyway, err := promptYNDef(in, w.Out, lang, i18n.T(lang, "wizard.port.inUse", p), false)
+			if err != nil {
+				return 0, err
+			}
+			if !useAnyway {
+				continue
+			}
 		}
-		fmt.Fprintln(w.Out, i18n.T(lang, "wizard.port.invalid"))
+		return p, nil
 	}
 }
 
 // promptYN は [Y/n] を尋ねる（空 Enter = Y）。不正は再入力・EOF はエラー。
 // ウィザード各所（S5/S6）と OfferDepInstall（S4）で共用する。
 func promptYN(in *bufio.Reader, out io.Writer, lang i18n.Lang, prompt string) (bool, error) {
+	return promptYNDef(in, out, lang, prompt, true)
+}
+
+// promptYNDef は空 Enter の既定値を指定できる y/n プロンプト。既定 N は S3 の
+// 「使用中ポートをこのまま使うか」だけ（全プロンプト既定 Y の原則の唯一の例外＝安全側）。
+func promptYNDef(in *bufio.Reader, out io.Writer, lang i18n.Lang, prompt string, defYes bool) (bool, error) {
 	for {
 		fmt.Fprint(out, prompt)
 		s, err := readLine(in)
@@ -289,7 +325,9 @@ func promptYN(in *bufio.Reader, out io.Writer, lang i18n.Lang, prompt string) (b
 			return false, err
 		}
 		switch strings.ToLower(s) {
-		case "", "y", "yes":
+		case "":
+			return defYes, nil
+		case "y", "yes":
 			return true, nil
 		case "n", "no":
 			return false, nil
