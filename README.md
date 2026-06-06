@@ -39,13 +39,15 @@ curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases
 cd mrhc-linux-amd64 && ./mrhc
 ```
 
-初回はセットアップウィザード（管理パスワード等の対話入力）が起動します。
+初回はセットアップウィザード（日本語/英語）が起動し、管理パスワード・ポート・Resonite 本体のダウンロード（Steam アカウントが必要・スキップ可）まで対話で完結して、そのままサーバーが立ち上がります。
 
 手動で導入する場合は[最新リリース](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest)から `mrhc-linux-amd64.tar.gz` / `mrhc-linux-arm64.tar.gz` を取得し、好きな場所に展開してください。**tar.gz は実行権を保持しているため `chmod +x` は不要です。**
 
 ### Windows
 
-[mrhc-windows-amd64.zip](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/mrhc-windows-amd64.zip) をダウンロード → 展開 → フォルダ内の `mrhc.exe` を実行。
+[mrhc-windows-amd64.zip](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/mrhc-windows-amd64.zip) をダウンロード → 展開 → フォルダ内の `mrhc.exe` を実行（初回は Linux と同じセットアップウィザードが起動します）。
+
+> 未署名のため、初回実行時に SmartScreen の警告（「Windows によって PC が保護されました」）が出ることがあります。「詳細情報」→「実行」で起動できます。
 
 ### 更新
 
@@ -56,6 +58,13 @@ MRHC を**停止してから**、導入時と同じ場所で install.sh を再�
 ### データの置き場所
 
 設定・状態・ダウンロードした Resonite 本体は、すべて**実行ファイルと同じフォルダ内**に保存されます（フォルダごと移動・バックアップ可能）。別の場所に置きたい場合は `-data <dir>` で指定できます。
+
+### 困ったとき
+
+- **管理パスワードを忘れた** — サーバー機のコマンドラインで `./mrhc reset-password`（Windows: `mrhc.exe reset-password`）を実行すると、旧パスワードなしで再設定できます。
+- **セットアップを最初からやり直したい** — フォルダ内の `mrhc.config.json` を削除してもう一度起動すると、ウィザードが再実行されます。
+- **Steam Guard をオフにできない** — スマホの「モバイル認証器」を設定済みのアカウントは、スマホの Steam アプリ側（Steamガード → 認証機器を削除）で解除してから、Steam の 設定 → セキュリティ でオフにします。
+- **表示言語を変えたい** — `mrhc.config.json` の `"language"` を `"ja"` / `"en"` に書き換えて再起動します（Web UI の表示言語は画面右上の切替で別管理）。
 
 ## ドキュメント
 - **設計書**: [docs/DESIGN.md](docs/DESIGN.md)
