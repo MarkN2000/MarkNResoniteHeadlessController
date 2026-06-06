@@ -10,10 +10,12 @@ package setup
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -25,6 +27,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
 
 // ErrAborted は入力が読み取れず（EOF 等）ウィザードを中断したことを表す。
@@ -38,9 +41,12 @@ type Wizard struct {
 	TTY        bool                                        // tty ならパスワードを伏せ字入力
 	DetectLang func() string                               // S0 言語選択の既定値の提案（"ja"/"en"）
 	CheckDeps  func(installDir string) []platform.DepIssue // S4 依存検出（nil 返却=不足なし）
+	// SteamUpdate は S5b の DL 実行（実環境= steam.Manager.Update への結線）。
+	// イベントは onEvent へ転送される（進捗%の端末描画用）。
+	SteamUpdate func(ctx context.Context, toolsDir string, p steam.UpdateParams, onEvent func(steam.Event)) error
 }
 
-// NewWizard は実環境（stdin/stdout・OS 言語検出・実依存チェック）の Wizard を返す。
+// NewWizard は実環境（stdin/stdout・OS 言語検出・実依存チェック・実 Steam DL）の Wizard を返す。
 func NewWizard() *Wizard {
 	return &Wizard{
 		In:         os.Stdin,
@@ -50,7 +56,27 @@ func NewWizard() *Wizard {
 		CheckDeps: func(installDir string) []platform.DepIssue {
 			return platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, installDir)
 		},
+		SteamUpdate: realSteamUpdate,
 	}
+}
+
+// realSteamUpdate は steam.Manager で実 DL を行い、進捗イベントを onEvent へ転送する。
+// サーバー未起動のウィザード段階なので Web UI（single-flight 共有）との衝突は構造的に無い。
+// 成否判定は Update の戻り値で行う（result イベントではない・pubsub は満杯時ドロップのため）。
+func realSteamUpdate(ctx context.Context, toolsDir string, p steam.UpdateParams, onEvent func(steam.Event)) error {
+	m := steam.NewManager(toolsDir)
+	ch, _ := m.Subscribe(64)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for e := range ch {
+			onEvent(e)
+		}
+	}()
+	err := m.Update(ctx, p)
+	m.Unsubscribe(ch) // close され転送 goroutine が抜ける
+	<-done
+	return err
 }
 
 // Run はウィザードを実行し、保存済み config と「今すぐサーバーを起動するか」を返す。
@@ -114,9 +140,10 @@ func (w *Wizard) Run(cfgPath string) (cfg *config.Config, startNow bool, err err
 	// S4: 依存チェック＋[Y/n] 導入提案（Linux のみ・不足時のみ表示）
 	w.offerDeps(cfgPath, cfg, in)
 
-	// S5（Resonite セットアップ）は後続コミットで追加。それまでは Web UI への案内のみ。
-	fmt.Fprintln(w.Out)
-	fmt.Fprintln(w.Out, "Resonite 本体はログイン後の Web UI（設定 → Steam）からダウンロードできます。")
+	// S5: Resonite セットアップ（任意・Steam 資格入力→DL 実行）
+	if err := w.offerResonite(cfgPath, cfg, in, lang); err != nil {
+		return nil, false, w.abort(lang)
+	}
 
 	// S6: 起動確認
 	fmt.Fprintln(w.Out)
@@ -265,6 +292,178 @@ func (w *Wizard) offerDeps(cfgPath string, cfg *config.Config, in *bufio.Reader)
 		}
 		return true
 	})
+}
+
+// offerResonite は S5: Resonite 本体のセットアップ（任意）。
+// Y なら Steam 資格を読み（S5a）、config へ保存して DL を実行する（S5b）。
+// 戻り値の error は EOF 等の読取エラーのみ（DL の失敗・中止はメッセージを出して nil ＝続行。
+// あとから Web UI で再試行できるため、ウィザードはブロックしない）。
+func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Reader, lang i18n.Lang) error {
+	dataDir := filepath.Dir(cfgPath)
+
+	fmt.Fprintln(w.Out)
+	fmt.Fprintln(w.Out, i18n.T(lang, "wizard.resonite.header"))
+	yes, err := w.promptYN(in, lang, i18n.T(lang, "wizard.resonite.prompt"))
+	if err != nil {
+		return err
+	}
+	if !yes {
+		return nil // ヘッダで「あとから Web UI で実行できます」と案内済み
+	}
+
+	for { // 認証失敗時は資格入力からやり直せる（S5b → S5a のループ）
+		creds, ok, err := w.readSteamCreds(in, lang, cfg.InstallDirOrDefault(dataDir))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil // 空 Enter で中止（案内表示済み）
+		}
+
+		// 資格を config へ保存（DL の成否に関わらず Web UI から再利用できるように先に保存）
+		cfg.Steam = &config.Steam{
+			Username:   creds.user,
+			Password:   creds.pw,
+			BranchCode: creds.code,
+			InstallDir: creds.installDir, // 空=既定導出（InstallDirOrDefault）
+		}
+		if err := cfg.SaveTo(cfgPath); err != nil {
+			return err
+		}
+
+		err = w.runSteamUpdate(dataDir, cfg, lang)
+		switch {
+		case err == nil:
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.done"))
+			return nil
+		case errors.Is(err, steam.ErrTwoFactorRequired):
+			// Guard オンは再入力しても絶対に成功しないため、再入力ループに入れない（M3）
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.twoFactor"))
+			return nil
+		case errors.Is(err, steam.ErrAuthFailed):
+			retry, err2 := w.promptYN(in, lang, i18n.T(lang, "wizard.dl.authRetry"))
+			if err2 != nil {
+				return err2
+			}
+			if !retry {
+				fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.retryLater"))
+				return nil
+			}
+			continue
+		default:
+			// ネットワーク断・Ctrl+C 中断・検証失敗など。DD は差分再開できるので
+			// あとから Web UI の「今すぐ更新」でやり直せる。
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.failed", err))
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.retryLater"))
+			return nil
+		}
+	}
+}
+
+// steamCreds は S5a で読み取る入力一式。installDir は空=既定導出。
+type steamCreds struct {
+	user, pw, code, installDir string
+}
+
+// readSteamCreds は S5a: Steam 資格の対話入力。ユーザー名・パスワード・コードの空 Enter は
+// セクション中止（ok=false・案内を表示）。インストール先だけは空=既定（確定仕様）。
+func (w *Wizard) readSteamCreds(in *bufio.Reader, lang i18n.Lang, defaultInstall string) (steamCreds, bool, error) {
+	var c steamCreds
+
+	cancel := func() (steamCreds, bool, error) {
+		fmt.Fprintln(w.Out, i18n.T(lang, "wizard.steam.cancelled"))
+		return c, false, nil
+	}
+
+	fmt.Fprint(w.Out, i18n.T(lang, "wizard.steam.user"))
+	user, err := readLine(in)
+	if err != nil {
+		return c, false, err
+	}
+	if user == "" {
+		return cancel()
+	}
+	c.user = user
+
+	for { // パスワードは ASCII 64 文字以内（DepotDownloader の制約）を満たすまで再入力
+		pw, err := w.readSecret(in, i18n.T(lang, "wizard.steam.pw"))
+		if err != nil {
+			return c, false, err
+		}
+		if pw == "" {
+			return cancel()
+		}
+		if steam.ValidatePassword(pw) != nil {
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.steam.pwInvalid"))
+			continue
+		}
+		c.pw = pw
+		break
+	}
+
+	fmt.Fprint(w.Out, i18n.T(lang, "wizard.steam.code"))
+	code, err := readLine(in)
+	if err != nil {
+		return c, false, err
+	}
+	if code == "" {
+		return cancel()
+	}
+	c.code = code
+
+	fmt.Fprint(w.Out, i18n.T(lang, "wizard.steam.installDir", defaultInstall))
+	dir, err := readLine(in)
+	if err != nil {
+		return c, false, err
+	}
+	c.installDir = dir // 空=既定導出のまま（config に保存しない）
+	return c, true, nil
+}
+
+// runSteamUpdate は S5b: DL を実行し進捗を表示する。
+// Ctrl+C は DL 実行区間だけ捕捉して cancel する（プロンプト読取中に張ると Linux で
+// Ctrl+C が「効いていない」ように見えるため・M2）。中断しても DD は差分再開できる。
+func (w *Wizard) runSteamUpdate(dataDir string, cfg *config.Config, lang i18n.Lang) error {
+	params, err := steam.BuildUpdateParams(
+		cfg.Steam.Username, cfg.Steam.Password, cfg.Steam.BranchCode,
+		platform.ExpandHome(cfg.InstallDirOrDefault(dataDir)), platform.HeadlessBinaryName())
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	fmt.Fprintln(w.Out)
+	fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.start"))
+	fmt.Fprint(w.Out, i18n.T(lang, "wizard.dl.preparing"))
+
+	// 進捗表示: DD 本体（ダウンロードツール）の準備完了は最初の progress/milestone で
+	// 判定する（acquire 中は log のみ）。% は 10% 刻みの行表示（tty/パイプ両対応・
+	// \r の上書き描画はパイプのログを汚すため使わない）。
+	preparing := true
+	lastStep := -10
+	onEvent := func(e steam.Event) {
+		if e.Kind != "progress" && e.Kind != "milestone" {
+			return
+		}
+		if preparing {
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.preparingDone"))
+			preparing = false
+		}
+		if e.Kind == "progress" {
+			step := int(e.Percent) / 10 * 10
+			if step > lastStep {
+				lastStep = step
+				fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.downloading", step))
+			}
+		}
+	}
+	err = w.SteamUpdate(ctx, filepath.Join(dataDir, "tools"), params, onEvent)
+	if preparing {
+		fmt.Fprintln(w.Out) // 1 度も進捗が来ずに失敗した場合の改行（"準備中..." の行を閉じる）
+	}
+	return err
 }
 
 // ResetPassword は既存設定の管理パスワードを再設定する（旧パスワード不要）。

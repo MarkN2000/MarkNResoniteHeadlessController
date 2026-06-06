@@ -70,6 +70,104 @@ var catalog = map[string]map[Lang]string{
 		En: "Please answer y or n.",
 	},
 
+	// ── ウィザード S5: Resonite セットアップ ───────────────────────
+	"wizard.resonite.header": {
+		Ja: "[3/3] Resonite 本体の準備（任意）\n" +
+			"Resonite ヘッドレスを Steam からダウンロードします。必要なもの:\n" +
+			"\n" +
+			"  - Steam アカウント\n" +
+			"    ⚠ MRHC は二段階認証に対応していないため、Steamガードを\n" +
+			"      オフにしたアカウントが必要です。普段使いのアカウントではなく、\n" +
+			"      ダウンロード専用の予備アカウントの利用を推奨します。\n" +
+			"      オフにする方法: Steam の 設定 → セキュリティ → Steamガードを管理 → Steamガードをオフ\n" +
+			"\n" +
+			"  - ヘッドレスコード\n" +
+			"    Resonite 内で bot「Resonite」に /headlessCode と送ると返信されます。\n" +
+			"\n" +
+			"スキップしても、あとから Web UI（設定 → Steam）で実行できます。",
+		En: "[3/3] Resonite installation (optional)\n" +
+			"Download Resonite headless from Steam. You will need:\n" +
+			"\n" +
+			"  - A Steam account\n" +
+			"    ⚠ MRHC does not support two-factor authentication, so the account\n" +
+			"      must have Steam Guard turned off. We recommend a spare account\n" +
+			"      dedicated to downloads instead of your main account.\n" +
+			"      To turn it off: Steam → Settings → Security → Manage Steam Guard → Turn Steam Guard off\n" +
+			"\n" +
+			"  - A headless code\n" +
+			"    In Resonite, send /headlessCode to the bot \"Resonite\" to receive it.\n" +
+			"\n" +
+			"You can skip this and do it later in the Web UI (Settings → Steam).",
+	},
+	"wizard.resonite.prompt": {
+		Ja: "今すぐダウンロードしますか? [Y/n]: ",
+		En: "Download now? [Y/n]: ",
+	},
+	"wizard.steam.user": {
+		Ja: "  Steam ユーザー名: ",
+		En: "  Steam username: ",
+	},
+	"wizard.steam.pw": {
+		Ja: "  Steam パスワード: ",
+		En: "  Steam password: ",
+	},
+	"wizard.steam.code": {
+		Ja: "  ヘッドレスコード: ",
+		En: "  Headless code: ",
+	},
+	"wizard.steam.installDir": {
+		Ja: "  インストール先 [%s]: ",
+		En: "  Install directory [%s]: ",
+	},
+	"wizard.steam.cancelled": {
+		Ja: "入力を中止しました。あとから Web UI（設定 → Steam）で設定できます。",
+		En: "Cancelled. You can set this up later in the Web UI (Settings → Steam).",
+	},
+	"wizard.steam.pwInvalid": {
+		Ja: "ASCII（半角英数記号）64 文字以内で入力してください。",
+		En: "Use ASCII characters only, up to 64 characters.",
+	},
+	"wizard.dl.start": {
+		Ja: "ダウンロードを開始します（約 3GB・回線速度により数分かかります）。",
+		En: "Starting the download (about 3 GB; may take several minutes depending on your connection).",
+	},
+	"wizard.dl.preparing": {
+		Ja: "  ダウンロードツールを準備中...",
+		En: "  Preparing the download tool...",
+	},
+	"wizard.dl.preparingDone": {
+		Ja: " 完了",
+		En: " done",
+	},
+	"wizard.dl.downloading": {
+		Ja: "  Resonite をダウンロード中... %d%%",
+		En: "  Downloading Resonite... %d%%",
+	},
+	"wizard.dl.done": {
+		Ja: "✓ ダウンロード完了",
+		En: "✓ Download complete",
+	},
+	"wizard.dl.twoFactor": {
+		Ja: "✗ このアカウントは Steam Guard（二段階認証）が有効です。MRHC は二段階認証に\n" +
+			"  対応していないため、Steamガードをオフにしたアカウントを使用してください。\n" +
+			"  あとから Web UI（設定 → Steam）で設定できます。",
+		En: "✗ This account has Steam Guard (two-factor authentication) enabled. MRHC does\n" +
+			"  not support it; use an account with Steam Guard turned off.\n" +
+			"  You can set this up later in the Web UI (Settings → Steam).",
+	},
+	"wizard.dl.authRetry": {
+		Ja: "認証に失敗しました（パスワード誤り、または Steamガードが有効です）。Steam の情報をもう一度入力しますか? [Y/n]: ",
+		En: "Authentication failed (wrong password, or Steam Guard is enabled). Enter your Steam details again? [Y/n]: ",
+	},
+	"wizard.dl.failed": {
+		Ja: "✗ ダウンロードに失敗しました: %v",
+		En: "✗ Download failed: %v",
+	},
+	"wizard.dl.retryLater": {
+		Ja: "  あとから Web UI（設定 → Steam）で再試行できます。",
+		En: "  You can retry later in the Web UI (Settings → Steam).",
+	},
+
 	// ── 起動バナー（S7=ウィザード直後 / S9=通常起動）────────────────
 	"banner.running": {
 		Ja: "MRHC %s を起動しました。",

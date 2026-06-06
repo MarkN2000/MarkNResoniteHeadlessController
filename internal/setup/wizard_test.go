@@ -2,6 +2,7 @@ package setup
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -11,9 +12,12 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
 
 // newTestWizard は非tty・依存なし・OS検出=ja の決定的なウィザードを作る。
+// SteamUpdate は既定で panic（S5 を通らないテストで誤って DL 経路に入った事故を検出）。
+// S5 を検証するテストは個別に差し替える（wizard_steam_test.go）。
 func newTestWizard(input string) (*Wizard, *bytes.Buffer) {
 	out := &bytes.Buffer{}
 	return &Wizard{
@@ -22,6 +26,9 @@ func newTestWizard(input string) (*Wizard, *bytes.Buffer) {
 		TTY:        false,
 		DetectLang: func() string { return "ja" },
 		CheckDeps:  func(string) []platform.DepIssue { return nil },
+		SteamUpdate: func(context.Context, string, steam.UpdateParams, func(steam.Event)) error {
+			panic("SteamUpdate が呼ばれるべきでないテストで呼ばれた")
+		},
 	}, out
 }
 
@@ -30,9 +37,9 @@ func tmpCfgPath(t *testing.T) string {
 	return filepath.Join(t.TempDir(), config.FileName)
 }
 
-// 空Enter連打（全既定値）= 言語ja・PW以外既定・起動Y の推奨フロー。
+// 既定値主体のフロー（S5 のみ n でスキップ）= 言語ja・port既定・起動Y。
 func TestWizard_HappyPathDefaults(t *testing.T) {
-	w, out := newTestWizard("\npw\npw\n\n\n") // S0空=ja / pw / pw / port空=8080 / S6空=Y
+	w, out := newTestWizard("\npw\npw\n\nn\n\n") // S0空=ja / pw / pw / port空=8080 / S5=n / S6空=Y
 	cfgPath := tmpCfgPath(t)
 
 	cfg, startNow, err := w.Run(cfgPath)
@@ -66,7 +73,7 @@ func TestWizard_HappyPathDefaults(t *testing.T) {
 
 // S6 で n → startNow=false・「あとで起動」案内。
 func TestWizard_StartLater(t *testing.T) {
-	w, out := newTestWizard("\npw\npw\n\nn\n")
+	w, out := newTestWizard("\npw\npw\n\nn\nn\n") // S5=n / S6=n
 	_, startNow, err := w.Run(tmpCfgPath(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -81,7 +88,7 @@ func TestWizard_StartLater(t *testing.T) {
 
 // S0 不正値 "3" → 再入力 → "1"=英語。config に en が保存され英語文言が出る。
 func TestWizard_LangInvalidThenEnglish(t *testing.T) {
-	w, out := newTestWizard("3\n1\npw\npw\n\n\n")
+	w, out := newTestWizard("3\n1\npw\npw\n\nn\n\n")
 	cfg, _, err := w.Run(tmpCfgPath(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -100,7 +107,7 @@ func TestWizard_LangInvalidThenEnglish(t *testing.T) {
 
 // S3 不正値（非数値・範囲外）→ 再入力 → 有効値。
 func TestWizard_PortInvalidThenValid(t *testing.T) {
-	w, out := newTestWizard("\npw\npw\nabc\n70000\n8081\n\n")
+	w, out := newTestWizard("\npw\npw\nabc\n70000\n8081\nn\n\n")
 	cfg, _, err := w.Run(tmpCfgPath(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -113,15 +120,15 @@ func TestWizard_PortInvalidThenValid(t *testing.T) {
 	}
 }
 
-// [Y/n] 不正値 → 再入力（黙って n に倒さない）。
+// [Y/n] 不正値 → 再入力（黙って n に倒さない）。S5 で不正→n、S6 で空=Y。
 func TestWizard_YNInvalidThenYes(t *testing.T) {
-	w, out := newTestWizard("\npw\npw\n\nはい\ny\n")
+	w, out := newTestWizard("\npw\npw\n\nはい\nn\n\n")
 	_, startNow, err := w.Run(tmpCfgPath(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if !startNow {
-		t.Error("再入力後の y は startNow=true のはず")
+		t.Error("S6 空Enter は startNow=true のはず")
 	}
 	if !strings.Contains(out.String(), "y か n で答えてください。") {
 		t.Errorf("[Y/n] 再入力の案内が出ていない: %s", out.String())
@@ -130,7 +137,7 @@ func TestWizard_YNInvalidThenYes(t *testing.T) {
 
 // PW 不一致 → 再入力 / 空PW → 再入力。
 func TestWizard_PasswordRetry(t *testing.T) {
-	w, out := newTestWizard("\n\npw1\npw2\npw\npw\n\n\n") // 空PW→不一致→一致
+	w, out := newTestWizard("\n\npw1\npw2\npw\npw\n\nn\n\n") // 空PW→不一致→一致
 	_, _, err := w.Run(tmpCfgPath(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -150,7 +157,8 @@ func TestWizard_EOFAborts(t *testing.T) {
 		{"S0 で即EOF", ""},
 		{"S2 PW入力中にEOF", "\npw\n"},
 		{"S3 ポート入力中にEOF", "\npw\npw\n"},
-		{"S6 起動確認でEOF", "\npw\npw\n\n"},
+		{"S5 Resonite確認でEOF", "\npw\npw\n\n"},
+		{"S6 起動確認でEOF", "\npw\npw\n\nn\n"},
 		{"S0 不正値の後にEOF", "3\n"},
 	}
 	for _, c := range cases {
@@ -167,9 +175,9 @@ func TestWizard_EOFAborts(t *testing.T) {
 	}
 }
 
-// S3 保存後の中断（S6 EOF）でも config は残る（途中までの入力が無駄にならない）。
+// S3 保存後の中断（S5 EOF）でも config は残る（途中までの入力が無駄にならない）。
 func TestWizard_ConfigSurvivesLateAbort(t *testing.T) {
-	w, _ := newTestWizard("\npw\npw\n\n") // S6 でEOF
+	w, _ := newTestWizard("\npw\npw\n\n") // S5 でEOF
 	cfgPath := tmpCfgPath(t)
 	_, _, err := w.Run(cfgPath)
 	if !errors.Is(err, ErrAborted) {

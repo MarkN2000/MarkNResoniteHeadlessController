@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -64,7 +63,7 @@ func (s *Server) handleSteamConfigPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Password != "" {
-		if err := validateSteamPassword(body.Password); err != nil {
+		if err := steam.ValidatePassword(body.Password); err != nil {
 			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
@@ -183,27 +182,17 @@ func steamEventName(e steam.Event) string {
 
 // steamParams は config から更新パラメータを組む。InstallDir は常に config.InstallDirOrDefault で
 // 解決する（明示 Steam.InstallDir→既定 {dataDir}/resonite）ため install 先が未設定でも欠けない。
-// 利用時に "~" を展開する（R-A）。資格（ユーザー名/パスワード/branchコード）のいずれかが欠ければ ErrSteamNotConfigured。
+// 利用時に "~" を展開する（R-A）。組み立て本体はウィザード S5 と共有の steam.BuildUpdateParams
+// （資格のいずれかが欠ければ ErrSteamNotConfigured・VerifyRelPath の導出込み）。
 func (s *Server) steamParams() (steam.UpdateParams, error) {
 	s.cfgMu.RLock()
-	var p steam.UpdateParams
+	var user, pw, code string
 	if s.cfg.Steam != nil {
-		p = steam.UpdateParams{
-			Username:   s.cfg.Steam.Username,
-			Password:   s.cfg.Steam.Password,
-			BranchCode: s.cfg.Steam.BranchCode,
-		}
+		user, pw, code = s.cfg.Steam.Username, s.cfg.Steam.Password, s.cfg.Steam.BranchCode
 	}
-	p.InstallDir = s.cfg.InstallDirOrDefault(s.dataDir)
+	installDir := s.cfg.InstallDirOrDefault(s.dataDir)
 	s.cfgMu.RUnlock()
-	p.InstallDir = platform.ExpandHome(p.InstallDir)
-	// DL 後に headless 実体が取れたかを検査する相対パス（OS 名を DI・H2）。
-	p.VerifyRelPath = filepath.Join("Headless", platform.HeadlessBinaryName())
-
-	if p.Username == "" || p.Password == "" || p.BranchCode == "" {
-		return steam.UpdateParams{}, steam.ErrSteamNotConfigured
-	}
-	return p, nil
+	return steam.BuildUpdateParams(user, pw, code, platform.ExpandHome(installDir), platform.HeadlessBinaryName())
 }
 
 // maybeScheduledUpdate は予定再起動の停止→起動の間に呼ばれる（orchestrator.beforeStart）。
@@ -231,19 +220,6 @@ func (s *Server) maybeScheduledUpdate(ctx context.Context, triggerType string) {
 		return
 	}
 	log.Printf("[restart] 予定再起動: Resonite の更新が完了しました")
-}
-
-// validateSteamPassword は Steam 仕様（ASCII 限定・最大64文字）を検証する。
-func validateSteamPassword(pw string) error {
-	if len(pw) > 64 {
-		return errors.New("Steam パスワードは64文字以内で入力してください")
-	}
-	for _, r := range pw {
-		if r > 127 {
-			return errors.New("Steam パスワードは ASCII 文字のみ使用できます")
-		}
-	}
-	return nil
 }
 
 // writeSteamErr は steam パッケージのセンチネルエラーを HTTP ステータスへ写す。
