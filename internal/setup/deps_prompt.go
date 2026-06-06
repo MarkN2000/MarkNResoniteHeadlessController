@@ -8,32 +8,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 
-	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 )
-
-// offerDeps はウィザード保存成功後の依存チェック＋導入提案。
-// ウィザード生成 cfg は Steam=nil のため installDir は常に既定（{dataDir}/resonite）。
-// ウィザード時点は Resonite 未 DL なので、ARM では system .NET 10 の有無がそのまま効く。
-func offerDeps(cfgPath string, cfg *config.Config, in *bufio.Reader, tty bool) {
-	dataDir := filepath.Dir(cfgPath)
-	installDir := cfg.InstallDirOrDefault(dataDir)
-	check := func() []platform.DepIssue {
-		return platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, installDir)
-	}
-	OfferDepInstall(check(), in, tty, nil, func(kind string) bool {
-		for _, i := range check() {
-			if i.Kind == kind {
-				return false // まだ不足のまま
-			}
-		}
-		return true
-	})
-}
 
 // OfferDepInstall は不足依存の導入を対話で提案する。
 // tty なら issue ごとに導入コマンドを提示し [Y/n]（空入力=Y）で同意実行、

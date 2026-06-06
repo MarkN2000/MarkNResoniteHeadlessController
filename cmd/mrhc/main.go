@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,6 +22,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/server"
@@ -65,11 +68,21 @@ func main() {
 		return
 	}
 
+	// 初回（config 無し）はウィザード。S6 で「今すぐ起動」を選んだらそのままサーバーへ
+	// 合流する（2回起動の廃止・docs/design/cli-onboarding.md）。
 	if !config.FileExists(cfgPath) {
-		if err := setup.RunWizard(cfgPath); err != nil {
+		cfg, startNow, err := setup.NewWizard().Run(cfgPath)
+		if err != nil {
+			if errors.Is(err, setup.ErrAborted) {
+				os.Exit(1) // 中断メッセージはウィザードが表示済み
+			}
 			log.Fatalf("セットアップに失敗しました: %v", err)
 		}
-		fmt.Println("セットアップ完了。もう一度起動するとサーバーが立ち上がります。")
+		if !startNow {
+			return
+		}
+		fmt.Println()
+		runServer(cfg, cfgPath, dir, true)
 		return
 	}
 
@@ -77,11 +90,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("設定の読み込みに失敗しました: %v", err)
 	}
+	runServer(cfg, cfgPath, dir, false)
+}
+
+// runServer はサーバー本体を起動し、SIGINT/SIGTERM で graceful 終了するまでブロックする。
+// fromWizard=true はウィザード直後の継続起動: S4 で依存チェック済みのため経路②
+// （毎起動の依存不足ログ）の重複実行をスキップし、バナーをログイン案内付きにする。
+func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
+	lang := cfg.LangOrDefault()
 
 	// 依存チェック（R-C 経路②）: 不足があればログで案内するだけで続行する
 	// （[Y/n] 対話は初回ウィザード末尾のみ＝起動をブロックしない）。Windows は常に no-op。
-	for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, cfg.InstallDirOrDefault(dir)) {
-		log.Printf("依存不足: %s / %s", issue.Title, issue.GuideText())
+	if !fromWizard {
+		for _, issue := range platform.CheckHeadlessDeps(runtime.GOOS, runtime.GOARCH, cfg.InstallDirOrDefault(dir)) {
+			log.Printf("依存不足: %s / %s", issue.Title, issue.GuideText())
+		}
 	}
 
 	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する。
@@ -93,22 +116,26 @@ func main() {
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
 	srv := server.New(cfg, cfgPath, driver, resonite.NewClient(), web.FS())
 
+	// ポートを同期で確保してからバナーを出す（bind 失敗を「起動しました」の後に出さない）。
+	// Windows の「使用中」は WSAEADDRINUSE(10048) で syscall.EADDRINUSE と一致しないため、
+	// 判定は platform.IsAddrInUse に集約している。
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(cfg.Port))
+	if err != nil {
+		if platform.IsAddrInUse(err) {
+			log.Fatal(i18n.T(lang, "main.portInUse", cfg.Port))
+		}
+		log.Fatal(i18n.T(lang, "main.listenFailed", err))
+	}
+
 	// バックグラウンドワーカー（scheduler 等・Phase 8）を起動。stop で停止する。
 	stopBackground := srv.Start()
 
-	httpServer := &http.Server{Addr: ":" + strconv.Itoa(cfg.Port), Handler: srv.Handler()}
+	printBanner(lang, cfg.Port, fromWizard)
+
+	httpServer := &http.Server{Handler: srv.Handler()}
 	go func() {
-		fmt.Printf("MRHC %s: http://localhost:%d を開いてください（管理パスワードでログイン）\n", version, cfg.Port)
-		// LAN アクセスと FW/ポート開放の案内（R-C・Linux のみ。Windows は OS が接続時に
-		// 自動でプロンプトを出す。IP は複数 NIC で混乱するため列挙しない）。
-		if runtime.GOOS == "linux" {
-			fmt.Printf("LAN内の別PCからは http://<このPCのIP>:%d でアクセスできます。\n", cfg.Port)
-			fmt.Printf("（接続できない場合はファイアウォールで TCP %d の開放が必要です。例:\n", cfg.Port)
-			fmt.Printf("  sudo firewall-cmd --permanent --add-port=%d/tcp && sudo firewall-cmd --reload\n", cfg.Port)
-			fmt.Printf("  / sudo ufw allow %d/tcp）\n", cfg.Port)
-		}
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("サーバー起動に失敗しました: %v", err)
+		if err := httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
+			log.Fatal(i18n.T(lang, "main.listenFailed", err))
 		}
 	}()
 
@@ -139,6 +166,25 @@ func main() {
 	defer cancel()
 	_ = httpServer.Shutdown(ctx)
 	fmt.Println("終了しました。")
+}
+
+// printBanner は起動バナー（S7/S9）を表示する。LAN URL を主役にする
+// （ブラウザで開くのは別 PC が前提）。IP は複数 NIC で混乱するため列挙せず固定文言。
+// FW 案内は両 OS（Windows=初回ダイアログと誤キャンセル時の復旧 / Linux=開放コマンド例）。
+func printBanner(lang i18n.Lang, port int, fromWizard bool) {
+	fmt.Println(i18n.T(lang, "banner.running", version))
+	if fromWizard {
+		fmt.Println(i18n.T(lang, "banner.openLanLogin", port))
+	} else {
+		fmt.Println(i18n.T(lang, "banner.openLan", port))
+	}
+	fmt.Println(i18n.T(lang, "banner.localhost", port))
+	if runtime.GOOS == "windows" {
+		fmt.Println(i18n.T(lang, "banner.fw.windows"))
+	} else {
+		fmt.Println(i18n.T(lang, "banner.fw.linux", port, port, port))
+	}
+	fmt.Println(i18n.T(lang, "banner.stop"))
 }
 
 // waitForStopped はヘッドレスが停止状態になるまで（または timeout まで）待つ。
