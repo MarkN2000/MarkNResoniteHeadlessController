@@ -25,6 +25,17 @@ function writeErrorText(r: WriteResult): string {
       return i18n.t("toast.errProcessGone");
     case "network":
       return i18n.t("toast.errNetwork");
+    // steam 系（/steam/config・/steam/download・/steam/cancel）
+    case "headless_running":
+      return i18n.t("toast.errHeadlessRunning");
+    case "steam_not_configured":
+      return i18n.t("toast.errSteamNotConfigured");
+    case "update_in_progress":
+      return i18n.t("toast.errUpdateInProgress");
+    case "no_update":
+      return i18n.t("toast.errNoUpdate");
+    case "steam_password_invalid":
+      return i18n.t("toast.errSteamPasswordInvalid");
     default:
       return r.error || i18n.t("toast.errGeneric");
   }

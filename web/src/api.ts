@@ -386,7 +386,9 @@ export interface SteamStatus {
   file?: string;
   startedAt?: string;
   finishedAt?: string;
-  lastError?: string;
+  lastError?: string; // エラー原文（ja・未知 errorCode のフォールバック）
+  errorCode?: string; // エラー分類コード（フロントが locale 変換する）
+  errorDetail?: string; // 見出し（errorCode）を除いた診断詳細（HTTP 状態・exit 等）
 }
 export async function getSteamStatus(): Promise<SteamStatus | null> {
   return getData<SteamStatus>("/steam/status");

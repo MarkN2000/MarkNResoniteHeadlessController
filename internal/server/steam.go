@@ -64,7 +64,8 @@ func (s *Server) handleSteamConfigPut(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Password != "" {
 		if err := steam.ValidatePassword(body.Password); err != nil {
-			writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
+			// 専用 code でフロントが locale 変換できるようにする（生メッセージは ja のため）。
+			writeErr(w, http.StatusBadRequest, "steam_password_invalid", err.Error())
 			return
 		}
 	}

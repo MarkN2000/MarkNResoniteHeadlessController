@@ -7,14 +7,70 @@ import { FieldRow, InspectorCard, InspectorTextInput } from "../../components/in
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { SaveButton } from "./SaveButton";
 
+// ログ1行の構造化エントリ。受信時に文字列へ焼かず、レンダー時に t() で解決する
+// （言語切替で表示中のログも追従し、SSE effect から t 依存を外せる＝再接続もしない）。
+type LogEntry =
+  | { kind: "text"; text: string }
+  | { kind: "msg"; msgKey: string; msgArgs?: Record<string, string>; text?: string }
+  | { kind: "result"; code?: string; text?: string; detail?: string };
+
+type Translator = ReturnType<typeof useTranslation>["t"];
+
+// 既知の errorCode → locale キー。動的キー連結はしない（未知 code でキー文字列が
+// そのまま画面に出るのを防ぐ）。未知/無 code は steamErrText が原文へフォールバックする。
+const STEAM_ERR_KEYS: Record<string, string> = {
+  auth_failed: "settings.steamErrAuthFailed",
+  two_factor_required: "settings.steamErrTwoFactor",
+  cancelled: "settings.steamErrCancelled",
+  stalled: "settings.steamErrStalled",
+  verify_missing: "settings.steamErrVerifyMissing",
+  acquire_failed: "settings.steamErrAcquireFailed",
+  dd_failed: "settings.steamErrDDFailed",
+  chmod_failed: "settings.steamErrChmodFailed",
+};
+
+// backend の Event.MsgKey → locale キー（MRHC 生成ログ行）。未知キーは原文（ja）のまま表示。
+const STEAM_LOG_KEYS: Record<string, string> = {
+  ddFetch: "settings.steamLogFetch",
+  ddFetched: "settings.steamLogFetched",
+  shaOk: "settings.steamLogShaOk",
+  chmodding: "settings.steamLogChmod",
+};
+
+// 失敗表示の文言。既知 code は locale（acquire/dd/chmod 系は detail＝診断詳細を併記）、
+// 未知/無 code は原文 → 汎用文言へフォールバック。
+function steamErrText(t: Translator, code?: string, raw?: string, detail?: string): string {
+  const key = code ? STEAM_ERR_KEYS[code] : undefined;
+  if (!key) return raw || t("toast.errGeneric");
+  const base = t(key);
+  return detail ? `${base}: ${detail}` : base;
+}
+
+// ログ1行の表示文字列をレンダー時に解決する。
+function logLineText(t: Translator, l: LogEntry): string {
+  switch (l.kind) {
+    case "text":
+      return l.text;
+    case "msg": {
+      const key = STEAM_LOG_KEYS[l.msgKey];
+      return key ? t(key, { ...l.msgArgs }) : (l.text ?? l.msgKey);
+    }
+    case "result":
+      if (!l.code && !l.text) return t("settings.steamResultSuccess");
+      if (l.code === "cancelled") return steamErrText(t, l.code, l.text, l.detail); // 中止は失敗扱いにしない
+      return `${t("settings.steamResultFailed")}: ${steamErrText(t, l.code, l.text, l.detail)}`;
+  }
+}
+
 // 進捗ログの小窓（milestone / log / result の行を表示）。進捗 % 行は流さない（多すぎるため）。
-function SteamLog({ logs }: { logs: string[] }) {
+function SteamLog({ logs }: { logs: LogEntry[] }) {
+  const { t } = useTranslation();
   if (logs.length === 0) return null;
   return (
     <ScrollArea h={120} type="auto">
       <Box style={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
         {logs.map((l, i) => (
-          <div key={i}>{l}</div>
+          <div key={i}>{logLineText(t, l)}</div>
         ))}
       </Box>
     </ScrollArea>
@@ -39,7 +95,7 @@ export function SteamSection({ status }: { status: Status | null }) {
 
   // 更新の進行（SSE 駆動）
   const [st, setSt] = useState<SteamStatus>({ state: "idle", percent: 0 });
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const load = useCallback(async () => {
     const c = await api.getSteamConfig();
@@ -59,14 +115,21 @@ export function SteamSection({ status }: { status: Status | null }) {
   }, [load]);
 
   // SSE /steam/events: 進捗・ログ・結果をライブ反映。接続直後に steam-status が現状を一度送る。
+  // ハンドラでは t() を使わず構造化のまま積む（表示は logLineText がレンダー時に解決）＝
+  // effect の依存が無く、言語切替で EventSource が張り直されない。
   useEffect(() => {
     const es = new EventSource("/api/v1/steam/events");
-    const addLog = (s: string) =>
+    const addLog = (l: LogEntry) =>
       setLogs((prev) => {
-        const next = [...prev, s];
+        const next = [...prev, l];
         return next.length > 200 ? next.slice(next.length - 200) : next;
       });
-    es.addEventListener("steam-status", (e) => setSt(JSON.parse((e as MessageEvent).data) as SteamStatus));
+    es.addEventListener("steam-status", (e) => {
+      // 接続（自動再接続含む）ごとの初期イベント。直後に backend が現 run のログ履歴を
+      // リプレイするため、手元のログを空にして入れ替える（再接続時の二重表示防止）。
+      setSt(JSON.parse((e as MessageEvent).data) as SteamStatus);
+      setLogs([]);
+    });
     es.addEventListener("steam-progress", (e) => {
       const d = JSON.parse((e as MessageEvent).data) as { percent?: number; file?: string };
       setSt((s) => ({ ...s, state: "running", percent: d.percent ?? 0, file: d.file }));
@@ -75,26 +138,33 @@ export function SteamSection({ status }: { status: Status | null }) {
       const d = JSON.parse((e as MessageEvent).data) as { text?: string };
       if (d.text) {
         setSt((s) => ({ ...s, phase: d.text }));
-        addLog(d.text);
+        addLog({ kind: "text", text: d.text });
       }
     });
     es.addEventListener("steam-log", (e) => {
-      const d = JSON.parse((e as MessageEvent).data) as { text?: string };
-      if (d.text) addLog(d.text);
+      const d = JSON.parse((e as MessageEvent).data) as {
+        text?: string;
+        msgKey?: string;
+        msgArgs?: Record<string, string>;
+      };
+      if (d.msgKey) addLog({ kind: "msg", msgKey: d.msgKey, msgArgs: d.msgArgs, text: d.text });
+      else if (d.text) addLog({ kind: "text", text: d.text });
     });
     es.addEventListener("steam-result", (e) => {
-      const d = JSON.parse((e as MessageEvent).data) as { text?: string };
-      const err = d.text ?? "";
+      const d = JSON.parse((e as MessageEvent).data) as { text?: string; code?: string; detail?: string };
+      const failed = !!(d.code || d.text);
       setSt((s) => ({
         ...s,
-        state: err ? "failed" : "success",
-        lastError: err || undefined,
-        percent: err ? s.percent : 100,
+        state: failed ? "failed" : "success",
+        lastError: d.text || undefined,
+        errorCode: d.code,
+        errorDetail: d.detail,
+        percent: failed ? s.percent : 100,
       }));
-      addLog(err ? `${t("settings.steamResultFailed")}: ${err}` : t("settings.steamResultSuccess"));
+      addLog({ kind: "result", code: d.code, text: d.text, detail: d.detail });
     });
     return () => es.close();
-  }, [t]);
+  }, []);
 
   // SSE は満杯時に終端 result を取りこぼし得る（pubsub 非ブロッキング）。running 中だけ
   // /steam/status を軽くポーリングし、終端（success/failed）への遷移を取りこぼさず UI 固着を防ぐ（H1）。
@@ -252,9 +322,15 @@ export function SteamSection({ status }: { status: Status | null }) {
                   {t("settings.steamResultSuccess")}
                 </Text>
               )}
-              {st.state === "failed" && st.lastError && (
+              {/* 中止（cancelled）はユーザー自身の操作＝失敗ではないので中立表示にする */}
+              {st.state === "failed" && st.errorCode === "cancelled" && (
+                <Text size="xs" c="dimmed" ta="center">
+                  {steamErrText(t, st.errorCode, st.lastError, st.errorDetail)}
+                </Text>
+              )}
+              {st.state === "failed" && st.errorCode !== "cancelled" && st.lastError && (
                 <Text size="xs" c="red.5" ta="center">
-                  {t("settings.steamResultFailed")}: {st.lastError}
+                  {t("settings.steamResultFailed")}: {steamErrText(t, st.errorCode, st.lastError, st.errorDetail)}
                 </Text>
               )}
               <SteamLog logs={logs} />
