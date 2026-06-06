@@ -39,6 +39,10 @@ var ErrAborted = errors.New("setup aborted")
 // 区別するために、読取系ヘルパはエラーを必ずこれで包む。
 var errInput = errors.New("input unavailable")
 
+// errDLCancelled は S5b の DL がキャンセル（Ctrl+C / shutdown）で終わったことを示す内部マーカー。
+// 「失敗」と区別して専用の中止文言を出すために使う。
+var errDLCancelled = errors.New("download cancelled")
+
 // Wizard は初回セットアップの対話。フィールドはテストからの注入点（NewWizard が実環境を結線）。
 type Wizard struct {
 	In         io.Reader
@@ -359,6 +363,10 @@ func (w *Wizard) offerResonite(cfgPath string, cfg *config.Config, in *bufio.Rea
 		case err == nil:
 			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.done"))
 			return nil
+		case errors.Is(err, errDLCancelled):
+			// ユーザー自身の中止は「失敗」と区別する（DD は差分再開できる）
+			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.cancelled"))
+			return nil
 		case errors.Is(err, steam.ErrTwoFactorRequired):
 			// Guard オンは再入力しても絶対に成功しないため、再入力ループに入れない（M3）
 			fmt.Fprintln(w.Out, i18n.T(lang, "wizard.dl.twoFactor"))
@@ -485,6 +493,11 @@ func (w *Wizard) runSteamUpdate(dataDir string, cfg *config.Config, lang i18n.La
 	err = w.SteamUpdate(ctx, filepath.Join(dataDir, "tools"), params, onEvent)
 	if preparing {
 		fmt.Fprintln(w.Out) // 1 度も進捗が来ずに失敗した場合の改行（"準備中..." の行を閉じる）
+	}
+	if err != nil && (errors.Is(err, steam.ErrCancelled) || ctx.Err() != nil) {
+		// manager の中止 sentinel に加え、acquire 段階の中断（ctx 起因の生エラーで返る）も
+		// ctx.Err() で拾って「中止」に正規化する。
+		return errDLCancelled
 	}
 	return err
 }

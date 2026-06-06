@@ -45,7 +45,8 @@ mrhc 実行
      │   │      ├ 成功 → 続行
      │   │      ├ 認証失敗(ErrAuthFailed) → 再入力? [Y/n] → Y で S5a へ戻る
      │   │      ├ Steam Guard 有効(ErrTwoFactorRequired) → 専用案内（再入力に誘導しない）→ 続行
-     │   │      └ その他失敗/Ctrl+C → 理由表示・Web UI 再試行案内 → 続行（DD は差分再開可）
+     │   │      ├ Ctrl+C 中止(ErrCancelled/ctx) → 「ダウンロードを中止しました（…再利用されます）」→ 続行
+     │   │      └ その他失敗 → 理由表示・Web UI 再試行案内 → 続行（DD は差分再開可）
      │   └ n → 続行
      S6 起動確認 [Y/n]
      │   ├ Y → S7 起動バナー → そのままサーバー稼働（2回起動の廃止）
@@ -173,9 +174,13 @@ MRHC v2.0.0 を起動しました。
 - **適用範囲**: CLI 全文言・起動バナー・経路②（毎起動の依存ログ）・経路③（Web コンソールの
   sys 案内）・reset-password。**対象外**: API エラー（code をフロントが翻訳する既存方式）・
   Web UI 本体（react-i18next が別管理）。
-- 残課題（文言未確定のため日本語のまま）: シャットダウン系（「終了シグナル受信…」等）・
-  起動前 fatal（config 読込失敗等）。steam パッケージのエラー文字列（ErrAuthFailed 等）が
-  Web UI の en 表示でも日本語のまま出るのは既存からの gap（backlog 記録のみ）。
+- **シャットダウン系・起動前 fatal・フラグ説明も確定済み（2026-06-06 追補）**:
+  シャットダウン3行（config 言語）・fatal 7種＋`-h` フラグ説明（**OS 検出言語**＝config が
+  読めない場面のため。日本語 OS 以外はすべて英語）・DL 中の Ctrl+C は専用の中止文言
+  （`wizard.dl.cancelled`・steam.ErrCancelled の sentinel 化＋ctx.Err() で acquire 段階も捕捉）。
+  カタログの `main.*` を参照。
+- 残 gap（backlog 記録のみ）: steam パッケージのエラー文字列（ErrAuthFailed 等）が
+  Web UI の en 表示でも日本語のまま出るのは既存からの gap。
 
 ## 5. 検証
 

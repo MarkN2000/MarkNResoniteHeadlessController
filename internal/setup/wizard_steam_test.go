@@ -214,6 +214,27 @@ func TestWizard_SteamTwoFactor(t *testing.T) {
 	}
 }
 
+// キャンセル（Ctrl+C / shutdown）→「失敗」でなく専用の中止文言で続行（再試行案内は出さない）。
+func TestWizard_SteamCancelled(t *testing.T) {
+	fake := &fakeUpdate{results: []error{steam.ErrCancelled}}
+	w, out := newTestWizard("\npw\npw\n\n\nuser\nspw\ncode\n\n\n")
+	w.SteamUpdate = fake.fn
+	_, startNow, err := w.Run(tmpCfgPath(t))
+	if err != nil {
+		t.Fatalf("Run: %v\nout=%s", err, out.String())
+	}
+	if !startNow {
+		t.Error("中止後も S6 まで続行するはず")
+	}
+	s := out.String()
+	if !strings.Contains(s, "ダウンロードを中止しました（途中までのデータは次回の更新で再利用されます）。") {
+		t.Errorf("中止の専用文言が出ていない:\n%s", s)
+	}
+	if strings.Contains(s, "ダウンロードに失敗しました") || strings.Contains(s, "もう一度入力しますか") {
+		t.Errorf("中止が失敗/再入力として表示された:\n%s", s)
+	}
+}
+
 // その他の失敗（ネットワーク等）→ 失敗表示＋再試行案内で続行。
 func TestWizard_SteamGenericFailure(t *testing.T) {
 	fake := &fakeUpdate{results: []error{errors.New("network down")}}

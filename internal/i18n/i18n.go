@@ -16,6 +16,16 @@ const (
 	En Lang = "en"
 )
 
+// LangOf は "en" なら En、それ以外（"ja"・空・未知）は Ja を返す。
+// platform.DetectLang の戻り値（"ja"/"en"）を Lang へ写すのに使う
+// （config.LangOrDefault と同じ「en 以外は ja」規約）。
+func LangOf(s string) Lang {
+	if s == string(En) {
+		return En
+	}
+	return Ja
+}
+
 // T は key の文言を lang で返す。args があれば fmt.Sprintf で埋め込む。
 // 未知のキーは key 自体を返す（実行時に panic させない。完全性はテストで担保）。
 func T(lang Lang, key string, args ...any) string {

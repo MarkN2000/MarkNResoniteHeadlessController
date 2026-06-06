@@ -167,6 +167,10 @@ var catalog = map[string]map[Lang]string{
 		Ja: "  あとから Web UI（設定 → Steam）で再試行できます。",
 		En: "  You can retry later in the Web UI (Settings → Steam).",
 	},
+	"wizard.dl.cancelled": {
+		Ja: "ダウンロードを中止しました（途中までのデータは次回の更新で再利用されます）。",
+		En: "Download cancelled (partially downloaded data will be reused next time).",
+	},
 
 	// ── 起動バナー（S7=ウィザード直後 / S9=通常起動）────────────────
 	"banner.running": {
@@ -302,5 +306,58 @@ var catalog = map[string]map[Lang]string{
 	"main.listenFailed": {
 		Ja: "サーバー起動に失敗しました: %v",
 		En: "Failed to start the server: %v",
+	},
+	// 以下は config が読めない場面で出るため OS 検出言語（i18n.LangOf(platform.DetectLang())）で表示
+	"main.exePathFailed": {
+		Ja: "実行ファイルパスの取得に失敗: %v",
+		En: "Failed to determine the executable path: %v",
+	},
+	"main.dataDirFailed": {
+		Ja: "データディレクトリの作成に失敗: %v",
+		En: "Failed to create the data directory: %v",
+	},
+	"main.resetNoConfig": {
+		Ja: "設定ファイルがありません: %s（先に通常起動して初回セットアップを完了してください）",
+		En: "No config file found: %s (run mrhc normally first to complete the initial setup)",
+	},
+	"main.resetFailed": {
+		Ja: "パスワード再設定に失敗: %v",
+		En: "Failed to reset the password: %v",
+	},
+	"main.setupFailed": {
+		Ja: "セットアップに失敗しました: %v",
+		En: "Setup failed: %v",
+	},
+	"main.configLoadFailed": {
+		Ja: "設定の読み込みに失敗しました: %v",
+		En: "Failed to load the config: %v",
+	},
+	"main.defaultConfigFailed": {
+		Ja: "デフォルトconfigの用意に失敗（続行します）: %v",
+		En: "Failed to prepare the default headless config (continuing): %v",
+	},
+
+	// ── シャットダウン（Ctrl+C・config 言語）──────────────────────
+	"main.shutdown.received": {
+		Ja: "終了シグナル受信。ヘッドレスを停止しています...（もう一度 Ctrl+C で即終了）",
+		En: "Shutdown signal received. Stopping the headless server... (press Ctrl+C again to force quit)",
+	},
+	"main.shutdown.force": {
+		Ja: "強制終了します。",
+		En: "Force quitting.",
+	},
+	"main.shutdown.done": {
+		Ja: "終了しました。",
+		En: "Shutdown complete.",
+	},
+
+	// ── フラグ説明（mrhc -h・OS 検出言語）──────────────────────────
+	"main.flag.data": {
+		Ja: "データディレクトリ（config/state置き場。既定: 実行ファイルと同じ場所）",
+		En: "data directory (config/state location; default: same folder as the executable)",
+	},
+	"main.flag.version": {
+		Ja: "バージョンを表示して終了",
+		En: "print version and exit",
 	},
 }

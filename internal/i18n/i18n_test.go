@@ -76,6 +76,15 @@ func TestT(t *testing.T) {
 	}
 }
 
+func TestLangOf(t *testing.T) {
+	cases := map[string]Lang{"en": En, "ja": Ja, "": Ja, "de": Ja, "EN": Ja}
+	for in, want := range cases {
+		if got := LangOf(in); got != want {
+			t.Errorf("LangOf(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestVerbSeq(t *testing.T) {
 	cases := []struct {
 		in   string

@@ -35,8 +35,12 @@ import (
 var version = "dev"
 
 func main() {
-	dataDir := flag.String("data", "", "データディレクトリ（config/state置き場。既定: 実行ファイルと同じ場所）")
-	showVersion := flag.Bool("version", false, "バージョンを表示して終了")
+	// config が読めない場面（フラグ説明・起動前の fatal）は OS 検出言語で表示する
+	// （日本語 OS 以外はすべて英語）。config が読めたら以降は config の言語。
+	osLang := i18n.LangOf(platform.DetectLang())
+
+	dataDir := flag.String("data", "", i18n.T(osLang, "main.flag.data"))
+	showVersion := flag.Bool("version", false, i18n.T(osLang, "main.flag.version"))
 	flag.Parse()
 
 	if *showVersion {
@@ -48,22 +52,22 @@ func main() {
 	if dir == "" {
 		exe, err := os.Executable()
 		if err != nil {
-			log.Fatalf("実行ファイルパスの取得に失敗: %v", err)
+			log.Fatal(i18n.T(osLang, "main.exePathFailed", err))
 		}
 		dir = filepath.Dir(exe)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		log.Fatalf("データディレクトリの作成に失敗: %v", err)
+		log.Fatal(i18n.T(osLang, "main.dataDirFailed", err))
 	}
 	cfgPath := filepath.Join(dir, config.FileName)
 
 	// サブコマンド: reset-password （旧PW不要・実機での復旧手段）
 	if flag.Arg(0) == "reset-password" {
 		if !config.FileExists(cfgPath) {
-			log.Fatalf("設定ファイルがありません: %s（先に通常起動して初回セットアップを完了してください）", cfgPath)
+			log.Fatal(i18n.T(osLang, "main.resetNoConfig", cfgPath))
 		}
 		if err := setup.ResetPassword(cfgPath); err != nil {
-			log.Fatalf("パスワード再設定に失敗: %v", err)
+			log.Fatal(i18n.T(osLang, "main.resetFailed", err))
 		}
 		return
 	}
@@ -76,7 +80,7 @@ func main() {
 			if errors.Is(err, setup.ErrAborted) {
 				os.Exit(1) // 中断メッセージはウィザードが表示済み
 			}
-			log.Fatalf("セットアップに失敗しました: %v", err)
+			log.Fatal(i18n.T(osLang, "main.setupFailed", err))
 		}
 		if !startNow {
 			return
@@ -88,7 +92,7 @@ func main() {
 
 	cfg, err := config.LoadFrom(cfgPath)
 	if err != nil {
-		log.Fatalf("設定の読み込みに失敗しました: %v", err)
+		log.Fatal(i18n.T(osLang, "main.configLoadFailed", err))
 	}
 	runServer(cfg, cfgPath, dir, false)
 }
@@ -110,7 +114,7 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する。
 	configDir := cfg.HeadlessConfigDirOrDefault(dir)
 	if err := hlconfig.EnsureDefault(configDir); err != nil {
-		log.Printf("デフォルトconfigの用意に失敗（続行します）: %v", err)
+		log.Print(i18n.T(lang, "main.defaultConfigFailed", err))
 	}
 
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
@@ -144,7 +148,8 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	<-sigCh
-	fmt.Println("\n終了シグナル受信。ヘッドレスを停止しています...（もう一度Ctrl-Cで即終了）")
+	fmt.Println()
+	fmt.Println(i18n.T(lang, "main.shutdown.received"))
 
 	// 先にバックグラウンドワーカーを止める（予定発火を打ち切り、進行中の再起動 ①②③ を cancel して
 	// 下の driver.Stop() と競合しないようにする）。
@@ -153,7 +158,7 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	if driver.Status().State != headless.StateStopped {
 		go func() {
 			<-sigCh
-			fmt.Println("強制終了します。")
+			fmt.Println(i18n.T(lang, "main.shutdown.force"))
 			os.Exit(1)
 		}()
 		_ = driver.Stop()
@@ -165,7 +170,7 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(ctx)
-	fmt.Println("終了しました。")
+	fmt.Println(i18n.T(lang, "main.shutdown.done"))
 }
 
 // printBanner は起動バナー（S7/S9）を表示する。LAN URL を主役にする

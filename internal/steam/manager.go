@@ -61,6 +61,10 @@ var (
 	ErrNoUpdateInProgress = errors.New("進行中の更新がありません")
 	// ErrSteamNotConfigured は Steam アカウント(A)・branch コード・install 先が未設定であることを表す。
 	ErrSteamNotConfigured = errors.New("Steam アカウント設定が未設定です（ユーザー名・パスワード・branch コード・install 先）")
+	// ErrCancelled は更新がキャンセル（ユーザー中止 / shutdown）で終わったことを表す。
+	// 文言は従来の非 sentinel エラーと同一（Web UI 表示は不変）。ウィザード S5b が
+	// 「失敗」と区別して専用文言を出すために sentinel 化した。
+	ErrCancelled = errors.New("更新を中止しました")
 )
 
 // UpdateParams は1回の入手/更新に必要なパラメータ（server が config から組む）。
@@ -217,7 +221,7 @@ func (m *Manager) run(runCtx context.Context, p UpdateParams) error {
 		// 親 ctx のキャンセル（ユーザー Cancel / shutdown）なら「中止」として明示する
 		// （stall は watchCtx のみを cancel するため runCtx.Err() は nil＝上の分岐で先に処理済み）。
 		if runCtx.Err() != nil {
-			return errors.New("更新を中止しました")
+			return ErrCancelled
 		}
 		return runErr
 	}
