@@ -105,10 +105,10 @@ function SessionCountBadge({ idx, total, title }: { idx: number | null; total: n
         justifyContent: "center",
       }}
     >
-      <Text fz={13} fw={700} c="brand.6" lh={1.1}>
+      <Text fz={12} fw={700} c="brand.6" lh={1.1}>
         {idx ?? "−"}
       </Text>
-      <Text fz={9} c="dark.2" lh={1.1}>
+      <Text fz={12} c="dark.2" lh={1.1}>
         /{total}
       </Text>
     </Box>
