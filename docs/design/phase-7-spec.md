@@ -68,9 +68,11 @@ Phase 9 (Resonite / Steam 統合):
 ### 2.3 Headless Config CRUD API（Pre-7b・実装済み）
 ```
 GET    /api/v1/headless-configs            一覧（name + comment + worldCount）
+POST   /api/v1/headless-configs            新規＝テンプレから即時作成（サーバー採番 new-config, new-config2, …）→ {name}
 GET    /api/v1/headless-configs/{name}     読込（loginPassword は "" でマスク）
-PUT    /api/v1/headless-configs/{name}     保存（新規/上書き = upsert）
+PUT    /api/v1/headless-configs/{name}     保存（上書き。?from={old} で保存リネーム＝旧を削除）
 DELETE /api/v1/headless-configs/{name}     削除
+POST   /api/v1/headless-configs/{name}/duplicate  複製＝サーバー側バイトコピー（採番 {name}-copy, -copy2, …）→ {name}
 GET    /api/v1/headless-configs/last-used  前回起動 config 名
 GET    /api/v1/headless-credentials        中央既定アカウント {username, hasPassword}（password 非返却）
 PUT    /api/v1/headless-credentials        中央既定アカウント登録 {username, password}（password 空=既存保持）
@@ -82,7 +84,8 @@ PUT    /api/v1/headless-credentials        中央既定アカウント登録 {us
 - **同梱デフォルト**: 起動時に config dir が空なら `default.json`（accessLevel=Anyone・公式スキーマ全項目を明示・1ワールド・creds 空）を自動生成（`EnsureDefault`）。フロント `defaultConfig()`/`defaultWorld()` と同一方針（UI 表示＝保存値の一致／未設定は null）
 - **dataFolder/cacheFolder の既定値（UI改善⑤）**: 雛形の `dataFolder`/`cacheFolder` には `{dataDir}/headless-data`・`{dataDir}/headless-cache` の**絶対パス**を焼き込む（相対は headless 即クラッシュのため必ず Abs。`-data` 未指定なら mrhc 実行ファイルと同階層）。導出は `hlconfig.DefaultFolders` が単一情報源で、`EnsureDefault`（default.json）と `GET /api/v1/headless-config-defaults`（UI 新規作成・リセットマーカー）の両方が使う。`logsFolder` は null のまま。起動時（`resolveLaunch`）に config の dataFolder/cacheFolder（絶対パスのみ）を `MkdirAll`（`hlconfig.EnsureFolders`・失敗は起動を止めて 409 で可視化）。既存の default.json は書き換えない（マイグレーション無し方針）
 - **認証情報（起動時注入）**: config 自身の `loginCredential`/`loginPassword` が空なら、中央既定アカウント（`mrhc.config.json` の `headlessCredentials`）を注入。注入は**起動時**に行い、解決済み config を `{dataDir}/.run/{name}.json`（0600）へ生成して Resonite に渡す。保存済みファイルに password を焼き込まない（平文は中央設定 + 起動用一時のみ）
-- **読込マスク**: GET は `loginPassword=""`。PUT は password 空=既存保持・非空=per-config 上書き
+- **読込マスク**: GET は `loginPassword=""`。PUT は password 空=既存保持・非空=per-config 上書き。**リネーム（`?from=`）時のマスク解決は from 側のファイル**（保存先で解決すると元 config の password が失われる）。書き込み成功 → 旧削除の順＝途中失敗でもデータは残る
+- **即時作成（2026-06-08）**: 新規/複製は POST した瞬間にサーバーが採番して実体を作る（未保存ドラフト無し）。複製はバイトコピーのため per-config `loginPassword`・未知フィールド・整形がそのまま写る（従来のフロント経由複製は GET マスク → PUT で password が失われていた）。新規のテンプレは `EnsureDefault` と同じ焼き込み済みテンプレ（`bakedDefaultJSON`・単一情報源）で、`comment` は default.json 用説明文を引き継がず空。採番は 64 字上限を base 側切詰で守る
 - **起動は config 名指定**: `POST /start {config: "<name>"}` → `headlessConfigDir` から解決。`driver.Start(headlessPath, launchPath, configLabel)` で Status には論理名を表示
 - **last-used**: 起動成功時に `{dataDir}/runtime-state.json` に記録
 - **同期**: credentials PUT（cfg 書込）と起動時読取の競合を `credMu sync.RWMutex` で防止
@@ -395,7 +398,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **前提（バックエンドの性質）**
 - config は**不透明な JSON map**。MRHC は name サニタイズ・`loginPassword` マスク/保持・`$schema` 付与・`startWorlds` 配列検証のみ。**未知フィールドは保持**。
 - 値の意味検証はしない（accessLevel/preset 名の正当性は Resonite が権威）→ フォームがガードレール役。
-- name = ファイル名（`^[A-Za-z0-9_\-]{1,64}$`）。リネーム API 無し。PUT は upsert。GET は `loginPassword=""` マスク。
+- name = ファイル名（`^[A-Za-z0-9_\-]{1,64}$`）。PUT は上書き（`?from=` で保存リネーム・§2.3）。GET は `loginPassword=""` マスク。
 
 **(A) エディタ方式＝フォームのみ（生JSON 撤去）**
 - 整形フォーム＋複数ワールドは**タブ式**。**生JSON 編集セクションは設けない**（ほぼ全項目をフォーム化するため不要・フォーム↔JSON 同期の複雑さとセキュリティ懸念を回避。v1 の編集可能 JSON プレビューも省く）。
@@ -404,9 +407,9 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **(D) レイアウト・CRUD**
 - 左=config 一覧レール（名前のみ・各行に複製⧉/削除×・選択で右に読込・上部に [＋新規]）／右=エディタカード。狭幅は「config 選択プルダウン＋エディタ」に畳む（`SplitColumns` 流儀）。一覧/タブ行のアクションアイコンは `ROW_ICON_SIZE`(=Button `xs` と同じ 30px) 共有で高さを揃える（C・`components/inspector`）。
-- 新規＝**インラインで空名ドラフト**（同梱デフォルト雛形・名前を入れるまで保存無効）／複製＝**インラインでクローン**（名前 `<元>-copy` を初期表示・編集可）／削除（確認）／保存（upsert・dirty 追跡＋未保存ガード）。**名前は ConfigEditor 先頭の編集欄**（D・識別子なので cfg 本文と別管理＝`draftName`）。**名前入力モーダルは廃止**（item4）。タイトルは「編集・作成」固定。
-- **リネーム＝Save As**（リネーム API 無し）：名前を別の新名にして保存すると**新規作成し元は残す**（旧名を指すスケジュール等の dangling 参照を回避）。
-- **誤上書き防止**：別の**既存 name へ保存しようとしたら上書き確認ダイアログ**（PUT が黙って上書きするため・Save As と一貫）。name は即時バリデーション（無効名は保存抑止・空欄はエラー文言を出さず抑止のみ）。
+- **即時作成方式（2026-06-08 改訂）**: 新規/複製ボタンで**即座にサーバーが採番・作成**（新規=`new-config, new-config2, …`・複製=`{元名}-copy, -copy2, …`・§2.3）→ 一覧に即出現し、エディタへ読込。**未保存ドラフト状態（selected=null/original=null）は存在しない**＝エディタは常に保存済み config の編集。作成直後は未編集（フォーカス移動等の特別な UI はしない）・未編集のまま離脱しても自動削除しない（不要なら手動削除）。削除（確認）／保存（dirty 追跡＋未保存ガード）。**名前は ConfigEditor 先頭の編集欄**（D・識別子なので cfg 本文と別管理＝`draftName`）。タイトルは「編集」固定。
+- **名前変更＋保存＝リネーム**（旧 Save As は廃止・コピーは複製ボタンが担う直交設計）：`PUT ?from={旧名}` で新名に保存し旧ファイルを削除。旧名を指す last-used/スケジュール参照は宙に浮き得る（再選択で回復・許容）。
+- **誤上書き防止**：リネーム先が**既存 name のときだけ上書き確認ダイアログ**（`renameOverwriteMessage`・旧名の削除も伝える）。name は即時バリデーション（無効名は保存抑止・空欄はエラー文言を出さず抑止のみ）。
 
 **(B) アカウント**
 - config 毎に任意の `loginCredential`/`loginPassword` 欄（空=中央アカウント注入）。password マスク・空=変更なし。中央アカウント設定自体は設定タブ（次フェーズ）の領分。
@@ -426,7 +429,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **安全/堅牢**
 - 新規 config の `accessLevel` 既定は **Anyone**（2026-06-03 変更。旧既定は安全側の Private だったが、ユーザー判断で公開既定に変更）。**雛形は公式スキーマ全項目を明示し、UI 表示＝保存値を一致させる方針**（旧来の「表示専用フォールバックで値を見せるが保存JSONにはキーが無い」ズレを排除。未設定は null）。no-config 起動や誤 accessLevel が公開事故になりうる点は domain-facts §7 のとおりで、**起動は config 必須**（無 config 起動ボタンを出さない）でカバーする。決定値の一覧は §3.14 末尾／`configModel.ts` コメント参照。
-- **未保存ガード**：dirty 時は **config 切替・新規作成・複製**で破棄確認を挟む（`guardDiscard` で3経路統一）。複製は保存状態（`original`）をクローン。同一 config 内のワールドタブ移動は保存単位が同じため不要。ワールド削除・config 削除は確認ダイアログ。**既知の制限**：コンフィグタブから**他タブへ離脱**すると未保存編集は警告なく失われる（アプリ横断の未保存ガードは未実装＝他タブ方針と整合・MVP 許容）。
+- **未保存ガード**：dirty 時は **config 切替・新規作成・複製**で破棄確認を挟む（`guardDiscard` で3経路統一・新規/複製はエディタの中身を新 config へ切り替えるため）。複製対象は**ディスク上の保存済み内容**（未保存編集は含まない）。同一 config 内のワールドタブ移動は保存単位が同じため不要。ワールド削除・config 削除は確認ダイアログ。**既知の制限**：コンフィグタブから**他タブへ離脱**すると未保存編集は警告なく失われる（アプリ横断の未保存ガードは未実装＝他タブ方針と整合・MVP 許容）。
 - **ワールドは最低1つ**（最後の1枚は削除不可）。
 - **稼働中の config 編集は再起動まで未反映**の注記。
 - `loginPassword` は常時マスク（タイプした平文を画面に再表示しない）。
@@ -436,7 +439,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **流用部品**：`components/inspector`（InspectorCard/FieldRow/InspectorSelect/InspectorTextInput/InspectorNumberInput/InspectorTextarea/InspectorButton/RefreshButton）・`hooks/useConfirm`＋`ConfirmModal`・`hooks/useAsyncAction`・`lib/notify`（結果トースト自動）・`SplitColumns`。
 
-**バックエンド**：改修ゼロ。GET `/headless-configs`（一覧）・GET `/headless-configs/{name}`（全文・pw マスク）・PUT（upsert）・DELETE。新規雛形はフロントが同梱デフォルト（Anyone・公式スキーマ全項目明示・1ワールド・creds 空）を保持。
+**バックエンド**：§2.3 の CRUD＋即時作成系（POST 作成/複製・PUT `?from=` リネーム・2026-06-08）。新規雛形はバックエンドのテンプレ（`bakedDefaultJSON`＝`EnsureDefault` と単一情報源・comment 空）から生成。フロント `defaultConfig()`/`defaultWorld()` はリセットマーカー比較値として同方針を維持（UI 表示＝保存値の一致／未設定は null）。
 
 ### 3.15 設定タブ (7-5) で確定した実装事項
 
