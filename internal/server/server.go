@@ -167,6 +167,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Headless Config CRUD（Pre-7b）。{name} ワイルドカードより literal の last-used が優先される。
 	mux.HandleFunc("GET /api/v1/headless-configs", s.requireAuth(s.handleConfigList))
+	mux.HandleFunc("GET /api/v1/headless-config-defaults", s.requireAuth(s.handleConfigDefaults))
 	mux.HandleFunc("GET /api/v1/headless-configs/last-used", s.requireAuth(s.handleConfigLastUsed))
 	mux.HandleFunc("GET /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigGet))
 	mux.HandleFunc("PUT /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigPut))
@@ -379,6 +380,12 @@ func (s *Server) resolveLaunch(name string) (headlessPath, launchPath string, er
 	headlessPath = s.cfg.HeadlessPathOrDefault(s.dataDir, platform.HeadlessBinaryName())
 	s.cfgMu.RUnlock()
 	headlessPath = platform.ExpandHome(headlessPath)
+	// config の dataFolder/cacheFolder（絶対パスのみ）を起動前に作成する（UI改善⑤）。
+	// 失敗は起動を止めてエラーを返す（headless 側の分かりにくいクラッシュにしない）。
+	// headlessPath は契約どおりエラー時も返す（呼び出し側が導出値を参照できる）。
+	if err := hlconfig.EnsureFolders(s.configDir, name); err != nil {
+		return headlessPath, "", err
+	}
 	runDir := filepath.Join(s.dataDir, ".run")
 	launchPath, err = hlconfig.ResolveForLaunch(s.configDir, name, central, runDir)
 	return headlessPath, launchPath, err

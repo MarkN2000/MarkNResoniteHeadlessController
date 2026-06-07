@@ -213,14 +213,30 @@ func TestList_MissingDir(t *testing.T) {
 }
 
 func TestEnsureDefault(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "configs")
+	tmp := t.TempDir()
+	dir := filepath.Join(tmp, "configs")
 	// 空 → default.json を作る
-	if err := EnsureDefault(dir); err != nil {
+	if err := EnsureDefault(dir, tmp); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := readRaw(dir, "default")
 	if err != nil {
 		t.Fatalf("default not created: %v", err)
+	}
+	// dataFolder/cacheFolder は {dataDir}/headless-data 等の絶対パスが焼き込まれること（UI改善⑤）。
+	wantData, wantCache, err := DefaultFolders(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw["dataFolder"] != wantData {
+		t.Fatalf("dataFolder = %v, want %v", raw["dataFolder"], wantData)
+	}
+	if raw["cacheFolder"] != wantCache {
+		t.Fatalf("cacheFolder = %v, want %v", raw["cacheFolder"], wantCache)
+	}
+	// logsFolder は対象外＝null のまま。
+	if v, ok := raw["logsFolder"]; !ok || v != nil {
+		t.Fatalf("logsFolder should stay null, got %v (present=%v)", v, ok)
 	}
 	sw, ok := raw["startWorlds"].([]any)
 	if !ok || len(sw) != 1 {
@@ -254,10 +270,53 @@ func TestEnsureDefault(t *testing.T) {
 	// 既に config がある → 何もしない（default を再作成しない）
 	_ = Delete(dir, "default")
 	writeRawFile(t, dir, "existing", map[string]any{"comment": "x"})
-	if err := EnsureDefault(dir); err != nil {
+	if err := EnsureDefault(dir, tmp); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := readRaw(dir, "default"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("default should not be created when a config exists")
+	}
+}
+
+// TestDefaultFolders は相対 dataDir でも絶対パスを返すこと（相対 dataFolder は headless 即クラッシュ）を検証する。
+func TestDefaultFolders(t *testing.T) {
+	dataFolder, cacheFolder, err := DefaultFolders("rel-data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(dataFolder) || !filepath.IsAbs(cacheFolder) {
+		t.Fatalf("folders must be absolute: %q %q", dataFolder, cacheFolder)
+	}
+	if filepath.Base(dataFolder) != "headless-data" || filepath.Base(cacheFolder) != "headless-cache" {
+		t.Fatalf("folder names wrong: %q %q", dataFolder, cacheFolder)
+	}
+}
+
+// TestEnsureFolders は起動前のフォルダ作成（絶対のみ・相対/未設定はスキップ）を検証する。
+func TestEnsureFolders(t *testing.T) {
+	tmp := t.TempDir()
+	dir := filepath.Join(tmp, "configs")
+	absData := filepath.Join(tmp, "hl-data")
+	writeRawFile(t, dir, "w", map[string]any{
+		"dataFolder":  absData,
+		"cacheFolder": "relative-cache", // 相対 → 作らない（cwd 汚染防止）
+		// logsFolder/未設定キーは対象外
+	})
+	if err := EnsureFolders(dir, "w"); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(absData); err != nil || !fi.IsDir() {
+		t.Fatalf("absolute dataFolder should be created: %v", err)
+	}
+	if _, err := os.Stat("relative-cache"); !os.IsNotExist(err) {
+		t.Fatalf("relative cacheFolder should NOT be created")
+	}
+	// 既存でも no-op（エラーにならない）
+	if err := EnsureFolders(dir, "w"); err != nil {
+		t.Fatal(err)
+	}
+	// config 不在は ErrNotFound
+	if err := EnsureFolders(dir, "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing config should return ErrNotFound, got %v", err)
 	}
 }

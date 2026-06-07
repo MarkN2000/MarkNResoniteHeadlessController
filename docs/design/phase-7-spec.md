@@ -80,6 +80,7 @@ PUT    /api/v1/headless-credentials        中央既定アカウント登録 {us
 - **name サニタイズ**: `^[A-Za-z0-9_\-]{1,64}$`（`/`・`\`・`.` 不可＝パストラバーサル防止）【必須】
 - **保存先**: `headlessConfigDir`（既定固定 `{dataDir}/headless-configs`、Settings で上級者のみ変更）
 - **同梱デフォルト**: 起動時に config dir が空なら `default.json`（accessLevel=Anyone・公式スキーマ全項目を明示・1ワールド・creds 空）を自動生成（`EnsureDefault`）。フロント `defaultConfig()`/`defaultWorld()` と同一方針（UI 表示＝保存値の一致／未設定は null）
+- **dataFolder/cacheFolder の既定値（UI改善⑤）**: 雛形の `dataFolder`/`cacheFolder` には `{dataDir}/headless-data`・`{dataDir}/headless-cache` の**絶対パス**を焼き込む（相対は headless 即クラッシュのため必ず Abs。`-data` 未指定なら mrhc 実行ファイルと同階層）。導出は `hlconfig.DefaultFolders` が単一情報源で、`EnsureDefault`（default.json）と `GET /api/v1/headless-config-defaults`（UI 新規作成・リセットマーカー）の両方が使う。`logsFolder` は null のまま。起動時（`resolveLaunch`）に config の dataFolder/cacheFolder（絶対パスのみ）を `MkdirAll`（`hlconfig.EnsureFolders`・失敗は起動を止めて 409 で可視化）。既存の default.json は書き換えない（マイグレーション無し方針）
 - **認証情報（起動時注入）**: config 自身の `loginCredential`/`loginPassword` が空なら、中央既定アカウント（`mrhc.config.json` の `headlessCredentials`）を注入。注入は**起動時**に行い、解決済み config を `{dataDir}/.run/{name}.json`（0600）へ生成して Resonite に渡す。保存済みファイルに password を焼き込まない（平文は中央設定 + 起動用一時のみ）
 - **読込マスク**: GET は `loginPassword=""`。PUT は password 空=既存保持・非空=per-config 上書き
 - **起動は config 名指定**: `POST /start {config: "<name>"}` → `headlessConfigDir` から解決。`driver.Start(headlessPath, launchPath, configLabel)` で Status には論理名を表示

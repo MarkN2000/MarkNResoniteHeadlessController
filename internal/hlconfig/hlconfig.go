@@ -196,8 +196,30 @@ func ResolveForLaunch(dir, name string, central Credentials, runDir string) (str
 	return out, nil
 }
 
+// DefaultFolders は新規 config 雛形に焼き込む dataFolder/cacheFolder の既定値を返す。
+// {dataDir}/headless-data・{dataDir}/headless-cache を必ず絶対パスで返す
+// （相対 dataFolder は headless が即クラッシュ＝ログ無しで落ちるため Abs 必須）。
+// dataDir 既定（-data 未指定）は mrhc 実行ファイルと同じフォルダ＝「mrhc と同じ階層」になる。
+// EnsureDefault（default.json）と /api/v1/headless-config-defaults（UI 新規作成）の単一情報源。
+func DefaultFolders(dataDir string) (dataFolder, cacheFolder string, err error) {
+	abs, err := filepath.Abs(dataDir)
+	if err != nil {
+		return "", "", err
+	}
+	return filepath.Join(abs, "headless-data"), filepath.Join(abs, "headless-cache"), nil
+}
+
+// jsonString は Go 文字列を JSON 文字列リテラルにする（Windows パスの \ を確実にエスケープ）。
+func jsonString(s string) string {
+	b, _ := json.Marshal(s) // string の Marshal は失敗しない
+	return string(b)
+}
+
 // EnsureDefault は dir に config が1つも無ければ同梱デフォルト(default.json)を作る。
-func EnsureDefault(dir string) error {
+// dataFolder/cacheFolder には DefaultFolders(dataDir) の絶対パスを焼き込む（表示=保存値一致）。
+// 雛形は手書き整形 JSON のため map 経由（キー順が壊れる）でなく文字列置換で値だけ差し込む。
+// DefaultFolders が失敗（Abs 不能・稀）した場合は null のまま＝headless 既定に委譲して生成は続行する。
+func EnsureDefault(dir, dataDir string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -210,7 +232,33 @@ func EnsureDefault(dir string) error {
 			return nil // 既に config がある
 		}
 	}
-	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(defaultConfigJSON), 0o600)
+	body := defaultConfigJSON
+	if dataFolder, cacheFolder, err := DefaultFolders(dataDir); err == nil {
+		body = strings.Replace(body, `"dataFolder": null`, `"dataFolder": `+jsonString(dataFolder), 1)
+		body = strings.Replace(body, `"cacheFolder": null`, `"cacheFolder": `+jsonString(cacheFolder), 1)
+	}
+	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(body), 0o600)
+}
+
+// EnsureFolders は config の dataFolder/cacheFolder（設定されている場合のみ）を起動前に作成する。
+// headless 側がフォルダを自作するかは実機未確認のため安全側で MkdirAll する（存在すれば no-op）。
+// 絶対パスのみ対象（相対値はカレントディレクトリ汚染を避けて作らない＝headless の挙動は従来どおり）。
+// 作成失敗はエラーで返して起動を止める（headless 側の分かりにくいクラッシュより明示的な 409 で見せる）。
+func EnsureFolders(dir, name string) error {
+	m, err := readRaw(dir, name)
+	if err != nil {
+		return err
+	}
+	for _, key := range []string{"dataFolder", "cacheFolder"} {
+		v, _ := m[key].(string)
+		if v == "" || !filepath.IsAbs(v) {
+			continue
+		}
+		if err := os.MkdirAll(v, 0o755); err != nil {
+			return fmt.Errorf("%s の作成に失敗: %w", key, err)
+		}
+	}
+	return nil
 }
 
 // defaultConfigJSON は同梱デフォルト config。専用フォーム（①一般＋②上級）のキーのみ明示し、

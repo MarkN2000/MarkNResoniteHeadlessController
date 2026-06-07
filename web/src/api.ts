@@ -394,6 +394,16 @@ export async function getCredentials(): Promise<CredentialsInfo | null> {
 export const putCredentials = (username: string, password: string) =>
   write("PUT", "/headless-credentials", { username, password });
 
+// 新規 config 雛形に入れる dataFolder/cacheFolder の既定値（{dataDir}/headless-data 等・絶対パス）。
+// backend の EnsureDefault（default.json 生成）と同じ導出＝単一情報源 hlconfig.DefaultFolders（UI改善⑤）。
+export interface ConfigDefaults {
+  dataFolder: string;
+  cacheFolder: string;
+}
+export async function getConfigDefaults(): Promise<ConfigDefaults | null> {
+  return getData<ConfigDefaults>("/headless-config-defaults");
+}
+
 // アプリ設定（秘密・encoding を含まない公開サブセット）。internal/server/settings.go。
 export interface AppSettings {
   port: number;

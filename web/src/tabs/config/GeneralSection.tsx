@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CollapsibleSection, FieldRow, InspectorNumberInput, InspectorTextarea, InspectorTextInput } from "../../components/inspector";
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
+import type { ConfigDefaults } from "../../api";
 import type { ConfigMap } from "./configModel";
 import { arrayToCsv, asNum, asStr, csvToArray, defaultConfig, getStringArray } from "./configModel";
 import { BufferedTextInput, StringListInput } from "./fields";
@@ -12,7 +13,16 @@ import { TOP_DEDICATED_KEYS, TOP_NICHE_CATALOG } from "./fieldCatalog";
 // config トップレベル（全体設定）＋アカウントのフォーム。map のキーを直接読み書きする。
 // 基本は「メモ」のみ常時表示し、技術系（tickRate/フォルダ/ホスト等）とアカウントは上級設定へ畳む（点5）。
 // コンフィグ名は ConfigEditor 側で常時表示（メモと並ぶ基本項目）。
-export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (cfg: ConfigMap) => void }) {
+// folderDefaults = dataFolder/cacheFolder のリセット先既定値（新規雛形と同値・UI改善⑤）。
+export function GeneralSection({
+  cfg,
+  onChange,
+  folderDefaults,
+}: {
+  cfg: ConfigMap;
+  onChange: (cfg: ConfigMap) => void;
+  folderDefaults?: ConfigDefaults | null;
+}) {
   const { t } = useTranslation();
   const set = (key: string, value: unknown) => onChange({ ...cfg, [key]: value });
   // 数値欄: 空欄は undefined（保存JSONからキーを省く＝headless 既定）。"" を書くと数値型へ不整合になるため（M1）。
@@ -23,6 +33,7 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
 
   // マーカー（ハンドル）クリック＝その項目を defaultConfig() の既定値へ戻す（確認あり）。
   // 雛形に無いキーは undefined＝暗黙の既定（空/フォールバック）に戻る。
+  // dataFolder/cacheFolder は folderDefaults 注入で新規雛形と同じ値に戻る（UI改善⑤）。
   const confirm = useConfirm();
   const resetProps = (key: string, fieldLabel: string) => ({
     markerLabel: t("common.resetToDefault"),
@@ -30,7 +41,7 @@ export function GeneralSection({ cfg, onChange }: { cfg: ConfigMap; onChange: (c
       confirm.ask({
         title: t("common.resetConfirmTitle"),
         message: t("common.resetConfirmMsg", { field: fieldLabel }),
-        onConfirm: () => set(key, defaultConfig()[key]),
+        onConfirm: () => set(key, defaultConfig(folderDefaults)[key]),
       }),
   });
 

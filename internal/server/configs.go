@@ -76,6 +76,19 @@ func (s *Server) handleConfigLastUsed(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"lastUsed": s.loadLastUsed()})
 }
 
+// handleConfigDefaults: GET /api/v1/headless-config-defaults → {dataFolder, cacheFolder}
+// UI の新規 config 作成（フロント defaultConfig()）に入れる既定値。EnsureDefault（default.json
+// 生成）と同じ導出＝単一情報源 hlconfig.DefaultFolders（UI改善⑤）。
+// パスは /headless-configs/{name} と衝突させない（"defaults" は有効な config 名のため別パス）。
+func (s *Server) handleConfigDefaults(w http.ResponseWriter, r *http.Request) {
+	dataFolder, cacheFolder, err := hlconfig.DefaultFolders(s.dataDir)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
+		return
+	}
+	writeOK(w, map[string]any{"dataFolder": dataFolder, "cacheFolder": cacheFolder})
+}
+
 // writeConfigErr は hlconfig のセンチネルエラーを HTTP ステータスにマップする。
 func writeConfigErr(w http.ResponseWriter, err error) {
 	switch {

@@ -3,6 +3,8 @@
 // 持つ（編集は clone への in-place）。これにより未知/レアフィールドはキーを落とさず自動温存される。
 // $schema は保存時に backend が付与するため雛形には含めない。
 
+import type { ConfigDefaults } from "../../api";
+
 export type ConfigMap = Record<string, unknown>;
 export type WorldMap = Record<string, unknown>;
 
@@ -47,7 +49,9 @@ export function defaultWorld(): WorldMap {
 // 同梱デフォルト config の雛形（hlconfig.defaultConfigJSON 相当・creds 空＝中央注入）。
 // 専用フォーム（①一般＋②上級）のトップレベルキーのみ明示（未設定は null）。universeId 等の
 // ニッチ項目は「詳細フィールド」から追加（スリム化）。$schema は保存時に backend が付与。
-export function defaultConfig(): ConfigMap {
+// folders = backend /headless-config-defaults の dataFolder/cacheFolder 既定値（UI改善⑤）。
+// 未着/取得失敗（null/undefined）は null のまま＝headless 既定に委譲（従来挙動）。
+export function defaultConfig(folders?: ConfigDefaults | null): ConfigMap {
   return {
     comment: "",
     tickRate: 60,
@@ -56,8 +60,8 @@ export function defaultConfig(): ConfigMap {
     loginCredential: "",
     loginPassword: "",
     startWorlds: [defaultWorld()],
-    dataFolder: null,
-    cacheFolder: null,
+    dataFolder: folders?.dataFolder ?? null,
+    cacheFolder: folders?.cacheFolder ?? null,
     logsFolder: null,
     allowedUrlHosts: ["https://ttsapi.markn2000.com/"],
     autoSpawnItems: null,

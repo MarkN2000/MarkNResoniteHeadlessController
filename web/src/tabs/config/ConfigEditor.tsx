@@ -1,5 +1,6 @@
 import { Button, Divider, Stack } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import type { ConfigDefaults } from "../../api";
 import { FieldRow, InspectorCard, InspectorTextInput } from "../../components/inspector";
 import type { ConfigMap } from "./configModel";
 import { GeneralSection } from "./GeneralSection";
@@ -19,6 +20,7 @@ export function ConfigEditor({
   saving,
   onSave,
   centralUserId,
+  folderDefaults,
 }: {
   draftName: string;
   onDraftNameChange: (v: string) => void;
@@ -29,6 +31,7 @@ export function ConfigEditor({
   saving: boolean;
   onSave: () => void;
   centralUserId?: string; // customSessionId prefix の自動入力元（R12）
+  folderDefaults?: ConfigDefaults | null; // dataFolder/cacheFolder のリセット先既定値（UI改善⑤）
 }) {
   const { t } = useTranslation();
   // 上下2箇所の保存ボタンを同一 props で生成（挙動・活性条件の単一情報源）。
@@ -57,7 +60,7 @@ export function ConfigEditor({
             error={nameError}
           />
         </FieldRow>
-        <GeneralSection cfg={cfg} onChange={onChange} />
+        <GeneralSection cfg={cfg} onChange={onChange} folderDefaults={folderDefaults} />
         <Divider color="dark.4" />
         <WorldsSection cfg={cfg} onChange={onChange} centralUserId={centralUserId} />
         <Divider color="dark.4" />

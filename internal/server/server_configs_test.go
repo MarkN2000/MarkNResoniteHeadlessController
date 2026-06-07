@@ -65,6 +65,26 @@ func authReq(t *testing.T, method, url, pw, contentType, body string) *http.Resp
 	return resp
 }
 
+// GET /api/v1/headless-config-defaults は dataDir 配下の headless-data/headless-cache（絶対パス）を返す（UI改善⑤）。
+func TestConfigDefaults(t *testing.T) {
+	ts, pw, _ := newConfigServer(t)
+	var got struct {
+		Data struct {
+			DataFolder  string `json:"dataFolder"`
+			CacheFolder string `json:"cacheFolder"`
+		} `json:"data"`
+	}
+	if code := authGet(t, ts.URL+"/api/v1/headless-config-defaults", pw, &got); code != http.StatusOK {
+		t.Fatalf("code = %d", code)
+	}
+	if !filepath.IsAbs(got.Data.DataFolder) || filepath.Base(got.Data.DataFolder) != "headless-data" {
+		t.Fatalf("dataFolder wrong: %q", got.Data.DataFolder)
+	}
+	if !filepath.IsAbs(got.Data.CacheFolder) || filepath.Base(got.Data.CacheFolder) != "headless-cache" {
+		t.Fatalf("cacheFolder wrong: %q", got.Data.CacheFolder)
+	}
+}
+
 func TestConfigs_PutGetMask(t *testing.T) {
 	ts, pw, _ := newConfigServer(t)
 	body := `{"loginCredential":"u@e.com","loginPassword":"secret","comment":"c","startWorlds":[{"sessionName":"W"}]}`

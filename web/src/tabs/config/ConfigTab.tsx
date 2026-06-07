@@ -26,6 +26,9 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const [original, setOriginal] = useState<ConfigMap | null>(null);
   const [loading, setLoading] = useState(false);
   const [centralUserId, setCentralUserId] = useState(""); // customSessionId prefix の自動入力元（R12）
+  // 新規雛形の dataFolder/cacheFolder 既定値（UI改善⑤）。応答前（〜100ms）に新規作成すると
+  // null のまま seed される既知の窓があるが、centralUserId（R12）と同様に実害軽微で許容。
+  const [folderDefaults, setFolderDefaults] = useState<api.ConfigDefaults | null>(null);
   const [draftName, setDraftName] = useState(""); // 編集可能なコンフィグ名＝保存(upsert/Save As)のターゲット
   const [formNonce, setFormNonce] = useState(0); // 編集セッションごとに++＝ConfigEditor の key（毎回再マウントしバッファ入力を再シード）
   const confirm = useConfirm();
@@ -77,6 +80,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     void api.getCredentials().then((c) => {
       if (c) setCentralUserId(c.userId);
     });
+    void api.getConfigDefaults().then(setFolderDefaults);
   }, []);
 
   // 未保存編集があれば破棄確認を挟んでから action を実行（一覧切替/新規/複製で共通）。
@@ -129,7 +133,8 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   };
 
   // 新規＝同梱デフォルト雛形の未保存ドラフト（名前は空＝インライン入力。保存で upsert/Save As）。
-  const openNew = () => guardDiscard(() => seedEditor(null, "", defaultConfig(), null));
+  // dataFolder/cacheFolder は backend 既定値（{dataDir}/headless-data 等）を注入（UI改善⑤）。
+  const openNew = () => guardDiscard(() => seedEditor(null, "", defaultConfig(folderDefaults), null));
   // 複製＝複製元を GET してクローンした未保存ドラフト（名前は "<元>-copy" を初期表示・編集可）。
   const openDuplicate = (name: string) =>
     guardDiscard(() => {
@@ -197,6 +202,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
                 saving={apply.busy}
                 onSave={save}
                 centralUserId={centralUserId}
+                folderDefaults={folderDefaults}
               />
             ) : (
               <Center h={200}>

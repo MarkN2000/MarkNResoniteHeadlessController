@@ -128,9 +128,10 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 		}
 	}
 
-	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する。
+	// headless config ディレクトリを確保し、空なら同梱デフォルトを用意する
+	// （dataFolder/cacheFolder には {dataDir}/headless-data 等の絶対パスを焼き込む）。
 	configDir := cfg.HeadlessConfigDirOrDefault(dir)
-	if err := hlconfig.EnsureDefault(configDir); err != nil {
+	if err := hlconfig.EnsureDefault(configDir, dir); err != nil {
 		log.Print(i18n.T(lang, "main.defaultConfigFailed", err))
 	}
 
