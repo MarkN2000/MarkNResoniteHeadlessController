@@ -44,10 +44,12 @@ atomic rename の前提）。手順:
    を強制（Check との間に latest が動いた場合のダウングレードも防ぐ）。
 2. **ロック** `<exe>.update.lock`（O_CREATE|O_EXCL・PID 記録）で UI/CLI の別プロセス間を排他。
    1時間より古いロックは中断の残骸として除去して1回だけ取り直す。多重は `ErrBusy`。
-3. exe の隣に `.mrhc-update-*.partial`（CreateTemp 一意名）として自 GOOS/GOARCH 用アセットを DL
-   （対応表に無いプラットフォームは `ErrUnsupportedPlatform`・サイズ上限 200MiB）。
-   一時ファイル作成を通信より先に行う＝書込不可（sudo 展開等）はネット前に EACCES で判明。
-4. 同じタグ配下の `SHA256SUMS` を取得し、**ディスクから読み直して** SHA-256 照合
+3. **`SHA256SUMS` を本体より先に**同じタグ配下から取得（公開直後等の欠落時に十数MBの
+   DL を始める前に失敗させる）→ exe の隣に `.mrhc-update-*.partial`（CreateTemp 一意名）
+   として自 GOOS/GOARCH 用アセットを DL（対応表に無いプラットフォームは
+   `ErrUnsupportedPlatform`・サイズ上限 200MiB）。一時ファイル作成は通信より先＝
+   書込不可（sudo 展開等）はネット前に EACCES で判明。
+4. **ディスクから読み直して** SHA-256 照合
    （DLストリームに対するハッシュでは並行書込等によるディスク上の破損を検出できない）。
 5. アーカイブから `mrhc-<os>-<arch>/mrhc(.exe)` **だけ**を `<exe>.new` へ抽出
    （エントリ名は path.Clean 正規化で比較・tar=TypeReg 限定・zip=symlink モード拒否・
@@ -62,6 +64,8 @@ atomic rename の前提）。手順:
    - 原理: Windows は実行中 exe の削除・上書きが不可でも**リネームは可能**
      （rclone selfupdate 等と同方式）。Linux は rename(2) が原子的に置換。
      実行中プロセスは旧イメージのまま動き続け、**次回起動から新版**。
+   - swap 失敗時は検証済み `.new` を**消さない**（三重失敗＝rename×3＋復元失敗で exe 不在に
+     なった場合の手動復旧先として残す。残骸は次回起動の掃除が stale 判定で回収）。
 
 ### エラー → 利用者表示（sentinel + errCode 方式・steam と同じ）
 
@@ -88,8 +92,12 @@ atomic rename の前提）。手順:
 ## 5. API / CLI / UI
 
 - `GET /api/v1/update/check`（requireAuth）→
-  `{current, latest, updateAvailable, currentIsRelease, staged?, goos}`。
+  `{current, latest, updateAvailable, currentIsRelease, staged?, goos, checkFailed?, checkError?}`。
   GitHub への問い合わせは呼ばれた時のみ（フロントもポーリングしない）。
+  **GitHub 不達でも 200 で返す**: staged/current/goos はローカル情報なので常に有効とし、
+  失敗は `checkFailed:true` ＋ `checkError:"<errCode>"` で通知する（エラー応答にすると
+  適用済み＝再起動待ちの表示と「今すぐ終了」導線が UI から消えるため）。フロントも
+  staged 保持中は null（MRHC 自体に不達）で表示を上書きしない。
 - `POST /api/v1/update/apply`（requireAuth）→ `{staged}`。**同期**だが Apply は
   `context.Background()` で実行＝ブラウザ切断でも中断しない（全体上限は DLClient の
   Timeout 15min）。応答を取り逃しても check の staged で回収できる。
@@ -107,8 +115,9 @@ atomic rename の前提）。手順:
 - `<exe>.old*` を削除（**自分自身と同一ファイルは SameFile ガードでスキップ**＝復旧のため
   .old を直接起動しているケースで自分を消さない）。見つかれば
   「MRHC は vX に更新されました」を1回ログ（更新の痕跡は .old の存在だけ）。
-- `<exe>.new` は無条件削除。`.partial`・lock は**1時間より古いものだけ**削除
-  （進行中の `mrhc update` 別プロセスを壊さない）。削除失敗は無視（次回起動で再掃除）。
+- `<exe>.new`・`.partial`・lock は**1時間より古いものだけ**削除
+  （進行中の `mrhc update` 別プロセス＝extract 完了〜swap の間に .new が秒オーダーで
+  存在する＝を壊さない）。削除失敗は無視（次回起動で再掃除）。
 
 ## 7. テスト・検証
 
