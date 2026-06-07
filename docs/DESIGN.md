@@ -175,6 +175,11 @@ type PreRestartAction interface {
 - **Guardオン時の2FA入力UI（プロンプト検出→`POST /steam/guard-code`→stdin投入）は将来拡張**（DepotDownloaderの2FA系プロンプトは全て `ReadLine` ＝stdinで対応可）。
 - ⚠️ パスワードは**ASCII限定・64文字以内**（Steam仕様）。betaコードは`/headlessCode`でResonite botから取得（変動しうる＝編集可に）。TOTPの共有シークレットは保存しない。
 
+### 5.8 MRHC自身の更新（self-update・実装済 2026-06-07）
+- GitHub Releases の最新版へ**MRHC自身を入れ替える**。入口は Web UI（⋮→更新を確認。ログイン後1回の自動チェックで赤丸）と `mrhc update`（config不要＝復旧経路兼用）。コアは `internal/selfupdate`。
+- 適用＝差し替えまで（「実行中exeはリネーム可」の2段rename・検証はSHA256SUMSのディスク再読込照合＋PE/ELF形式検査）。**新版が効くのは次回起動から**。適用後は「今すぐ終了する（graceful・`POST /shutdown`）／あとで自分で再起動」の2択で、自動再起動はしない。
+- チェックは `releases/latest` のリダイレクトからタグ抽出（GitHub API不使用＝レート制限なし）・semver比較・非semverビルド（dev等）は適用不可。詳細 [`design/self-update.md`](./design/self-update.md)。
+
 ---
 
 ## 6. 設定ファイル（統一）
