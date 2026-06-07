@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -193,7 +194,9 @@ func sysProbe(home string, statOK map[string]bool, lookPathResult string, runOut
 			return lookPathResult, nil
 		},
 		stat: func(p string) (os.FileInfo, error) {
-			if statOK[filepath.ToSlash(p)] {
+			// filepath.ToSlash は実行ホスト依存（Linux では `\` を変換しない）ため、Windows 風
+			// パスを使うサブテストが Linux 上（-race 検証等）でも通るよう両区切りを正規化する。
+			if statOK[strings.ReplaceAll(p, `\`, "/")] {
 				return nil, nil
 			}
 			return nil, os.ErrNotExist
