@@ -381,6 +381,10 @@ var catalog = map[string]map[Lang]string{
 		Ja: "強制終了します。",
 		En: "Force quitting.",
 	},
+	"main.shutdown.requestedWeb": {
+		Ja: "Web UI から終了が要求されました。ヘッドレスを停止して終了します...（Ctrl+C で即終了）",
+		En: "Shutdown requested from the Web UI. Stopping the headless server and exiting... (press Ctrl+C to force quit)",
+	},
 	"main.shutdown.done": {
 		Ja: "終了しました。",
 		En: "Shutdown complete.",

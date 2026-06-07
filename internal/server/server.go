@@ -26,6 +26,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
 
@@ -43,6 +44,16 @@ type Server struct {
 	scheduler *restartScheduler    // 予定再起動の発火（Phase 8・P8-4a）
 	crashMon  *crashMonitor        // クラッシュ自動復帰（Phase 8・P8-4b）
 	steam     *steam.Manager       // Resonite 入手/更新（DepotDownloader・P9-B）
+
+	// 自己更新（docs/design/self-update.md）。updater は main が注入する
+	// （SetUpdater。未注入＝テストでは update API が 503 を返す）。
+	updater      *selfupdate.Updater
+	updateMu     sync.Mutex // updateStaged の保護
+	updateStaged string     // 適用済み・再起動待ちの版（プロセス内のみ。再起動後は実体が追いつく）
+
+	// requestShutdown は MRHC プロセスの終了依頼を main へ伝える（自己更新後の
+	// 「今すぐ終了」）。main が Listen 前に設定する（serving 中の書き換えはしない）。
+	requestShutdown func()
 
 	// checkDeps は依存検出（R-C）。本番は platform.CheckHeadlessDeps・テストで偽装する。
 	checkDeps func(goos, goarch string) []platform.DepIssue
@@ -218,6 +229,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/steam/cancel", s.requireAuth(s.handleSteamCancel))
 	mux.HandleFunc("GET /api/v1/steam/status", s.requireAuth(s.handleSteamStatus))
 	mux.HandleFunc("GET /api/v1/steam/events", s.requireAuth(s.handleSteamEvents)) // SSE（進捗/ログ/結果）
+
+	// 自己更新（docs/design/self-update.md）: チェックは要求時のみ・適用は同期（数秒〜十数秒）・
+	// shutdown は graceful 終了（ヘッドレス停止込み）を main 経由で起動する。
+	mux.HandleFunc("GET /api/v1/update/check", s.requireAuth(s.handleUpdateCheck))
+	mux.HandleFunc("POST /api/v1/update/apply", s.requireAuth(s.handleUpdateApply))
+	mux.HandleFunc("POST /api/v1/shutdown", s.requireAuth(s.handleShutdown))
 
 	// ワールドお気に入り（favorites.json・新規セッションの検索→保存／一覧）。
 	mux.HandleFunc("GET /api/v1/favorites", s.requireAuth(s.handleFavoritesList))

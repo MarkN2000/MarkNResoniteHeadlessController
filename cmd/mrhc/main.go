@@ -137,6 +137,20 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	driver := headless.NewDriver(platform.ConsoleEncoding(cfg.Encoding))
 	srv := server.New(cfg, cfgPath, driver, resonite.NewClient(), web.FS())
 
+	// 自己更新（Web UI 経路）と終了依頼の注入（Listen 前に設定する・docs/design/self-update.md）。
+	if u, err := newUpdater(); err == nil {
+		srv.SetUpdater(u)
+	} else {
+		log.Print(i18n.T(lang, "main.update.failed", err)) // update API は 503 になるが起動は続行
+	}
+	shutdownReq := make(chan struct{}, 1)
+	srv.SetShutdownRequest(func() {
+		select {
+		case shutdownReq <- struct{}{}:
+		default: // 既に依頼済み
+		}
+	})
+
 	// ポートを同期で確保してからバナーを出す（bind 失敗を「起動しました」の後に出さない）。
 	// Windows の「使用中」は WSAEADDRINUSE(10048) で syscall.EADDRINUSE と一致しないため、
 	// 判定は platform.IsAddrInUse に集約している。
@@ -160,13 +174,18 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 		}
 	}()
 
-	// SIGINT/SIGTERM で graceful 終了。稼働中のヘッドレスを shutdown して
-	// orphan（管理不能な残存プロセス）を防ぐ。もう一度シグナルが来たら即終了。
+	// SIGINT/SIGTERM または Web UI の終了依頼（自己更新後の「今すぐ終了」）で graceful 終了。
+	// 稼働中のヘッドレスを shutdown して orphan（管理不能な残存プロセス）を防ぐ。
+	// もう一度シグナルが来たら即終了。
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	<-sigCh
-	fmt.Println()
-	fmt.Println(i18n.T(lang, "main.shutdown.received"))
+	select {
+	case <-sigCh:
+		fmt.Println()
+		fmt.Println(i18n.T(lang, "main.shutdown.received"))
+	case <-shutdownReq:
+		fmt.Println(i18n.T(lang, "main.shutdown.requestedWeb"))
+	}
 
 	// 先にバックグラウンドワーカーを止める（予定発火を打ち切り、進行中の再起動 ①②③ を cancel して
 	// 下の driver.Stop() と競合しないようにする）。
@@ -190,6 +209,20 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	fmt.Println(i18n.T(lang, "main.shutdown.done"))
 }
 
+// newUpdater は自己更新の実行器を返す（CLI の update サブコマンドと Web UI 経路で共用）。
+// 検証・ローカルテスト用の取得元差し替え MRHC_UPDATE_BASE はここで注入する
+// （install.sh の MRHC_DOWNLOAD_BASE と同じ流儀。selfupdate 内では環境変数を読まない）。
+func newUpdater() (*selfupdate.Updater, error) {
+	u, err := selfupdate.New(version)
+	if err != nil {
+		return nil, err
+	}
+	if base := os.Getenv("MRHC_UPDATE_BASE"); base != "" {
+		u.BaseURL = base
+	}
+	return u, nil
+}
+
 // runUpdate は `mrhc update` サブコマンド本体。自分自身を最新リリースへ入れ替える。
 // 表示言語は config があればその言語・無ければ OS 検出言語（config は必須にしない）。
 // 適用後の有効化は次回起動時（実行中の MRHC があってもファイル入れ替えは安全・無影響）。
@@ -200,14 +233,9 @@ func runUpdate(cfgPath string, osLang i18n.Lang) {
 			lang = cfg.LangOrDefault()
 		}
 	}
-	u, err := selfupdate.New(version)
+	u, err := newUpdater()
 	if err != nil {
 		log.Fatal(i18n.T(lang, "main.update.failed", err))
-	}
-	// 検証・ローカルテスト用の取得元差し替え（install.sh の MRHC_DOWNLOAD_BASE と同じ流儀。
-	// 環境変数はパッケージ内で読まずここで注入する）。
-	if base := os.Getenv("MRHC_UPDATE_BASE"); base != "" {
-		u.BaseURL = base
 	}
 	// Ctrl+C で中断可能にする（既存バイナリに触るのは全検証後の一瞬だけなので、
 	// どの時点で中断しても現状維持のまま）。
