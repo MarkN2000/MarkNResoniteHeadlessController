@@ -6,6 +6,9 @@
 *.exe
 *.test
 *.out
+# go mod vendor の生成物（race テスト同梱等の一時用途のみ・存在すると
+# ローカルビルドが暗黙に -mod=vendor へ切り替わるためコミットしない）
+/vendor/
 
 # --- Frontend (React / Vite / Mantine) ---
 node_modules/
