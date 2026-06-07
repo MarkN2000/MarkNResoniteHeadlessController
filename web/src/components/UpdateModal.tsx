@@ -23,7 +23,7 @@ export function UpdateModal({
   onClose: () => void;
   info: UpdateInfo | null;
   onInfoChange: (i: UpdateInfo | null) => void;
-  onShutdownDone: () => void;
+  onShutdownDone: (info: UpdateInfo) => void;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
@@ -89,8 +89,9 @@ export function UpdateModal({
     setShuttingDown(true);
     setError(null);
     const r = await api.shutdownApp();
-    if (r.ok) {
-      onShutdownDone(); // App 全体を終了後の静止画面へ（サーバーは停止する＝以後の API は失敗）
+    // info はボタンが staged 分岐（info 非 null）でしか描画されないため成功時は常にある。
+    if (r.ok && info) {
+      onShutdownDone(info); // App 全体を終了後の静止画面へ（サーバーは停止する＝以後の API は失敗）
       return;
     }
     setShuttingDown(false);
@@ -98,7 +99,7 @@ export function UpdateModal({
   }
 
   const staged = info?.staged;
-  const win = (info?.goos ?? "windows") === "windows";
+  const win = info?.goos === "windows"; // 使うのは staged 分岐内＝info 非 null 時のみ
   const title = staged ? t("update.pendingTitle", { version: staged }) : t("update.title");
 
   let body: React.ReactNode;

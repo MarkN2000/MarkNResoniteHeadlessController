@@ -8,6 +8,7 @@ package selfupdate
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"runtime"
@@ -85,10 +86,12 @@ func New(version string) (*Updater, error) {
 }
 
 // assetForPlatform は指定キーのアセット名を返す。未対応なら ErrUnsupportedPlatform。
+// エラー合成は steam.assetForPlatform と同形（errors.Join は Error() が改行連結になり、
+// 1行=1イベント前提のログ・UI 表示で2行目が孤立するため使わない）。
 func assetForPlatform(key string) (string, error) {
 	a, ok := assets[key]
 	if !ok {
-		return "", errors.Join(ErrUnsupportedPlatform, errors.New(key))
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedPlatform, key)
 	}
 	return a, nil
 }

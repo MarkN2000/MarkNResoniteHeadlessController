@@ -1,4 +1,4 @@
-package server
+﻿package server
 
 // Steam（DepotDownloader）HTTP 層のテスト（P9-B）。実ダウンロードは走らせず、
 // config CRUD・秘密マスキング・検証・未設定/idle のエラー経路のみ検証する
@@ -20,7 +20,9 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 )
 
-func newSteamServer(t *testing.T) (ts *httptest.Server, pw, cfgPath string) {
+// newSteamServer は認証つきのテストサーバー一式を返す（steam・update 系テストで共用。
+// セッター注入が要るテストのため *Server も返す）。
+func newSteamServer(t *testing.T) (ts *httptest.Server, pw, cfgPath string, srv *Server) {
 	t.Helper()
 	tmp := t.TempDir()
 	cfgPath = filepath.Join(tmp, "mrhc.config.json")
@@ -35,14 +37,14 @@ func newSteamServer(t *testing.T) (ts *httptest.Server, pw, cfgPath string) {
 	if err := cfg.SaveTo(cfgPath); err != nil {
 		t.Fatal(err)
 	}
-	srv := New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
+	srv = New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
 	ts = httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
-	return ts, testPassword, cfgPath
+	return ts, testPassword, cfgPath, srv
 }
 
 func TestSteamConfig_GetPutMasking(t *testing.T) {
-	ts, pw, cfgPath := newSteamServer(t)
+	ts, pw, cfgPath, _ := newSteamServer(t)
 
 	// 初期は空
 	var got okEnv[steamConfigResp]
@@ -104,7 +106,7 @@ func TestSteamConfig_GetPutMasking(t *testing.T) {
 }
 
 func TestSteamConfig_PasswordValidation(t *testing.T) {
-	ts, pw, _ := newSteamServer(t)
+	ts, pw, _, _ := newSteamServer(t)
 	// 非ASCII
 	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/steam/config", pw, "application/json",
 		`{"username":"u","password":"パスワード","branchCode":"b","installDir":"/x"}`)
@@ -122,7 +124,7 @@ func TestSteamConfig_PasswordValidation(t *testing.T) {
 }
 
 func TestSteamDownload_NotConfigured(t *testing.T) {
-	ts, pw, _ := newSteamServer(t)
+	ts, pw, _, _ := newSteamServer(t)
 	// driver 未起動(stopped) かつ Steam 未設定 → 400 steam_not_configured（ネットワークに行かない）
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/steam/download", pw, "application/json", "")
 	if resp.StatusCode != http.StatusBadRequest {
@@ -132,7 +134,7 @@ func TestSteamDownload_NotConfigured(t *testing.T) {
 }
 
 func TestSteamCancel_Idle(t *testing.T) {
-	ts, pw, _ := newSteamServer(t)
+	ts, pw, _, _ := newSteamServer(t)
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/steam/cancel", pw, "application/json", "")
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("idle の cancel は 409: %d", resp.StatusCode)
@@ -141,7 +143,7 @@ func TestSteamCancel_Idle(t *testing.T) {
 }
 
 func TestSteamStatus_Idle(t *testing.T) {
-	ts, pw, _ := newSteamServer(t)
+	ts, pw, _, _ := newSteamServer(t)
 	var got okEnv[struct {
 		State string `json:"state"`
 	}]

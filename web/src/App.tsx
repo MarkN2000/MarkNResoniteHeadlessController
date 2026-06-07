@@ -24,7 +24,7 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   // MRHC 終了依頼後の静止画面（自己更新の「今すぐ終了」）。Shell ごと差し替えて
   // SSE 購読等を unmount する（サーバー停止後の再接続ループを残さない）。
-  const [shutdownInfo, setShutdownInfo] = useState<{ goos: string; staged?: string } | null>(null);
+  const [shutdownInfo, setShutdownInfo] = useState<UpdateInfo | null>(null);
 
   // 初回: 既存 Cookie セッションを確認
   useEffect(() => {
@@ -39,11 +39,11 @@ export default function App() {
     );
   }
   if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
-  if (shutdownInfo) return <ShutdownScreen goos={shutdownInfo.goos} staged={shutdownInfo.staged} />;
-  return <Shell onLogout={() => setAuthed(false)} onShutdownDone={(goos, staged) => setShutdownInfo({ goos, staged })} />;
+  if (shutdownInfo) return <ShutdownScreen info={shutdownInfo} />;
+  return <Shell onLogout={() => setAuthed(false)} onShutdownDone={setShutdownInfo} />;
 }
 
-function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownDone: (goos: string, staged?: string) => void }) {
+function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownDone: (info: UpdateInfo) => void }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -268,7 +268,7 @@ function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownD
       onClose={() => setUpdateOpen(false)}
       info={updateInfo}
       onInfoChange={setUpdateInfo}
-      onShutdownDone={() => onShutdownDone(updateInfo?.goos ?? "windows", updateInfo?.staged)}
+      onShutdownDone={onShutdownDone}
     />
     </>
   );

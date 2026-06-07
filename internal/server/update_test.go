@@ -1,4 +1,4 @@
-package server
+﻿package server
 
 // 自己更新 HTTP 層のテスト。スワップ・抽出の実体は internal/selfupdate の単体で網羅済みのため、
 // ここでは HTTP セマンティクス（応答形・errCode マップ・staged・shutdown 依頼）のみ検証する。
@@ -7,38 +7,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
-	"golang.org/x/crypto/bcrypt"
-
-	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
-	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
-	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
 )
 
-// newUpdateTestServer はセッター注入のため *Server も返す（newSteamServer と同構成）。
-func newUpdateTestServer(t *testing.T) (ts *httptest.Server, pw string, srv *Server) {
-	t.Helper()
-	tmp := t.TempDir()
-	cfgPath := filepath.Join(tmp, "mrhc.config.json")
-	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
-	cfg := &config.Config{
-		Version:           config.SchemaVersion,
-		AdminPasswordHash: string(hash),
-		SessionSecret:     "update-test-secret",
-		Port:              8080,
-		HeadlessConfigDir: filepath.Join(tmp, "configs"),
-	}
-	if err := cfg.SaveTo(cfgPath); err != nil {
-		t.Fatal(err)
-	}
-	srv = New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
-	ts = httptest.NewServer(srv.Handler())
-	t.Cleanup(ts.Close)
-	return ts, testPassword, srv
-}
+// テストサーバーは steam_test.go の newSteamServer を共用する（同構成の重複を作らない）。
 
 // fakeLatest は releases/latest だけを模す（tag 空なら 404）。
 func fakeLatest(t *testing.T, tag string) *httptest.Server {
@@ -83,7 +57,7 @@ func assertErrCode(t *testing.T, resp *http.Response, want string) {
 }
 
 func TestUpdateCheck(t *testing.T) {
-	ts, pw, srv := newUpdateTestServer(t)
+	ts, pw, _, srv := newSteamServer(t)
 	gh := fakeLatest(t, "v2.1.0")
 
 	// updater 未注入（テスト既定）→ 503
@@ -108,7 +82,7 @@ func TestUpdateCheck(t *testing.T) {
 
 // GitHub 不達・リリース未公開でも check は 200 で返す（staged 等のローカル情報を消さない）。
 func TestUpdateCheckNoRelease(t *testing.T) {
-	ts, pw, srv := newUpdateTestServer(t)
+	ts, pw, _, srv := newSteamServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "").URL, "v2.0.0")) // リリース未公開
 
 	var env okEnv[updateCheckResp]
@@ -127,7 +101,7 @@ func TestUpdateCheckNoRelease(t *testing.T) {
 // 適用済み（staged）の表示と「今すぐ終了」導線は GitHub 不達でも UI に残るべき
 // ＝check 失敗応答にも staged が載ることを検証する。
 func TestUpdateCheckFailedKeepsStaged(t *testing.T) {
-	ts, pw, srv := newUpdateTestServer(t)
+	ts, pw, _, srv := newSteamServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "").URL, "v2.0.0"))
 	srv.setStagedVersion("v2.1.0")
 
@@ -141,7 +115,7 @@ func TestUpdateCheckFailedKeepsStaged(t *testing.T) {
 }
 
 func TestUpdateApplyUpToDate(t *testing.T) {
-	ts, pw, srv := newUpdateTestServer(t)
+	ts, pw, _, srv := newSteamServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "v2.0.0").URL, "v2.0.0")) // 最新 == 現行
 
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
@@ -153,7 +127,7 @@ func TestUpdateApplyUpToDate(t *testing.T) {
 }
 
 func TestUpdateApplyNotReleaseBuild(t *testing.T) {
-	ts, pw, srv := newUpdateTestServer(t)
+	ts, pw, _, srv := newSteamServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "v2.1.0").URL, "dev"))
 
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
@@ -165,7 +139,7 @@ func TestUpdateApplyNotReleaseBuild(t *testing.T) {
 }
 
 func TestShutdownRequest(t *testing.T) {
-	ts, pw, srv := newUpdateTestServer(t)
+	ts, pw, _, srv := newSteamServer(t)
 
 	// 未注入（テスト既定）→ 503
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/shutdown", pw, "", "")
@@ -189,7 +163,7 @@ func TestShutdownRequest(t *testing.T) {
 }
 
 func TestUpdateRequiresAuth(t *testing.T) {
-	ts, _, _ := newUpdateTestServer(t)
+	ts, _, _, _ := newSteamServer(t)
 	for _, ep := range []struct{ method, path string }{
 		{http.MethodGet, "/api/v1/update/check"},
 		{http.MethodPost, "/api/v1/update/apply"},

@@ -269,19 +269,8 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
 // 失敗理由は code で出し分ける（up_to_date/update_busy/no_release/not_release_build/
 // exe_dir_not_writable/update_failed・通信不通は network）。
 export async function applyUpdate(): Promise<{ ok: boolean; staged?: string; error?: string; code?: string }> {
-  try {
-    const res = await req("/update/apply", { method: "POST" });
-    let j: { data?: { staged?: string }; error?: { message?: string; code?: string } } | null = null;
-    try {
-      j = await res.json();
-    } catch {
-      /* ignore */
-    }
-    if (res.ok) return { ok: true, staged: j?.data?.staged };
-    return { ok: false, error: j?.error?.message, code: j?.error?.code };
-  } catch {
-    return { ok: false, code: "network" };
-  }
+  const r = await write("POST", "/update/apply");
+  return { ok: r.ok, error: r.error, code: r.code, staged: (r.data as { staged?: string } | undefined)?.staged };
 }
 
 // MRHC プロセス自体の終了依頼（自己更新後の「今すぐ終了」）。応答後にサーバーは graceful 終了する。
@@ -291,20 +280,25 @@ export function shutdownApp(): Promise<WriteResult> {
 
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
 
-// 成功 = {ok:true}。失敗 = {ok:false, error?, code?}。
+// 成功 = {ok:true, data?}。失敗 = {ok:false, error?, code?}。
 //   code は backend の error.code（not_ready/timeout/process_gone/exec_failed/bad_request 等）。
 //   通信不通など backend に届かない失敗は code:"network"。トーストの出し分けは code を権威にする。
+//   data は成功封筒の data（applyUpdate 等、結果値が要る呼び出しだけが読む）。
 export interface WriteResult {
   ok: boolean;
   error?: string;
   code?: string;
+  data?: unknown;
 }
 
 // POST/PUT/DELETE の封筒を解いて WriteResult を返す共通実行（方針A）。
 async function write(method: string, path: string, body?: unknown): Promise<WriteResult> {
   try {
     const res = await req(path, { method, body: body !== undefined ? JSON.stringify(body) : undefined });
-    if (res.ok) return { ok: true };
+    if (res.ok) {
+      const j = await res.json().catch(() => null);
+      return { ok: true, data: j?.data };
+    }
     let error: string | undefined;
     let code: string | undefined;
     try {
