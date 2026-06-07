@@ -373,9 +373,18 @@ export const startWorldTemplate = (template: string) => post(`/sessions/start`, 
 export async function getConfig(name: string): Promise<Record<string, unknown> | null> {
   return getData<Record<string, unknown>>(`/headless-configs/${encodeURIComponent(name)}`);
 }
-// 保存（新規/上書き = upsert）。body は config 全文 map（未知フィールド含め丸ごと送る）。
-export const saveConfig = (name: string, body: Record<string, unknown>) =>
-  write("PUT", `/headless-configs/${encodeURIComponent(name)}`, body);
+// 保存（上書き）。body は config 全文 map（未知フィールド含め丸ごと送る）。
+// from 指定（≠name）は保存リネーム＝from の内容を name で保存し from を削除（マスク解決も from 側）。
+export const saveConfig = (name: string, body: Record<string, unknown>, from?: string) =>
+  write(
+    "PUT",
+    `/headless-configs/${encodeURIComponent(name)}${from ? `?from=${encodeURIComponent(from)}` : ""}`,
+    body,
+  );
+// 新規＝テンプレから即時作成（名前はサーバーが採番: new-config, new-config2, …）。data={name}。
+export const createConfig = () => post("/headless-configs");
+// 複製＝サーバー側バイトコピー（{元名}-copy, -copy2, …。password も写る）。data={name}。
+export const duplicateConfig = (name: string) => post(`/headless-configs/${encodeURIComponent(name)}/duplicate`);
 // 削除。
 export const deleteConfig = (name: string) => write("DELETE", `/headless-configs/${encodeURIComponent(name)}`);
 

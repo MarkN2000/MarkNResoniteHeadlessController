@@ -11,13 +11,14 @@ import { SplitColumns } from "../../components/SplitColumns";
 import { ConfigEditor } from "./ConfigEditor";
 import { ConfigList } from "./ConfigList";
 import type { ConfigMap } from "./configModel";
-import { defaultConfig } from "./configModel";
 
 // config 名のバリデーション（backend の SanitizeName と同じ・パストラバーサル防止）。
 const NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 // コンフィグタブの container（§3.14）。一覧/読込/保存/複製/削除と未保存ガードを集約。
 // working map（cfg）を単一の真実とし、未知/レア項目はキーを落とさず温存される。
+// 新規/複製は即時作成方式: 押した瞬間にサーバーが採番して実体を作り（POST）、エディタは常に
+// 「保存済み config の編集」だけになる（未保存ドラフト状態は無い）。名前変更＋保存＝リネーム。
 export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }) {
   const { t } = useTranslation();
   const [list, setList] = useState<ConfigSummary[]>([]);
@@ -26,17 +27,17 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const [original, setOriginal] = useState<ConfigMap | null>(null);
   const [loading, setLoading] = useState(false);
   const [centralUserId, setCentralUserId] = useState(""); // customSessionId prefix の自動入力元（R12）
-  // 新規雛形の dataFolder/cacheFolder 既定値（UI改善⑤）。応答前（〜100ms）に新規作成すると
-  // null のまま seed される既知の窓があるが、centralUserId（R12）と同様に実害軽微で許容。
+  // dataFolder/cacheFolder 既定値（UI改善⑤）。リセットマーカーの比較値（GeneralSection）に使う
+  // （新規作成の雛形は backend の Create がテンプレから直接作るため、ここでは seed しない）。
   const [folderDefaults, setFolderDefaults] = useState<api.ConfigDefaults | null>(null);
-  const [draftName, setDraftName] = useState(""); // 編集可能なコンフィグ名＝保存(upsert/Save As)のターゲット
+  const [draftName, setDraftName] = useState(""); // 編集可能なコンフィグ名（selected と変えて保存＝リネーム）
   const [formNonce, setFormNonce] = useState(0); // 編集セッションごとに++＝ConfigEditor の key（毎回再マウントしバッファ入力を再シード）
   const confirm = useConfirm();
   const apply = useAsyncAction();
 
-  // 新規/複製（original=null）は常に dirty。既存は working≠original または名前変更で判定（キー順は in-place 編集で保持）。
-  const dirty =
-    cfg !== null && (original === null || JSON.stringify(cfg) !== JSON.stringify(original) || draftName !== selected);
+  // dirty = working≠original または名前変更（キー順は in-place 編集で保持）。
+  // 即時作成方式によりエディタは常に保存済み config を編集する＝未保存ドラフト特例（original=null）は無い。
+  const dirty = cfg !== null && (JSON.stringify(cfg) !== JSON.stringify(original) || draftName !== selected);
   // 名前の検証は親に一元化。エラー文言は「入力済みで不正」な時だけ出す（空の新規欄を即赤にしない）。
   const nameValid = NAME_RE.test(draftName.trim());
   const nameError = draftName.trim() !== "" && !nameValid ? t("config.invalidName") : undefined;
@@ -49,8 +50,8 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     return l;
   };
 
-  // 編集セッションを初期化（読込/新規/複製/空 で共通）。formNonce を進めて ConfigEditor を再マウントし、
-  // バッファ付き入力（タグ/autoSpawn 等）を確実に再シードする。未保存ドラフトは selected=null。
+  // 編集セッションを初期化（読込/空 で共通）。formNonce を進めて ConfigEditor を再マウントし、
+  // バッファ付き入力（タグ/autoSpawn 等）を確実に再シードする。空（config 0件）は cfg=null。
   const seedEditor = (sel: string | null, name: string, cfgVal: ConfigMap | null, orig: ConfigMap | null) => {
     setSelected(sel);
     setDraftName(name);
@@ -101,16 +102,17 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     if (name !== selected) guardDiscard(() => void load(name));
   };
 
-  // 保存（アップサート・Save As）。リネーム専用 API は無いため、名前を別の新名にすると作成し元は残す。
-  //   name===selected: 同名上書き ／ name=新名: 作成（元は残す） … いずれも persist 直行。
-  //   name=別の既存名: 上書き確認を挟む。無効名は保存ガード（ボタンも disabled）。
+  // 保存（上書き／リネーム）。
+  //   name===selected: 同名上書き ／ name=別名: 保存リネーム（from=selected の内容を name で保存し元を削除）。
+  //   リネーム先が既存名なら上書き確認を挟む。無効名は保存ガード（ボタンも disabled）。
   const save = () => {
     if (!cfg) return;
     const body = cfg;
     const name = draftName.trim();
     if (!NAME_RE.test(name)) return;
+    const from = selected !== null && selected !== name ? selected : undefined;
     const persist = async () => {
-      const r = await api.saveConfig(name, body);
+      const r = await api.saveConfig(name, body, from);
       if (r.ok) {
         setSelected(name);
         setDraftName(name);
@@ -119,10 +121,10 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
       }
       return r;
     };
-    if (name !== selected && list.some((c) => c.name === name)) {
+    if (from !== undefined && list.some((c) => c.name === name)) {
       confirm.ask({
         title: t("config.overwriteTitle"),
-        message: t("config.overwriteMessage", { name }),
+        message: t("config.renameOverwriteMessage", { from, name }),
         danger: true,
         success: t("config.toastSaved"),
         onConfirm: persist,
@@ -132,21 +134,24 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     }
   };
 
-  // 新規＝同梱デフォルト雛形の未保存ドラフト（名前は空＝インライン入力。保存で upsert/Save As）。
-  // dataFolder/cacheFolder は backend 既定値（{dataDir}/headless-data 等）を注入（UI改善⑤）。
-  const openNew = () => guardDiscard(() => seedEditor(null, "", defaultConfig(folderDefaults), null));
-  // 複製＝複製元を GET してクローンした未保存ドラフト（名前は "<元>-copy" を初期表示・編集可）。
-  const openDuplicate = (name: string) =>
+  // 作成系（新規/複製）の共通処理: サーバーが採番して即時作成 → 一覧を更新して読込（即時作成方式）。
+  const createAndLoad = (create: () => Promise<api.WriteResult>, successMsg: string) =>
     guardDiscard(() => {
-      void (async () => {
-        const m = await api.getConfig(name);
-        if (!m) {
-          notifyError(t("config.loadFailed"));
-          return;
+      void apply.run(async () => {
+        const r = await create();
+        const name = (r.data as { name?: string } | undefined)?.name;
+        if (r.ok && name) {
+          await refreshList();
+          await load(name);
         }
-        seedEditor(null, `${name}-copy`, JSON.parse(JSON.stringify(m)) as ConfigMap, null);
-      })();
+        return r;
+      }, successMsg);
     });
+
+  // 新規＝テンプレ（dataFolder/cacheFolder 既定値焼き込み・comment 空）から new-config, … を作成。
+  const openNew = () => createAndLoad(() => api.createConfig(), t("config.toastCreated"));
+  // 複製＝サーバー側バイトコピーで {元名}-copy, … を作成（password も写る・対象はディスク上の保存済み内容）。
+  const openDuplicate = (name: string) => createAndLoad(() => api.duplicateConfig(name), t("config.toastDuplicated"));
 
   const selectFirst = (l: ConfigSummary[]) => {
     if (l[0]) void load(l[0].name);
