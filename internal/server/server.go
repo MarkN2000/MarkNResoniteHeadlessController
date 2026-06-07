@@ -324,6 +324,11 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusNotFound, "config_not_found", "指定のコンフィグが見つかりません")
 			return
 		}
+		// dataFolder/cacheFolder の作成失敗＝config のパス起因（ユーザーが直せる）→ 409（UI改善⑤）。
+		if errors.Is(err, hlconfig.ErrFolderCreate) {
+			writeErr(w, http.StatusConflict, "folder_create_failed", err.Error())
+			return
+		}
 		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
 		return
 	}

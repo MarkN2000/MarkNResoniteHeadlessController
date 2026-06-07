@@ -89,10 +89,13 @@ function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: numbe
 // セッションバッジ（稼働中のみ・フォーカスプルダウンの左）。上段=フォーカス中の worlds index
 // （0始まり＝コンソールの focus N と同じ番号・brand色）、下段=/セッション総数（dimmed）。
 // 正方形でスペースを取らない（スマホ/PC共通・UI改善①）。フォーカス対象が無い時は「−」。
-function SessionCountBadge({ idx, total, title }: { idx: number | null; total: number; title: string }) {
+// title（ツールチップ）は表示値と同じ idx/total からここで組み立てる（呼び出し側との二重組み立てを避ける）。
+function SessionCountBadge({ idx, total }: { idx: number | null; total: number }) {
+  const { t } = useTranslation();
+  const displayIdx = idx ?? "−";
   return (
     <Box
-      title={title}
+      title={t("topbar.sessionBadge", { idx: displayIdx, total })}
       style={{
         width: 36,
         height: 36,
@@ -106,7 +109,7 @@ function SessionCountBadge({ idx, total, title }: { idx: number | null; total: n
       }}
     >
       <Text fz={12} fw={700} c="brand.6" lh={1.1}>
-        {idx ?? "−"}
+        {displayIdx}
       </Text>
       <Text fz={12} c="dark.2" lh={1.1}>
         /{total}
@@ -229,11 +232,7 @@ export function TopBar(props: TopBarProps) {
         <StartingIndicator startedAt={props.status?.startedAt} />
       ) : (
         <>
-          <SessionCountBadge
-            idx={focused ? focused.index : null}
-            total={props.sessions.length}
-            title={t("topbar.sessionBadge", { idx: focused ? focused.index : "−", total: props.sessions.length })}
-          />
+          <SessionCountBadge idx={focused ? focused.index : null} total={props.sessions.length} />
           <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
             <Menu.Target>
               <Button

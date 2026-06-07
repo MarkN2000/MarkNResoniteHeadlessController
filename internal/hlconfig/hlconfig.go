@@ -27,6 +27,10 @@ var (
 	ErrNotFound        = errors.New("config が見つかりません")
 	ErrStartWorldsType = errors.New("startWorlds は配列である必要があります")
 	ErrInvalidJSON     = errors.New("不正な JSON")
+	// ErrFolderCreate は EnsureFolders（起動前の dataFolder/cacheFolder 作成）の失敗。
+	// config に書かれたパス起因＝ユーザーが直せるエラーのため、HTTP 層は 409 にマップする
+	// （500 だと「サーバー内部エラー」に見えて原因に辿り着けない）。
+	ErrFolderCreate = errors.New("フォルダを作成できません")
 )
 
 // nameRe は config 名の許可文字。`/` `\` `.` を含まないためパストラバーサル不可。
@@ -255,7 +259,7 @@ func EnsureFolders(dir, name string) error {
 			continue
 		}
 		if err := os.MkdirAll(v, 0o755); err != nil {
-			return fmt.Errorf("%s の作成に失敗: %w", key, err)
+			return fmt.Errorf("%w: %s（%s）: %v", ErrFolderCreate, key, v, err)
 		}
 	}
 	return nil

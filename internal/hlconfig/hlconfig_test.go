@@ -319,4 +319,13 @@ func TestEnsureFolders(t *testing.T) {
 	if err := EnsureFolders(dir, "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing config should return ErrNotFound, got %v", err)
 	}
+	// 作成失敗（パス位置に既存ファイル）→ ErrFolderCreate（HTTP 層が 409 にマップする契約）
+	blocked := filepath.Join(tmp, "blocked")
+	if err := os.WriteFile(blocked, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	writeRawFile(t, dir, "bad", map[string]any{"dataFolder": filepath.Join(blocked, "sub")})
+	if err := EnsureFolders(dir, "bad"); !errors.Is(err, ErrFolderCreate) {
+		t.Fatalf("mkdir failure should return ErrFolderCreate, got %v", err)
+	}
 }
