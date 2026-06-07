@@ -197,8 +197,9 @@ MRHC v2.0.0 を起動しました。
   読めない場面のため。日本語 OS 以外はすべて英語）・DL 中の Ctrl+C は専用の中止文言
   （`wizard.dl.cancelled`・steam.ErrCancelled の sentinel 化＋ctx.Err() で acquire 段階も捕捉）。
   カタログの `main.*` を参照。
-- 残 gap（backlog 記録のみ）: steam パッケージのエラー文字列（ErrAuthFailed 等）が
-  Web UI の en 表示でも日本語のまま出るのは既存からの gap。
+- ~~残 gap: steam パッケージのエラー文字列（ErrAuthFailed 等）が Web UI の en 表示でも
+  日本語のまま出る~~ → **✅ 解消（2026-06-07・sentinel+code 化 d61f44d / Web UI 写像 fb8b567）**。
+  正本は `steam-depotdownloader.md` §9.1。
 
 ## 5. 検証
 
