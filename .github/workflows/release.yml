@@ -106,11 +106,16 @@ jobs:
         working-directory: dist
         run: sha256sum mrhc-linux-amd64.tar.gz mrhc-linux-arm64.tar.gz mrhc-windows-amd64.zip > SHA256SUMS
 
-      - name: Create release
+      - name: Create release (draft)
         uses: softprops/action-gh-release@v2
         with:
+          # draft で作成し、全アセットが揃ってから下のステップで公開する。
+          # 公開済みリリースへ逐次アップロードすると、releases/latest が新タグを指すのに
+          # アセットがまだ無い数十秒〜数分の窓ができ、自己更新（selfupdate）や install.sh が
+          # 404 を踏む。draft は /latest に出ないため窓が消える。
+          draft: true
           # セマンティックバージョンのプレリリースタグ（v2.0.0-rc.1 等・「-」を含む）は prerelease
-          # として公開 → releases/latest の固定リンク（install.sh の取得先）を汚さない。
+          # として公開 → releases/latest の固定リンク（install.sh / 自己更新の取得先）を汚さない。
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true # タグ間のコミット一覧からリリースノートを自動生成
           fail_on_unmatched_files: true
@@ -120,3 +125,9 @@ jobs:
             dist/mrhc-windows-amd64.zip
             dist/SHA256SUMS
             install.sh
+
+      # 全アセット添付済みの draft を公開（この時点で初めて /latest が新タグを指す）。
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${GITHUB_REF_NAME}" --draft=false
