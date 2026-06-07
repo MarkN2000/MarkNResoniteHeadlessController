@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import * as api from "../../api";
 import type { WorldResult } from "../../api";
 
-// ワールドお気に入りの単一の真実源。NewSessionTab で一度だけ呼び、StartPanel と
-// WorldSearchPanel の両方へ渡す（2箇所で別 state を持つと追加が片方に反映されない不整合を防ぐ）。
+// ワールドお気に入りの取得・トグル（サーバー保存 favorites.json と同期）。
+// 新規セッションタブでは NewSessionTab で一度だけ呼び StartPanel/WorldSearchPanel の両方へ渡す
+// （同一タブ内で別 state を持つと追加が片方に反映されない不整合を防ぐ＝単一の真実源）。
+// コンフィグ編集（WorldUrlSearch）は別タブのため独立インスタンスでよい（サーバー保存で整合）。
 // favorites=一覧表示用 / isFavorited=recordId で塗り判定 / toggle=登録↔解除（無音・更新後一覧で同期）。
 export function useFavorites() {
   const [favorites, setFavorites] = useState<WorldResult[]>([]);

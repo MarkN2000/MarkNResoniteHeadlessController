@@ -2,7 +2,7 @@ import { Box, ScrollArea } from "@mantine/core";
 import { SplitColumns } from "../../components/SplitColumns";
 import { StartPanel } from "./StartPanel";
 import { WorldSearchPanel } from "./WorldSearchPanel";
-import { useFavorites } from "./useFavorites";
+import { useFavorites } from "../../components/worldsearch/useFavorites";
 
 // 新規セッションタブ（docs §3.3 #3 / phase-7-spec §3.12）。2セクション構成:
 //   ① StartPanel（左）     = URL / テンプレートから新ワールドを起動（URL欄で★お気に入り登録）

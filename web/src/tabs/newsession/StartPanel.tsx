@@ -13,7 +13,7 @@ import {
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { isResoniteUrl, parseResrecUrl } from "../../lib/resoniteUrl";
-import { StarButton } from "./StarButton";
+import { StarButton } from "../../components/worldsearch/StarButton";
 
 // 新規セッションの起動方法（URL / テンプレート）。起動は確認 → 実行 → onStarted（一覧再取得）。
 // 結果トーストは useConfirm（onConfirm が WriteResult を返す）で自動（7-7 第1層）。

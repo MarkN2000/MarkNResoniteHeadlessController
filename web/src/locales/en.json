@@ -209,6 +209,7 @@
     "sessionNameHint": "Empty = world name",
     "loadWorldPresetName": "Preset",
     "loadWorldURL": "Record URL",
+    "worldSearchPick": "Select",
     "customSessionId": "Custom ID",
     "sentinelNote": "A value of -1 means \"disabled\".",
     "tags": "Tags",

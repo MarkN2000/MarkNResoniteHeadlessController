@@ -209,6 +209,7 @@
     "sessionNameHint": "空欄＝ワールド名",
     "loadWorldPresetName": "プリセット",
     "loadWorldURL": "レコードURL",
+    "worldSearchPick": "選択",
     "customSessionId": "カスタムID",
     "sentinelNote": "数値の -1 は「無効」を表します。",
     "tags": "タグ",

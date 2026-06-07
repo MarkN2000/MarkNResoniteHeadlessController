@@ -15,6 +15,7 @@ import {
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import type { ConfigMap, WorldMap } from "./configModel";
+import { WorldUrlSearch } from "./WorldUrlSearch";
 import {
   addWorld,
   arrayToCsv,
@@ -166,13 +167,15 @@ export function WorldsSection({
               onChange={(v) => v && setW("loadWorldPresetName", v)}
             />
           </FieldRow>
-          <FieldRow label={t("config.loadWorldURL")} {...resetProps("loadWorldURL", t("config.loadWorldURL"))}>
-            <InspectorTextInput
-              value={asStr(world.loadWorldURL)}
-              onChange={(e) => setWText("loadWorldURL", e.currentTarget.value)}
-              placeholder="resrec://..."
-            />
-          </FieldRow>
+          {/* URL欄＋「検索 ▾」トグル＋Collapse検索パネル（UI改善②・FieldRowごと所有）。
+              「選択」でカードのURLをそのままセット（sessionName 等は触らない）。 */}
+          <WorldUrlSearch
+            label={t("config.loadWorldURL")}
+            {...resetProps("loadWorldURL", t("config.loadWorldURL"))}
+            value={asStr(world.loadWorldURL)}
+            onChange={(v) => setWText("loadWorldURL", v)}
+            onPickUrl={(url) => setW("loadWorldURL", url)}
+          />
           {/* customSessionId はバッファ付き入力（内部 state）でリセットが表示へ反映されないため対象外。 */}
           <FieldRow label={t("config.customSessionId")} align="start">
             {/* key に centralUserId を含め、UserID が後着でも prefix 自動入力が反映されるよう再シード。

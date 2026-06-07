@@ -2,7 +2,8 @@ import { ActionIcon } from "@mantine/core";
 
 // ★/☆ のコンパクトなトグルアイコン（RefreshButton と同じ ActionIcon 規約）。
 // active=登録済/表示中＝塗り★(黄)、未＝枠☆(灰)。絵文字なので aria-label/title 必須。
-// StartPanel（URL欄）と WorldSearchPanel（検索）で共有。disabled=お気に入り不可URL等で無効化。
+// StartPanel（URL欄）・WorldSearchView（検索・新規セッション/コンフィグ編集共用）で共有
+// （UI改善②で components/worldsearch へ移設）。disabled=お気に入り不可URL等で無効化。
 export function StarButton({
   active,
   onClick,
