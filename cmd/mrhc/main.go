@@ -185,6 +185,13 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 		fmt.Println(i18n.T(lang, "main.shutdown.received"))
 	case <-shutdownReq:
 		fmt.Println(i18n.T(lang, "main.shutdown.requestedWeb"))
+		// select 以前に届いていたシグナルが buffer に残っていると、下の force-quit goroutine が
+		// それを「2発目」として即終了に使ってしまう。1発目は graceful 扱い＝ここで読み捨てる
+		//（旧コードの「最初のシグナルは必ず graceful」を web 終了経路でも保つ）。
+		select {
+		case <-sigCh:
+		default:
+		}
 	}
 
 	// 先にバックグラウンドワーカーを止める（予定発火を打ち切り、進行中の再起動 ①②③ を cancel して

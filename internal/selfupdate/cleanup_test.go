@@ -14,13 +14,14 @@ func TestCleanupStale(t *testing.T) {
 	// 更新の残骸（消えるべきもの）
 	writeExe(t, exe+".old", []byte("old"))
 	writeExe(t, exe+".old-1700000000", []byte("older"))
-	writeExe(t, exe+".new", []byte("staged"))
+	staleNew := exe + ".new"
+	writeExe(t, staleNew, []byte("staged"))
 	stalePartial := filepath.Join(dir, ".mrhc-update-1.partial")
 	writeExe(t, stalePartial, []byte("x"))
 	staleLock := exe + ".update.lock"
 	writeExe(t, staleLock, []byte("123\n"))
 	staleAt := time.Now().Add(-2 * lockStaleAfter)
-	for _, p := range []string{stalePartial, staleLock} {
+	for _, p := range []string{staleNew, stalePartial, staleLock} {
 		if err := os.Chtimes(p, staleAt, staleAt); err != nil {
 			t.Fatal(err)
 		}
@@ -32,7 +33,7 @@ func TestCleanupStale(t *testing.T) {
 	if !cleanupStale(exe) {
 		t.Error("updated = false, want true（.old があった）")
 	}
-	for _, p := range []string{exe + ".old", exe + ".old-1700000000", exe + ".new", stalePartial, staleLock} {
+	for _, p := range []string{exe + ".old", exe + ".old-1700000000", staleNew, stalePartial, staleLock} {
 		mustNotExist(t, p)
 	}
 	if _, err := os.Stat(freshPartial); err != nil {
@@ -40,6 +41,20 @@ func TestCleanupStale(t *testing.T) {
 	}
 	if _, err := os.Stat(exe); err != nil {
 		t.Error("実行ファイル本体が消されています")
+	}
+}
+
+// 進行中の `mrhc update`（extract 完了〜swap の間）が書いた新しい .new は消さない。
+func TestCleanupStaleKeepsFreshNew(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "mrhc")
+	writeExe(t, exe, []byte("current"))
+	writeExe(t, exe+".new", []byte("staging-in-progress"))
+	if cleanupStale(exe) {
+		t.Error("updated = true, want false")
+	}
+	if _, err := os.Stat(exe + ".new"); err != nil {
+		t.Error("進行中の .new が消されています")
 	}
 }
 

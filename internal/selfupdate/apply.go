@@ -65,6 +65,13 @@ func (u *Updater) Apply(ctx context.Context) (string, error) {
 	defer os.Remove(tmpPath) // 成否にかかわらずアーカイブは残さない
 
 	base := strings.TrimSuffix(u.BaseURL, "/") + "/releases/download/" + latest
+	// SHA256SUMS（数百B）は本体（十数MB）より先に取得する: 公開直後等で SUMS が欠けている
+	// 場合に大きな DL を始める前に失敗させる。取得元は latest 固定リンクではなく解決済み
+	// タグ配下＝本体と常に同一リリース内で一貫し、順序を入れ替えても安全。
+	expected, err := u.fetchExpectedSHA(ctx, base+"/SHA256SUMS", assetFile)
+	if err != nil {
+		return "", err
+	}
 	dlErr := u.fetchToWriter(ctx, base+"/"+assetFile, tmp)
 	closeErr := tmp.Close()
 	if dlErr != nil {
@@ -72,12 +79,6 @@ func (u *Updater) Apply(ctx context.Context) (string, error) {
 	}
 	if closeErr != nil {
 		return "", fmt.Errorf("一時ファイルのクローズに失敗: %w", closeErr)
-	}
-
-	// SHA256SUMS も同じタグ配下から取得（latest 固定リンクは使わない＝常に同一リリース内で一貫）。
-	expected, err := u.fetchExpectedSHA(ctx, base+"/SHA256SUMS", assetFile)
-	if err != nil {
-		return "", err
 	}
 	// ハッシュは DL ストリームではなくディスクから読み直して計算する。並行書込・書込経路の
 	// 破損があった場合、ストリーム側ハッシュでは検出できずディスク上の壊れた実体を通してしまう。
@@ -99,7 +100,9 @@ func (u *Updater) Apply(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if err := swapBinary(u.ExePath, newPath); err != nil {
-		os.Remove(newPath)
+		// ここでは .new を消さない: 三重失敗（rename×3 ＋ .old 復元失敗）で exe 不在に
+		// なった場合に、検証済みの新バイナリを手動復旧の選択肢として残すため。
+		// 残骸になった場合は次回起動の CleanupStale（stale 判定）が回収する。
 		return "", err
 	}
 	return latest, nil

@@ -106,16 +106,38 @@ func TestUpdateCheck(t *testing.T) {
 	}
 }
 
+// GitHub 不達・リリース未公開でも check は 200 で返す（staged 等のローカル情報を消さない）。
 func TestUpdateCheckNoRelease(t *testing.T) {
 	ts, pw, srv := newUpdateTestServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "").URL, "v2.0.0")) // リリース未公開
 
-	resp := authReq(t, http.MethodGet, ts.URL+"/api/v1/update/check", pw, "", "")
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("status=%d, want 404", resp.StatusCode)
+	var env okEnv[updateCheckResp]
+	if code := authGet(t, ts.URL+"/api/v1/update/check", pw, &env); code != http.StatusOK {
+		t.Fatalf("status=%d, want 200（ローカル情報は GitHub 不達でも返す）", code)
 	}
-	assertErrCode(t, resp, "no_release")
+	d := env.Data
+	if !d.CheckFailed || d.CheckError != "no_release" {
+		t.Errorf("checkFailed/checkError = %v/%q, want true/no_release", d.CheckFailed, d.CheckError)
+	}
+	if d.Current != "v2.0.0" || d.Goos == "" || d.UpdateAvailable {
+		t.Errorf("ローカル情報が想定外: %+v", d)
+	}
+}
+
+// 適用済み（staged）の表示と「今すぐ終了」導線は GitHub 不達でも UI に残るべき
+// ＝check 失敗応答にも staged が載ることを検証する。
+func TestUpdateCheckFailedKeepsStaged(t *testing.T) {
+	ts, pw, srv := newUpdateTestServer(t)
+	srv.SetUpdater(testUpdater(fakeLatest(t, "").URL, "v2.0.0"))
+	srv.setStagedVersion("v2.1.0")
+
+	var env okEnv[updateCheckResp]
+	if code := authGet(t, ts.URL+"/api/v1/update/check", pw, &env); code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", code)
+	}
+	if env.Data.Staged != "v2.1.0" || !env.Data.CheckFailed {
+		t.Errorf("staged/checkFailed = %q/%v, want v2.1.0/true", env.Data.Staged, env.Data.CheckFailed)
+	}
 }
 
 func TestUpdateApplyUpToDate(t *testing.T) {

@@ -37,10 +37,10 @@ func cleanupStale(exePath string) bool {
 		updated = true
 		_ = os.Remove(p)
 	}
-	// 入れ替え直前で中断した展開済みバイナリは常に作り直すため無条件で削除。
-	_ = os.Remove(exePath + ".new")
-	// DL 途中のアーカイブとロックは、進行中の `mrhc update`（別プロセス）を壊さないよう
-	// 古いものだけを残骸とみなす。
+	// 展開済みバイナリ・DL 途中のアーカイブ・ロックは、進行中の `mrhc update`（別プロセス。
+	// extract 完了〜swap の間 .new が秒オーダーで存在する）を壊さないよう、
+	// 古いものだけを残骸とみなして削除する。
+	removeIfStale(exePath+".new", lockStaleAfter)
 	removeIfStale(exePath+".update.lock", lockStaleAfter)
 	partials, _ := filepath.Glob(filepath.Join(filepath.Dir(exePath), ".mrhc-update-*.partial"))
 	for _, p := range partials {

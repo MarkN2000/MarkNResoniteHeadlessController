@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Anchor, Button, Group, List, Loader, Modal, Stack, Text } from "@mantine/core";
 import * as api from "../api";
@@ -31,11 +31,18 @@ export function UpdateModal({
   const [shuttingDown, setShuttingDown] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 最新の info を deps に入れず参照するための ref（deps に入れると onInfoChange→info 変化→
+  // recheck 再生成→useEffect 再発火のチェックループになる）。
+  const infoRef = useRef(info);
+  infoRef.current = info;
+
   const recheck = useCallback(() => {
     setChecking(true);
     setError(null);
     void api.checkUpdate().then((i) => {
-      onInfoChange(i);
+      // MRHC 自体に不達（null）のときは保持済みの staged 表示を消さない
+      //（staged はローカル状態で、応答が無くても正しさが変わらないため）。
+      if (i || !infoRef.current?.staged) onInfoChange(i);
       setChecking(false);
     });
   }, [onInfoChange]);
@@ -59,7 +66,9 @@ export function UpdateModal({
       case "network":
         return t("update.errNetwork");
       default:
-        return raw || t("update.errFailed");
+        // 未知 code（update_failed 等）は steam と同じく「locale 見出し + 生 detail」の併記
+        //（生 detail は日本語のため、見出し無しだと英語 UI に日本語だけが出てしまう）。
+        return raw ? `${t("update.errFailed")}: ${raw}` : t("update.errFailed");
     }
   }
 
@@ -153,6 +162,21 @@ export function UpdateModal({
         </Group>
       </Stack>
     );
+  } else if (info.checkFailed) {
+    // GitHub への確認失敗（staged は上の分岐が先に拾う＝ここはローカルに見せるものが無いケース）。
+    body = (
+      <Stack gap="sm">
+        <Text size="sm">
+          {info.checkError === "no_release" ? t("update.errNoRelease") : t("update.checkFailed")}
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>
+            {t("update.close")}
+          </Button>
+          <Button onClick={recheck}>{t("update.retry")}</Button>
+        </Group>
+      </Stack>
+    );
   } else if (!info.currentIsRelease) {
     body = (
       <Stack gap="sm">
@@ -203,12 +227,14 @@ export function UpdateModal({
 
   return (
     // 適用中・終了依頼中は閉じさせない（押した操作の結果を見届けさせる）。
+    // Esc（closeOnEscape は Mantine 既定 true）も同条件で無効化する。
     <Modal
       opened={opened}
       onClose={onClose}
       title={title}
       centered
       closeOnClickOutside={!applying && !shuttingDown}
+      closeOnEscape={!applying && !shuttingDown}
       withCloseButton={!applying && !shuttingDown}
     >
       {body}

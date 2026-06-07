@@ -254,6 +254,10 @@ export interface UpdateInfo {
   currentIsRelease: boolean; // 適用可能なリリースビルドか
   staged?: string; // 適用済み・再起動待ちの版
   goos: string; // "windows" | "linux"（再起動手順の出し分け）
+  // GitHub への確認に失敗（current/staged/goos のローカル情報のみ有効）。
+  // checkError はその errCode（no_release / update_failed 等）。
+  checkFailed?: boolean;
+  checkError?: string;
 }
 
 // 更新チェック。GitHub への問い合わせはこの呼び出し時のみ（常時ポーリングはしない）。失敗時 null。

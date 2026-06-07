@@ -40,28 +40,38 @@ type updateCheckResp struct {
 	CurrentIsRelease bool   `json:"currentIsRelease"` // 適用可能なリリースビルドか
 	Staged           string `json:"staged,omitempty"` // 適用済み・再起動待ちの版（このプロセスでの適用のみ）
 	Goos             string `json:"goos"`             // 再起動手順の出し分け用（windows / linux）
+
+	// GitHub への確認に失敗したとき true（current/staged/goos のローカル情報のみ有効）。
+	// CheckError はその errCode（no_release / update_failed 等）。
+	CheckFailed bool   `json:"checkFailed,omitempty"`
+	CheckError  string `json:"checkError,omitempty"`
 }
 
 // handleUpdateCheck: GET /api/v1/update/check → updateCheckResp
 // GitHub への問い合わせは本ハンドラ呼び出し時のみ（常時ポーリングはフロント側でもしない）。
+// staged/current/goos はローカル情報なので、GitHub 不達でも 200 ＋ CheckFailed で返す
+// （エラー応答にすると、適用済み＝再起動待ちの表示と「今すぐ終了」導線が UI から消えてしまう）。
 func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	if s.updater == nil {
 		writeErr(w, http.StatusServiceUnavailable, "update_unavailable", "自己更新が初期化されていません")
 		return
 	}
+	resp := updateCheckResp{
+		Current: s.updater.Version,
+		Staged:  s.stagedVersion(),
+		Goos:    runtime.GOOS,
+	}
 	info, err := s.updater.Check(r.Context())
 	if err != nil {
-		writeUpdateErr(w, err)
+		resp.CheckFailed = true
+		resp.CheckError = updateErrCode(err)
+		writeOK(w, resp)
 		return
 	}
-	writeOK(w, updateCheckResp{
-		Current:          info.Current,
-		Latest:           info.Latest,
-		UpdateAvailable:  info.UpdateAvailable,
-		CurrentIsRelease: info.CurrentIsRelease,
-		Staged:           s.stagedVersion(),
-		Goos:             runtime.GOOS,
-	})
+	resp.Latest = info.Latest
+	resp.UpdateAvailable = info.UpdateAvailable
+	resp.CurrentIsRelease = info.CurrentIsRelease
+	writeOK(w, resp)
 }
 
 // handleUpdateApply: POST /api/v1/update/apply → {staged}
@@ -74,7 +84,8 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 適用済み・再起動待ち中の再実行: 最新が staged と同じなら再DLせずそのまま返す（冪等）。
-	// staged より新しいリリースが出ていれば続行して上書き適用する。
+	// staged と異なる latest になっていれば（取り下げで古くなった場合も含め）続行して
+	// latest を適用し直す（実行中の版より古ければ Apply 側が ErrUpToDate で拒否する）。
 	if st := s.stagedVersion(); st != "" {
 		if info, err := s.updater.Check(r.Context()); err == nil && info.Latest == st {
 			writeOK(w, map[string]any{"staged": st})
@@ -103,21 +114,36 @@ func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	s.requestShutdown()
 }
 
-// writeUpdateErr は selfupdate の sentinel を errCode へマップする
+// updateErrCode は selfupdate の sentinel を errCode へマップする
 // （フロントは code で locale 変換・steam の sentinel+errorCode 方式と同じ）。
-func writeUpdateErr(w http.ResponseWriter, err error) {
+func updateErrCode(err error) string {
 	switch {
 	case errors.Is(err, selfupdate.ErrNoRelease):
-		writeErr(w, http.StatusNotFound, "no_release", err.Error())
+		return "no_release"
 	case errors.Is(err, selfupdate.ErrUpToDate):
-		writeErr(w, http.StatusConflict, "up_to_date", err.Error())
+		return "up_to_date"
 	case errors.Is(err, selfupdate.ErrBusy):
-		writeErr(w, http.StatusConflict, "update_busy", err.Error())
+		return "update_busy"
 	case errors.Is(err, selfupdate.ErrNotReleaseBuild):
-		writeErr(w, http.StatusConflict, "not_release_build", err.Error())
+		return "not_release_build"
 	case errors.Is(err, fs.ErrPermission):
-		writeErr(w, http.StatusInternalServerError, "exe_dir_not_writable", err.Error())
+		return "exe_dir_not_writable"
 	default:
-		writeErr(w, http.StatusBadGateway, "update_failed", err.Error())
+		return "update_failed"
 	}
+}
+
+// writeUpdateErr は errCode に応じた HTTP ステータスでエラー応答を書く（apply 用）。
+func writeUpdateErr(w http.ResponseWriter, err error) {
+	code := updateErrCode(err)
+	status := http.StatusBadGateway
+	switch code {
+	case "no_release":
+		status = http.StatusNotFound
+	case "up_to_date", "update_busy", "not_release_build":
+		status = http.StatusConflict
+	case "exe_dir_not_writable":
+		status = http.StatusInternalServerError
+	}
+	writeErr(w, status, code, err.Error())
 }
