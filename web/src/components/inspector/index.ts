@@ -4,6 +4,7 @@ export { InspectorCard } from "./InspectorCard";
 export { FieldRow, ROW_ICON_SIZE } from "./FieldRow";
 export { InspectorTextInput, InspectorNumberInput, InspectorTextarea, InspectorSelect } from "./inputs";
 export { InspectorButton, type Severity } from "./InspectorButton";
+export { SelectionButton } from "./SelectionButton";
 export { RowIconButton } from "./RowIconButton";
 export { AddIconButton } from "./AddIconButton";
 export { RefreshButton } from "./RefreshButton";

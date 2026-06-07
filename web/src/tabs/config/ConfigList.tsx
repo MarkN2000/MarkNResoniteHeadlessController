@@ -1,7 +1,7 @@
-import { Button, Group, Stack, Text } from "@mantine/core";
+import { Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import type { ConfigSummary } from "../../api";
-import { InspectorButton, InspectorCard, RowIconButton } from "../../components/inspector";
+import { InspectorButton, InspectorCard, RowIconButton, SelectionButton } from "../../components/inspector";
 
 // config 一覧（master）。各行 = 名前（クリックで編集）＋ 複製/削除。worldCount は出さない（名前のみ）。
 // 右パネル（ConfigEditor）と同じ InspectorCard で見た目を揃え、SplitColumns に並べる。
@@ -35,10 +35,8 @@ export function ConfigList({
           const active = c.name === selected;
           return (
             <Group key={c.name} gap={4} wrap="nowrap">
-              <Button
-                size="xs"
-                variant={active ? "filled" : "default"}
-                color="gray"
+              <SelectionButton
+                selected={active}
                 justify="flex-start"
                 onClick={() => onSelect(c.name)}
                 style={{ flex: 1, minWidth: 0 }}
@@ -50,7 +48,7 @@ export function ConfigList({
                 }}
               >
                 {c.name}
-              </Button>
+              </SelectionButton>
               <RowIconButton color="green" label={t("config.duplicate")} onClick={() => onDuplicate(c.name)}>
                 ⧉
               </RowIconButton>

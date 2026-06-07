@@ -10,6 +10,7 @@ import {
   InspectorTextInput,
   InspectorTextarea,
   RowIconButton,
+  SelectionButton,
 } from "../../components/inspector";
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -116,14 +117,9 @@ export function WorldsSection({
       <Group gap={4} wrap="wrap">
         {worlds.map((w, i) => (
           <Group key={i} gap={2} wrap="nowrap">
-            <Button
-              size="xs"
-              variant={i === idx ? "filled" : "default"}
-              color="gray"
-              onClick={() => setActive(i)}
-            >
+            <SelectionButton selected={i === idx} onClick={() => setActive(i)}>
               {worldLabel(w, i)}
-            </Button>
+            </SelectionButton>
             {worlds.length > 1 && (
               <RowIconButton color="red" label={t("config.removeWorld")} onClick={() => askRemove(i)}>
                 ×

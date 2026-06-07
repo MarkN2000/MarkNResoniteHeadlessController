@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Divider, Group, Stack, Text } from "@mantine/core";
-import { InspectorButton, InspectorCard, InspectorTextInput } from "../../components/inspector";
+import { InspectorButton, InspectorCard, InspectorTextInput, SelectionButton } from "../../components/inspector";
 import type { FriendSource, LoadSource } from "./FriendsTab";
 
 interface Props {
@@ -70,31 +70,31 @@ export function SourcePanel({ active, loading, onLoad, onSearch }: Props) {
 
         <Divider color="dark.4" />
 
-        {/* 取得系ソース。押したソースだけ②に取得。現ソースは filled でハイライト。 */}
-        <InspectorButton
+        {/* 取得系ソース。押したソースだけ②に取得。現ソースは SelectionButton（brand filled）でハイライト。 */}
+        <SelectionButton
           fullWidth
-          variant={active === "requests" ? "filled" : "light"}
+          selected={active === "requests"}
           loading={loading && active === "requests"}
           onClick={() => onLoad("requests")}
         >
           {t("friends.loadRequests")}
-        </InspectorButton>
-        <InspectorButton
+        </SelectionButton>
+        <SelectionButton
           fullWidth
-          variant={active === "bans" ? "filled" : "light"}
+          selected={active === "bans"}
           loading={loading && active === "bans"}
           onClick={() => onLoad("bans")}
         >
           {t("friends.loadBans")}
-        </InspectorButton>
-        <InspectorButton
+        </SelectionButton>
+        <SelectionButton
           fullWidth
-          variant={active === "focused" ? "filled" : "light"}
+          selected={active === "focused"}
           loading={loading && active === "focused"}
           onClick={() => onLoad("focused")}
         >
           {t("friends.loadFocused")}
-        </InspectorButton>
+        </SelectionButton>
       </Stack>
     </InspectorCard>
   );
