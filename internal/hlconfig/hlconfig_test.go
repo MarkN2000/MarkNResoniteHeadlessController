@@ -223,6 +223,10 @@ func TestEnsureDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("default not created: %v", err)
 	}
+	// default.json には説明文が注入されること（テンプレ側は空・EnsureDefault が jsonString で注入）。
+	if raw["comment"] != defaultConfigComment {
+		t.Fatalf("comment not injected: %v", raw["comment"])
+	}
 	// dataFolder/cacheFolder は {dataDir}/headless-data 等の絶対パスが焼き込まれること（UI改善⑤）。
 	wantData, wantCache, err := DefaultFolders(tmp)
 	if err != nil {

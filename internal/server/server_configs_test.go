@@ -5,7 +5,6 @@ package server
 // start-by-name のみ fakehl を使う（fakehlPath は server_integration_test.go の TestMain で用意）。
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -140,18 +139,6 @@ func TestConfigs_List_SaveAs_Delete(t *testing.T) {
 	if code := authGet(t, ts.URL+"/api/v1/headless-configs/alpha", pw, nil); code != http.StatusNotFound {
 		t.Fatalf("deleted config GET expected 404, got %d", code)
 	}
-}
-
-// decodeResp は resp の JSON を target へ読み、Body を閉じてステータスを返す（POST/PUT 用）。
-func decodeResp(t *testing.T, resp *http.Response, target any) int {
-	t.Helper()
-	defer resp.Body.Close()
-	if target != nil {
-		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-			t.Fatalf("decode: %v status=%d", err, resp.StatusCode)
-		}
-	}
-	return resp.StatusCode
 }
 
 // 即時作成方式: POST 作成/複製はサーバーが採番して実体を作り {name} を返す。

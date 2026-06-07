@@ -7,8 +7,8 @@ import { GeneralSection } from "./GeneralSection";
 import { WorldsSection } from "./WorldsSection";
 
 // エディタカード（detail）。タイトルは固定文言、先頭の「コンフィグ名」は編集欄（識別子＝cfg 本文とは別物）。
-// 名前は親（ConfigTab）が draftName として保持し、保存時に upsert/Save As のターゲットになる。
-// nameError があれば名前欄に表示し保存を抑止する（検証は親に一元化）。複製/削除は一覧の各行へ。
+// 名前は親（ConfigTab）が draftName として保持し、選択中と変えて保存するとリネームになる（即時作成方式）。
+// nameError があれば名前欄に表示し保存を抑止する（検証は親に一元化）。新規/複製/削除は一覧側へ。
 // 保存ボタンはタイトル右（actions）と末尾の2箇所・完全同挙動（長いフォームの見逃し防止）。
 export function ConfigEditor({
   draftName,

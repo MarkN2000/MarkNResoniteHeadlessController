@@ -264,6 +264,7 @@ func bakedDefaultJSON(dataDir string) string {
 
 // EnsureDefault は dir に config が1つも無ければ同梱デフォルト(default.json)を作る。
 // dataFolder/cacheFolder には DefaultFolders(dataDir) の絶対パスを焼き込む（表示=保存値一致）。
+// comment はテンプレでは空で、default.json にだけ説明文を注入する（jsonString＝エスケープ安全）。
 func EnsureDefault(dir, dataDir string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -277,7 +278,9 @@ func EnsureDefault(dir, dataDir string) error {
 			return nil // 既に config がある
 		}
 	}
-	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(bakedDefaultJSON(dataDir)), 0o600)
+	body := strings.Replace(bakedDefaultJSON(dataDir),
+		`"comment": ""`, `"comment": `+jsonString(defaultConfigComment), 1)
+	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(body), 0o600)
 }
 
 // pickUniqueName は base, base2, base3, … の最初の未使用名を返す（即時作成の自動命名）。
@@ -300,9 +303,9 @@ func pickUniqueName(dir, base string) (string, error) {
 	return "", errors.New("空き名を採番できません")
 }
 
-// Create は同梱テンプレ（dataFolder/cacheFolder 焼き込み済み）から新しい config を即時作成し、
-// 作成した名前（new-config, new-config2, …）を返す。comment は default.json 用の説明文を
-// 引き継がず空にする（UI 新規作成の従来挙動＝フロント defaultConfig() と一致）。
+// Create は同梱テンプレ（dataFolder/cacheFolder 焼き込み済み・comment 空）から新しい config を
+// 即時作成し、作成した名前（new-config, new-config2, …）を返す。default.json 用の説明文は
+// EnsureDefault 側で注入するため、こちらはテンプレそのまま＝フロント defaultConfig() と一致。
 func Create(dir, dataDir string) (string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
@@ -311,9 +314,7 @@ func Create(dir, dataDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	body := strings.Replace(bakedDefaultJSON(dataDir),
-		`"comment": "`+defaultConfigComment+`"`, `"comment": ""`, 1)
-	if err := os.WriteFile(pathFor(dir, name), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(pathFor(dir, name), []byte(bakedDefaultJSON(dataDir)), 0o600); err != nil {
 		return "", err
 	}
 	return name, nil
@@ -371,13 +372,14 @@ func EnsureFolders(dir, name string) error {
 // idleRestartInterval=1800・強制再起動/自動保存=-1(無効)・creds 空（中央注入）。
 // 注: autoRecover は雛形から外し headless 既定へ委譲（既定値 true は明示しない）。
 //
-// defaultConfigComment は default.json（同梱デフォルト）にだけ入れる説明文。Create（UI 新規作成）は
-// これを文字列一致で空に置換するため、JSON エスケープが要る文字（" \ < > & 制御文字）を含めないこと。
+// defaultConfigComment は default.json（同梱デフォルト）にだけ入れる説明文。雛形の comment は
+// 空で持ち、EnsureDefault が jsonString（json.Marshal）でエスケープして注入する＝説明文に
+// 使える文字の制約は無い。Create（UI 新規作成）は雛形そのまま＝説明文を引き継がない。
 const defaultConfigComment = "MRHC デフォルト設定（Settings で Resonite アカウントを登録し、必要に応じて編集してください）"
 
 const defaultConfigJSON = `{
   "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
-  "comment": "` + defaultConfigComment + `",
+  "comment": "",
   "tickRate": 60.0,
   "maxConcurrentAssetTransfers": 128,
   "usernameOverride": null,

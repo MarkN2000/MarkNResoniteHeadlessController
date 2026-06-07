@@ -112,6 +112,19 @@ func stopFakehl(drv *headless.Driver) {
 	}
 }
 
+// decodeResp は resp の JSON を target へ読み、Body を閉じてステータスを返す
+// （authGet の復路と、authReq/authPost で得た POST/PUT 応答の decode を共通化）。
+func decodeResp(t *testing.T, resp *http.Response, target any) int {
+	t.Helper()
+	defer resp.Body.Close()
+	if target != nil {
+		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+			t.Fatalf("decode: %v status=%d", err, resp.StatusCode)
+		}
+	}
+	return resp.StatusCode
+}
+
 // authGet は Bearer 認証付き GET → JSON decode → status を返す。
 func authGet(t *testing.T, url, pw string, target any) int {
 	t.Helper()
@@ -121,13 +134,7 @@ func authGet(t *testing.T, url, pw string, target any) int {
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
-	defer resp.Body.Close()
-	if target != nil {
-		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-			t.Fatalf("decode: %v status=%d", err, resp.StatusCode)
-		}
-	}
-	return resp.StatusCode
+	return decodeResp(t, resp, target)
 }
 
 // authPost は Bearer 認証付き POST を行う（呼び出し側で Body.Close する）。
