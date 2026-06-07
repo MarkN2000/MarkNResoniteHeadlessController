@@ -5,6 +5,7 @@ package server
 // start-by-name のみ fakehl を使う（fakehlPath は server_integration_test.go の TestMain で用意）。
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -138,6 +139,83 @@ func TestConfigs_List_SaveAs_Delete(t *testing.T) {
 	// alpha は 404
 	if code := authGet(t, ts.URL+"/api/v1/headless-configs/alpha", pw, nil); code != http.StatusNotFound {
 		t.Fatalf("deleted config GET expected 404, got %d", code)
+	}
+}
+
+// decodeResp は resp の JSON を target へ読み、Body を閉じてステータスを返す（POST/PUT 用）。
+func decodeResp(t *testing.T, resp *http.Response, target any) int {
+	t.Helper()
+	defer resp.Body.Close()
+	if target != nil {
+		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+			t.Fatalf("decode: %v status=%d", err, resp.StatusCode)
+		}
+	}
+	return resp.StatusCode
+}
+
+// 即時作成方式: POST 作成/複製はサーバーが採番して実体を作り {name} を返す。
+// PUT ?from= は保存リネーム（from の password でマスク解決し from を削除）。
+func TestConfigs_CreateDuplicateRename(t *testing.T) {
+	ts, pw, configDir := newConfigServer(t)
+
+	// POST /headless-configs → new-config（テンプレから即時作成）
+	var created okEnv[map[string]any]
+	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/headless-configs", pw, "", "")
+	if code := decodeResp(t, resp, &created); code != http.StatusOK {
+		t.Fatalf("create: status=%d", code)
+	}
+	if created.Data["name"] != "new-config" {
+		t.Fatalf("created name = %v", created.Data["name"])
+	}
+
+	// 複製元（password 付き）を用意 → POST duplicate → password ごと写る
+	put := authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/src", pw, "application/json",
+		`{"loginPassword":"secret","comment":"c","startWorlds":[]}`)
+	put.Body.Close()
+	var dup okEnv[map[string]any]
+	resp = authReq(t, http.MethodPost, ts.URL+"/api/v1/headless-configs/src/duplicate", pw, "", "")
+	if code := decodeResp(t, resp, &dup); code != http.StatusOK {
+		t.Fatalf("duplicate: status=%d", code)
+	}
+	if dup.Data["name"] != "src-copy" {
+		t.Fatalf("duplicated name = %v", dup.Data["name"])
+	}
+
+	// PUT ?from=src-copy: マスク（空 password）のまま renamed へ保存 → 旧名は消え password は保持
+	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/renamed?from=src-copy", pw,
+		"application/json", `{"loginPassword":"","comment":"c2","startWorlds":[]}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("rename PUT: %d", resp.StatusCode)
+	}
+	if code := authGet(t, ts.URL+"/api/v1/headless-configs/src-copy", pw, nil); code != http.StatusNotFound {
+		t.Fatalf("renamed-from should be gone, got %d", code)
+	}
+	var got okEnv[map[string]any]
+	if code := authGet(t, ts.URL+"/api/v1/headless-configs/renamed", pw, &got); code != http.StatusOK {
+		t.Fatalf("renamed GET: %d", code)
+	}
+	if got.Data["comment"] != "c2" {
+		t.Fatalf("renamed body wrong: %v", got.Data["comment"])
+	}
+	// 複製（バイトコピー）→ リネーム（from 側でマスク解決）を通して password が失われていないこと。
+	if disk, err := os.ReadFile(filepath.Join(configDir, "renamed.json")); err != nil || !strings.Contains(string(disk), "secret") {
+		t.Fatalf("password should survive duplicate+rename (err=%v)", err)
+	}
+
+	// 不在 from は 404（何も書かれない）
+	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/x?from=missing", pw,
+		"application/json", `{"startWorlds":[]}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("missing from should be 404, got %d", resp.StatusCode)
+	}
+	// 不在ソースの複製も 404
+	resp = authReq(t, http.MethodPost, ts.URL+"/api/v1/headless-configs/missing/duplicate", pw, "", "")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("duplicate of missing should be 404, got %d", resp.StatusCode)
 	}
 }
 

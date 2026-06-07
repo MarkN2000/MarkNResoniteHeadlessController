@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -126,6 +127,35 @@ func ReadMasked(dir, name string) (map[string]any, error) {
 //   - loginPassword が空なら既存ファイルの値を保持（GET でマスクされるため空送信＝変更なし）
 //   - $schema を付与し 0600 で保存
 func Write(dir, name string, body map[string]any) error {
+	return writeMasked(dir, name, name, body)
+}
+
+// WriteRenamed は body を newName で保存し、成功後に oldName を削除する（保存＝リネーム）。
+// マスクされた loginPassword（空）は oldName 側のファイルから解決する（Write の解決先は
+// 保存先名のため、リネームでは元 config の password が失われる）。oldName 不在は ErrNotFound。
+// 書き込み成功 → 削除の順なので、途中で失敗してもデータは失われない（両方残る＝リトライ可能）。
+func WriteRenamed(dir, oldName, newName string, body map[string]any) error {
+	if err := SanitizeName(oldName); err != nil {
+		return err
+	}
+	if oldName == newName {
+		return Write(dir, newName, body)
+	}
+	if _, err := os.Stat(pathFor(dir, oldName)); err != nil {
+		if os.IsNotExist(err) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if err := writeMasked(dir, newName, oldName, body); err != nil {
+		return err
+	}
+	return os.Remove(pathFor(dir, oldName))
+}
+
+// writeMasked は Write の本体。マスクされた loginPassword（空）の解決先ファイルを
+// maskSource で指定する（通常保存=保存先自身・リネーム=旧名）。
+func writeMasked(dir, name, maskSource string, body map[string]any) error {
 	if err := SanitizeName(name); err != nil {
 		return err
 	}
@@ -135,7 +165,7 @@ func Write(dir, name string, body map[string]any) error {
 		}
 	}
 	if pw, _ := body["loginPassword"].(string); pw == "" {
-		if existing, err := readRaw(dir, name); err == nil {
+		if existing, err := readRaw(dir, maskSource); err == nil {
 			if oldPw, ok := existing["loginPassword"].(string); ok && oldPw != "" {
 				body["loginPassword"] = oldPw
 			}
@@ -219,10 +249,21 @@ func jsonString(s string) string {
 	return string(b)
 }
 
+// bakedDefaultJSON は同梱テンプレに DefaultFolders(dataDir) の絶対パスを焼き込んで返す
+// （EnsureDefault と Create の共用＝テンプレの単一情報源）。
+// 雛形は手書き整形 JSON のため map 経由（キー順が壊れる）でなく文字列置換で値だけ差し込む。
+// DefaultFolders が失敗（Abs 不能・稀）した場合は null のまま＝headless 既定に委譲する。
+func bakedDefaultJSON(dataDir string) string {
+	body := defaultConfigJSON
+	if dataFolder, cacheFolder, err := DefaultFolders(dataDir); err == nil {
+		body = strings.Replace(body, `"dataFolder": null`, `"dataFolder": `+jsonString(dataFolder), 1)
+		body = strings.Replace(body, `"cacheFolder": null`, `"cacheFolder": `+jsonString(cacheFolder), 1)
+	}
+	return body
+}
+
 // EnsureDefault は dir に config が1つも無ければ同梱デフォルト(default.json)を作る。
 // dataFolder/cacheFolder には DefaultFolders(dataDir) の絶対パスを焼き込む（表示=保存値一致）。
-// 雛形は手書き整形 JSON のため map 経由（キー順が壊れる）でなく文字列置換で値だけ差し込む。
-// DefaultFolders が失敗（Abs 不能・稀）した場合は null のまま＝headless 既定に委譲して生成は続行する。
 func EnsureDefault(dir, dataDir string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -236,12 +277,70 @@ func EnsureDefault(dir, dataDir string) error {
 			return nil // 既に config がある
 		}
 	}
-	body := defaultConfigJSON
-	if dataFolder, cacheFolder, err := DefaultFolders(dataDir); err == nil {
-		body = strings.Replace(body, `"dataFolder": null`, `"dataFolder": `+jsonString(dataFolder), 1)
-		body = strings.Replace(body, `"cacheFolder": null`, `"cacheFolder": `+jsonString(cacheFolder), 1)
+	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(bakedDefaultJSON(dataDir)), 0o600)
+}
+
+// pickUniqueName は base, base2, base3, … の最初の未使用名を返す（即時作成の自動命名）。
+// 64文字（nameRe 上限）を超える場合は base 側を切り詰める（名前は ASCII のみ＝バイト切詰で安全）。
+func pickUniqueName(dir, base string) (string, error) {
+	for n := 1; n <= 9999; n++ {
+		suffix := ""
+		if n >= 2 {
+			suffix = strconv.Itoa(n)
+		}
+		b := base
+		if len(b)+len(suffix) > 64 {
+			b = b[:64-len(suffix)]
+		}
+		cand := b + suffix
+		if _, err := os.Stat(pathFor(dir, cand)); os.IsNotExist(err) {
+			return cand, nil
+		}
 	}
-	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(body), 0o600)
+	return "", errors.New("空き名を採番できません")
+}
+
+// Create は同梱テンプレ（dataFolder/cacheFolder 焼き込み済み）から新しい config を即時作成し、
+// 作成した名前（new-config, new-config2, …）を返す。comment は default.json 用の説明文を
+// 引き継がず空にする（UI 新規作成の従来挙動＝フロント defaultConfig() と一致）。
+func Create(dir, dataDir string) (string, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	name, err := pickUniqueName(dir, "new-config")
+	if err != nil {
+		return "", err
+	}
+	body := strings.Replace(bakedDefaultJSON(dataDir),
+		`"comment": "`+defaultConfigComment+`"`, `"comment": ""`, 1)
+	if err := os.WriteFile(pathFor(dir, name), []byte(body), 0o600); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// Duplicate は config をサーバー側でバイトコピーし、コピーの名前（{name}-copy, {name}-copy2, …）
+// を返す。フロント経由（GET マスク → PUT）と違い loginPassword・未知フィールド・整形が
+// そのまま写る（マスク済み password の喪失が構造的に起きない）。
+func Duplicate(dir, name string) (string, error) {
+	if err := SanitizeName(name); err != nil {
+		return "", err
+	}
+	b, err := os.ReadFile(pathFor(dir, name))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", ErrNotFound
+		}
+		return "", err
+	}
+	newName, err := pickUniqueName(dir, name+"-copy")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(pathFor(dir, newName), b, 0o600); err != nil {
+		return "", err
+	}
+	return newName, nil
 }
 
 // EnsureFolders は config の dataFolder/cacheFolder（設定されている場合のみ）を起動前に作成する。
@@ -271,9 +370,14 @@ func EnsureFolders(dir, name string) error {
 // から追加するため雛形には入れない。決定値: accessLevel=Anyone・awayKickMinutes=5・autoSleep=true・
 // idleRestartInterval=1800・強制再起動/自動保存=-1(無効)・creds 空（中央注入）。
 // 注: autoRecover は雛形から外し headless 既定へ委譲（既定値 true は明示しない）。
+//
+// defaultConfigComment は default.json（同梱デフォルト）にだけ入れる説明文。Create（UI 新規作成）は
+// これを文字列一致で空に置換するため、JSON エスケープが要る文字（" \ < > & 制御文字）を含めないこと。
+const defaultConfigComment = "MRHC デフォルト設定（Settings で Resonite アカウントを登録し、必要に応じて編集してください）"
+
 const defaultConfigJSON = `{
   "$schema": "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json",
-  "comment": "MRHC デフォルト設定（Settings で Resonite アカウントを登録し、必要に応じて編集してください）",
+  "comment": "` + defaultConfigComment + `",
   "tickRate": 60.0,
   "maxConcurrentAssetTransfers": 128,
   "usernameOverride": null,

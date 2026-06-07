@@ -166,12 +166,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/friendrequests", s.requireAuth(s.handleFriendRequests))
 
 	// Headless Config CRUD（Pre-7b）。{name} ワイルドカードより literal の last-used が優先される。
+	// POST（コレクション/duplicate）は即時作成方式: 押した瞬間にサーバーが採番して実体を作る。
 	mux.HandleFunc("GET /api/v1/headless-configs", s.requireAuth(s.handleConfigList))
+	mux.HandleFunc("POST /api/v1/headless-configs", s.requireAuth(s.handleConfigCreate))
 	mux.HandleFunc("GET /api/v1/headless-config-defaults", s.requireAuth(s.handleConfigDefaults))
 	mux.HandleFunc("GET /api/v1/headless-configs/last-used", s.requireAuth(s.handleConfigLastUsed))
 	mux.HandleFunc("GET /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigGet))
 	mux.HandleFunc("PUT /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigPut))
 	mux.HandleFunc("DELETE /api/v1/headless-configs/{name}", s.requireAuth(s.handleConfigDelete))
+	mux.HandleFunc("POST /api/v1/headless-configs/{name}/duplicate", s.requireAuth(s.handleConfigDuplicate))
 	mux.HandleFunc("GET /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsGet))
 	mux.HandleFunc("PUT /api/v1/headless-credentials", s.requireAuth(s.handleCredentialsPut))
 

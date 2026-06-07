@@ -42,7 +42,9 @@ func (s *Server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, m)
 }
 
-// handleConfigPut: PUT /api/v1/headless-configs/{name} → 保存（新規/上書き）
+// handleConfigPut: PUT /api/v1/headless-configs/{name}[?from={old}] → 保存（上書き/リネーム）
+// from 指定（≠name）は「from の編集内容を name で保存し from を削除」＝保存リネーム。
+// マスクされた loginPassword の解決先も from（通常保存は name 自身）。
 func (s *Server) handleConfigPut(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if err := hlconfig.SanitizeName(name); err != nil {
@@ -54,11 +56,40 @@ func (s *Server) handleConfigPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正な JSON")
 		return
 	}
-	if err := hlconfig.Write(s.configDir, name, body); err != nil {
+	var err error
+	if from := r.URL.Query().Get("from"); from != "" && from != name {
+		err = hlconfig.WriteRenamed(s.configDir, from, name, body)
+	} else {
+		err = hlconfig.Write(s.configDir, name, body)
+	}
+	if err != nil {
 		writeConfigErr(w, err)
 		return
 	}
 	writeOK(w, map[string]any{"saved": name})
+}
+
+// handleConfigCreate: POST /api/v1/headless-configs → テンプレから即時作成 {name}
+// 名前はサーバーが採番（new-config, new-config2, …）。新規/複製とも「押した瞬間に実体を作り、
+// 保存＝上書き（名前変更時はリネーム）」の即時作成方式（複製は handleConfigDuplicate）。
+func (s *Server) handleConfigCreate(w http.ResponseWriter, r *http.Request) {
+	name, err := hlconfig.Create(s.configDir, s.dataDir)
+	if err != nil {
+		writeConfigErr(w, err)
+		return
+	}
+	writeOK(w, map[string]any{"name": name})
+}
+
+// handleConfigDuplicate: POST /api/v1/headless-configs/{name}/duplicate → {name: 新名}
+// サーバー側のバイトコピー（password を含む全内容がそのまま写る）。名前はサーバーが採番。
+func (s *Server) handleConfigDuplicate(w http.ResponseWriter, r *http.Request) {
+	newName, err := hlconfig.Duplicate(s.configDir, r.PathValue("name"))
+	if err != nil {
+		writeConfigErr(w, err)
+		return
+	}
+	writeOK(w, map[string]any{"name": newName})
 }
 
 // handleConfigDelete: DELETE /api/v1/headless-configs/{name}
