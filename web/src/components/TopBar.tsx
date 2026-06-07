@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionIcon, Burger, Button, Group, Indicator, Loader, Menu, Select, Text } from "@mantine/core";
+import { ActionIcon, Box, Burger, Button, Group, Indicator, Loader, Menu, Select, Text } from "@mantine/core";
 import type { ConfigSummary, Status, UpdateInfo, World } from "../api";
 import { LANGUAGES, setLanguage } from "../i18n";
 
@@ -83,6 +83,35 @@ function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: numbe
         {s.present}/{s.users}/{s.maxUsers} · {s.accessLevel}
       </span>
     </span>
+  );
+}
+
+// セッションバッジ（稼働中のみ・フォーカスプルダウンの左）。上段=フォーカス中の worlds index
+// （0始まり＝コンソールの focus N と同じ番号・brand色）、下段=/セッション総数（dimmed）。
+// 正方形でスペースを取らない（スマホ/PC共通・UI改善①）。フォーカス対象が無い時は「−」。
+function SessionCountBadge({ idx, total, title }: { idx: number | null; total: number; title: string }) {
+  return (
+    <Box
+      title={title}
+      style={{
+        width: 36,
+        height: 36,
+        flexShrink: 0,
+        borderRadius: "var(--mantine-radius-md)",
+        backgroundColor: "var(--mantine-color-dark-6)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text fz={13} fw={700} c="brand.6" lh={1.1}>
+        {idx ?? "−"}
+      </Text>
+      <Text fz={9} c="dark.2" lh={1.1}>
+        /{total}
+      </Text>
+    </Box>
   );
 }
 
@@ -199,31 +228,51 @@ export function TopBar(props: TopBarProps) {
       ) : starting ? (
         <StartingIndicator startedAt={props.status?.startedAt} />
       ) : (
-        <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
-          <Menu.Target>
-            <Button
-              rightSection="▾"
-              styles={{
-                // flex:1 でヘッダーの空き幅まで伸び、minWidth:0 で狭画面では縮む。maxWidth で上限。
-                root: { flex: 1, minWidth: 0, maxWidth: FOCUS_MAX_WIDTH, height: "auto", paddingTop: 4, paddingBottom: 4 },
-                // 名前(label)を左いっぱいに広げ、▾(section)を右端へ押し出す。
-                inner: { width: "100%" },
-                label: { flex: 1, minWidth: 0, overflow: "hidden" },
-                section: { flexShrink: 0 },
-              }}
-            >
-              {focused ? <SessionTwoLine s={focused} maxWidth="100%" clampLines={2} /> : t("topbar.noSession")}
-            </Button>
-          </Menu.Target>
-          <Menu.Dropdown>
-            {props.sessions.length === 0 && <Menu.Item disabled>{t("topbar.noSession")}</Menu.Item>}
-            {props.sessions.map((s) => (
-              <Menu.Item key={s.index} onClick={() => props.onFocus(s.index)}>
-                <SessionTwoLine s={s} maxWidth="100%" clampLines={3} />
-              </Menu.Item>
-            ))}
-          </Menu.Dropdown>
-        </Menu>
+        <>
+          <SessionCountBadge
+            idx={focused ? focused.index : null}
+            total={props.sessions.length}
+            title={t("topbar.sessionBadge", { idx: focused ? focused.index : "−", total: props.sessions.length })}
+          />
+          <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
+            <Menu.Target>
+              <Button
+                rightSection="▾"
+                styles={{
+                  // flex:1 でヘッダーの空き幅まで伸び、minWidth:0 で狭画面では縮む。maxWidth で上限。
+                  root: { flex: 1, minWidth: 0, maxWidth: FOCUS_MAX_WIDTH, height: "auto", paddingTop: 4, paddingBottom: 4 },
+                  // 名前(label)を左いっぱいに広げ、▾(section)を右端へ押し出す。
+                  inner: { width: "100%" },
+                  label: { flex: 1, minWidth: 0, overflow: "hidden" },
+                  section: { flexShrink: 0 },
+                }}
+              >
+                {focused ? <SessionTwoLine s={focused} maxWidth="100%" clampLines={2} /> : t("topbar.noSession")}
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {props.sessions.length === 0 && <Menu.Item disabled>{t("topbar.noSession")}</Menu.Item>}
+              {props.sessions.map((s) => (
+                <Menu.Item key={s.index} onClick={() => props.onFocus(s.index)}>
+                  {/* 左=index番号（バッジと同じ採番・フォーカス中はbrand色）、右=既存の2行表示 */}
+                  <Group gap={8} wrap="nowrap">
+                    <Text
+                      size="xs"
+                      fw={700}
+                      c={s.index === props.focusedIdx ? "brand.6" : "dimmed"}
+                      style={{ flexShrink: 0, minWidth: 16, textAlign: "right" }}
+                    >
+                      {s.index}
+                    </Text>
+                    <Box style={{ flex: 1, minWidth: 0 }}>
+                      <SessionTwoLine s={s} maxWidth="100%" clampLines={3} />
+                    </Box>
+                  </Group>
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        </>
       )}
 
       {overflowMenu(!stopped, !stopped && !starting)}

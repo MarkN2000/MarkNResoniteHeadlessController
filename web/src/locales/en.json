@@ -31,6 +31,7 @@
     "selectConfig": "Select config",
     "noConfig": "Create one in the Config tab",
     "noSession": "No session",
+    "sessionBadge": "Focused: #{{idx}} of {{total}} sessions",
     "starting": "Starting…",
     "startingElapsed": "Starting… {{sec}}s"
   },

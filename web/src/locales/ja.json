@@ -31,6 +31,7 @@
     "selectConfig": "コンフィグを選択",
     "noConfig": "コンフィグタブで作成してください",
     "noSession": "セッションなし",
+    "sessionBadge": "フォーカス中: #{{idx}} / 全{{total}}セッション",
     "starting": "起動中…",
     "startingElapsed": "起動中… {{sec}}秒"
   },
