@@ -245,6 +245,46 @@ export async function removeFavorite(recordId: string): Promise<WorldResult[] | 
   return getData<WorldResult[]>(`/favorites/${encodeURIComponent(recordId)}`, { method: "DELETE" });
 }
 
+// --- 自己更新（MRHC 自身の入れ替え・docs/design/self-update.md） ---
+
+export interface UpdateInfo {
+  current: string; // 実行中の版（dev 等もありうる）
+  latest: string; // 最新リリースタグ
+  updateAvailable: boolean; // 実行中の版より新しいリリースがあるか
+  currentIsRelease: boolean; // 適用可能なリリースビルドか
+  staged?: string; // 適用済み・再起動待ちの版
+  goos: string; // "windows" | "linux"（再起動手順の出し分け）
+}
+
+// 更新チェック。GitHub への問い合わせはこの呼び出し時のみ（常時ポーリングはしない）。失敗時 null。
+export async function checkUpdate(): Promise<UpdateInfo | null> {
+  return getData<UpdateInfo>("/update/check");
+}
+
+// 更新の適用（DL→検証→入れ替えの同期実行・数秒〜十数秒）。成功で staged（次回起動からの版）を返す。
+// 失敗理由は code で出し分ける（up_to_date/update_busy/no_release/not_release_build/
+// exe_dir_not_writable/update_failed・通信不通は network）。
+export async function applyUpdate(): Promise<{ ok: boolean; staged?: string; error?: string; code?: string }> {
+  try {
+    const res = await req("/update/apply", { method: "POST" });
+    let j: { data?: { staged?: string }; error?: { message?: string; code?: string } } | null = null;
+    try {
+      j = await res.json();
+    } catch {
+      /* ignore */
+    }
+    if (res.ok) return { ok: true, staged: j?.data?.staged };
+    return { ok: false, error: j?.error?.message, code: j?.error?.code };
+  } catch {
+    return { ok: false, code: "network" };
+  }
+}
+
+// MRHC プロセス自体の終了依頼（自己更新後の「今すぐ終了」）。応答後にサーバーは graceful 終了する。
+export function shutdownApp(): Promise<WriteResult> {
+  return write("POST", "/shutdown");
+}
+
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---
 
 // 成功 = {ok:true}。失敗 = {ok:false, error?, code?}。

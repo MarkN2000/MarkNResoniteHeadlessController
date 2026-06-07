@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, AppShell, Box, Button, Center, Group, NavLink, Stack, Text } from "@mantine/core";
 import * as api from "./api";
-import type { ConfigSummary, LogLine, Status, World } from "./api";
+import type { ConfigSummary, LogLine, Status, UpdateInfo, World } from "./api";
 import { notifyError, notifyInfo, reportWriteResult } from "./lib/notify";
 import { TABS, type TabId } from "./nav";
 import { SURFACE } from "./theme";
 import { Login } from "./components/Login";
 import { TopBar } from "./components/TopBar";
 import { AccountSetupModal } from "./components/AccountSetupModal";
+import { UpdateModal } from "./components/UpdateModal";
+import { ShutdownScreen } from "./components/ShutdownScreen";
 import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
 import { SessionTab } from "./tabs/session/SessionTab";
@@ -20,6 +22,9 @@ import { ScheduleTab } from "./tabs/schedule/ScheduleTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  // MRHC 終了依頼後の静止画面（自己更新の「今すぐ終了」）。Shell ごと差し替えて
+  // SSE 購読等を unmount する（サーバー停止後の再接続ループを残さない）。
+  const [shutdownInfo, setShutdownInfo] = useState<{ goos: string; staged?: string } | null>(null);
 
   // 初回: 既存 Cookie セッションを確認
   useEffect(() => {
@@ -34,10 +39,11 @@ export default function App() {
     );
   }
   if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
-  return <Shell onLogout={() => setAuthed(false)} />;
+  if (shutdownInfo) return <ShutdownScreen goos={shutdownInfo.goos} staged={shutdownInfo.staged} />;
+  return <Shell onLogout={() => setAuthed(false)} onShutdownDone={(goos, staged) => setShutdownInfo({ goos, staged })} />;
 }
 
-function Shell({ onLogout }: { onLogout: () => void }) {
+function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownDone: (goos: string, staged?: string) => void }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -53,6 +59,13 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const [credUnset, setCredUnset] = useState<boolean | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const setupShown = useRef(false);
+  // 自己更新: ログイン後に1回だけチェックして ⋮ の赤丸とメニュー表示を駆動
+  // （常時ポーリングはしない・docs/design/self-update.md）。失敗（null）はバッジを出さないだけ。
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  useEffect(() => {
+    void api.checkUpdate().then(setUpdateInfo);
+  }, []);
 
   const running = status?.state === "running";
   // 起動できない致命要因（duplicate_instance 等）を SSE status で受けたら、新規発生時に1回だけ赤トースト。
@@ -198,6 +211,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           }}
           navOpened={navOpened}
           onToggleNav={() => setNavOpened((o) => !o)}
+          updateInfo={updateInfo}
+          onOpenUpdate={() => setUpdateOpen(true)}
         />
       </AppShell.Header>
 
@@ -246,6 +261,15 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
     {/* 初回オンボーディング: アカウント未設定時にログイン直後 1 回自動表示（バナーからも開ける）。 */}
     <AccountSetupModal opened={setupOpen} onClose={() => setSetupOpen(false)} onSaved={refreshCred} />
+
+    {/* 自己更新（⋮ メニューから。適用→再起動手順／「今すぐ終了」→ App が静止画面へ差し替え）。 */}
+    <UpdateModal
+      opened={updateOpen}
+      onClose={() => setUpdateOpen(false)}
+      info={updateInfo}
+      onInfoChange={setUpdateInfo}
+      onShutdownDone={() => onShutdownDone(updateInfo?.goos ?? "windows", updateInfo?.staged)}
+    />
     </>
   );
 }

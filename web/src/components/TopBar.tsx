@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionIcon, Burger, Button, Group, Loader, Menu, Select, Text } from "@mantine/core";
-import type { ConfigSummary, Status, World } from "../api";
+import { ActionIcon, Burger, Button, Group, Indicator, Loader, Menu, Select, Text } from "@mantine/core";
+import type { ConfigSummary, Status, UpdateInfo, World } from "../api";
 import { LANGUAGES, setLanguage } from "../i18n";
 
 // フォーカスボタン（＝ドロップダウン）の最大幅。ヘッダーの空き幅まで伸ばしつつ、
@@ -27,6 +27,9 @@ interface TopBarProps {
   onLogout: () => void;
   navOpened: boolean;
   onToggleNav: () => void;
+  // 自己更新（ログイン時チェックの結果＝⋮ の赤丸とメニュー文言を駆動。null は未取得/失敗）
+  updateInfo: UpdateInfo | null;
+  onOpenUpdate: () => void;
 }
 
 // フォーカスボタンのセッション名表示を整える。
@@ -114,11 +117,17 @@ export function TopBar(props: TopBarProps) {
   const stopped = state === "stopped";
   const starting = state === "starting";
 
+  // 更新あり or 再起動待ち → ⋮ に赤丸（気づきの導線。チェックはログイン時1回＋メニューを開いた時）。
+  const upd = props.updateInfo;
+  const updateReady = !!upd && (!!upd.staged || upd.updateAvailable);
+
   const overflowMenu = (showForceStop: boolean, showGracefulStop: boolean) => (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
         <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0, marginLeft: "auto" }}>
-          ⋮
+          <Indicator color="red" size={8} offset={-1} disabled={!updateReady}>
+            <span>⋮</span>
+          </Indicator>
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
@@ -133,7 +142,12 @@ export function TopBar(props: TopBarProps) {
             <Menu.Divider />
           </>
         )}
-        <Menu.Item disabled>{t("topbar.checkUpdate")}</Menu.Item>
+        <Menu.Item
+          onClick={props.onOpenUpdate}
+          rightSection={updateReady ? <span style={{ color: "var(--mantine-color-red-6)" }}>●</span> : undefined}
+        >
+          {upd?.staged ? t("topbar.updatePending", { version: upd.staged }) : t("topbar.checkUpdate")}
+        </Menu.Item>
         <Menu.Divider />
         <Menu.Label>{t("menu.language")}</Menu.Label>
         {LANGUAGES.map((l) => (
