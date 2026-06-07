@@ -20,6 +20,9 @@ import (
 // 呼び出し側 main が読んで注入する。パッケージ内では環境変数を読まない）。
 const repoBase = "https://github.com/MarkN2000/MarkNResoniteHeadlessController"
 
+// ReleasesURL はリリース一覧ページ（リリース未公開エラー時の案内用）。
+const ReleasesURL = repoBase + "/releases"
+
 // assets は runtime.GOOS+"/"+runtime.GOARCH をキーにしたリリースアセット名の対応表。
 // release.yml の3ターゲットと一致させる。未対応プラットフォームは明示エラーにする
 // （存在しない名前で 404 を踏ませない）。

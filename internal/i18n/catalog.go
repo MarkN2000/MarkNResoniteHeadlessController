@@ -395,4 +395,46 @@ var catalog = map[string]map[Lang]string{
 		Ja: "バージョンを表示して終了",
 		En: "print version and exit",
 	},
+
+	// ── 自己更新（mrhc update・起動時ログ）─────────────────────────
+	"main.update.checking": {
+		Ja: "更新を確認しています...",
+		En: "Checking for updates...",
+	},
+	"main.update.upToDate": {
+		Ja: "既に最新です（%s）。",
+		En: "Already up to date (%s).",
+	},
+	"main.update.devBuild": {
+		Ja: "リリースビルドではないため更新できません（version: %s）。",
+		En: "This is not a release build, so it cannot be updated (version: %s).",
+	},
+	"main.update.noRelease": {
+		Ja: "リリースが見つかりません。公開状況を確認してください: %s",
+		En: "No release found. Check the releases page: %s",
+	},
+	"main.update.downloading": {
+		Ja: "%s から %s へ更新します。ダウンロードしています...",
+		En: "Updating from %s to %s. Downloading...",
+	},
+	"main.update.done": {
+		Ja: "更新が完了しました。次回起動時から %s になります。",
+		En: "Update complete. %s takes effect the next time MRHC starts.",
+	},
+	"main.update.busy": {
+		Ja: "別の更新が進行中です。完了を待って再実行してください。",
+		En: "Another update is already in progress. Wait for it to finish and try again.",
+	},
+	"main.update.permission": {
+		Ja: "設置ディレクトリに書き込めません（%v）。root で設置した場合は sudo chown -R で所有者を変更するか、root で mrhc update を実行してください。",
+		En: "Cannot write to the install directory (%v). If it was installed as root, change the owner with sudo chown -R, or run mrhc update as root.",
+	},
+	"main.update.failed": {
+		Ja: "更新に失敗しました: %v",
+		En: "Update failed: %v",
+	},
+	"main.updated": {
+		Ja: "MRHC は %s に更新されました。",
+		En: "MRHC was updated to %s.",
+	},
 }

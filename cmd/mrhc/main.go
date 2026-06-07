@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/server"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/setup"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/web"
@@ -72,6 +74,14 @@ func main() {
 		return
 	}
 
+	// サブコマンド: update （自己更新・docs/design/self-update.md）。
+	// ウィザード分岐より前に置き、config 不要で動かす（MRHC が起動できないほど
+	// 壊れた環境での復旧経路を兼ねるため。新規環境でウィザードが起動しても困る）。
+	if flag.Arg(0) == "update" {
+		runUpdate(cfgPath, osLang)
+		return
+	}
+
 	// 初回（config 無し）はウィザード。S6 で「今すぐ起動」を選んだらそのままサーバーへ
 	// 合流する（2回起動の廃止・docs/design/cli-onboarding.md）。
 	if !config.FileExists(cfgPath) {
@@ -102,6 +112,12 @@ func main() {
 // （毎起動の依存不足ログ）の重複実行をスキップし、バナーをログイン案内付きにする。
 func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	lang := cfg.LangOrDefault()
+
+	// 前回起動以降に自己更新が適用されていれば、残骸（退避された旧バイナリ等）を掃除して
+	// その旨をログする（版が変わった痕跡は .old の存在だけなので、ここで一度だけ可視化する）。
+	if selfupdate.CleanupStale() {
+		log.Print(i18n.T(lang, "main.updated", version))
+	}
 
 	// 依存チェック（R-C 経路②）: 不足があればログで案内するだけで続行する
 	// （[Y/n] 対話は初回ウィザード末尾のみ＝起動をブロックしない）。Windows は常に no-op。
@@ -172,6 +188,68 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	defer cancel()
 	_ = httpServer.Shutdown(ctx)
 	fmt.Println(i18n.T(lang, "main.shutdown.done"))
+}
+
+// runUpdate は `mrhc update` サブコマンド本体。自分自身を最新リリースへ入れ替える。
+// 表示言語は config があればその言語・無ければ OS 検出言語（config は必須にしない）。
+// 適用後の有効化は次回起動時（実行中の MRHC があってもファイル入れ替えは安全・無影響）。
+func runUpdate(cfgPath string, osLang i18n.Lang) {
+	lang := osLang
+	if config.FileExists(cfgPath) {
+		if cfg, err := config.LoadFrom(cfgPath); err == nil {
+			lang = cfg.LangOrDefault()
+		}
+	}
+	u, err := selfupdate.New(version)
+	if err != nil {
+		log.Fatal(i18n.T(lang, "main.update.failed", err))
+	}
+	// 検証・ローカルテスト用の取得元差し替え（install.sh の MRHC_DOWNLOAD_BASE と同じ流儀。
+	// 環境変数はパッケージ内で読まずここで注入する）。
+	if base := os.Getenv("MRHC_UPDATE_BASE"); base != "" {
+		u.BaseURL = base
+	}
+	// Ctrl+C で中断可能にする（既存バイナリに触るのは全検証後の一瞬だけなので、
+	// どの時点で中断しても現状維持のまま）。
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	fmt.Println(i18n.T(lang, "main.update.checking"))
+	info, err := u.Check(ctx)
+	if err != nil {
+		fatalUpdateErr(lang, err)
+	}
+	if !info.CurrentIsRelease {
+		log.Fatal(i18n.T(lang, "main.update.devBuild", info.Current))
+	}
+	if !info.UpdateAvailable {
+		fmt.Println(i18n.T(lang, "main.update.upToDate", info.Current))
+		return
+	}
+	fmt.Println(i18n.T(lang, "main.update.downloading", info.Current, info.Latest))
+	staged, err := u.Apply(ctx)
+	if err != nil {
+		fatalUpdateErr(lang, err)
+	}
+	fmt.Println(i18n.T(lang, "main.update.done", staged))
+}
+
+// fatalUpdateErr は selfupdate の sentinel を利用者向け文言に変換して終了する。
+func fatalUpdateErr(lang i18n.Lang, err error) {
+	switch {
+	case errors.Is(err, selfupdate.ErrNoRelease):
+		log.Fatal(i18n.T(lang, "main.update.noRelease", selfupdate.ReleasesURL))
+	case errors.Is(err, selfupdate.ErrBusy):
+		log.Fatal(i18n.T(lang, "main.update.busy"))
+	case errors.Is(err, selfupdate.ErrUpToDate):
+		// Check と Apply の間に latest が動いた稀なケース。更新不要＝正常終了。
+		fmt.Println(i18n.T(lang, "main.update.upToDate", version))
+		os.Exit(0)
+	case errors.Is(err, fs.ErrPermission):
+		log.Fatal(i18n.T(lang, "main.update.permission", err))
+	default:
+		log.Fatal(i18n.T(lang, "main.update.failed", err))
+	}
 }
 
 // printBanner は起動バナー（S7/S9）を表示する。LAN URL を主役にする
