@@ -70,6 +70,12 @@ MRHC 本体の更新は内蔵の自己更新で行えます。
 - **更新の途中で失敗して起動できなくなった** — 実行ファイルの隣に `mrhc.exe.old`（Linux: `mrhc.old`）が残っていれば、それを `mrhc.exe`（`mrhc`）に名前を戻すと元のバージョンに復旧できます。
 - **セットアップを最初からやり直したい** — フォルダ内の `mrhc.config.json` を削除してもう一度起動すると、ウィザードが再実行されます。
 - **ポートを変えたい／ポートが使用中と表示される** — `mrhc.config.json` の `"port"` を他の番号に書き換えて、もう一度起動してください。
+- **同じ LAN からセッションに入れない／見つからない** — サーバー機側で LAN からの UDP 受信を許可してください。
+  - **Windows**: ネットワークの設定で、接続中のネットワークを「**プライベート ネットワーク**」に変更します（設定 → ネットワークとインターネット → イーサネット（または Wi-Fi））。
+  - **Linux**: ファイアウォールが有効な場合は LAN からの UDP を許可します（`192.168.1.0/24` の部分はお使いの LAN のアドレス帯に合わせてください）。
+    - ufw の場合（Ubuntu 系・CachyOS・Manjaro など）: `sudo ufw allow from 192.168.1.0/24 proto udp`
+    - firewalld の場合（Fedora・RHEL 系・openSUSE など）: `sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" protocol value="udp" accept' && sudo firewall-cmd --reload`
+    - 素の Arch Linux など、ファイアウォールが標準で無効な環境では設定不要です。
 - **Steam Guard をオフにできない** — スマホの「モバイル認証器」を設定済みのアカウントは、スマホの Steam アプリ側（Steamガード → 認証機器を削除）で解除してから、Steam の 設定 → セキュリティ でオフにします。
 - **表示言語を変えたい** — `mrhc.config.json` の `"language"` を `"ja"` / `"en"` に書き換えて再起動します（Web UI の表示言語は画面右上の切替で別管理）。
 
