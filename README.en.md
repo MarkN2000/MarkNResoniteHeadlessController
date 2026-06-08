@@ -162,6 +162,46 @@ Resonite's headless server is distributed as a **private beta**, and a "headless
 - <a id="steam-guard-off"></a>**I can't turn off Steam Guard** — If the account has the mobile authenticator set up, first remove it in the Steam mobile app (Steam Guard → Remove Authenticator), then turn it off under Steam "Settings → Security".
 - **I want to change the display language** — Change `"language"` in `mrhc.config.json` to `"ja"` / `"en"` and restart (the web UI's display language is managed separately via the toggle at the top right).
 
+## Key features
+
+Manage your entire headless server from a browser on your LAN.
+
+**Start / stop / monitoring**
+- Start / graceful stop (stops safely in about 2 minutes) / force stop / restart of the headless (Resonite process)
+- Live status: participants (present/away), world info, uptime, session URL
+- Live log of Resonite output (SSE), plus viewing and copying log files
+- Server resource usage (CPU / memory / free disk)
+- Send arbitrary console commands
+
+**Running sessions**
+- Open a new session: from a template, a record URL, or by **searching worlds by keyword (world name & tags)**; save favorites
+- Edit session settings: name, access level, max users, description, hide from listing
+- Participant actions: kick / ban / mute / respawn / role change / send message
+- Spawn items (by URL) and send dynamic impulses (tag + value)
+
+**User management**
+- Search by username or user ID; send and remove friend requests
+- Accept friend requests; invite to the focused session
+- Ban and unban across all sessions
+
+**Config (headless settings)**
+- Create, duplicate, rename, and save multiple configs and switch between them
+- Per-world settings following the official schema (access level, tags, AFK kick, autosave, auto-recover, roles, auto-invite, forcePort, etc.)
+- Add any schema field from "Advanced fields"
+
+**Auto-restart & maintenance**
+- Scheduled restarts (once / daily / weekly), with pre-actions such as an announcement (dynamicImpulse), going private, or renaming
+- Restart safely after waiting for users to leave
+- Automatic recovery from crashes (with a crash-count guard against runaway loops)
+- Optionally update Resonite during a scheduled restart
+- Cache management (auto-delete on stop, manual full clear, size check)
+
+**Setup & distribution**
+- Auto-download/update Resonite via DepotDownloader (all OSes, ARM included; the .NET runtime is installed automatically too)
+- Detect missing dependencies (e.g. freetype2) and guide installation
+- Self-update of MRHC itself (web UI / CLI)
+- Japanese/English support (setup wizard and web UI); a single binary with no runtime required (Windows / Linux x64 / ARM)
+
 ## Documentation
 
 - Design doc: [docs/DESIGN.md](docs/DESIGN.md)
