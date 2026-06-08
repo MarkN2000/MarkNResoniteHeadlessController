@@ -1,146 +1,193 @@
 # MarkN Resonite Headless Controller (MRHC)
 
-ResoniteのヘッドレスサーバーをLAN内のブラウザ／スクリプトから操作・管理するツール。
+Resonite のヘッドレスサーバーを、LAN 内のブラウザから操作・管理するツールです。
 
-> ⚠️ **現在 v2 を新規に作り直し中**です（Go + React、ランタイム不要の単一バイナリ、Windows / Linux 対応）。
-> 旧 v1（Node.js + Svelte）は `dev` / `main` ブランチおよびタグ `v1.1.0` にあります。
+**対応プラットフォーム:** Windows (x64) ／ Linux (x64) ／ Linux (ARM)
 
-## 対応プラットフォーム
-Resonite ヘッドレスが動作する以下の環境に対応します（いずれもランタイム不要の単一バイナリ）。
+ランタイム不要の単一バイナリで動作し、Resonite 本体は MRHC が自分のフォルダ内へ自動でダウンロードします。
 
-| OS | アーキテクチャ | Go ターゲット | 備考 |
-| --- | --- | --- | --- |
-| Windows | x64 | `windows/amd64` | 文字コードは Shift_JIS(CP932) を自動判定 |
-| Linux | x64 | `linux/amd64` | 文字コードは UTF-8 |
-| Linux (ARM) | ARM64 | `linux/arm64` | Raspberry Pi 等。Resonite が ARM Linux で動く環境向け。文字コードは UTF-8 |
+## 事前に確認
 
-> **.NET ランタイムは自動で用意されます（全 OS / ARM 共通）**: Resonite のダウンロード品に .NET ランタイムは含まれませんが、MRHC が Resonite のダウンロード後（および起動時に不足を検知したとき）に公式ビルドから自動設置します（管理者権限不要・設置先は Resonite フォルダ内）。システムに .NET 10 が導入済みの場合はそれをそのまま使い、何も変更しません。
->
-> **Resonite の入手 / 更新は DepotDownloader**（SteamCMD は ARM 非対応のため全 OS で統一）:
-> - MRHC が DepotDownloader を自動取得し、ダウンロードと実行権限付与（`chmod +x`）まで行います。
-> - ダウンロードには予備の Steam アカウント（Steam Guard オフ推奨）と、headless ベータコード（Resonite bot に `/headlessCode`）が必要です。
-> - 既に Steam で Resonite を導入済みの場合は、設定でそのインストール先を指定して流用できます。
+MRHC を使うには、次の準備が必要です。
+
+- **Resonite のヘッドレスコード（必須）** — Resonite を[サブスクリプション](https://account.resonite.com/)（Stripe）で月 $10 以上のプランで支援し、ヘッドレス用のコードを取得している必要があります（→ [取得方法](#ヘッドレスコードの取得方法)）。
+- **Steam のサブアカウント** — Resonite 本体の自動ダウンロード／更新に Steam を使います。普段使いとは別の **サブアカウントを新しく作成** し、その **Steam Guard（二段階認証）は必ずオフ** にしてください（→ [やり方](#steam-guard-off)）。
+- **Resonite 本体は自動ダウンロード** — このソフトが Resonite を取得するため、事前にダウンロードしておく必要はありません。Steam クライアントのインストールも不要です。
+- **空き容量に余裕のある場所へ** — Resonite 本体とキャッシュで相応の容量を使います（古いキャッシュを自動で削除する機能があります）。
+- **設置場所は先に決めてください** — Resonite 本体や設定はフォルダ内に保存され、その絶対パスが記録されます。**一度起動（特に Resonite のダウンロード）した後は、フォルダを移動・改名しないでください。** 使いたい場所に置いてから起動します。
+- **接続は LAN 内から** — Web UI（管理画面）には **同じネットワーク内からのみ** アクセスできます。外出先から使うには VPN や Tailscale などのセットアップが必要です（→ [VPS で動かす場合](#install-vps)）。
 
 ## インストール
 
-> ⚠️ 以下のダウンロードリンクは **v2 の初回リリース公開後に有効**になります。
+環境を選んでください: [Windows](#install-windows) ／ [Linux（x64 / ARM）](#install-linux) ／ [VPS（Oracle Cloud 等）](#install-vps)
 
-### Linux
+<a id="install-windows"></a>
+### Windows
 
-置きたい場所（例: `~/servers`）で次の 1 行を実行します:
+1. [リリースページ](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest)から `mrhc-windows-amd64.zip` をダウンロードします。
+2. **使いたい場所で展開**し、フォルダ内の `mrhc.exe` を実行します（起動後はフォルダを移動しないでください）。
+3. 初回はセットアップウィザード（日本語／英語）が起動します。管理パスワード・ポートを設定すると、続けて Resonite 本体のダウンロードが始まります。**ダウンロードには時間がかかります。「今すぐサーバーを起動しますか?」と表示されるまでお待ちください。**
+
+起動したら、ブラウザで `http://localhost:8080`（既定）を開くと Web UI が使えます。
+
+> **SmartScreen の警告について** — 未署名のため、初回実行時に「Windows によって PC が保護されました」と表示されることがあります。「詳細情報」→「実行」で起動できます。
+>
+> **データの置き場所** — 設定・状態・ダウンロードした Resonite 本体は、すべて `mrhc.exe` と同じフォルダ内にまとまっています。バックアップはこのフォルダごとコピーしてください（前述のとおり、起動後の移動・改名は避けてください）。
+
+<a id="install-linux"></a>
+### Linux（x64 / ARM）
+
+置きたい場所へ移動し、次の 1 行を実行します。x64・ARM のどちらも同じコマンドで、アーキテクチャは自動で判定されます。
 
 ```sh
+cd ~/servers   # 置きたい場所へ（例）
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
 
-実行した場所に `mrhc-linux-amd64/`（ARM では `mrhc-linux-arm64/`）フォルダが作られるので、その中で起動します:
+実行した場所に `mrhc-linux-amd64/`（ARM では `mrhc-linux-arm64/`）が作られるので、その中で起動します。
 
 ```sh
-cd mrhc-linux-amd64 && ./mrhc
+cd mrhc-linux-amd64   # ARM では mrhc-linux-arm64
+./mrhc
 ```
 
-初回はセットアップウィザード（日本語/英語）が起動し、管理パスワード・ポート・Resonite 本体のダウンロード（Steam アカウントが必要・スキップ可）まで対話で完結して、そのままサーバーが立ち上がります。
+初回はセットアップウィザード（日本語／英語）が起動します。管理パスワード・ポートを設定すると Resonite 本体のダウンロードが始まります（時間がかかります。「今すぐサーバーを起動しますか?」と表示されるまでお待ちください）。完了するとそのままサーバーが立ち上がり、ブラウザで `http://<サーバーの IP>:8080`（既定）から Web UI が使えます。
 
-手動で導入する場合は[最新リリース](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest)から `mrhc-linux-amd64.tar.gz` / `mrhc-linux-arm64.tar.gz` を取得し、好きな場所に展開してください。**tar.gz は実行権を保持しているため `chmod +x` は不要です。**
+.NET ランタイムや DepotDownloader は MRHC が自動で取得するため、ファイアウォール以外に事前準備は基本的に不要です（freetype2 など依存が不足している場合は、セットアップ時に導入の案内があります）。
 
-### Windows
+> **データの置き場所** — 設定・状態・Resonite 本体は、すべて `mrhc` と同じフォルダ内にまとまっています（別の場所に置きたい場合は `-data <dir>` で指定できます）。起動後はフォルダを移動・改名しないでください。手動で展開したい場合は、[最新リリース](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest)の `mrhc-linux-amd64.tar.gz` ／ `mrhc-linux-arm64.tar.gz` を好きな場所に展開してください（実行権を保持しているため `chmod +x` は不要です）。
 
-[mrhc-windows-amd64.zip](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/mrhc-windows-amd64.zip) をダウンロード → 展開 → フォルダ内の `mrhc.exe` を実行（初回は Linux と同じセットアップウィザードが起動します）。
+**ファイアウォール（参考）** — 同じ LAN の他ユーザーがセッションに参加できない・見つからないときは、LAN からの UDP 受信を許可します（`192.168.1.0/24` はお使いの LAN のアドレス帯に合わせてください）。
 
-> 未署名のため、初回実行時に SmartScreen の警告（「Windows によって PC が保護されました」）が出ることがあります。「詳細情報」→「実行」で起動できます。
+- ufw（Ubuntu 系・CachyOS など）: `sudo ufw allow from 192.168.1.0/24 proto udp`
+- firewalld（Fedora・RHEL 系・openSUSE など）: `sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" protocol value="udp" accept' && sudo firewall-cmd --reload`
+- 素の Arch Linux など、ファイアウォールが標準で無効な環境では設定は不要です。
 
-### 更新
+<a id="install-vps"></a>
+### VPS（Oracle Cloud 等）
 
-MRHC 本体の更新は内蔵の自己更新で行えます。
+> ⚠️ **重要: Web UI は LAN 内からしか開けません。** VPS 上で動かす場合、インターネットから直接アクセスすることはできません。**SSH トンネル** または **Tailscale などの VPN** で「同じネットワークにいる」状態を作ってからアクセスします。Web UI は平文 HTTP のため、ポートを直接インターネットに公開しないでください（管理パスワードが平文で流れてしまいます）。
 
-- **Web UI から**: 新しいバージョンがあると画面右上の ⋮ に赤丸が付きます。⋮ →「更新を確認」→「アップデート」でダウンロード・検証・差し替えまで自動で行われ、**次に MRHC を起動し直した時から**新バージョンになります（差し替え自体は稼働中のワールドに影響しません）。そのまま「今すぐ終了する」を押せばワールドを順に停止して MRHC が終了するので、あとは起動し直すだけです。
-- **コマンドラインから**: `./mrhc update`（Windows: `mrhc.exe update`）。MRHC が起動できない状態からの復旧手段としても使えます。
+**おすすめ構成（本節はこれを前提に説明します）**
 
-従来どおり、MRHC を停止してから install.sh を再実行（Linux）または zip を同じ場所に上書き展開（Windows）しても更新できます。設定・データはアーカイブに含まれないため、どの方法でも保持されます。
+- Oracle Cloud の **Ampere A1（ARM）** インスタンス
+- OS は **Ubuntu**
 
-> install.sh の再実行は、展開フォルダの名前を変えている場合は別フォルダが新規作成されるため、tar.gz を手動で展開して中身を上書きしてください。
-
-### データの置き場所
-
-設定・状態・ダウンロードした Resonite 本体は、すべて**実行ファイルと同じフォルダ内**に保存されます（フォルダごと移動・バックアップ可能）。別の場所に置きたい場合は `-data <dir>` で指定できます。
-
-### VPS / クラウド（Oracle Cloud 等）で動かす場合
-
-クラウド VM ではファイアウォールが **2 層**（クラウド側のセキュリティルール ＋ VM 内のファイアウォール）になっている点に注意してください。Oracle Cloud の Ubuntu イメージは両方とも既定で有効です。
-
-**Web UI（管理画面・既定 TCP 8080）— SSH トンネル推奨（ポート開放は不要）**
-
-MRHC の Web UI は平文 HTTP です。インターネットに直接公開すると管理パスワードが平文で流れるため、**ポートは開けず SSH トンネル越しに見る**のがおすすめです。SSH（22 番）は接続に使えている時点で両層とも通っているので、**ファイアウォールの変更は一切不要**です。手元の PC で次を実行し（スマホからは Termius 等の SSH アプリでも可）、
+**1. 導入**（Linux ARM と同じ） — SSH でログインし、置きたい場所で次を実行します。
 
 ```sh
-ssh -L 8080:localhost:8080 <ユーザー>@<VMのIP>
+curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
+cd mrhc-linux-arm64 && ./mrhc
 ```
 
-接続したまま手元のブラウザで `http://localhost:8080` を開きます。
+**2. Web UI にアクセスする**（次のどちらかの方法で「同じネットワークにいる」状態を作ります）
 
-**セッションへの直接参加（UDP・任意・低遅延化）**
+**方法 A: SSH トンネル**（追加インストール不要・ポート開放も不要）
 
-ファイアウォールを開けなくても、Resonite のリレー経由で他ユーザーはセッションに参加できます（遅延は増えます）。直接接続で遅延を抑えたい場合のみ、以下を設定します。
-
-ヘッドレスは既定でセッションの UDP ポートを毎回ランダムに選ぶため、まず番号を固定します:
-
-1. コンフィグタブでワールドを開き、「詳細フィールド」から `forcePort` を追加して任意の番号（例: `32100`）を設定 → 保存 → ヘッドレスを再起動。
-
-次にその番号（例 `32100/udp`）を 2 層とも開放します:
-
-2. **クラウド側**: Oracle Cloud コンソール → 対象 VCN の「セキュリティリスト」（または NSG）→ イングレス規則を追加（ソース `0.0.0.0/0`・IP プロトコル `UDP`・宛先ポート `32100`）。
-3. **VM 内（Ubuntu）**: Oracle の Ubuntu は raw iptables が有効（ufw は既定で無効）なので、iptables に直接追加します:
+手元の PC で次を実行します（スマホからは Termius などの SSH アプリでも可）。
 
 ```sh
-sudo iptables -I INPUT -p udp --dport 32100 -j ACCEPT
-sudo netfilter-persistent save
+ssh -L 8080:localhost:8080 <ユーザー>@<VM の IP>
 ```
 
-> `-I INPUT` は規則を**先頭に挿入**します（Oracle 既定の末尾 REJECT より前に置くため。`-A`〔末尾追記〕では REJECT に弾かれて効きません）。`netfilter-persistent save` で再起動後も維持されます。セッションへの参加は誰でも可能になりますが、アクセス制御はファイアウォールではなく Resonite 側の accessLevel で行います。
+接続したまま、手元のブラウザで `http://localhost:8080` を開きます。SSH（22 番）が通っている時点でファイアウォールは通っているので、追加の開放は不要です。
 
-### 困ったとき
+**方法 B: Tailscale**（VPN。スマホからも使いやすい）
 
-- **ヘッドレスのログを見たい** — Web UI の「ログ」タブで Resonite ヘッドレスのログファイル（`<インストール先>/Headless/Logs`）を選んで表示・コピーできます（読み取り専用・停止中でも閲覧可）。大きいログは末尾のみ表示されます。稼働中の現行ログは OS によっては読み取れないことがあります。
-- **ディスク容量が気になる（キャッシュ）** — 設定タブの「キャッシュ管理」で、Resonite キャッシュ（既定 `headless-cache`）の合計サイズ確認・全削除（ヘッドレス停止中のみ）ができます。「停止時に古いキャッシュを自動削除」を ON にすると、停止のたびに最終更新が指定日数（既定30日）より古いキャッシュを自動で掃除します。削除しても必要なものは次回自動で再取得されます。
+VPS と手元の端末を同じ Tailscale ネットワーク（tailnet）に入れると、その間は同一ネットワーク扱いになり、Web UI に直接アクセスできます。
+
+1. VPS に Tailscale を入れて接続します。
+
+   ```sh
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+   ```
+
+   表示される URL を開いてログイン・承認します。
+2. 手元の PC ／ スマホにも [Tailscale](https://tailscale.com/download) を入れ、同じアカウントでログインします。
+3. VPS の Tailscale IP を確認し（VPS で `tailscale ip -4`）、手元のブラウザで `http://<その IP>:8080` を開きます。
+
+**3.（任意）セッションへの直接参加を速くする — UDP ポートの開放**
+
+ポートを開けなくても、Resonite のリレー経由で他ユーザーはセッションに参加できます（その分だけ遅延が増えます）。直接接続で遅延を抑えたい場合のみ設定してください。クラウド VM のファイアウォールは **2 層**（クラウド側のセキュリティルール ＋ VM 内）あり、両方で開放が必要です。
+
+1. **ポート番号を固定する** — Web UI の「コンフィグ」タブでワールドを開き、「詳細フィールド」から `forcePort` に任意の番号（例: `32100`）を設定 → 保存 → ヘッドレスを再起動します（既定はランダムポートのため、固定が必要です）。
+2. **クラウド側を開放する** — Oracle Cloud コンソール → 対象 VCN の「セキュリティリスト」（または NSG）→ イングレス規則を追加します（ソース `0.0.0.0/0`・プロトコル `UDP`・宛先ポート `32100`）。
+3. **VM 内（Ubuntu）を開放する** — Oracle の Ubuntu は raw iptables が有効です（ufw は既定で無効）。
+
+   ```sh
+   sudo iptables -I INPUT -p udp --dport 32100 -j ACCEPT
+   sudo netfilter-persistent save
+   ```
+
+   `-I INPUT` は規則を **先頭に挿入** します（Oracle 既定の末尾 REJECT より前に置くため。`-A`〔末尾追記〕では REJECT に弾かれて効きません）。
+
+> 誰でもセッションに参加できるようになりますが、アクセス制御はファイアウォールではなく Resonite 側の accessLevel で行います。
+
+## アップデート
+
+MRHC 本体は、内蔵の自己更新機能でアップデートできます。
+
+- **Web UI から** — 新しいバージョンがあると、画面右上の ⋮ に赤丸が付きます。⋮ →「更新を確認」→「アップデート」で、ダウンロード・検証・差し替えまで自動で行われ、**次に MRHC を起動し直した時から** 新バージョンになります（差し替え自体は稼働中のワールドに影響しません）。続けて「今すぐ終了する」を押すとワールドを順に停止して MRHC が終了するので、あとは起動し直すだけです。
+- **コマンドラインから** — `./mrhc update`（Windows: `mrhc.exe update`）。MRHC が起動できない状態からの復旧手段としても使えます。
+
+> 手動でアップデートする場合は、MRHC を停止してから install.sh を再実行（Linux）、または zip を同じ場所へ上書き展開（Windows）してください。設定・データはアーカイブに含まれないため、どの方法でも保持されます。
+
+## ヘッドレスコードの取得方法
+
+Resonite のヘッドレスサーバーは **非公開ベータ** として配布されており、ダウンロード・起動には「ヘッドレスコード」が必要です。
+
+1. Resonite を[サブスクリプション](https://account.resonite.com/)（Stripe・手数料が安く公式推奨）で支援し、ヘッドレスが利用できるティア（月 $10 以上）になります。
+2. Resonite を起動し、フレンドにいる **Resonite bot** へ **`/headlessCode`** とメッセージを送ります。
+3. 返ってきたコードを、MRHC のセットアップウィザード（または「設定 → Steam」のブランチコード欄）に入力します。
+
+> コードは変更されることがあります。更新後に動かなくなったら、もう一度 `/headlessCode` で最新のコードを取得して設定し直してください。
+
+## 困ったとき
+
+- **ヘッドレスのログを見たい** — Web UI の「ログ」タブで、Resonite ヘッドレスのログファイル（`<インストール先>/Headless/Logs`）を選んで表示・コピーできます（読み取り専用・停止中でも閲覧可能）。大きいログは末尾のみ表示されます。稼働中の現行ログは、OS によっては読み取れないことがあります。
+- **ディスク容量が気になる（キャッシュ）** — 設定タブの「キャッシュ管理」で、Resonite キャッシュ（既定 `headless-cache`）の合計サイズ確認・全削除（ヘッドレス停止中のみ）ができます。「停止時に古いキャッシュを自動削除」を ON にすると、停止のたびに、最終更新が指定日数（既定 30 日）より古いキャッシュを自動で掃除します。削除しても、必要なものは次回に自動で再取得されます。
 - **管理パスワードを忘れた** — サーバー機のコマンドラインで `./mrhc reset-password`（Windows: `mrhc.exe reset-password`）を実行すると、旧パスワードなしで再設定できます。
 - **更新の途中で失敗して起動できなくなった** — 実行ファイルの隣に `mrhc.exe.old`（Linux: `mrhc.old`）が残っていれば、それを `mrhc.exe`（`mrhc`）に名前を戻すと元のバージョンに復旧できます。
 - **セットアップを最初からやり直したい** — フォルダ内の `mrhc.config.json` を削除してもう一度起動すると、ウィザードが再実行されます。
 - **ポートを変えたい／ポートが使用中と表示される** — `mrhc.config.json` の `"port"` を他の番号に書き換えて、もう一度起動してください。
-- **同じ LAN からセッションに入れない／見つからない** — サーバー機側で LAN からの UDP 受信を許可してください。
-  - **Windows**: ネットワークの設定で、接続中のネットワークを「**プライベート ネットワーク**」に変更します（設定 → ネットワークとインターネット → イーサネット（または Wi-Fi））。
-  - **Linux**: ファイアウォールが有効な場合は LAN からの UDP を許可します（`192.168.1.0/24` の部分はお使いの LAN のアドレス帯に合わせてください）。
-    - ufw の場合（Ubuntu 系・CachyOS・Manjaro など）: `sudo ufw allow from 192.168.1.0/24 proto udp`
-    - firewalld の場合（Fedora・RHEL 系・openSUSE など）: `sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" protocol value="udp" accept' && sudo firewall-cmd --reload`
-    - 素の Arch Linux など、ファイアウォールが標準で無効な環境では設定不要です。
-- **Steam Guard をオフにできない** — スマホの「モバイル認証器」を設定済みのアカウントは、スマホの Steam アプリ側（Steamガード → 認証機器を削除）で解除してから、Steam の 設定 → セキュリティ でオフにします。
-- **表示言語を変えたい** — `mrhc.config.json` の `"language"` を `"ja"` / `"en"` に書き換えて再起動します（Web UI の表示言語は画面右上の切替で別管理）。
+- **同じ LAN からセッションに入れない／見つからない** — サーバー機側で、LAN からの UDP 受信を許可してください。
+  - **Windows**: 接続中のネットワークを「**プライベート ネットワーク**」に変更します（設定 → ネットワークとインターネット → イーサネット、または Wi-Fi）。
+  - **Linux**: ファイアウォールが有効な場合は、LAN からの UDP を許可します（[Linux のインストール](#install-linux)の「ファイアウォール（参考）」を参照）。
+- <a id="steam-guard-off"></a>**Steam Guard をオフにできない** — スマホの「モバイル認証器」を設定済みのアカウントは、まずスマホの Steam アプリ側で解除し（Steam ガード → 認証機器を削除）、その後で Steam の「設定 → セキュリティ」からオフにします。
+- **表示言語を変えたい** — `mrhc.config.json` の `"language"` を `"ja"` ／ `"en"` に書き換えて再起動します（Web UI の表示言語は、画面右上の切り替えで別管理です）。
 
 ## ドキュメント
-- **設計書**: [docs/DESIGN.md](docs/DESIGN.md)
-- **Resoniteドメイン事実**（コンソールコマンド・出力書式・起動方法など）: [docs/resonite-domain-facts.md](docs/resonite-domain-facts.md)
 
-## ステータス
-v2 を実装中。コア機能は実装済み（CLIセットアップ・ヘッドレス起動/停止/再起動・ライブログ(SSE)・全タブの Web UI・スケジュール再起動・Steam（DepotDownloader）経由の Resonite 入手/更新・MRHC 自身の自己更新（Web UI / CLI）・依存検出と導入案内・Resonite ログ閲覧・キャッシュ管理（停止時の自動削除／手動全削除）・Windows / Linux 単一バイナリ）。残りは ARM 実機検証とリリース準備。
+- 設計書: [docs/DESIGN.md](docs/DESIGN.md)
+- Resonite ドメイン事実（コンソールコマンド・出力書式・起動方法など）: [docs/resonite-domain-facts.md](docs/resonite-domain-facts.md)
 
 ## ビルド / 開発
+
 前提: **Go 1.26+** と **Node 20+**。
 
 ```sh
-# 1) フロントエンドをビルド（web/dist を生成 → Goが埋め込む）
+# 1) フロントエンドをビルド（web/dist を生成 → Go が埋め込む）
 cd web && npm install && npm run build && cd ..
 
 # 2) バイナリをビルド
-go build -o bin/mrhc ./cmd/mrhc                                      # 現OS向け
+go build -o bin/mrhc ./cmd/mrhc                                              # 現在の OS 向け
 GOOS=windows GOARCH=amd64 go build -o bin/mrhc-windows-amd64.exe ./cmd/mrhc  # Windows (x64)
 GOOS=linux   GOARCH=amd64 go build -o bin/mrhc-linux-amd64      ./cmd/mrhc   # Linux (x64)
 GOOS=linux   GOARCH=arm64 go build -o bin/mrhc-linux-arm64      ./cmd/mrhc   # Linux (ARM64)
 ```
-> いずれも **CGO 不要の純 Go**（依存は `golang.org/x/{crypto,sys,term,text}` のみ）なので、上記のように環境変数を変えるだけでクロスビルドできます。リリース用の全ターゲット一括ビルドは GitHub Actions（`.github/workflows/release.yml`）で行います。
-> ⚠️ `web/dist` はビルド成果物のため **git管理外**。`go build`（embed.FSで同梱）の前に**必ずフロントをビルド**すること。
+
+いずれも **CGO 不要の純 Go**（依存は `golang.org/x/{crypto,sys,term,text}` のみ）なので、環境変数を変えるだけでクロスビルドできます。リリース用の全ターゲット一括ビルドは GitHub Actions（`.github/workflows/release.yml`）で行います。
+
+> ⚠️ `web/dist` はビルド成果物のため **git 管理外** です。`go build`（embed.FS で同梱）の前に、必ずフロントエンドをビルドしてください。
 
 開発時:
+
 - バックエンド: `go run ./cmd/mrhc -data ./bin/devdata`（初回は対話セットアップ）
-- フロント: `cd web && npm run dev`（`/api` を `:8080` のバックエンドへプロキシ）
+- フロントエンド: `cd web && npm run dev`（`/api` を `:8080` のバックエンドへプロキシ）
 
 ## ライセンス
+
 MIT — [LICENSE](LICENSE)
+
+本ソフトは Resonite のヘッドレスサーバーを操作するツールです。利用にあたっては、Resonite の[ガイドライン](https://resonite.com/policies/Guidelines.html)・利用規約に従ってください。
