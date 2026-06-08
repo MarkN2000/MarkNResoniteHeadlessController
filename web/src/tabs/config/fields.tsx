@@ -10,6 +10,7 @@ import {
   InspectorTextInput,
   RowIconButton,
 } from "../../components/inspector";
+import { useIsNarrow } from "../../hooks/useIsNarrow";
 import { joinCustomSessionId, splitCustomSessionId } from "./configModel";
 
 // -1=無効 のセンチネル数値入力。下限を -1 に固定（InspectorNumberInput の strict で -1 未満は打てない）。
@@ -99,6 +100,7 @@ export function RowsEditor({
   onRowsChange: (rows: string[][]) => void;
   addLabel: string;
 }) {
+  const narrow = useIsNarrow();
   const [rows, setRows] = useState<string[][]>(() => initialRows);
   const commit = (next: string[][]) => {
     setRows(next);
@@ -109,36 +111,80 @@ export function RowsEditor({
   const remove = (ri: number) => commit(rows.filter((_, i) => i !== ri));
   // 新規行の初期値: text=空、select=addDefault。
   const add = () => commit([...rows, columns.map((c) => (c.kind === "select" ? c.addDefault : ""))]);
+
+  // 1セルの入力ウィジェット（text/select）。ラッパ Box は呼び出し側（PC=固定幅/モバイル=全幅）が持つ。
+  const cellInput = (col: CellSpec, ci: number, row: string[], ri: number) => {
+    if (col.kind === "text") {
+      return (
+        <InspectorTextInput
+          value={row[ci] ?? ""}
+          placeholder={col.placeholder}
+          onChange={(e) => update(ri, ci, e.currentTarget.value)}
+        />
+      );
+    }
+    // 候補外の値（既存 config のカスタムロール等）も表示できるよう data に補う。
+    const cur = row[ci] ?? col.addDefault;
+    const data = col.options.includes(cur) ? [...col.options] : [...col.options, cur];
+    return <InspectorSelect data={data} value={cur} onChange={(v) => v && update(ri, ci, v)} />;
+  };
+
+  const deleteButton = (ri: number) => (
+    <RowIconButton color="red" label="×" onClick={() => remove(ri)}>
+      ×
+    </RowIconButton>
+  );
+
+  // 行の描画。モバイル かつ 複数列（select を含む defaultUserRoles 等）のときだけ「カード枠＋2段」へ。
+  //   1段目=最後尾以外の列（=名前）を全幅 / 2段目=最後の列（=ロール）＋削除× を横並び。
+  // 1列（テキストのみ）や PC では従来の横一列を維持（元々あふれないため）。狭幅判定は [[useIsNarrow]]。
+  const renderRow = (row: string[], ri: number) => {
+    if (narrow && columns.length > 1) {
+      const last = columns.length - 1;
+      return (
+        <Box
+          key={ri}
+          style={{
+            border: "1px solid var(--mantine-color-dark-4)",
+            borderRadius: "var(--mantine-radius-md)",
+            padding: 6,
+          }}
+        >
+          <Stack gap={4}>
+            {columns.slice(0, last).map((col, ci) => (
+              <Box key={ci} style={{ width: "100%" }}>
+                {cellInput(col, ci, row, ri)}
+              </Box>
+            ))}
+            <Group gap={4} wrap="nowrap">
+              <Box style={{ flex: 1, minWidth: 0 }}>{cellInput(columns[last], last, row, ri)}</Box>
+              {deleteButton(ri)}
+            </Group>
+          </Stack>
+        </Box>
+      );
+    }
+    return (
+      <Group key={ri} gap={4} wrap="nowrap">
+        {columns.map((col, ci) =>
+          col.kind === "text" ? (
+            <Box key={ci} style={{ flex: 1, minWidth: 0 }}>
+              {cellInput(col, ci, row, ri)}
+            </Box>
+          ) : (
+            <Box key={ci} style={{ width: col.width ?? 120, flexShrink: 0 }}>
+              {cellInput(col, ci, row, ri)}
+            </Box>
+          ),
+        )}
+        {deleteButton(ri)}
+      </Group>
+    );
+  };
+
   return (
     <Stack gap={4}>
-      {rows.map((row, ri) => (
-        <Group key={ri} gap={4} wrap="nowrap">
-          {columns.map((col, ci) => {
-            if (col.kind === "text") {
-              return (
-                <Box key={ci} style={{ flex: 1, minWidth: 0 }}>
-                  <InspectorTextInput
-                    value={row[ci] ?? ""}
-                    placeholder={col.placeholder}
-                    onChange={(e) => update(ri, ci, e.currentTarget.value)}
-                  />
-                </Box>
-              );
-            }
-            // 候補外の値（既存 config のカスタムロール等）も表示できるよう data に補う。
-            const cur = row[ci] ?? col.addDefault;
-            const data = col.options.includes(cur) ? [...col.options] : [...col.options, cur];
-            return (
-              <Box key={ci} style={{ width: col.width ?? 120, flexShrink: 0 }}>
-                <InspectorSelect data={data} value={cur} onChange={(v) => v && update(ri, ci, v)} />
-              </Box>
-            );
-          })}
-          <RowIconButton color="red" label="×" onClick={() => remove(ri)}>
-            ×
-          </RowIconButton>
-        </Group>
-      ))}
+      {rows.map((row, ri) => renderRow(row, ri))}
       <Group gap={4} wrap="nowrap">
         <AddIconButton label={addLabel} onClick={add} />
       </Group>
