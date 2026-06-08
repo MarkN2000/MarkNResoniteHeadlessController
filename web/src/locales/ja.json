@@ -66,6 +66,10 @@
   },
   "session": {
     "settings": "セッション設定",
+    "sessionUrl": "セッションURL",
+    "copy": "コピー",
+    "urlCopied": "セッションURLをコピーしました",
+    "copyFailed": "コピーに失敗しました",
     "refresh": "更新",
     "name": "名前",
     "accessLevel": "アクセスレベル",

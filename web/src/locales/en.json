@@ -66,6 +66,10 @@
   },
   "session": {
     "settings": "Session settings",
+    "sessionUrl": "Session URL",
+    "copy": "Copy",
+    "urlCopied": "Session URL copied",
+    "copyFailed": "Copy failed",
     "refresh": "Refresh",
     "name": "Name",
     "accessLevel": "Access level",
