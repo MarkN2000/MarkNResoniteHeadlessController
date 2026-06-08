@@ -343,7 +343,7 @@
     "bannerAction": "Set up",
     "cacheSection": "Cache management",
     "cacheDesc": "Manage Resonite's default cache (headless-cache). Cleared cache is re-downloaded automatically when needed.",
-    "cacheAutoEnabled": "Auto-delete old cache on stop",
+    "cacheAutoEnabled": "Auto-delete cache",
     "cacheMaxAgeDays": "Delete older than (days)",
     "cacheAutoNote": "When the headless stops, cache files not modified within this many days are deleted automatically.",
     "cachePath": "Location",

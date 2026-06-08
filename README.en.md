@@ -151,7 +151,7 @@ Resonite's headless server is distributed as a **private beta**, and a "headless
 ## Troubleshooting
 
 - **I want to see the headless logs** — In the web UI "Logs" tab, you can pick a Resonite headless log file (`<install dir>/Headless/Logs`) to view and copy (read-only; viewable even while stopped). Large logs show only the tail. The current log of a running server may be unreadable depending on the OS.
-- **I'm worried about disk space (cache)** — Under "Cache management" in the Settings tab, you can check the total size of the Resonite cache (default `headless-cache`) and clear it entirely (only while the headless is stopped). Turning on "Auto-delete old cache on stop" cleans up, every time it stops, any cache whose last modification is older than a set number of days (default 30). Anything still needed is re-fetched automatically next time.
+- **I'm worried about disk space (cache)** — Under "Cache management" in the Settings tab, you can check the total size of the Resonite cache (default `headless-cache`) and clear it entirely (only while the headless is stopped). Turning on "Auto-delete cache" cleans up, every time it stops, any cache whose last modification is older than a set number of days (default 30). Anything still needed is re-fetched automatically next time.
 - **I forgot the admin password** — Run `./mrhc reset-password` (Windows: `mrhc.exe reset-password`) on the server's command line to reset it without the old password.
 - **An update failed midway and it won't start** — If `mrhc.exe.old` (Linux: `mrhc.old`) remains next to the executable, rename it back to `mrhc.exe` (`mrhc`) to recover the previous version.
 - **I want to redo setup from scratch** — Delete `mrhc.config.json` in the folder and start again; the wizard runs again.

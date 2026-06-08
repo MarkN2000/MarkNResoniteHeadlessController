@@ -343,7 +343,7 @@
     "bannerAction": "設定する",
     "cacheSection": "キャッシュ管理",
     "cacheDesc": "Resonite の既定キャッシュ（headless-cache）の管理です。キャッシュは消えても必要なら自動で再取得されます。",
-    "cacheAutoEnabled": "停止時に古いキャッシュを自動削除",
+    "cacheAutoEnabled": "キャッシュ自動削除",
     "cacheMaxAgeDays": "削除する古さ（日数）",
     "cacheAutoNote": "ヘッドレス停止時に、最終更新がこの日数より古いキャッシュファイルを自動削除します。",
     "cachePath": "場所",
