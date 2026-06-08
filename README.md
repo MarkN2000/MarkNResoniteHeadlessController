@@ -2,7 +2,7 @@
 
 # MarkN Resonite Headless Controller (MRHC)
 
-![MRHC の操作画面](docs/images/screenshot.jpg)
+![MRHC の操作画面](docs/images/screenshot.webp)
 
 Resonite のヘッドレスサーバーを、LAN 内のブラウザから操作・管理するツールです。
 
