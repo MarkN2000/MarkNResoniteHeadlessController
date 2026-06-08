@@ -15,7 +15,7 @@ It runs as a single binary with no runtime required, and MRHC downloads Resonite
 You'll need the following to use MRHC:
 
 - **A Resonite headless code (required)** — You must support Resonite via a [subscription](https://account.resonite.com/) (Stripe) at the $10/month tier or higher, and have obtained the headless code (→ [how to get it](#headless-code)).
-- **A separate Steam account** — MRHC uses Steam to download/update Resonite. Create a **dedicated sub-account** (separate from your everyday one) and make sure its **Steam Guard (two-factor authentication) is turned off** (→ [how](#steam-guard-off)).
+- **A separate Steam account** — MRHC uses Steam to download/update Resonite. Because MRHC stores this password and does not support two-factor authentication, create a **dedicated sub-account** (separate from your everyday one) and make sure its **Steam Guard (two-factor authentication) is turned off** (→ [how](#steam-guard-off)).
 - **Resonite is downloaded automatically** — MRHC fetches Resonite for you, so there's no need to download it beforehand. You don't need to install the Steam client either.
 - **Pick a location with plenty of free space** — Resonite itself and its cache use a fair amount of space (MRHC can delete old cache automatically).
 - **Decide the location first** — Resonite and your settings are stored inside the folder, and their absolute paths are recorded. **Do not move or rename the folder after the first launch (especially after Resonite has been downloaded).** Put it where you want it before starting.
@@ -132,7 +132,7 @@ Even without opening a port, others can join your session through Resonite's rel
 
 MRHC keeps itself up to date with its built-in self-update.
 
-- **From the web UI** — When a new version is available, a red dot appears on the ⋮ at the top right. ⋮ → "Check for updates" → "Update" downloads, verifies, and swaps it in automatically, and you're on the new version **from the next time you restart MRHC** (the swap itself doesn't affect running worlds). Then press "Quit now" to stop the worlds one by one and exit MRHC — just start it again afterward.
+- **From the web UI** — When a new version is available, a red dot appears on the ⋮ at the top right. ⋮ → "Check for updates" → "Update" downloads, verifies, and swaps it in automatically, and you're on the new version **from the next time you restart MRHC** (the swap itself doesn't affect running worlds). Then press "Shut down now" to stop the worlds one by one and exit MRHC — just start it again afterward.
 - **From the command line** — `./mrhc update` (Windows: `mrhc.exe update`). This also serves as a recovery method when MRHC won't start.
 
 > To update manually, stop MRHC and re-run install.sh (Linux), or extract the zip over the same location (Windows). Settings and data aren't included in the archive, so they're preserved either way.
