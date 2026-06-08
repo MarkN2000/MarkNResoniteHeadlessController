@@ -86,10 +86,10 @@ function SessionTwoLine({ s, maxWidth, clampLines }: { s: World; maxWidth: numbe
   );
 }
 
-// セッションバッジ（稼働中のみ・フォーカスプルダウンの左）。上段=フォーカス中の worlds index
+// セッションバッジ（稼働中のみ・フォーカスボタンの leftSection）。上段=フォーカス中の worlds index
 // （0始まり＝コンソールの focus N と同じ番号・brand色）、下段=/セッション総数（dimmed）。
-// 正方形でスペースを取らない（スマホ/PC共通・UI改善①）。フォーカス対象が無い時は「−」。
-// title（ツールチップ）は表示値と同じ idx/total からここで組み立てる（呼び出し側との二重組み立てを避ける）。
+// フォーカスカード内（dark[6] 面）に入るため背景は持たず、数字のみを縦積みで表示する。
+// フォーカス対象が無い時は「−」。title（ツールチップ）は表示値と同じ idx/total からここで組み立てる。
 function SessionCountBadge({ idx, total }: { idx: number | null; total: number }) {
   const { t } = useTranslation();
   const displayIdx = idx ?? "−";
@@ -97,11 +97,7 @@ function SessionCountBadge({ idx, total }: { idx: number | null; total: number }
     <Box
       title={t("topbar.sessionBadge", { idx: displayIdx, total })}
       style={{
-        width: 36,
-        height: 36,
         flexShrink: 0,
-        borderRadius: "var(--mantine-radius-md)",
-        backgroundColor: "var(--mantine-color-dark-6)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -115,6 +111,28 @@ function SessionCountBadge({ idx, total }: { idx: number | null; total: number }
         /{total}
       </Text>
     </Box>
+  );
+}
+
+// 通常停止ボタン（稼働中のみ・フォーカスボタンの左）。テキストを使わず赤い停止アイコン（■）の
+// 正方形で、スマホ幅でも常時表示する（旧セッションバッジ枠の置き換え）。押下時の確認は呼び出し側
+// （App.onGracefulStop）で共通 ConfirmModal を挟む。filled red は autoContrast={false} で白アイコンを保つ
+// （theme.ts のテーマ規約に従う）。
+function GracefulStopButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <ActionIcon
+      aria-label={t("topbar.gracefulStop")}
+      title={t("topbar.gracefulStop")}
+      onClick={onClick}
+      variant="filled"
+      color="red"
+      autoContrast={false}
+      size={36}
+      style={{ flexShrink: 0 }}
+    >
+      <span style={{ fontSize: 16, lineHeight: 1 }}>■</span>
+    </ActionIcon>
   );
 }
 
@@ -153,7 +171,7 @@ export function TopBar(props: TopBarProps) {
   const upd = props.updateInfo;
   const updateReady = !!upd && (!!upd.staged || upd.updateAvailable);
 
-  const overflowMenu = (showForceStop: boolean, showGracefulStop: boolean) => (
+  const overflowMenu = (showForceStop: boolean) => (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
         <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0, marginLeft: "auto" }}>
@@ -165,9 +183,7 @@ export function TopBar(props: TopBarProps) {
       <Menu.Dropdown>
         {showForceStop && (
           <>
-            {showGracefulStop && (
-              <Menu.Item onClick={props.onGracefulStop}>{t("topbar.gracefulStop")}</Menu.Item>
-            )}
+            {/* 通常停止は稼働中ヘッダーの赤い停止ボタンへ昇格したためメニューからは除外。強制停止のみ残置。 */}
             <Menu.Item color="red" onClick={props.onStop}>
               {t("topbar.forceStop")}
             </Menu.Item>
@@ -232,15 +248,16 @@ export function TopBar(props: TopBarProps) {
         <StartingIndicator startedAt={props.status?.startedAt} />
       ) : (
         <>
-          <SessionCountBadge idx={focused ? focused.index : null} total={props.sessions.length} />
+          <GracefulStopButton onClick={props.onGracefulStop} />
           <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
             <Menu.Target>
               <Button
+                leftSection={<SessionCountBadge idx={focused ? focused.index : null} total={props.sessions.length} />}
                 rightSection="▾"
                 styles={{
                   // flex:1 でヘッダーの空き幅まで伸び、minWidth:0 で狭画面では縮む。maxWidth で上限。
                   root: { flex: 1, minWidth: 0, maxWidth: FOCUS_MAX_WIDTH, height: "auto", paddingTop: 4, paddingBottom: 4 },
-                  // 名前(label)を左いっぱいに広げ、▾(section)を右端へ押し出す。
+                  // 名前(label)を左いっぱいに広げ、0/1(leftSection)と▾(rightSection)を両端に固定する。
                   inner: { width: "100%" },
                   label: { flex: 1, minWidth: 0, overflow: "hidden" },
                   section: { flexShrink: 0 },
@@ -274,7 +291,7 @@ export function TopBar(props: TopBarProps) {
         </>
       )}
 
-      {overflowMenu(!stopped, !stopped && !starting)}
+      {overflowMenu(!stopped)}
     </Group>
   );
 }

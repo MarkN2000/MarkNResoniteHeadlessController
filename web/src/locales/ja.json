@@ -37,6 +37,7 @@
   },
   "topbar": {
     "gracefulStop": "通常停止",
+    "gracefulStopConfirm": "通常停止を開始します。約2分後に停止します（スケジュールタブで中止できます）。よろしいですか？",
     "gracefulStopAccepted": "通常停止を開始しました（約2分後に停止・スケジュールタブで中止できます）",
     "forceStop": "強制停止",
     "checkUpdate": "更新を確認",

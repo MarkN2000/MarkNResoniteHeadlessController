@@ -3,13 +3,15 @@ import { useTranslation } from "react-i18next";
 import { Alert, AppShell, Box, Button, Center, Group, NavLink, Stack, Text } from "@mantine/core";
 import * as api from "./api";
 import type { ConfigSummary, LogLine, Status, UpdateInfo, World } from "./api";
-import { notifyError, notifyInfo, reportWriteResult } from "./lib/notify";
+import { notifyError, notifyInfo } from "./lib/notify";
 import { TABS, type TabId } from "./nav";
 import { SURFACE } from "./theme";
 import { Login } from "./components/Login";
 import { TopBar } from "./components/TopBar";
 import { AccountSetupModal } from "./components/AccountSetupModal";
 import { UpdateModal } from "./components/UpdateModal";
+import { ConfirmHost } from "./components/ConfirmHost";
+import { useConfirm } from "./hooks/useConfirm";
 import { ShutdownScreen } from "./components/ShutdownScreen";
 import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
@@ -142,11 +144,18 @@ function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownD
     else setSessions([]);
   }, [running, refreshSessions]);
 
-  // 通常停止（R7・無確認＋受理トースト）: ⋮ メニューから即受付。進行（待機/告知/停止中＋残り時間）と
-  // 中止はスケジュールタブの状態カードに表示される。強制停止が無確認なのに合わせ確認は挟まない
-  // （通常停止は2分猶予＋中止可で誤操作は復旧可能）。成功/失敗トーストは reportWriteResult が処理。
+  // トップバー稼働中の赤い停止ボタン用・共通確認。誤タップ対策にワンクッション挟む（R7 で無確認だったが
+  // 常時表示ボタンへ昇格したため確認を追加）。確定で /stop/graceful 受付＝進行/中止はスケジュールタブに出る。
+  // 成功/失敗トーストは useConfirm.confirm() が WriteResult を reportWriteResult へ流して処理する。
+  const stopConfirm = useConfirm();
   function onGracefulStop() {
-    void api.gracefulStop().then((r) => reportWriteResult(r, t("topbar.gracefulStopAccepted")));
+    stopConfirm.ask({
+      title: t("topbar.gracefulStop"),
+      message: t("topbar.gracefulStopConfirm"),
+      danger: true,
+      success: t("topbar.gracefulStopAccepted"),
+      onConfirm: () => api.gracefulStop(),
+    });
   }
 
   async function onStart() {
@@ -260,6 +269,9 @@ function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownD
         </Stack>
       </AppShell.Main>
     </AppShell>
+
+    {/* トップバーの通常停止ボタン用の共通確認モーダル（赤い確定ボタン）。 */}
+    <ConfirmHost confirm={stopConfirm} />
 
     {/* 初回オンボーディング: アカウント未設定時にログイン直後 1 回自動表示（バナーからも開ける）。 */}
     <AccountSetupModal opened={setupOpen} onClose={() => setSetupOpen(false)} onSaved={refreshCred} />

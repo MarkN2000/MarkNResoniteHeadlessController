@@ -37,6 +37,7 @@
   },
   "topbar": {
     "gracefulStop": "Graceful stop",
+    "gracefulStopConfirm": "Start a graceful stop? It will stop in about 2 minutes (you can cancel it in the Schedule tab).",
     "gracefulStopAccepted": "Graceful stop started (stops in ~2 min; cancel in the Schedule tab)",
     "forceStop": "Force stop",
     "checkUpdate": "Check for updates",
