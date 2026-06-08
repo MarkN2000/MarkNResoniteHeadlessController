@@ -114,10 +114,11 @@ function SessionCountBadge({ idx, total }: { idx: number | null; total: number }
   );
 }
 
-// 通常停止ボタン（稼働中のみ・フォーカスボタンの左）。テキストを使わず赤い停止アイコン（■）の
-// 正方形で、スマホ幅でも常時表示する（旧セッションバッジ枠の置き換え）。押下時の確認は呼び出し側
-// （App.onGracefulStop）で共通 ConfirmModal を挟む。filled red は autoContrast={false} で白アイコンを保つ
-// （theme.ts のテーマ規約に従う）。
+// 通常停止ボタン（稼働中のみ・⋮メニューの左隣＝ヘッダー右端）。テキストを使わず赤い停止アイコン（■）の
+// 正方形で、スマホ幅でも常時表示する。誤爆防止のためフォーカス切替の隣から右端へ移設し、marginLeft:auto で
+// 右クラスタ（■停止＋⋮）をまとめて右へ寄せる（フォーカス切替の flex:1 が空き幅を吸う狭画面では auto は効かず
+// ⋮ の直左に隣接する）。押下時の確認は呼び出し側（App.onGracefulStop）で共通 ConfirmModal を挟む。
+// filled red は autoContrast={false} で白アイコンを保つ（theme.ts のテーマ規約に従う）。
 function GracefulStopButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (
@@ -129,7 +130,7 @@ function GracefulStopButton({ onClick }: { onClick: () => void }) {
       color="red"
       autoContrast={false}
       size={36}
-      style={{ flexShrink: 0 }}
+      style={{ flexShrink: 0, marginLeft: "auto" }}
     >
       <span style={{ fontSize: 16, lineHeight: 1 }}>■</span>
     </ActionIcon>
@@ -158,7 +159,7 @@ function StartingIndicator({ startedAt }: { startedAt?: string }) {
 }
 
 // トップバー（3モード）。docs/design/phase-7-spec.md §3.2。
-//   稼働中: 🎯フォーカス切替 + ⋮（通常停止/強制停止・更新[P9]/言語/ログアウト）
+//   稼働中: 🎯フォーカス切替 + ■通常停止 + ⋮（強制停止・更新[P9]/言語/ログアウト）
 //   起動中: ⟳ 起動中… N秒 + ⋮（強制停止のみ・更新[P9]/言語/ログアウト）
 //   停止中: [起動] + config選択 + ⋮（更新[P9]/言語/ログアウト）
 export function TopBar(props: TopBarProps) {
@@ -173,8 +174,10 @@ export function TopBar(props: TopBarProps) {
 
   const overflowMenu = (showForceStop: boolean) => (
     <Menu position="bottom-end" withinPortal>
+      {/* 停止中のみ ⋮ を右端へ寄せる auto 余白が必要。稼働中は ■停止(GracefulStopButton)の auto が、
+          起動中は StartingIndicator の flex:1 が右寄せを担うので、ここでは auto を付けず ⋮ を ■停止の直右に隣接させる。 */}
       <Menu.Target>
-        <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0, marginLeft: "auto" }}>
+        <ActionIcon aria-label="menu" size="lg" style={{ flexShrink: 0, marginLeft: stopped ? "auto" : undefined }}>
           <Indicator color="red" size={8} offset={-1} disabled={!updateReady}>
             <span>⋮</span>
           </Indicator>
@@ -248,7 +251,6 @@ export function TopBar(props: TopBarProps) {
         <StartingIndicator startedAt={props.status?.startedAt} />
       ) : (
         <>
-          <GracefulStopButton onClick={props.onGracefulStop} />
           <Menu position="bottom-start" withinPortal width="target" onOpen={props.onRefreshSessions}>
             <Menu.Target>
               <Button
@@ -288,6 +290,7 @@ export function TopBar(props: TopBarProps) {
               ))}
             </Menu.Dropdown>
           </Menu>
+          <GracefulStopButton onClick={props.onGracefulStop} />
         </>
       )}
 
