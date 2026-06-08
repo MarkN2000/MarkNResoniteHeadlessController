@@ -1,3 +1,5 @@
+<p align="right"><b>日本語</b> | <a href="README.en.md">English</a></p>
+
 # MarkN Resonite Headless Controller (MRHC)
 
 ![MRHC の操作画面](docs/images/screenshot.jpg)
