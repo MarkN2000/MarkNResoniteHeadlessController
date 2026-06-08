@@ -44,7 +44,7 @@ Once it's running, open `http://localhost:8080` (default) in your browser to use
 Move to where you want it, then run this single line. The command is the same for x64 and ARM (the architecture is detected automatically).
 
 ```sh
-cd ~/servers   # wherever you want it (example)
+cd ~   # wherever you want it (e.g. your home directory — it always exists)
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
 

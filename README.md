@@ -44,7 +44,7 @@ MRHC を使うには、次の準備が必要です。
 置きたい場所へ移動し、次の 1 行を実行します。x64・ARM のどちらも同じコマンドで、アーキテクチャは自動で判定されます。
 
 ```sh
-cd ~/servers   # 置きたい場所へ（例）
+cd ~   # 置きたい場所へ（例: ホーム直下。必ず存在します）
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
 
