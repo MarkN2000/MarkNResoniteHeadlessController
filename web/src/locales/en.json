@@ -445,7 +445,13 @@
     "weekday3": "Wed",
     "weekday4": "Thu",
     "weekday5": "Fri",
-    "weekday6": "Sat"
+    "weekday6": "Sat",
+    "systemTitle": "System usage",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disk": "Disk",
+    "diskFree": "{{free}} free / {{total}}",
+    "metricsUnsupported": "Usage metrics are unavailable on this OS"
   },
   "toast": {
     "writeFailTitle": "Operation failed",

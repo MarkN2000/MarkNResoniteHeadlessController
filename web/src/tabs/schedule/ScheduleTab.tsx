@@ -10,6 +10,7 @@ import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
 import { StatusCard } from "./StatusCard";
 import { ManualCard } from "./ManualCard";
+import { SystemMetricsCard } from "./SystemMetricsCard";
 import { ScheduleListCard } from "./ScheduleListCard";
 import { WaitControlCard } from "./WaitControlCard";
 import { PreActionsCard } from "./PreActionsCard";
@@ -113,6 +114,7 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
             left={
               <Stack gap="lg">
                 <StatusCard status={rs} running={running} onCancel={onCancel} />
+                <SystemMetricsCard />
                 <ManualCard running={running} configs={configs} onRestart={onRestart} />
               </Stack>
             }

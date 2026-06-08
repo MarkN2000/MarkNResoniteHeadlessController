@@ -445,7 +445,13 @@
     "weekday3": "水",
     "weekday4": "木",
     "weekday5": "金",
-    "weekday6": "土"
+    "weekday6": "土",
+    "systemTitle": "システム使用率",
+    "cpu": "CPU",
+    "memory": "メモリ",
+    "disk": "ディスク",
+    "diskFree": "空き {{free}} / {{total}}",
+    "metricsUnsupported": "このOSでは使用率を取得できません"
   },
   "toast": {
     "writeFailTitle": "操作に失敗しました",

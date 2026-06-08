@@ -598,6 +598,21 @@ export async function getRestartStatus(): Promise<RestartStatus | null> {
   return getData<RestartStatus>("/restart-status");
 }
 
+// マシン全体のシステム使用率（スケジュールタブの「システム使用率」カード）。
+// supported=false は非対応OS/未サンプル。diskTotalBytes=0 はディスク取得不可（UI は「—」）。
+export interface SystemMetrics {
+  supported: boolean;
+  cpuPercent: number;
+  memUsedBytes: number;
+  memTotalBytes: number;
+  memPercent: number;
+  diskFreeBytes: number;
+  diskTotalBytes: number;
+}
+export async function getSystemMetrics(): Promise<SystemMetrics | null> {
+  return getData<SystemMetrics>("/system/metrics");
+}
+
 // 手動「通常再起動」を受付（configName 空=前回 config）。
 export const triggerRestart = (configName?: string) =>
   post("/restart/trigger", { configName: configName ?? "" });

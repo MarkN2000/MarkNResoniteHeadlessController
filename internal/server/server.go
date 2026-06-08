@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
@@ -28,6 +29,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/sysmetrics"
 )
 
 type Server struct {
@@ -92,6 +94,18 @@ type Server struct {
 	// cacheMu はキャッシュ削除（手動全削除 / 停止時の自動古削除）を直列化する
 	// （停止直後の自動削除と手動全削除が同時に同じフォルダを消す競合を防ぐ）。
 	cacheMu sync.Mutex
+
+	// システム使用率（マシン全体・metrics.go）。sysSampler は runMetricsSampler（単一 goroutine）
+	// のみが触る。保持スナップショット（cpumem/disk）は metricsMu で HTTP 読み出しと排他する。
+	sysSampler *sysmetrics.Sampler
+	metricsMu  sync.RWMutex
+	cpumem     sysmetrics.CPUMem
+	cpumemOK   bool
+	disk       sysmetrics.Disk
+	diskOK     bool
+	// metricsActiveUntil は最後にメトリクスが要求された時刻＋有効窓（unixnano）。
+	// サンプラはこの時刻を過ぎたらアイドル化し syscall を止める（アクセス駆動の遅延ゲート）。
+	metricsActiveUntil atomic.Int64
 }
 
 func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *resonite.Client, webFS fs.FS) *Server {
@@ -126,6 +140,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		return s.steam.InstallRuntime(ctx, installDir)
 	}
 	s.steamRunning = func() bool { return s.steam.Status().State == "running" }
+	s.sysSampler = sysmetrics.NewSampler()
 	return s
 }
 
@@ -143,6 +158,7 @@ func (s *Server) Start() (stop func()) {
 	s.driver.SetOnStopped(s.maybeAutoEvictCache)              // 停止時の自動キャッシュ削除（設定 ON 時のみ）
 	go s.scheduler.run(ctx)
 	go s.crashMon.run(ctx)
+	go s.runMetricsSampler(ctx) // システム使用率の定期サンプリング（metrics.go）
 	return func() {
 		cancel()
 		_ = s.restart.Cancel()
@@ -259,6 +275,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/cache/config", s.requireAuth(s.handleCacheConfigPut))
 	mux.HandleFunc("GET /api/v1/cache/info", s.requireAuth(s.handleCacheInfo))
 	mux.HandleFunc("POST /api/v1/cache/clear", s.requireAuth(s.handleCacheClear))
+
+	// システム使用率（マシン全体の CPU/メモリ/ディスク・metrics.go）。読み取り専用。
+	mux.HandleFunc("GET /api/v1/system/metrics", s.requireAuth(s.handleSystemMetrics))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {
