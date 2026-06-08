@@ -257,6 +257,11 @@ var catalog = map[string]map[Lang]string{
 		Ja: "依存不足: %s — 起動に失敗する場合はサーバー側での導入が必要です。%s",
 		En: "Missing dependency: %s — if startup fails, it must be installed on the server. %s",
 	},
+	// 停止時の自動キャッシュ削除（server・PublishSys）。引数: 件数(%d) / サイズ(%s) / しきい値日数(%d)
+	"cache.autoEvicted": {
+		Ja: "キャッシュ自動削除: %d 件 / %s を削除しました（%d 日以上前の未更新ファイル）",
+		En: "Auto cache cleanup: removed %d files / %s (not modified in over %d days)",
+	},
 	// 経路①（ウィザード S4 の [Y/n] 対話・setup）
 	"deps.headline.freetype2": {
 		Ja: "⚠ Resonite の動作に必要な freetype2 が見つかりません。",

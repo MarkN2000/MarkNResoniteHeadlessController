@@ -20,7 +20,20 @@
     "config": "Config",
     "schedule": "Schedule",
     "settings": "Settings",
-    "command": "Command"
+    "command": "Command",
+    "logs": "Logs"
+  },
+  "logs": {
+    "title": "Resonite Logs",
+    "file": "File",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "truncated": "File is large — showing the last 10 MiB only (beginning omitted; the log is not cut off mid-stream)",
+    "noFiles": "No logs",
+    "empty": "No logs to display",
+    "loadError": "Could not read the log (the current log may be unreadable while running)"
   },
   "topbar": {
     "gracefulStop": "Graceful stop",
@@ -326,7 +339,22 @@
     "setupIntro": "Please set the Resonite account the headless will use.",
     "setupLater": "Later",
     "bannerUnset": "Resonite account is not set",
-    "bannerAction": "Set up"
+    "bannerAction": "Set up",
+    "cacheSection": "Cache management",
+    "cacheDesc": "Manage Resonite's default cache (headless-cache). Cleared cache is re-downloaded automatically when needed.",
+    "cacheAutoEnabled": "Auto-delete old cache on stop",
+    "cacheMaxAgeDays": "Delete older than (days)",
+    "cacheAutoNote": "When the headless stops, cache files not modified within this many days are deleted automatically.",
+    "cachePath": "Location",
+    "cacheSize": "Size",
+    "cacheSizeUnknown": "Size not computed",
+    "cacheComputeSize": "Compute size",
+    "cacheClear": "Clear all cache",
+    "cacheClearStoppedHint": "Clearing all is only possible while the headless is stopped",
+    "cacheClearConfirmTitle": "Clear all cache",
+    "cacheClearConfirmMsg": "This deletes everything in the cache folder. Continue? (Anything needed is re-downloaded next time.)",
+    "toastCacheSaved": "Cache settings saved",
+    "toastCacheCleared": "Cache cleared"
   },
   "schedule": {
     "statusTitle": "Status",

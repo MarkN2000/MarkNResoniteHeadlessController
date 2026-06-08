@@ -140,6 +140,12 @@ type Driver struct {
 	// onUnexpectedExit は意図しない終了（クラッシュ）検知時に1回呼ばれる（設定時のみ）。
 	// waitExit が wasStopping==false のとき mu 外で呼ぶ。中身は非ブロッキングに保つこと（crash-monitor §5.6）。
 	onUnexpectedExit func()
+
+	// onStopped はプロセスが完全終了し StateStopped へ移った後、通常停止/クラッシュ時に1回呼ばれる
+	// （設定時のみ・mu 外・クラッシュ自動復帰 onUnexpectedExit の前）。重複インスタンス失敗時は
+	// 呼ばない（キャッシュを孤児プロセスが使用中の可能性があるため）。停止時の自動キャッシュ削除に使う。
+	// プロセスは reap 済み＝対象（キャッシュ）が確実に未使用なので、同期的なファイル操作を行ってよい。
+	onStopped func()
 }
 
 // NewDriver は文字コード enc（nil=UTF-8パススルー）でドライバを生成する。
@@ -157,6 +163,15 @@ func NewDriver(enc encoding.Encoding) *Driver {
 func (d *Driver) SetOnUnexpectedExit(fn func()) {
 	d.mu.Lock()
 	d.onUnexpectedExit = fn
+	d.mu.Unlock()
+}
+
+// SetOnStopped は停止完了時（通常停止/クラッシュ）に呼ぶコールバックを登録する。
+// 停止時の自動キャッシュ削除に使う。waitExit の goroutine で同期的に走る（重複インスタンス失敗時は
+// 呼ばれない）。プロセスは終了済みなのでファイル操作は安全。起動前に1回設定する想定。
+func (d *Driver) SetOnStopped(fn func()) {
+	d.mu.Lock()
+	d.onStopped = fn
 	d.mu.Unlock()
 }
 
@@ -457,6 +472,7 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	d.mu.Lock()
 	wasStopping := d.stopping
 	onExit := d.onUnexpectedExit
+	onStopped := d.onStopped
 	fault := d.startFault
 	d.cmd = nil
 	d.stdin = nil
@@ -468,12 +484,21 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 	switch {
 	case wasStopping:
 		d.publishLog("sys", "ヘッドレスを停止しました")
+		// プロセスは終了済み＝キャッシュ未使用。停止時フックを同期実行（自動キャッシュ削除等）。
+		if onStopped != nil {
+			onStopped()
+		}
 	case fault == FaultDuplicateInstance:
 		// 別プロセスが同じ data path を占有（孤児ヘッドレスの残存等）。自動復帰しても同じ壁に
 		// 当たるだけなので onExit は呼ばず（クラッシュ復帰ループを回さない）、明確なログで通知する。
+		// キャッシュは孤児プロセスが使用中の可能性があるため onStopped も呼ばない。
 		d.publishLog("sys", "起動失敗: 別のヘッドレスが同じデータパスで稼働中です（残存プロセスを停止してください）")
 	default:
 		d.publishLog("sys", fmt.Sprintf("ヘッドレスが終了しました（意図しない終了の可能性: %v）", err))
+		// クラッシュ自動復帰の前に停止時フックを完了させる（復帰起動とキャッシュ削除の競合を避ける）。
+		if onStopped != nil {
+			onStopped()
+		}
 		if onExit != nil {
 			onExit() // §5.6 クラッシュ自動復帰: crash-monitor へ非ブロッキング通知（mu 外で呼ぶ）
 		}

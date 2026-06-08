@@ -38,6 +38,32 @@ type Config struct {
 	Language            string              `json:"language,omitempty"`            // CLI/起動メッセージ/sys案内の表示言語（"ja"/"en"。空=ja・ウィザードS0が保存）
 	Restart             *Restart            `json:"restart,omitempty"`             // 自動再起動設定（未設定=DefaultRestart・§3.16）
 	Steam               *Steam              `json:"steam,omitempty"`               // Resonite入手/更新用 Steam アカウント(A)（DepotDownloader・P9-B）
+	CacheCleanup        *CacheCleanup       `json:"cacheCleanup,omitempty"`        // 停止時の自動キャッシュ削除（未設定=OFF・CacheCleanupOrDefault）
+}
+
+// CacheCleanup は停止時の自動キャッシュ削除設定。ヘッドレス停止時に、既定キャッシュ
+// {dataDir}/headless-cache 内で最終更新(mtime)が一定日数より古いファイルを削除する。
+// 対象は既定キャッシュのみ（独自 cacheFolder は対象外）。追加フィールドのため既存 config は
+// マイグレ不要（未知キー無視＋未設定=既定）。
+type CacheCleanup struct {
+	Enabled    bool `json:"enabled"`              // 停止時の自動削除を行うか（既定 false=OFF・オプトイン）
+	MaxAgeDays int  `json:"maxAgeDays,omitempty"` // この日数より古い(mtime)ファイルを削除（既定30・最小1）
+}
+
+// DefaultCacheMaxAgeDays は自動キャッシュ削除のしきい値の既定（日）。
+const DefaultCacheMaxAgeDays = 30
+
+// CacheCleanupOrDefault は自動キャッシュ削除設定を返す（未設定=OFF・30日）。
+// MaxAgeDays は防御的に最小1日へ丸める（手編集の 0/負値で「全削除」化しないため）。
+func (c *Config) CacheCleanupOrDefault() CacheCleanup {
+	cc := CacheCleanup{Enabled: false, MaxAgeDays: DefaultCacheMaxAgeDays}
+	if c.CacheCleanup != nil {
+		cc.Enabled = c.CacheCleanup.Enabled
+		if c.CacheCleanup.MaxAgeDays >= 1 {
+			cc.MaxAgeDays = c.CacheCleanup.MaxAgeDays
+		}
+	}
+	return cc
 }
 
 // Steam は DepotDownloader による Resonite 入手/更新に使う「DL 用 Steam アカウント(A)」。

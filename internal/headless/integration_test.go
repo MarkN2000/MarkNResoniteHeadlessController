@@ -351,6 +351,28 @@ func TestIntegration_Exec_ProcessGone(t *testing.T) {
 	}
 }
 
+// TestIntegration_OnStopped_FiresOnGracefulStop は SetOnStopped が通常停止時に呼ばれることを検証する
+// （停止時の自動キャッシュ削除フックの土台）。waitExit → wasStopping 経路で発火する。
+func TestIntegration_OnStopped_FiresOnGracefulStop(t *testing.T) {
+	d := newFakeDriver(t)
+	fired := make(chan struct{}, 1)
+	d.SetOnStopped(func() {
+		select {
+		case fired <- struct{}{}:
+		default:
+		}
+	})
+	if err := d.Stop(); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	select {
+	case <-fired:
+		// ok: 停止完了時に呼ばれた
+	case <-time.After(5 * time.Second):
+		t.Fatal("onStopped was not called within timeout")
+	}
+}
+
 func TestIntegration_Exec_NotReadyAfterStop(t *testing.T) {
 	// 既に停止した Driver に Exec を投げたら ErrNotReady
 	d := newFakeDriver(t)

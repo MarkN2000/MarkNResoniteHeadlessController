@@ -245,6 +245,29 @@ export async function removeFavorite(recordId: string): Promise<WorldResult[] | 
   return getData<WorldResult[]>(`/favorites/${encodeURIComponent(recordId)}`, { method: "DELETE" });
 }
 
+// --- Resonite ログ閲覧（{InstallDir}/Headless/Logs・読み取り専用） ---
+
+// ログファイル一覧の1要素（internal/server.logFileInfo）。modTime は RFC3339。
+export interface LogFileInfo {
+  name: string;
+  size: number;
+  modTime: string;
+}
+export async function getLogFiles(): Promise<LogFileInfo[]> {
+  return (await getData<LogFileInfo[]>("/logs")) ?? [];
+}
+
+// ログ本文。truncated=true なら末尾10MiBのみ（先頭省略）。
+export interface LogContent {
+  name: string;
+  size: number;
+  truncated: boolean;
+  content: string;
+}
+export async function getLogContent(name: string): Promise<LogContent | null> {
+  return getData<LogContent>(`/logs/${encodeURIComponent(name)}`);
+}
+
 // --- 自己更新（MRHC 自身の入れ替え・docs/design/self-update.md） ---
 
 export interface UpdateInfo {
@@ -426,6 +449,31 @@ export const putAppSettings = (s: AppSettings) => write("PUT", "/app-settings", 
 // 管理パスワード変更（成功時 backend が新Cookieを再発行＝このブラウザは継続・他端末は失効）。
 export const changePassword = (currentPassword: string, newPassword: string) =>
   post("/password", { currentPassword, newPassword });
+
+// --- キャッシュ管理（既定 {dataDir}/headless-cache・internal/server/cache.go）---
+
+// 停止時の自動キャッシュ削除設定（既定 OFF・30日）。
+export interface CacheConfig {
+  enabled: boolean;
+  maxAgeDays: number;
+}
+export async function getCacheConfig(): Promise<CacheConfig | null> {
+  return getData<CacheConfig>("/cache/config");
+}
+export const putCacheConfig = (c: CacheConfig) => write("PUT", "/cache/config", c);
+
+// キャッシュのパスと合計サイズ（サイズ集計は走査するため「サイズを計算」ボタン押下時のみ呼ぶ）。
+export interface CacheInfo {
+  path: string;
+  sizeBytes: number;
+  exists: boolean;
+}
+export async function getCacheInfo(): Promise<CacheInfo | null> {
+  return getData<CacheInfo>("/cache/info");
+}
+
+// 全キャッシュ削除（停止中のみ・backend が State!=stopped を 409）。
+export const clearCache = () => post("/cache/clear");
 
 // --- Steam（DepotDownloader）: Resonite の入手/更新（P9-B）---
 // 秘密（password/branchCode）は返さず hasXxx のみ。internal/server/steam.go。

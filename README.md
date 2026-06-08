@@ -100,6 +100,8 @@ sudo netfilter-persistent save
 
 ### 困ったとき
 
+- **ヘッドレスのログを見たい** — Web UI の「ログ」タブで Resonite ヘッドレスのログファイル（`<インストール先>/Headless/Logs`）を選んで表示・コピーできます（読み取り専用・停止中でも閲覧可）。大きいログは末尾のみ表示されます。稼働中の現行ログは OS によっては読み取れないことがあります。
+- **ディスク容量が気になる（キャッシュ）** — 設定タブの「キャッシュ管理」で、Resonite キャッシュ（既定 `headless-cache`）の合計サイズ確認・全削除（ヘッドレス停止中のみ）ができます。「停止時に古いキャッシュを自動削除」を ON にすると、停止のたびに最終更新が指定日数（既定30日）より古いキャッシュを自動で掃除します。削除しても必要なものは次回自動で再取得されます。
 - **管理パスワードを忘れた** — サーバー機のコマンドラインで `./mrhc reset-password`（Windows: `mrhc.exe reset-password`）を実行すると、旧パスワードなしで再設定できます。
 - **更新の途中で失敗して起動できなくなった** — 実行ファイルの隣に `mrhc.exe.old`（Linux: `mrhc.old`）が残っていれば、それを `mrhc.exe`（`mrhc`）に名前を戻すと元のバージョンに復旧できます。
 - **セットアップを最初からやり直したい** — フォルダ内の `mrhc.config.json` を削除してもう一度起動すると、ウィザードが再実行されます。
@@ -118,7 +120,7 @@ sudo netfilter-persistent save
 - **Resoniteドメイン事実**（コンソールコマンド・出力書式・起動方法など）: [docs/resonite-domain-facts.md](docs/resonite-domain-facts.md)
 
 ## ステータス
-v2 を実装中。コア機能は実装済み（CLIセットアップ・ヘッドレス起動/停止/再起動・ライブログ(SSE)・全タブの Web UI・スケジュール再起動・Steam（DepotDownloader）経由の Resonite 入手/更新・MRHC 自身の自己更新（Web UI / CLI）・依存検出と導入案内・Windows / Linux 単一バイナリ）。残りは ARM 実機検証とリリース準備。
+v2 を実装中。コア機能は実装済み（CLIセットアップ・ヘッドレス起動/停止/再起動・ライブログ(SSE)・全タブの Web UI・スケジュール再起動・Steam（DepotDownloader）経由の Resonite 入手/更新・MRHC 自身の自己更新（Web UI / CLI）・依存検出と導入案内・Resonite ログ閲覧・キャッシュ管理（停止時の自動削除／手動全削除）・Windows / Linux 単一バイナリ）。残りは ARM 実機検証とリリース準備。
 
 ## ビルド / 開発
 前提: **Go 1.26+** と **Node 20+**。

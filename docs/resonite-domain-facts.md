@@ -21,6 +21,8 @@
 | stdout復号 | utf8試行 → 失敗時shift_jis → 最終utf8 | processManager.ts:503-513 |
 | ⚠️ エンコーディング | stdin固定Shift_JISは**Windows日本語ロケール前提**。Linux/UTF-8ヘッドレスではUTF-8が必要 → **ロケール検出で吸収すべき** | — |
 | 正常停止 | `shutdown`送信 → 60秒待ち → SIGTERM → 70秒でSIGKILL | processManager.ts:485+ |
+| ログ出力先 | `<install>/Headless/Logs/*.log`（`logsFolder`=null の既定）。ファイル名は `<セッション名> - <版> - <YYYY-MM-DD HH_mm_ss>.log` | 実機(Win) 2026-06-08 |
+| ⚠️ **ログファイルの文字コード** | **両OSとも UTF-8**。コンソール stdout は Win=Shift_JIS だが、**ディスク上のログファイルは別系統で UTF-8**（実機249件すべて UTF-8 として妥当・日本語含む199件も化けなし、2026-06-08 確認）。→ ログ閲覧は変換不要でそのまま UTF-8 表示でよい | 実機(Win) 2026-06-08 |
 
 ### コマンド完了の判定（重要なドメイン挙動）
 Resoniteヘッドレスは**構造化レスポンスを返さない**。コマンド送信後の完了判定は以下のヒューリスティック：

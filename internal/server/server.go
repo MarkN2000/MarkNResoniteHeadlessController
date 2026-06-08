@@ -88,6 +88,10 @@ type Server struct {
 	// favMu は favorites.json（ワールドお気に入り）の read-modify-write を直列化する
 	// （add/remove の並行リクエストでの取りこぼし・上書きを防ぐ）。
 	favMu sync.Mutex
+
+	// cacheMu はキャッシュ削除（手動全削除 / 停止時の自動古削除）を直列化する
+	// （停止直後の自動削除と手動全削除が同時に同じフォルダを消す競合を防ぐ）。
+	cacheMu sync.Mutex
 }
 
 func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *resonite.Client, webFS fs.FS) *Server {
@@ -136,6 +140,7 @@ func (s *Server) Start() (stop func()) {
 	s.restart.setParent(ctx)                                  // 進行中フローを bg ctx の子に＝shutdown で ①②③ を cancel
 	s.steam.SetParent(ctx)                                    // 進行中の更新を bg ctx の子に＝shutdown で中断（P9-B）
 	s.driver.SetOnUnexpectedExit(s.crashMon.onUnexpectedExit) // クラッシュ検知を crash-monitor へ（P8-4b）
+	s.driver.SetOnStopped(s.maybeAutoEvictCache)              // 停止時の自動キャッシュ削除（設定 ON 時のみ）
 	go s.scheduler.run(ctx)
 	go s.crashMon.run(ctx)
 	return func() {
@@ -244,6 +249,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/favorites", s.requireAuth(s.handleFavoritesList))
 	mux.HandleFunc("POST /api/v1/favorites", s.requireAuth(s.handleFavoriteAdd))
 	mux.HandleFunc("DELETE /api/v1/favorites/{recordId}", s.requireAuth(s.handleFavoriteRemove))
+
+	// Resonite ログ閲覧（{InstallDir}/Headless/Logs・読み取り専用）。稼働中/停止中どちらでも可。
+	mux.HandleFunc("GET /api/v1/logs", s.requireAuth(s.handleLogList))
+	mux.HandleFunc("GET /api/v1/logs/{name}", s.requireAuth(s.handleLogGet))
+
+	// キャッシュ管理（既定 headless-cache）。自動古削除の設定 + サイズ取得 + 手動全削除（停止中のみ）。
+	mux.HandleFunc("GET /api/v1/cache/config", s.requireAuth(s.handleCacheConfigGet))
+	mux.HandleFunc("PUT /api/v1/cache/config", s.requireAuth(s.handleCacheConfigPut))
+	mux.HandleFunc("GET /api/v1/cache/info", s.requireAuth(s.handleCacheInfo))
+	mux.HandleFunc("POST /api/v1/cache/clear", s.requireAuth(s.handleCacheClear))
 
 	// フロントエンド（埋め込み静的資産）。テストでは nil 渡しで未登録にできる。
 	if s.webFS != nil {

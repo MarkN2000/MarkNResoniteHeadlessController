@@ -20,7 +20,20 @@
     "config": "コンフィグ",
     "schedule": "スケジュール",
     "settings": "設定",
-    "command": "コマンド"
+    "command": "コマンド",
+    "logs": "ログ"
+  },
+  "logs": {
+    "title": "Resonite ログ",
+    "file": "ファイル",
+    "refresh": "更新",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "copyFailed": "コピーに失敗しました",
+    "truncated": "ファイルが大きいため末尾10MiBのみ表示しています（先頭は省略・途中で切れているわけではありません）",
+    "noFiles": "ログがありません",
+    "empty": "表示できるログがありません",
+    "loadError": "ログを読み取れませんでした（稼働中の現行ログは読み取れない場合があります）"
   },
   "topbar": {
     "gracefulStop": "通常停止",
@@ -326,7 +339,22 @@
     "setupIntro": "ヘッドレスが使う Resonite アカウントを設定してください。",
     "setupLater": "後で",
     "bannerUnset": "Resonite アカウントが未設定です",
-    "bannerAction": "設定する"
+    "bannerAction": "設定する",
+    "cacheSection": "キャッシュ管理",
+    "cacheDesc": "Resonite の既定キャッシュ（headless-cache）の管理です。キャッシュは消えても必要なら自動で再取得されます。",
+    "cacheAutoEnabled": "停止時に古いキャッシュを自動削除",
+    "cacheMaxAgeDays": "削除する古さ（日数）",
+    "cacheAutoNote": "ヘッドレス停止時に、最終更新がこの日数より古いキャッシュファイルを自動削除します。",
+    "cachePath": "場所",
+    "cacheSize": "サイズ",
+    "cacheSizeUnknown": "サイズ未計算",
+    "cacheComputeSize": "サイズを計算",
+    "cacheClear": "全キャッシュを削除",
+    "cacheClearStoppedHint": "全削除はヘッドレス停止中のみ可能です",
+    "cacheClearConfirmTitle": "全キャッシュを削除",
+    "cacheClearConfirmMsg": "キャッシュフォルダの中身をすべて削除します。よろしいですか？（必要なものは次回自動で再取得されます）",
+    "toastCacheSaved": "キャッシュ設定を保存しました",
+    "toastCacheCleared": "キャッシュを削除しました"
   },
   "schedule": {
     "statusTitle": "状態",

@@ -19,6 +19,7 @@ import { NewSessionTab } from "./tabs/newsession/NewSessionTab";
 import { ConfigTab } from "./tabs/config/ConfigTab";
 import { SettingsTab } from "./tabs/settings/SettingsTab";
 import { ScheduleTab } from "./tabs/schedule/ScheduleTab";
+import { LogsTab } from "./tabs/logs/LogsTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -181,6 +182,7 @@ function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownD
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
     if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} status={status} />;
     if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} />;
+    if (activeTab === "logs") return <LogsTab />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
 

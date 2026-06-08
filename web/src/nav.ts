@@ -7,7 +7,8 @@ export type TabId =
   | "config"
   | "schedule"
   | "settings"
-  | "command";
+  | "command"
+  | "logs";
 
 export interface TabDef {
   id: TabId;
@@ -25,4 +26,6 @@ export const TABS: TabDef[] = [
   { id: "schedule", labelKey: "tabs.schedule", availableWhenStopped: true },
   { id: "settings", labelKey: "tabs.settings", availableWhenStopped: true },
   { id: "command", labelKey: "tabs.command", availableWhenStopped: false },
+  // ログ閲覧はディスク上のログファイルを読むだけなので停止中でも使える（クラッシュ後の診断に有用）。
+  { id: "logs", labelKey: "tabs.logs", availableWhenStopped: true },
 ];
