@@ -33,7 +33,7 @@ export const TOP_DEDICATED_KEYS: ReadonlySet<string> = new Set([
   "loginPassword",
 ]);
 
-// 専用フォーム（①②）が扱うワールドキー（①一般14＋②上級9＝23）。
+// 専用フォーム（①②）が扱うワールドキー（①一般14＋②上級10＝24）。
 export const WORLD_DEDICATED_KEYS: ReadonlySet<string> = new Set([
   // ①一般
   "isEnabled",
@@ -60,14 +60,14 @@ export const WORLD_DEDICATED_KEYS: ReadonlySet<string> = new Set([
   "saveAsOwner",
   "enableResoniteLink",
   "forceResoniteLinkPort",
+  "forcePort",
 ]);
 
 // ③カタログ（トップレベル）。当面は universeId のみ（残りは全て①②）。
 export const TOP_NICHE_CATALOG: readonly FieldDef[] = [{ key: "universeId", type: "string" }];
 
-// ③カタログ（ワールド・13キー）。
+// ③カタログ（ワールド・12キー）。
 export const WORLD_NICHE_CATALOG: readonly FieldDef[] = [
-  { key: "forcePort", type: "int" },
   { key: "keepOriginalRoles", type: "bool" },
   { key: "useCustomJoinVerifier", type: "bool" },
   { key: "waitForLogin", type: "bool" },

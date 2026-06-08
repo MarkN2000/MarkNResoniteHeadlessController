@@ -303,6 +303,18 @@ export function WorldsSection({
                   onChange={(v) => setW("saveAsOwner", !v || v === "unset" ? null : v)}
                 />
               </FieldRow>
+              {/* 固定ポート（forcePort）。ポート開放したPCで直結させたいワールドのUDPポートを固定する。
+                  空＝自動（headless がランダムな空きポートを選ぶ・保存JSONから省く）。詳細フィールドから昇格。 */}
+              <FieldRow label={t("config.forcePort")} {...resetProps("forcePort", t("config.forcePort"))}>
+                <InspectorNumberInput
+                  value={asNum(world.forcePort)}
+                  onChange={omitW("forcePort")}
+                  min={1}
+                  max={65535}
+                  allowNegative={false}
+                  placeholder={t("config.forcePortHint")}
+                />
+              </FieldRow>
               {/* ResoniteLink（R13）。port は空＝自動（未設定）＝保存JSONから省く。 */}
               <FieldRow label={t("config.enableResoniteLink")} {...resetProps("enableResoniteLink", t("config.enableResoniteLink"))}>
                 <Switch
@@ -321,7 +333,7 @@ export function WorldsSection({
                 />
               </FieldRow>
               <Divider my={4} color="dark.4" />
-              {/* ③詳細フィールド（ワールド）: 専用フォームに無い公式キー（forcePort/各クラウド変数/
+              {/* ③詳細フィールド（ワールド）: 専用フォームに無い公式キー（各クラウド変数/
                   overrideCorrespondingWorldId/mobileFriendly/autoRecover 等）を追加。内部 state を持つ子
                   （RawJsonInput）があるため key={idx} でワールド切替時に再マウント＝再シードする。 */}
               <AdvancedFieldsEditor
