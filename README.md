@@ -1,10 +1,11 @@
 <p align="right"><b>日本語</b> | <a href="README.en.md">English</a></p>
 
-# MarkN Resonite Headless Controller (MRHC)
+# MarkN Resonite Headless Controller v2 (MRHC)
 
 ![MRHC の操作画面](docs/images/screenshot.webp)
 
 Resonite のヘッドレスサーバーを、LAN 内のブラウザから操作・管理するツールです。
+>旧バージョンを使い続けたい方はresleseの v1.~ をお使いください<br>旧バージョン(v1.~)から乗り換える場合は、互換性が無いのでmrhcフォルダを丸ごと削除してください。使用していたResonite本体やsteamも新バージョンでは必要ないのでアンインストールしてしまって構いません。
 
 **対応プラットフォーム:** Windows (x64) ／ Linux (x64) ／ Linux (ARM)
 
