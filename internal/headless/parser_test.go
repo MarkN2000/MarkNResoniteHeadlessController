@@ -164,6 +164,106 @@ func TestParseStatusMultiUsersAndTags(t *testing.T) {
 	}
 }
 
+// 2026-06-08 実機観測（fixtures/2026-06-08-status-ambient.log）の回帰テスト。
+// Resonite の非同期ログが status 応答窓に混入しても、本物のブロックだけを正しく取る。
+
+// パターン1: focus 切替直後の SIGNALR BroadcastStatus ダンプ（TAB インデント子項目つき）が
+// 本物の Name より前に混入する。前方 ambient を全て読み飛ばし、13項目を正しく取れること。
+func TestParseStatusIgnoresSignalRBroadcastDump(t *testing.T) {
+	input := []string{
+		"SIGNALR: BroadcastStatus - Contact status for U-1NzqeqewOpM.",
+		"\tUserSessionId: 019ea753-ef55-778b-a64d-a439f62bb038.",
+		"\tType: Headless",
+		"\tOutputDevice: ",
+		"\tIsMobile: False",
+		"\tOnlineStatus: ",
+		"\tIsPresent: False",
+		"\tLastPresenceTimestamp: ",
+		"\tLastStatusChange: 2026/06/08 13:13:33",
+		"\tAppVersion: 2026.6.4.1252",
+		"\tCompatibilityHash: ",
+		"\tCurrentSessionIndex: 2 to AllContacts",
+		"Name: Test World",
+		"SessionID: S-test-9999",
+		"Current Users: 1",
+		"Present Users: 0",
+		"Max Users: 32",
+		"Uptime: 00:06:19",
+		"Access Level: Private",
+		"Hidden from listing: False",
+		"Mobile Friendly: False",
+		"Description: ",
+		"Tags: ",
+		"Users: HeadlessBot",
+		"ResoniteLink: off",
+	}
+	got := ParseStatus(input)
+	want := WorldStatus{
+		Name:         "Test World",
+		SessionID:    "S-test-9999",
+		CurrentUsers: 1,
+		PresentUsers: 0,
+		MaxUsers:     32,
+		Uptime:       "00:06:19",
+		AccessLevel:  "Private",
+		Description:  "",
+		Tags:         nil,
+		Users:        []string{"HeadlessBot"},
+		ResoniteLink: "off",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("SIGNALR ダンプ混入で壊れた\n got=%+v\nwant=%+v", got, want)
+	}
+}
+
+// パターン2: "Running refresh on: ..." が本物の Name より前に混入する。
+func TestParseStatusIgnoresRunningRefreshLine(t *testing.T) {
+	input := []string{
+		"Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.NoticeDisplay",
+		"Name: Test World",
+		"SessionID: S-test-1",
+		"Current Users: 5",
+		"ResoniteLink: off",
+	}
+	got := ParseStatus(input)
+	if got.Name != "Test World" || got.SessionID != "S-test-1" || got.CurrentUsers != 5 {
+		t.Fatalf("混入行を除外して本物を取れるべき: %+v", got)
+	}
+}
+
+// パターン3: "SIGNALR: BroadcastSession SessionInfo. ... Name: X, ..." の1行混入。
+// 値の中に "Name:" を含むが、行のキーは "SIGNALR" なので Name 起点を誤発火させないこと。
+func TestParseStatusIgnoresSignalRBroadcastSessionLine(t *testing.T) {
+	input := []string{
+		"SIGNALR: BroadcastSession SessionInfo. Id: S-aaa, Name: Decoy World, Host: HeadlessBot, IsExpired: False to Public",
+		"Name: Real World",
+		"SessionID: S-real",
+		"ResoniteLink: off",
+	}
+	got := ParseStatus(input)
+	if got.Name != "Real World" {
+		t.Fatalf("混入行の値中の Name: にアンカーしてはいけない: %q", got.Name)
+	}
+	if got.SessionID != "S-real" {
+		t.Fatalf("SessionID mismatch: %+v", got)
+	}
+}
+
+// 起点は「最初の既知 Key」なので、先頭が Name でなくても（将来の項目順変化でも）壊れない。
+// 前方の未知行（"ambient noise: ..."）はブロック開始前として黙って読み飛ばす。
+func TestParseStatusAnchorsOnFirstKnownKey(t *testing.T) {
+	input := []string{
+		"ambient noise: whatever happened here",
+		"SessionID: S-first",
+		"Name: Later Name",
+		"Current Users: 2",
+	}
+	got := ParseStatus(input)
+	if got.SessionID != "S-first" || got.Name != "Later Name" || got.CurrentUsers != 2 {
+		t.Fatalf("既知 Key 起点で順序非依存に取れるべき: %+v", got)
+	}
+}
+
 func TestParseUsers(t *testing.T) {
 	// 実機採取（2026-05-28 Windows）ID は空文字（ヘッドレス自身ユーザー）
 	input := []string{

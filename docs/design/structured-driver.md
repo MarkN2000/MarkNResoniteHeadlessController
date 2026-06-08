@@ -195,9 +195,13 @@ strip できず、`^\[(\d+)\]` regex が当たらず World A が parser から�
   - `users` パーサは **`id` 空文字を許容**（旧 `\S+` → `[^\s]*` 等）
   - その他は旧 regex がそのまま通用（採取で再確認）
 - **未知Keyへの寛容性（将来のバージョン変化への耐性）**:
-  - `status` パーサは「`<key>: <value>` を全て収集し、**知っている Key だけ構造体に写す**」方針。未知Keyは warning ログを 1 回だけ出して握る（毎回出さない＝spam防止）。これにより新Key追加で**パースが落ちない**。
+  - `status` パーサは「**最初の既知 Key を起点に**、知っている Key だけ構造体に写す」方針。起点より前の行と、起点以降の未知Keyの扱いは下記「ambient 混入耐性」を参照。これにより新Key追加でも**パースが落ちない**。
   - `worlds` / `users` 等の表形式は regex が当たらない行を**無視**するだけで耐性あり（ResoniteLink追加でも壊れなかった実例）。
   - 既知Key全部が一斉に書式変わった場合は明示的な不一致として扱う（フィクスチャの差分で検知）。
+- **status 応答への ambient ログ混入耐性（2026-06-08 実機観測で強化）**:
+  - 実機運用中、`status` の応答窓に Resonite の非同期ログ（`SIGNALR: BroadcastStatus ...` + TAB子項目、`Running refresh on: ...`、`SIGNALR: BroadcastSession ...`）が**本物のブロックより前に**混入し、初期実装が `<key>:<value>` として拾って毎Key警告を出していた（誤って「バージョン変更で項目増加」と推測する文言）。実例: `scripts/empirical-capture/fixtures/2026-06-08-status-ambient.log`。
+  - 対策（`ParseStatus`）: ①最初の既知 Status Key が出るまでの行を読み飛ばす（前方 ambient を除外。Name固定でなく既知Key起点なので項目順変化にも耐性）／②TAB・空白インデント行は ambient 子項目として無視／③既知 Key は first-value-wins／④**ブロック開始後**の未知Keyのみ初回1回だけ警告（Resonite の真の新項目検知は維持）。
+  - 結果、観測された混入は警告ゼロになり、警告は「本物の status ブロック中に現れた本当に新しい Key」だけに限定される。
 
 ## 9. Go 型・インターフェース（概略）
 

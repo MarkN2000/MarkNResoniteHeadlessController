@@ -1,0 +1,117 @@
+# 実機採取 2026-06-08 / Resonite Headless AppVersion 2026.6.4.1252（Windows・運用中）
+#
+# 目的: status / users 応答窓へ Resonite の非同期(ambient)ログが混入する実例の保全。
+#       これが [structured-driver] 「status の未知Key ... を観測」警告の発生源。
+#       回帰テスト: internal/headless/parser_test.go
+#         TestParseStatusIgnoresSignalRBroadcastDump
+#         TestParseStatusIgnoresRunningRefreshLine
+#         TestParseStatusIgnoresSignalRBroadcastSessionLine
+#
+# 匿名化: 第三者の username / UserID は User1..6 / BannedUser1..2 / Requester1..3 に、
+#         MachineId と lnl-nat リレーIDは <...-redacted> に置換。
+#         オーナー自身(MarkN / MarkN_headless / U-1NzqeqewOpM / U-MarkN)・ワールド名・
+#         SessionID・UserSessionId・AppVersion は解析に必要なため保持。
+#         （元ログの空行と、本筋に無関係なポーリング反復は削除してトリム済み）
+#
+# 注意: 以下は「生のコンソール出力」。行頭の "<world>>" はプロンプト接頭辞で、
+#       Driver(stripExactPrompt) が剥がした後の綺麗な行を ParseStatus が受け取る。
+#       本物の status ブロックは常に Name: で始まり ResoniteLink: で終わる13項目。
+
+# ============================================================================
+# [A] 通常の status（混入なし・baseline）
+# ============================================================================
+> focus 0
+> status
+MarkN_headless World>MarkN_headless World>Name: MarkN_headless World
+SessionID: S-019ea753-f552-78dc-a382-25c029ba92dc
+Current Users: 5
+Present Users: 3
+Max Users: 8
+Uptime: 00:10:53.1062829
+Access Level: Anyone
+Hidden from listing: False
+Mobile Friendly: False
+Description: test world
+Tags:
+Users: MarkN_headless, MarkN, User1, User2, User3
+ResoniteLink: off
+
+# ============================================================================
+# [B] focus 切替直後の SIGNALR BroadcastStatus ダンプが Name: の前に混入
+#     先頭行は非インデント、子項目は TAB インデント。どれも既知Keyと衝突しない。
+# ============================================================================
+> focus 1
+> status
+MarkN_headless World>3Dマウスパッドショップ 3D Mousepad Shop>SIGNALR: BroadcastStatus - Contact status for U-1NzqeqewOpM.
+	UserSessionId: 019ea753-ef55-778b-a64d-a439f62bb038.
+	Type: Headless
+	OutputDevice:
+	IsMobile: False
+	OnlineStatus:
+	IsPresent: False
+	LastPresenceTimestamp:
+	LastStatusChange: 2026/06/08 13:13:33
+	AppVersion: 2026.6.4.1252
+	CompatibilityHash:
+	CurrentSessionIndex: 2 to AllContacts
+Name: 3Dマウスパッドショップ 3D Mousepad Shop
+SessionID: S-019ea758-2d3a-7072-a229-3ed741aeab0d
+Current Users: 1
+Present Users: 0
+Max Users: 32
+Uptime: 00:06:19.5181564
+Access Level: Private
+Hidden from listing: False
+Mobile Friendly: False
+Description:
+Tags: MarkN, マウスパッド, mousepad, shop, maker, 3Dマウスパッド, unifesta2024, create, 立体マウスパッド
+Users: MarkN_headless
+ResoniteLink: off
+
+# ============================================================================
+# [C] "Running refresh on: ..." が Name: の前に混入（キーは "Running refresh on"）
+# ============================================================================
+> focus 0
+> status
+MarkN_headless test>MarkN_headless test>Running refresh on: OwnerId: U-1NzqeqewOpM, Path: G-Resonite.Favorites.NoticeDisplay
+Name: MarkN_headless test
+SessionID: S-019ea753-f552-78dc-a382-25c029ba92dc
+Current Users: 5
+Present Users: 4
+Max Users: 8
+Uptime: 00:30:06.9805963
+Access Level: Anyone
+Hidden from listing: False
+Mobile Friendly: False
+Description: test world
+Tags:
+Users: MarkN_headless, MarkN, User1, User3, User4
+ResoniteLink: off
+
+# ============================================================================
+# [D] users 出力に "SIGNALR: BroadcastSession SessionInfo. ... Name: ..." が1行混入。
+#     値の中に Name:/Id: を含むが usersLineRe(TAB区切り厳格)に当たらず自然に無視される。
+# ============================================================================
+> users
+MarkN_headless World>SIGNALR: BroadcastSession SessionInfo. Id: S-019ea753-f552-78dc-a382-25c029ba92dc, Name: MarkN_headless World, Host: MarkN_headless, CorrespondingWorldId: , URLs: lnl-nat://<nat-id-redacted>/S-019ea753-f552-78dc-a382-25c029ba92dc, IsExpired: False to Public
+MarkN_headless	ID: U-1NzqeqewOpM	Role: Admin	Present: False	Ping: 0 ms	FPS: 59.234306	Silenced: False
+MarkN	ID: U-MarkN	Role: Admin	Present: True	Ping: 0 ms	FPS: 9.990971	Silenced: False
+User1	ID: U-redactedUser1	Role: Builder	Present: True	Ping: 8 ms	FPS: 74.05398	Silenced: False
+User2	ID: U-redactedUser2	Role: Builder	Present: True	Ping: 56 ms	FPS: 89.09248	Silenced: False
+User3	ID: U-redactedUser3	Role: Builder	Present: True	Ping: 9 ms	FPS: 60.15231	Silenced: False
+
+# ============================================================================
+# [参考] listbans（混入なし。MachineId は匿名化）
+# ============================================================================
+> listbans
+MarkN_headless test>[0]	Username: BannedUser1	UserID: U-redactedBanned1	MachineIds: <machine-id-redacted-1>
+[1]	Username: BannedUser2	UserID: U-redactedBanned2	MachineIds: <machine-id-redacted-2>
+
+# ============================================================================
+# [参考] friendrequests（混入なし。username は匿名化）
+# ============================================================================
+> friendrequests
+MarkN_headless World>Requester1
+Requester2
+Requester3
+User4

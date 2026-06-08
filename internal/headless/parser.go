@@ -71,49 +71,94 @@ func ParseWorlds(lines []string) []World {
 }
 
 // ParseStatus は status コマンドの応答行から WorldStatus を構築する。
-// 知っている Key だけ構造体に写し、未知 Key は初回1回だけ警告して無視する
-// （将来のバージョン変化への耐性）。
+//
+// === ambient ログ混入への耐性（2026-06-08 実機観測で強化）===
+// Resonite は status コマンド出力の直前に非同期ログを stdout へ流すことがあり、
+// その行が応答窓に紛れ込む（[structured-driver] の「未知Key」警告の発生源）。
+// 実機観測された混入パターン（fixtures/2026-06-08-status-ambient.log）:
+//   - "SIGNALR: BroadcastStatus - ..." + TAB インデントの子項目群（UserStatus ダンプ）
+//   - "Running refresh on: ..."
+//   - "SIGNALR: BroadcastSession SessionInfo. ... Name: X, ..."（1行・値中に Name: を含む）
+// これらは全て本物の status ブロック（Name: 〜 ResoniteLink:）より前に出現する。
+//
+// 対策:
+//   1. 最初の「既知 Status Key」が現れるまでの行を読み飛ばす（前方 ambient を除外）。
+//      Name 固定ではなく既知 Key で起点を取るため、項目順が変わっても壊れない。
+//   2. 行頭がインデント（TAB/空白）の行は ambient 子項目とみなし無視（保険）。
+//   3. 既知 Key は first-value-wins（万一の重複・衝突でも先頭=本物を保持）。
+//   4. ブロック開始後の未知 Key のみ初回1回だけ警告（Resonite の真の新項目検知は維持）。
 func ParseStatus(lines []string) WorldStatus {
 	var s WorldStatus
+	seen := make(map[string]bool)
+	started := false // 最初の既知 Key を観測したら true（status ブロック開始）
 	for _, line := range lines {
+		if isIndentedLine(line) {
+			continue // ambient ダンプの TAB インデント子項目（"\tUserSessionId: ..." 等）
+		}
 		m := statusKVRe.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
 		key := strings.TrimSpace(m[1])
 		val := strings.TrimSpace(m[2])
-		switch key {
-		case "Name":
-			s.Name = val
-		case "SessionID":
-			s.SessionID = val
-		case "Current Users":
-			s.CurrentUsers, _ = strconv.Atoi(val)
-		case "Present Users":
-			s.PresentUsers, _ = strconv.Atoi(val)
-		case "Max Users":
-			s.MaxUsers, _ = strconv.Atoi(val)
-		case "Uptime":
-			s.Uptime = val
-		case "Access Level":
-			s.AccessLevel = val
-		case "Hidden from listing":
-			s.HiddenFromListing = parseHeadlessBool(val)
-		case "Mobile Friendly":
-			s.MobileFriendly = parseHeadlessBool(val)
-		case "Description":
-			s.Description = val
-		case "Tags":
-			s.Tags = splitCommaList(val)
-		case "Users":
-			s.Users = splitCommaList(val)
-		case "ResoniteLink":
-			s.ResoniteLink = val
-		default:
+		if seen[key] {
+			continue // first-value-wins
+		}
+		switch {
+		case assignStatusField(&s, key, val):
+			seen[key] = true
+			started = true
+		case started:
+			// ブロック内に現れた未知 Key = Resonite の真の新項目候補
+			seen[key] = true
 			warnUnknownStatusKey(key)
+		default:
+			// ブロック開始前の未知 Key = ambient → 黙って読み飛ばす（警告しない）
 		}
 	}
 	return s
+}
+
+// assignStatusField は既知 Status Key なら s に値を書いて true、未知 Key なら false を返す。
+// 既知 Key 一覧の唯一の定義箇所（ParseStatus の起点判定もこの真偽値に従う）。
+func assignStatusField(s *WorldStatus, key, val string) bool {
+	switch key {
+	case "Name":
+		s.Name = val
+	case "SessionID":
+		s.SessionID = val
+	case "Current Users":
+		s.CurrentUsers, _ = strconv.Atoi(val)
+	case "Present Users":
+		s.PresentUsers, _ = strconv.Atoi(val)
+	case "Max Users":
+		s.MaxUsers, _ = strconv.Atoi(val)
+	case "Uptime":
+		s.Uptime = val
+	case "Access Level":
+		s.AccessLevel = val
+	case "Hidden from listing":
+		s.HiddenFromListing = parseHeadlessBool(val)
+	case "Mobile Friendly":
+		s.MobileFriendly = parseHeadlessBool(val)
+	case "Description":
+		s.Description = val
+	case "Tags":
+		s.Tags = splitCommaList(val)
+	case "Users":
+		s.Users = splitCommaList(val)
+	case "ResoniteLink":
+		s.ResoniteLink = val
+	default:
+		return false
+	}
+	return true
+}
+
+// isIndentedLine は行頭が空白/TAB かを返す。ambient ダンプの子項目（"\tUserSessionId: ..."）は
+// インデントされ、本物の status 行は常に非インデントなので、これで両者を分離する。
+func isIndentedLine(line string) bool {
+	return len(line) > 0 && (line[0] == ' ' || line[0] == '\t')
 }
 
 // ParseUsers は users コマンドの応答行から UserInfo 一覧を構築する。
