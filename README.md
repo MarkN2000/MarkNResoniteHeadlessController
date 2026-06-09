@@ -35,6 +35,8 @@ MRHC を使うには、次の準備が必要です。
 
 起動したら、ブラウザで `http://localhost:8080`（既定）を開くと Web UI が使えます。
 
+> **ウィンドウを閉じると MRHC も終了します。** `mrhc.exe` を実行したコンソールウィンドウを閉じる（または PC をログオフ・シャットダウンする）と、MRHC も止まります。動かしている間はウィンドウを開いたままにしてください。ログオフ後や PC 起動時にも常駐させたい場合は、Windows の「タスク スケジューラ」でログオン時に起動するよう登録するなどの方法があります。
+>
 > **SmartScreen の警告について** — 未署名のため、初回実行時に「Windows によって PC が保護されました」と表示されることがあります。「詳細情報」→「実行」で起動できます。
 >
 > **データの置き場所** — 設定・状態・ダウンロードした Resonite 本体は、すべて `mrhc.exe` と同じフォルダ内にまとまっています。バックアップはこのフォルダごとコピーしてください（前述のとおり、起動後の移動・改名は避けてください）。
@@ -58,6 +60,8 @@ cd mrhc-linux-amd64   # ARM では mrhc-linux-arm64
 
 初回はセットアップウィザード（日本語／英語）が起動します。管理パスワード・ポートを設定すると Resonite 本体のダウンロードが始まります（時間がかかります。「今すぐサーバーを起動しますか?」と表示されるまでお待ちください）。完了するとそのままサーバーが立ち上がり、ブラウザで `http://<サーバーの IP>:8080`（既定）から Web UI が使えます。
 
+> **ターミナル（ウィンドウ）を閉じると MRHC も終了します。** とくに SSH 越しに運用する場合、`./mrhc` をそのまま起動しただけだと、SSH を切った瞬間にプロセスごと止まります。閉じても動かし続けたい場合は、[VPS（Oracle Cloud 等）](#install-vps)節の「**プロセスを常駐させる**」（tmux ／ systemd）を参照してください（VPS でなくても同じ手順が使えます）。
+
 .NET ランタイムや DepotDownloader は MRHC が自動で取得するため、ファイアウォール以外に事前準備は基本的に不要です（freetype2 など依存が不足している場合は、セットアップ時に導入の案内があります）。
 
 > **データの置き場所** — 設定・状態・Resonite 本体は、すべて `mrhc` と同じフォルダ内にまとまっています（別の場所に置きたい場合は `-data <dir>` で指定できます）。起動後はフォルダを移動・改名しないでください。手動で展開したい場合は、[最新リリース](https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest)の `mrhc-linux-amd64.tar.gz` ／ `mrhc-linux-arm64.tar.gz` を好きな場所に展開してください（実行権を保持しているため `chmod +x` は不要です）。
@@ -73,7 +77,7 @@ cd mrhc-linux-amd64   # ARM では mrhc-linux-arm64
 
 > ⚠️ **重要: Web UI は LAN 内からしか開けません。** VPS 上で動かす場合、インターネットから直接アクセスすることはできません。**SSH トンネル** または **Tailscale などの VPN** で「同じネットワークにいる」状態を作ってからアクセスします。Web UI は平文 HTTP のため、ポートを直接インターネットに公開しないでください（管理パスワードが平文で流れてしまいます）。
 
-**おすすめ構成（本節はこれを前提に説明します）**
+**構成（本節はこれを前提に説明します）**
 
 - Oracle Cloud の **Ampere A1（ARM）** インスタンス
 - OS は **Ubuntu**
@@ -82,10 +86,58 @@ cd mrhc-linux-amd64   # ARM では mrhc-linux-arm64
 
 ```sh
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
-cd mrhc-linux-arm64 && ./mrhc
 ```
 
-**2. Web UI にアクセスする**（次のどちらかの方法で「同じネットワークにいる」状態を作ります）
+**2. 起動する（SSH を閉じても止めないために tmux の中で）**
+
+`./mrhc` をそのまま実行すると、**SSH を閉じた（ターミナルを閉じた）瞬間に MRHC も終了**してしまいます。`tmux` の中で起動すれば、SSH を切っても動き続けます。初回のセットアップウィザードも tmux の中なら対話で進められるので、初回起動にも便利です。
+
+```sh
+sudo apt install -y tmux       # 入っていなければ
+tmux new -s mrhc               # mrhc というセッションを作る
+cd mrhc-linux-arm64 && ./mrhc  # この中で起動（初回はウィザード）
+```
+
+起動できたら **`Ctrl + B` を押してから `D`** を押すと、セッションから「デタッチ（切り離し）」されます。この状態で SSH を閉じても MRHC は tmux の中で動き続けます。再びログを見たいときは `tmux attach -t mrhc` で戻れます（`screen` 派の方は `screen -S mrhc` でも同様です）。
+
+> tmux はお手軽ですが、**サーバー（VM）自体を再起動すると生き残りません**。OS の再起動後も自動で立ち上げたい・MRHC が落ちたときに自動で復帰させたい場合は、次の systemd をご利用ください。
+
+**（＋α・任意）再起動後も自動で起動する — systemd サービス化**
+
+長期運用するなら systemd に登録しておくと、VM の再起動後も自動で起動し、MRHC が落ちても自動で復帰します。**先に上記の tmux 等でセットアップウィザードを一度完了**させ（`mrhc.config.json` が作られます）、その tmux 内の MRHC は `Ctrl + C` で止めてから設定します。
+
+`/etc/systemd/system/mrhc.service` を作成します（パスとユーザー名は環境に合わせてください）。
+
+```ini
+[Unit]
+Description=MarkN Resonite Headless Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/mrhc-linux-arm64
+ExecStart=/home/ubuntu/mrhc-linux-arm64/mrhc
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=200
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now mrhc   # 今すぐ起動＋次回ブート時も自動起動
+journalctl -u mrhc -f              # ログを見る
+```
+
+- **`TimeoutStopSec=200` は省略しないでください。** MRHC は停止時にワールドを安全に閉じるため最大 185 秒待ちます。ここが短いと停止の途中で強制終了され、Resonite ヘッドレスが取り残されることがあります。
+- **root では実行しないでください。** 自己更新（Web UI ／ `mrhc update`）が実行ファイルの隣に書き込むため、`User=` には mrhc フォルダの所有者（この例では `ubuntu`）を指定します。
+- Web UI の「今すぐ再起動する」（更新の適用後など）は systemd 管理下でもそのまま機能します（同じプロセスを置き換える方式のため、systemd は終了とは見なしません）。
+
+**3. Web UI にアクセスする**（次のどちらかの方法で「同じネットワークにいる」状態を作ります）
 
 **方法 A: SSH トンネル**（追加インストール不要・ポート開放も不要）
 
@@ -112,7 +164,7 @@ VPS と手元の端末を同じ Tailscale ネットワーク（tailnet）に入�
 2. 手元の PC ／ スマホにも [Tailscale](https://tailscale.com/download) を入れ、同じアカウントでログインします。
 3. VPS の Tailscale IP を確認し（VPS で `tailscale ip -4`）、手元のブラウザで `http://<その IP>:8080` を開きます。
 
-**3.（任意）セッションへの直接参加を速くする — UDP ポートの開放**
+**4.（任意）セッションへの直接参加を速くする — UDP ポートの開放**
 
 ポートを開けなくても、Resonite のリレー経由で他ユーザーはセッションに参加できます（その分だけ遅延が増えます）。直接接続で遅延を抑えたい場合のみ設定してください。クラウド VM のファイアウォールは **2 層**（クラウド側のセキュリティルール ＋ VM 内）あり、両方で開放が必要です。
 

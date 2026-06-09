@@ -34,6 +34,8 @@ Choose your environment: [Windows](#install-windows) / [Linux (x64 / ARM)](#inst
 
 Once it's running, open `http://localhost:8080` (default) in your browser to use the web UI.
 
+> **Closing the window stops MRHC too.** Closing the console window where you ran `mrhc.exe` (or signing out / shutting down the PC) stops MRHC. Keep the window open while it's running. If you want it to keep running after sign-out or to start at boot, you can register it with Windows "Task Scheduler" to launch at logon, for example.
+>
 > **About the SmartScreen warning** — Because the binary is unsigned, you may see "Windows protected your PC" on first run. Click "More info" → "Run anyway" to start it.
 >
 > **Where data is stored** — Settings, state, and the downloaded Resonite are all kept inside the same folder as `mrhc.exe`. To back up, copy the whole folder (as noted above, avoid moving/renaming it after launch).
@@ -56,6 +58,8 @@ cd mrhc-linux-amd64   # mrhc-linux-arm64 on ARM
 ```
 
 On first launch, a setup wizard (Japanese/English) starts. After you set the admin password and port, Resonite begins downloading (it takes a while — wait until you see "Start the server now?"). When it finishes, the server comes up and you can use the web UI at `http://<server IP>:8080` (default).
+
+> **Closing the terminal (window) stops MRHC too.** Especially when operating over SSH, if you just launch `./mrhc`, the whole process stops the moment you disconnect SSH. To keep it running after you close the window, see "**Keep the process running**" (tmux / systemd) in the [VPS (Oracle Cloud, etc.)](#install-vps) section — the same steps work even if you're not on a VPS.
 
 The .NET runtime and DepotDownloader are fetched automatically by MRHC, so aside from the firewall there's basically nothing to prepare in advance (if a dependency such as freetype2 is missing, you'll be guided to install it during setup).
 
@@ -81,10 +85,58 @@ The .NET runtime and DepotDownloader are fetched automatically by MRHC, so aside
 
 ```sh
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
-cd mrhc-linux-arm64 && ./mrhc
 ```
 
-**2. Access the web UI** (use either method to create a "same network" state)
+**2. Start it (inside tmux, so it keeps running after you close SSH)**
+
+If you just run `./mrhc`, **MRHC stops the moment you close SSH (close the terminal).** Starting it inside `tmux` keeps it running even after you disconnect. The first-run setup wizard works interactively inside tmux too, so it's handy for the initial launch as well.
+
+```sh
+sudo apt install -y tmux       # if not already installed
+tmux new -s mrhc               # create a session named mrhc
+cd mrhc-linux-arm64 && ./mrhc  # start it here (the wizard runs on first launch)
+```
+
+Once it's up, press **`Ctrl + B`, then `D`** to "detach" from the session. MRHC keeps running inside tmux even after you close SSH. To see the logs again, run `tmux attach -t mrhc` (if you prefer `screen`, `screen -S mrhc` works the same way).
+
+> tmux is easy, but **it does not survive a reboot of the server (VM) itself.** If you want MRHC to start automatically after the OS reboots, or to recover automatically when it crashes, use systemd below.
+
+**(+α, optional) Start automatically after a reboot — run it as a systemd service**
+
+For long-term operation, registering it with systemd makes MRHC start automatically after a VM reboot and recover automatically if it goes down. **First complete the setup wizard once via tmux** (etc.) above so `mrhc.config.json` is created, stop that MRHC inside tmux with `Ctrl + C`, and then configure the following.
+
+Create `/etc/systemd/system/mrhc.service` (adjust the paths and user name to your environment):
+
+```ini
+[Unit]
+Description=MarkN Resonite Headless Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/mrhc-linux-arm64
+ExecStart=/home/ubuntu/mrhc-linux-arm64/mrhc
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=200
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now mrhc   # start now + start automatically on next boot
+journalctl -u mrhc -f              # view the logs
+```
+
+- **Don't omit `TimeoutStopSec=200`.** MRHC waits up to 185 seconds to close worlds safely when stopping. If this is too short, it gets force-killed mid-stop and the Resonite headless can be left orphaned.
+- **Don't run it as root.** Because self-update (web UI / `mrhc update`) writes next to the executable, set `User=` to the owner of the mrhc folder (`ubuntu` in this example).
+- The web UI's "Restart now" (e.g. after applying an update) works under systemd too (it replaces the same process, so systemd doesn't treat it as an exit).
+
+**3. Access the web UI** (use either method to create a "same network" state)
 
 **Option A: SSH tunnel** (no extra install, no port opening needed)
 
@@ -111,7 +163,7 @@ Putting the VPS and your local device on the same Tailscale network (tailnet) ma
 2. Install [Tailscale](https://tailscale.com/download) on your local PC/phone too and log in with the same account.
 3. Check the VPS's Tailscale IP (run `tailscale ip -4` on the VPS) and open `http://<that IP>:8080` in your local browser.
 
-**3. (Optional) Speed up direct session joins — open a UDP port**
+**4. (Optional) Speed up direct session joins — open a UDP port**
 
 Even without opening a port, others can join your session through Resonite's relay (with extra latency). Only set this up if you want lower latency via a direct connection. A cloud VM's firewall has **two layers** (the cloud-side security rule + the VM's own), and both must be opened.
 
@@ -132,7 +184,7 @@ Even without opening a port, others can join your session through Resonite's rel
 
 MRHC keeps itself up to date with its built-in self-update.
 
-- **From the web UI** — When a new version is available, a red dot appears on the ⋮ at the top right. ⋮ → "Check for updates" → "Update" downloads, verifies, and swaps it in automatically, and you're on the new version **from the next time you restart MRHC** (the swap itself doesn't affect running worlds). Then press "Shut down now" to stop the worlds one by one and exit MRHC — just start it again afterward.
+- **From the web UI** — When a new version is available, a red dot appears on the ⋮ at the top right. ⋮ → "Check for updates" → "Update" downloads (with a progress bar), verifies, and swaps it in automatically, and you're on the new version **from the next time you restart MRHC** (the swap itself doesn't affect running worlds). Then press "Restart now" to stop the worlds one by one, after which MRHC relaunches itself on the new version and the screen reconnects automatically (this can take a few minutes if stopping is slow).
 - **From the command line** — `./mrhc update` (Windows: `mrhc.exe update`). This also serves as a recovery method when MRHC won't start.
 
 > To update manually, stop MRHC and re-run install.sh (Linux), or extract the zip over the same location (Windows). Settings and data aren't included in the archive, so they're preserved either way.
