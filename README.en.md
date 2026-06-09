@@ -81,11 +81,13 @@ The .NET runtime and DepotDownloader are fetched automatically by MRHC, so aside
 - An Oracle Cloud **Ampere A1 (ARM)** instance
 - OS: **Ubuntu**
 
-**1. Install** (same as Linux ARM) — Log in over SSH and run this where you want it.
+**1. Install** (same as Linux ARM) — Log in over SSH and run the following. **If you have no particular preference, just run it where you land after logging in (your home directory)** (it extracts into the current directory, so only `cd` somewhere first if you want it elsewhere).
 
 ```sh
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
+
+> **Don't use `sudo`.** Extracting as root makes the folder owned by root, so MRHC's self-update can't write next to the executable and will fail. Run it as your login user (`ubuntu` on Oracle's Ubuntu).
 
 **2. Start it (inside tmux, so it keeps running after you close SSH)**
 

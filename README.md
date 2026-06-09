@@ -5,7 +5,7 @@
 ![MRHC の操作画面](docs/images/screenshot.webp)
 
 Resonite のヘッドレスサーバーを、LAN 内のブラウザから操作・管理するツールです。
->旧バージョンを使い続けたい方はresleseの v1.~ をお使いください<br>旧バージョン(v1.~)から乗り換える場合は、互換性が無いのでmrhcフォルダを丸ごと削除してください。使用していたResonite本体やsteamも新バージョンでは必要ないのでアンインストールしてしまって構いません。
+>旧バージョンを使い続けたい方はresleseの v1.~ をお使いください<br>旧バージョン(v1.~)から乗り換える場合は、互換性が無いのでmrhcフォルダを丸ごと削除してください(競合はしないので放置でも構いません)。使用していたResonite本体やsteamも新バージョンでは必要ないのでアンインストールしてしまって構いません。
 
 **対応プラットフォーム:** Windows (x64) ／ Linux (x64) ／ Linux (ARM)
 
@@ -82,11 +82,13 @@ cd mrhc-linux-amd64   # ARM では mrhc-linux-arm64
 - Oracle Cloud の **Ampere A1（ARM）** インスタンス
 - OS は **Ubuntu**
 
-**1. 導入**（Linux ARM と同じ） — SSH でログインし、置きたい場所で次を実行します。
+**1. 導入**（Linux ARM と同じ） — SSH でログインし、次を実行します。**特にこだわりがなければ、ログイン直後の場所（ホーム）のまま実行して構いません**（展開先はカレントディレクトリなので、別の場所に置きたいときだけ先に `cd` してください）。
 
 ```sh
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
+
+> **`sudo` は付けないでください。** root で展開するとフォルダの所有者が root になり、MRHC の自己更新が実行ファイルの隣に書き込めず失敗します。ログインユーザー（Oracle の Ubuntu なら `ubuntu`）のまま実行してください。
 
 **2. 起動する（SSH を閉じても止めないために tmux の中で）**
 
@@ -102,7 +104,7 @@ cd mrhc-linux-arm64 && ./mrhc  # この中で起動（初回はウィザード�
 
 > tmux はお手軽ですが、**サーバー（VM）自体を再起動すると生き残りません**。OS の再起動後も自動で立ち上げたい・MRHC が落ちたときに自動で復帰させたい場合は、次の systemd をご利用ください。
 
-**（＋α・任意）再起動後も自動で起動する — systemd サービス化**
+**再起動後も自動で起動する（任意） — systemd サービス化**
 
 長期運用するなら systemd に登録しておくと、VM の再起動後も自動で起動し、MRHC が落ちても自動で復帰します。**先に上記の tmux 等でセットアップウィザードを一度完了**させ（`mrhc.config.json` が作られます）、その tmux 内の MRHC は `Ctrl + C` で止めてから設定します。
 
