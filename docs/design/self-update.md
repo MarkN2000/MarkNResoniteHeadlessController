@@ -96,10 +96,20 @@ atomic rename の前提）。手順:
 - **POST /api/v1/restart**: 応答を返してから main へ再起動依頼（チャネル）→ Ctrl+C と同じ
   graceful 経路（ヘッドレス停止を最大 185s 待つ→HTTP shutdown）を経た**後**、`relaunch()` で
   新バイナリを起動し直す（Unix=`syscall.Exec`／Windows=新プロセス起動＋本プロセス終了）。
-  UI は依頼成功で全画面を再起動中画面（RestartingScreen）に差し替え＝Shell unmount で停止中の
-  SSE 再接続エラーループを残さない。同画面は `/status` をポーリングし、応答が返り次第 reload。
+  - **要注意（落とし穴）**: `relaunch` に渡す exe パスは**起動時（swap 前）に捕捉**すること。
+    swap は実行中 exe を `<exe>.old` へリネームするため、swap 後に `os.Executable()`
+    （Linux=`/proc/self/exe`）を呼ぶと `.old`（旧版）を指し、**旧版を再起動してしまう**。
+    main は runServer 冒頭で `selfExe` を捕捉して relaunch に渡す。
+  - UI は依頼成功で全画面を再起動中画面（RestartingScreen）に差し替え＝Shell unmount で停止中の
+    SSE 再接続エラーループを残さない。
+  - **新プロセス検出**: 再起動要求後も旧 HTTP サーバーはヘッドレス停止中（最大 185s）応答し続ける
+    ため「応答あり＝復帰」では旧サーバーへ誤って戻る。プロセス毎の **boot 識別子**（無認証
+    `GET /api/v1/ping` が `{boot}` を返す・乱数）を使い、再起動直前に捕捉した boot から変化したら
+    新プロセスとみなして reload する（タイミング非依存）。boot は再起動を投げる直前
+    （旧プロセスが確実に生きている時点）に UpdateModal で捕捉して RestartingScreen へ渡す。
 - 停止が重いワールドで遅いと、再起動完了（UI 復帰）まで最大数分かかりうる（停止モードは
-  graceful 維持の裁定）。Ctrl+C/SIGTERM での終了は従来どおり「ただ終了」（re-exec しない）。
+  graceful 維持の裁定）。再起動後はセッション（メモリ）が切れるため再ログインになる（許容）。
+  Ctrl+C/SIGTERM での終了は従来どおり「ただ終了」（re-exec しない）。再起動中の Ctrl+C は中断。
 
 ## 5. API / CLI / UI
 
@@ -118,6 +128,8 @@ atomic rename の前提）。手順:
   http.Flusher 非対応の writer では従来の同期 JSON（`{staged}`／エラーは HTTP ステータス）へ
   フォールバック。フロントは fetch + ReadableStream で読む（EventSource は POST 不可）。
 - `POST /api/v1/restart`（requireAuth）→ `{accepted}`。§4 参照。
+- `GET /api/v1/ping`（**無認証**）→ `{boot}`。プロセス毎の乱数のみ公開（情報漏えいなし）。
+  再起動中画面の新プロセス検出専用。§4 参照。
 - CLI `mrhc update`: **ウィザード分岐より前**に dispatch（新規環境でウィザードを起動させない）・
   config 不要（言語は config があれば LangOrDefault・無ければ OS 検出）。進捗 SSE は Web 専用で
   CLI は従来どおり（`Apply` を progress=nil で呼ぶ）。
@@ -142,7 +154,7 @@ atomic rename の前提）。手順:
 - 単体（internal/selfupdate）: タグ抽出/semver/404/不正リダイレクト・SHA 改竄・symlink 拒否・
   別アーキ/非バイナリ拒否・ロック（busy/stale）・.old 削除不可の一意名退避・掃除の自己ガード等。
 - HTTP 層（internal/server/update_test.go）: errCode マップ（SSE `update-error`）・staged の
-  SSE `update-result`・check の TTL キャッシュ・restart コールバック・401。
+  SSE `update-result`・check の TTL キャッシュ・restart コールバック・`/ping` 無認証＋boot・401。
 - E2E: **`MRHC_UPDATE_BASE`**（main で読んで注入。selfupdate 内では env を読まない）を
   ローカルの偽 GitHub サーバー（`/releases/latest` 302 ＋ `/releases/download/<tag>/` 配信）に
   向け、実バイナリ v0.0.1→v0.0.2 で実施。2026-06-07 Windows 実機で CLI・Web UI とも全段階合格

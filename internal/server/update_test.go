@@ -224,6 +224,26 @@ func TestRestartRequest(t *testing.T) {
 	}
 }
 
+// /ping は無認証で応答し boot（プロセス識別子）を返す（再起動後の新プロセス検出用）。
+func TestPingUnauthenticated(t *testing.T) {
+	ts, _, _, _ := newSteamServer(t)
+	resp, err := http.Get(ts.URL + "/api/v1/ping")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d, want 200（無認証で応答）", resp.StatusCode)
+	}
+	var env okEnv[map[string]string]
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Data["boot"] == "" {
+		t.Error("boot が空")
+	}
+}
+
 func TestUpdateRequiresAuth(t *testing.T) {
 	ts, _, _, _ := newSteamServer(t)
 	for _, ep := range []struct{ method, path string }{

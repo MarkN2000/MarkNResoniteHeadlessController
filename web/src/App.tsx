@@ -27,7 +27,8 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   // 自己更新の「今すぐ再起動」後の画面（再起動中）。Shell ごと差し替えて SSE 購読等を unmount し、
   // 専用画面側でサーバー復帰を制御ポーリングする（停止中の SSE 再接続エラーループを残さない）。
-  const [restartInfo, setRestartInfo] = useState<UpdateInfo | null>(null);
+  // oldBoot は再起動を投げる直前に捕捉した旧プロセスの boot（新プロセス検出の基準）。
+  const [restart, setRestart] = useState<{ info: UpdateInfo; oldBoot: string | null } | null>(null);
 
   // 初回: 既存 Cookie セッションを確認
   useEffect(() => {
@@ -42,11 +43,19 @@ export default function App() {
     );
   }
   if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
-  if (restartInfo) return <RestartingScreen info={restartInfo} />;
-  return <Shell onLogout={() => setAuthed(false)} onRestarting={setRestartInfo} />;
+  if (restart) return <RestartingScreen info={restart.info} oldBoot={restart.oldBoot} />;
+  return (
+    <Shell onLogout={() => setAuthed(false)} onRestarting={(info, oldBoot) => setRestart({ info, oldBoot })} />
+  );
 }
 
-function Shell({ onLogout, onRestarting }: { onLogout: () => void; onRestarting: (info: UpdateInfo) => void }) {
+function Shell({
+  onLogout,
+  onRestarting,
+}: {
+  onLogout: () => void;
+  onRestarting: (info: UpdateInfo, oldBoot: string | null) => void;
+}) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);

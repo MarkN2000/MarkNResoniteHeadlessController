@@ -6,6 +6,8 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,6 +39,7 @@ type Server struct {
 	cfgPath   string
 	dataDir   string // cfgPath のディレクトリ（runtime-state / .run / 既定configDir の基点）
 	configDir string // headless config 格納ディレクトリ（解決済み）
+	bootID    string // プロセス起動毎の乱数。/ping で公開し、再起動後の新プロセス検出に使う
 	driver    *headless.Driver
 	worlds    headless.WorldsService
 	auth      *authManager
@@ -124,6 +127,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		cfgPath:   cfgPath,
 		dataDir:   dataDir,
 		configDir: cfg.HeadlessConfigDirOrDefault(dataDir),
+		bootID:    randomBootID(),
 		driver:    driver,
 		worlds:    headless.NewWorldsService(driver),
 		webFS:     webFS,
@@ -176,6 +180,7 @@ func (s *Server) Handler() http.Handler {
 
 	// 既存（プロセスライフサイクル・raw コマンド・SSE）
 	mux.HandleFunc("POST /api/v1/login", s.handleLogin)
+	mux.HandleFunc("GET /api/v1/ping", s.handlePing) // 無認証: 生存確認＋boot 識別（再起動後の新プロセス検出）
 	mux.HandleFunc("POST /api/v1/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/v1/status", s.requireAuth(s.handleStatus))
 	mux.HandleFunc("POST /api/v1/start", s.requireAuth(s.handleStart))                // 状態変更=POST限定
@@ -344,6 +349,23 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, s.driver.Status())
+}
+
+// handlePing: GET /api/v1/ping（無認証）→ {boot}
+// boot はプロセス起動毎の乱数。再起動中の Web UI が「応答が返る＝復帰」と誤判定しないために使う
+// （再起動要求後も旧プロセスはヘッドレス停止中ずっと応答するため、boot の変化で新プロセスを判定する）。
+// 公開するのは無意味な乱数のみ（情報漏えいなし）。
+func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	writeOK(w, map[string]any{"boot": s.bootID})
+}
+
+// randomBootID はプロセス識別用の短い乱数 hex を返す（生成失敗時も衝突しにくい時刻フォールバック）。
+func randomBootID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("t%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {

@@ -23,7 +23,7 @@ export function UpdateModal({
   onClose: () => void;
   info: UpdateInfo | null;
   onInfoChange: (i: UpdateInfo | null) => void;
-  onRestarting: (info: UpdateInfo) => void;
+  onRestarting: (info: UpdateInfo, oldBoot: string | null) => void;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
@@ -95,10 +95,13 @@ export function UpdateModal({
   async function restartNow() {
     setRestarting(true);
     setError(null);
+    // 旧プロセスの boot を再起動要求の前に捕捉（この時点でサーバーは確実に生きている）。
+    // 再起動中画面はこの boot からの変化で新プロセスを検出する。
+    const oldBoot = await api.fetchBootID();
     const r = await api.restartApp();
     // info はボタンが staged 分岐（info 非 null）でしか描画されないため成功時は常にある。
     if (r.ok && info) {
-      onRestarting(info); // App 全体を再起動中画面へ（サーバーは停止→新バイナリ起動。専用画面が復帰を待つ）
+      onRestarting(info, oldBoot); // App 全体を再起動中画面へ（サーバーは停止→新バイナリ起動）
       return;
     }
     setRestarting(false);

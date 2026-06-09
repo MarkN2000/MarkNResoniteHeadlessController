@@ -384,14 +384,18 @@ export function restartApp(): Promise<WriteResult> {
   return write("POST", "/restart");
 }
 
-// サーバーが応答可能か（再起動からの復帰検出用）。HTTP 応答が返れば true（401 等のステータスも
-// 「起動している」とみなす＝復帰検出には十分）、通信不通なら false。
-export async function pingAlive(): Promise<boolean> {
+// 無認証 /ping から boot 識別子を取得する（再起動後の新プロセス検出用）。サーバーが応答すれば
+// boot 文字列、通信不通・異常応答なら null。再起動要求後も旧プロセスはヘッドレス停止中ずっと応答
+// するため、生存ではなく boot の変化で「新プロセスが起動した」を判定する。
+export async function fetchBootID(): Promise<string | null> {
   try {
-    await fetch(API + "/status", { credentials: "include", cache: "no-store" });
-    return true;
+    const res = await fetch(API + "/ping", { cache: "no-store" });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const boot = j?.data?.boot;
+    return typeof boot === "string" ? boot : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

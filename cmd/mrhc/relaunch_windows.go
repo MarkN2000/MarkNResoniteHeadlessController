@@ -8,17 +8,16 @@ import (
 	"syscall"
 )
 
-// relaunch は新バイナリで自分自身を起動し直す（Windows）。
+// relaunch は exePath（自己更新の swap 済み＝新版が載った元の設置パス）で自分自身を起動し直す（Windows）。
 // Windows には exec 置換が無いため、新バイナリを子プロセスとして起動し、本プロセスは終了する。
 // 呼び出し元は事前に HTTP リスナーを閉じ・ヘッドレスを停止しているため、ポートは解放済み。
 // CREATE_NEW_PROCESS_GROUP で、親終了時の Ctrl+C 等が子へ伝播しないようにする。
 // 標準入出力は引き継ぎ、ログ出力を同じコンソールへ継続させる（コンソールが残る運用を想定）。
-func relaunch() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(exe, os.Args[1:]...)
+//
+// exePath は起動時（swap 前）に捕捉した元名のパスを渡すこと。os.Executable() を swap 後に
+// 呼ぶと <exe>.old（旧版）を指すため、ここで取り直してはならない。
+func relaunch(exePath string, args []string) error {
+	cmd := exec.Command(exePath, args...)
 	cmd.Env = os.Environ()
 	if wd, err := os.Getwd(); err == nil {
 		cmd.Dir = wd
