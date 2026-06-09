@@ -622,7 +622,7 @@ export const steamCancel = () => post("/steam/cancel");
 // 受信タグは全テンプレ共通（v1 restartManager の固定値）＝下の ANNOUNCE_COMMON_TAG。
 export const ANNOUNCE_TEMPLATES = [
   { label: "とらぞセッション閉店アナウンス", url: "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4" },
-  { label: "テキスト読み上げ", url: "resrec:///U-MarkN/R-47c7c916-1e47-470d-abae-9e7c22315743" },
+  { label: "テキスト読み上げループ", url: "resrec:///U-MarkN/R-019ead5f-846d-7ee4-abb3-1db92b61068a" },
 ] as const;
 export const ANNOUNCE_COMMON_TAG = "MRHC.play";
 

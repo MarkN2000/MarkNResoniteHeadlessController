@@ -1,4 +1,5 @@
 // スケジュールタブの表示ヘルパ（純関数）。Phase 8・§3.16。
+import { ANNOUNCE_TEMPLATES, ANNOUNCE_COMMON_TAG } from "../../api";
 import type {
   RestartAnnounce,
   RestartCrashRecovery,
@@ -78,7 +79,8 @@ export function defaultCrashRecovery(): RestartCrashRecovery {
   return { enabled: true, maxCrashes: 3, windowMinutes: 10 };
 }
 export function defaultAnnounce(): RestartAnnounce {
-  return { enabled: false, itemUrl: "", impulseTag: "", message: "まもなく再起動します" };
+  // 告知は既定 OFF だが、ON 時に即使えるよう既定テンプレ（とらぞ閉店アナウンス）＋共通タグを入れる。
+  return { enabled: false, itemUrl: ANNOUNCE_TEMPLATES[0].url, impulseTag: ANNOUNCE_COMMON_TAG, message: "" };
 }
 export function defaultSessionChanges(): RestartSessionChanges {
   return { setPrivate: false, setMaxUsersOne: true, renameEnabled: false, renameTo: "" };

@@ -77,15 +77,23 @@ type CrashRecovery struct {
 }
 
 // DefaultRestart は restart 未設定時の既定値（§3.16）。
-// 告知は既定 OFF（itemUrl/tag はワールド依存で空のため）、セッション変更は maxusers=1 のみ ON、
-// クラッシュ復帰は ON（10分に3回で停止）、待機は静かに58分＋告知後2分（合計60分）。
+// 告知は既定 OFF だが、ON にしたとき即使えるよう itemUrl/tag に既定テンプレ
+// （とらぞ閉店アナウンス＋共通タグ MRHC.play）を入れておく。メッセージは既定で空。
+// セッション変更は maxusers=1 のみ ON、クラッシュ復帰は ON（10分に3回で停止）、
+// 待機は静かに58分＋告知後2分（合計60分）。
 // 予定再起動時の更新は既定 ON（Steam 未設定なら no-op なので安全・P9-B）。
+// itemUrl/tag はフロント web/src/api.ts の ANNOUNCE_TEMPLATES[0] と同期すること。
 func DefaultRestart() Restart {
 	return Restart{
 		Scheduled:   []ScheduledRestart{},
 		WaitControl: WaitControl{QuietWaitMin: 58, AnnounceWaitMin: 2},
 		PreActions: PreActions{
-			Announce:       AnnounceAction{Enabled: false, Message: "まもなく再起動します"},
+			Announce: AnnounceAction{
+				Enabled:    false,
+				ItemURL:    "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4",
+				ImpulseTag: "MRHC.play",
+				Message:    "",
+			},
 			SessionChanges: SessionChanges{SetMaxUsersOne: true},
 		},
 		CrashRecovery:            CrashRecovery{Enabled: true, MaxCrashes: 3, WindowMinutes: 10},
