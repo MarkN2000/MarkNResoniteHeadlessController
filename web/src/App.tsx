@@ -49,6 +49,9 @@ export default function App() {
   );
 }
 
+// タブ非表示が続いたら SSE を切断するまでの猶予。短いタブ切替で切断/再接続を繰り返さないため。
+const SSE_HIDDEN_GRACE_MS = 15000;
+
 function Shell({
   onLogout,
   onRestarting,
@@ -65,7 +68,10 @@ function Shell({
   const [focusedIdx, setFocusedIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("session");
   const [navOpened, setNavOpened] = useState(false);
-  const seenSeq = useRef<Set<number>>(new Set());
+  // SSE ログの重複除去。seq はサーバー側で単調増加（driver.publishLog）なので「見た最大 seq」
+  // 1つだけ覚えれば足りる（Set 全件保持は無制限に増えるため不可）。再接続時の履歴再送（重複 seq）も
+  // これで弾け、取りこぼした新しい行は履歴から復旧できる。
+  const lastSeq = useRef(0); // seq は 1 始まり。0 は安全な番兵
   // 中央 Resonite アカウントの設定状態（初回モーダル + 未設定バナーを駆動）。
   // null=未取得/取得失敗（バナー出さず）。取得成功して username+password が揃えば false。
   const [credUnset, setCredUnset] = useState<boolean | null>(null);
@@ -92,19 +98,49 @@ function Shell({
   }, [status, t]);
 
   // SSE（status + log）をシェル最上位で購読し、トップバーのモードとログを駆動。
+  // タブ非表示中は接続ごと閉じ、受信・JSON解析・再レンダリングを完全停止する（見ていない間の
+  // 無駄処理を止める）。再表示で張り直すと、サーバーが接続直後に現在 status＋直近履歴を再送する
+  // ため画面は即追いつき、lastSeq の重複除去で行は重複しない（logs は表示専用で、取りこぼしても
+  // ディスクの Logs タブに全量が残る）。useVisiblePolling と同じ Page Visibility 連動。
   useEffect(() => {
-    const es = new EventSource("/api/v1/events");
-    es.addEventListener("status", (e) => setStatus(JSON.parse((e as MessageEvent).data) as Status));
-    es.addEventListener("log", (e) => {
-      const line = JSON.parse((e as MessageEvent).data) as LogLine;
-      if (seenSeq.current.has(line.seq)) return;
-      seenSeq.current.add(line.seq);
-      setLogs((prev) => {
-        const next = [...prev, line];
-        return next.length > 1000 ? next.slice(next.length - 1000) : next;
+    let es: EventSource | null = null;
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const connect = () => {
+      if (es) return; // 既に接続中（猶予中に戻ってきた等）
+      es = new EventSource("/api/v1/events");
+      es.addEventListener("status", (e) => setStatus(JSON.parse((e as MessageEvent).data) as Status));
+      es.addEventListener("log", (e) => {
+        const line = JSON.parse((e as MessageEvent).data) as LogLine;
+        if (line.seq <= lastSeq.current) return; // 既読（履歴再送の重複等）は捨てる
+        lastSeq.current = line.seq;
+        setLogs((prev) => {
+          const next = [...prev, line];
+          return next.length > 1000 ? next.slice(next.length - 1000) : next;
+        });
       });
-    });
-    return () => es.close();
+    };
+    const disconnect = () => {
+      es?.close();
+      es = null;
+    };
+    const onVisibility = () => {
+      clearTimeout(closeTimer);
+      if (document.hidden) {
+        closeTimer = setTimeout(disconnect, SSE_HIDDEN_GRACE_MS); // 猶予後に切断
+      } else {
+        connect(); // 再表示で即再接続（現在 status＋履歴を再取得）
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    if (!document.hidden) connect();
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearTimeout(closeTimer);
+      disconnect();
+    };
   }, []);
 
   // 停止中トップバーの config 選択肢。コンフィグタブの CRUD 後にも再取得する（ConfigTab に渡す）。
