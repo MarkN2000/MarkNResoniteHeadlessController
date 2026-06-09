@@ -108,7 +108,8 @@ atomic rename の前提）。手順:
     新プロセスとみなして reload する（タイミング非依存）。boot は再起動を投げる直前
     （旧プロセスが確実に生きている時点）に UpdateModal で捕捉して RestartingScreen へ渡す。
 - 停止が重いワールドで遅いと、再起動完了（UI 復帰）まで最大数分かかりうる（停止モードは
-  graceful 維持の裁定）。再起動後はセッション（メモリ）が切れるため再ログインになる（許容）。
+  graceful 維持の裁定）。セッションは再起動を跨いで維持される（署名鍵が config 永続の
+  SessionSecret＋adminPasswordHash 由来で不変なため・stateless HMAC トークン）＝再ログイン不要。
   Ctrl+C/SIGTERM での終了は従来どおり「ただ終了」（re-exec しない）。再起動中の Ctrl+C は中断。
 
 ## 5. API / CLI / UI
@@ -159,9 +160,14 @@ atomic rename の前提）。手順:
   ローカルの偽 GitHub サーバー（`/releases/latest` 302 ＋ `/releases/download/<tag>/` 配信）に
   向け、実バイナリ v0.0.1→v0.0.2 で実施。2026-06-07 Windows 実機で CLI・Web UI とも全段階合格
   （実行中イメージの rename・graceful exit・起動時ログ・掃除を含む）。
-  **2026-06-09 改修（re-exec／SSE 進捗）は両 OS の実機 E2E 未実施＝要確認**:
-  Windows の `relaunch`（子プロセス起動・コンソール挙動・ポート再bind）と、再起動後の
-  RestartingScreen 自動復帰を Linux/Windows 双方で確認すること。
+  **2026-06-09 改修（re-exec／SSE 進捗）の検証状況**:
+  - **Linux: 実 mrhc で通し E2E 合格**。偽リリースサーバ（MRHC_UPDATE_BASE）に対し
+    check(v1.0.0→v2.0.0)→apply（SSE で update-progress→update-result staged=v2.0.0）→
+    `mrhc`＋`mrhc.old` の 2 段 rename→restart→**再起動後 current=v2.0.0**（syscall.Exec で PID 不変）→
+    `mrhc.old` 掃除→ポート再bind→旧 Cookie でセッション継続、まで確認。
+  - **Windows: 未検証（要確認）**。クロスビルドは通るが、`relaunch`（子プロセス起動・コンソール
+    継承の挙動・親終了後の生存・ポート再bind）と RestartingScreen の自動復帰は実機で確認すること。
+    `.old` は子起動時に親が掴んでいると 1 サイクル残りうる（次回起動の CleanupStale が掃除）。
 
 ## 8. 手動復旧（README にも記載）
 
