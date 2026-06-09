@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Anchor, Button, Group, List, Loader, Modal, Stack, Text } from "@mantine/core";
+import { Anchor, Button, Group, List, Loader, Modal, Progress, Stack, Text } from "@mantine/core";
 import * as api from "../api";
 import type { UpdateInfo } from "../api";
 
@@ -8,7 +8,7 @@ import type { UpdateInfo } from "../api";
 const RELEASES_URL = "https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases";
 
 // 自己更新モーダル（docs/design/self-update.md）。表示は info から導出する:
-//   staged あり        → 適用済み（再起動手順＋「今すぐ終了」）
+//   staged あり        → 適用済み（「今すぐ再起動」＋手動再起動手順）
 //   updateAvailable    → 適用前（アップデートボタン）
 //   currentIsRelease外 → 開発ビルド（適用不可）／それ以外 → 最新です
 // 開くたびに再チェックする（ログイン時のバッジ情報が古い可能性があるため）。
@@ -17,18 +17,19 @@ export function UpdateModal({
   onClose,
   info,
   onInfoChange,
-  onShutdownDone,
+  onRestarting,
 }: {
   opened: boolean;
   onClose: () => void;
   info: UpdateInfo | null;
   onInfoChange: (i: UpdateInfo | null) => void;
-  onShutdownDone: (info: UpdateInfo) => void;
+  onRestarting: (info: UpdateInfo) => void;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [shuttingDown, setShuttingDown] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null); // DL 進捗%（total 不明なら null）
+  const [restarting, setRestarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 最新の info を deps に入れず参照するための ref（deps に入れると onInfoChange→info 変化→
@@ -74,28 +75,34 @@ export function UpdateModal({
 
   async function apply() {
     setApplying(true);
+    setProgress(null);
     setError(null);
-    const r = await api.applyUpdate();
-    setApplying(false);
+    const r = await api.applyUpdate((p) => {
+      setProgress(p.total > 0 ? Math.round((p.downloaded / p.total) * 100) : null);
+    });
     if (r.ok && r.staged) {
-      // 以後の表示（バッジ・メニュー・本モーダル）を「再起動待ち」へ切り替える。
-      onInfoChange(info ? { ...info, staged: r.staged } : info);
+      // 楽観更新で staged を取りこぼさないよう、サーバー権威の状態を取り直して
+      // 表示（バッジ・メニュー・本モーダル）を「再起動待ち」へ切り替える。
+      const fresh = await api.checkUpdate();
+      onInfoChange(fresh ?? (info ? { ...info, staged: r.staged } : null));
     } else {
       setError(applyErrorText(r.code, r.error));
     }
+    setApplying(false);
+    setProgress(null);
   }
 
-  async function shutdownNow() {
-    setShuttingDown(true);
+  async function restartNow() {
+    setRestarting(true);
     setError(null);
-    const r = await api.shutdownApp();
+    const r = await api.restartApp();
     // info はボタンが staged 分岐（info 非 null）でしか描画されないため成功時は常にある。
     if (r.ok && info) {
-      onShutdownDone(info); // App 全体を終了後の静止画面へ（サーバーは停止する＝以後の API は失敗）
+      onRestarting(info); // App 全体を再起動中画面へ（サーバーは停止→新バイナリ起動。専用画面が復帰を待つ）
       return;
     }
-    setShuttingDown(false);
-    setError(t("update.shutdownFailed"));
+    setRestarting(false);
+    setError(t("update.restartFailed"));
   }
 
   const staged = info?.staged;
@@ -126,7 +133,7 @@ export function UpdateModal({
       </Stack>
     );
   } else if (staged) {
-    // 適用済み・再起動待ち: 「今すぐ終了」と手動再起動の手順を1画面で示す。
+    // 適用済み・再起動待ち: 「今すぐ再起動」と手動再起動の手順を1画面で示す。
     body = (
       <Stack gap="sm">
         <Text fw={600}>✅ {t("update.applied", { version: staged })}</Text>
@@ -136,14 +143,14 @@ export function UpdateModal({
             {error}
           </Text>
         )}
-        <Button color="red" autoContrast={false} loading={shuttingDown} onClick={() => void shutdownNow()}>
-          {t("update.shutdownNow")}
+        <Button color="red" autoContrast={false} loading={restarting} onClick={() => void restartNow()}>
+          {t("update.restartNow")}
         </Button>
         <Text size="xs" c="dimmed">
-          {t("update.shutdownNowNote")}
+          {t("update.restartNowNote")}
         </Text>
         <Text size="sm" fw={600} mt="xs">
-          {t("update.shutdownLater")}
+          {t("update.restartLater")}
         </Text>
         <List size="sm" type="ordered" spacing="xs">
           <List.Item>
@@ -198,13 +205,21 @@ export function UpdateModal({
         <Anchor href={RELEASES_URL} target="_blank" rel="noreferrer" size="sm">
           {t("update.releaseNotes")}
         </Anchor>
+        {applying && (
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              {progress !== null ? t("update.downloading", { pct: progress }) : t("update.applying")}
+            </Text>
+            <Progress value={progress ?? 100} animated striped={progress === null} />
+          </Stack>
+        )}
         {error && (
           <Text size="sm" c="red">
             {error}
           </Text>
         )}
         <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>
+          <Button variant="default" onClick={onClose} disabled={applying}>
             {t("update.close")}
           </Button>
           <Button loading={applying} onClick={() => void apply()}>
@@ -227,16 +242,16 @@ export function UpdateModal({
   }
 
   return (
-    // 適用中・終了依頼中は閉じさせない（押した操作の結果を見届けさせる）。
+    // 適用中・再起動依頼中は閉じさせない（押した操作の結果を見届けさせる）。
     // Esc（closeOnEscape は Mantine 既定 true）も同条件で無効化する。
     <Modal
       opened={opened}
       onClose={onClose}
       title={title}
       centered
-      closeOnClickOutside={!applying && !shuttingDown}
-      closeOnEscape={!applying && !shuttingDown}
-      withCloseButton={!applying && !shuttingDown}
+      closeOnClickOutside={!applying && !restarting}
+      closeOnEscape={!applying && !restarting}
+      withCloseButton={!applying && !restarting}
     >
       {body}
     </Modal>

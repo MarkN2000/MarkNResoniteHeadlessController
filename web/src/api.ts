@@ -288,17 +288,111 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
   return getData<UpdateInfo>("/update/check");
 }
 
-// 更新の適用（DL→検証→入れ替えの同期実行・数秒〜十数秒）。成功で staged（次回起動からの版）を返す。
-// 失敗理由は code で出し分ける（up_to_date/update_busy/no_release/not_release_build/
-// exe_dir_not_writable/update_failed・通信不通は network）。
-export async function applyUpdate(): Promise<{ ok: boolean; staged?: string; error?: string; code?: string }> {
-  const r = await write("POST", "/update/apply");
-  return { ok: r.ok, error: r.error, code: r.code, staged: (r.data as { staged?: string } | undefined)?.staged };
+// 本体DLの進捗（downloaded/total バイト。total は不明なら -1）。
+export interface UpdateProgress {
+  downloaded: number;
+  total: number;
 }
 
-// MRHC プロセス自体の終了依頼（自己更新後の「今すぐ終了」）。応答後にサーバーは graceful 終了する。
-export function shutdownApp(): Promise<WriteResult> {
-  return write("POST", "/shutdown");
+export interface ApplyResult {
+  ok: boolean;
+  staged?: string;
+  error?: string;
+  code?: string;
+}
+
+// SSE の1イベント（event 名 + パース済み data）を取り出す。ping 行（":..."）は無視。
+function parseSSEEvent(chunk: string): { event: string; data: unknown } | null {
+  let event = "message";
+  let data = "";
+  for (const line of chunk.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return null;
+  try {
+    return { event, data: JSON.parse(data) };
+  } catch {
+    return null;
+  }
+}
+
+// 更新の適用（DL→検証→入れ替え・数秒〜十数秒）。進捗を SSE でストリーミングし onProgress で通知する。
+// 成功で staged（次回起動からの版）を返す。失敗理由は code で出し分ける（up_to_date/update_busy/
+// no_release/not_release_build/exe_dir_not_writable/update_failed・通信不通は network）。
+// http.Flusher 非対応のフォールバック（従来 JSON 応答）も受理する。
+export async function applyUpdate(onProgress?: (p: UpdateProgress) => void): Promise<ApplyResult> {
+  let res: Response;
+  try {
+    res = await req("/update/apply", { method: "POST" });
+  } catch {
+    return { ok: false, code: "network" };
+  }
+
+  // フォールバック: ストリーミングでない応答は JSON 封筒として読む。
+  if (!(res.headers.get("Content-Type") ?? "").includes("text/event-stream") || !res.body) {
+    if (res.ok) {
+      const j = await res.json().catch(() => null);
+      return { ok: true, staged: (j?.data as { staged?: string } | undefined)?.staged };
+    }
+    let error: string | undefined;
+    let code: string | undefined;
+    try {
+      const j = await res.json();
+      error = j?.error?.message;
+      code = j?.error?.code;
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, error, code };
+  }
+
+  // SSE をストリーム読み。最終イベント（update-result / update-error）で結果が確定する。
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let result: ApplyResult | null = null;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const ev = parseSSEEvent(buf.slice(0, idx));
+        buf = buf.slice(idx + 2);
+        if (!ev) continue;
+        if (ev.event === "update-progress" && onProgress) {
+          onProgress(ev.data as UpdateProgress);
+        } else if (ev.event === "update-result") {
+          result = { ok: true, staged: (ev.data as { staged?: string }).staged };
+        } else if (ev.event === "update-error") {
+          const d = ev.data as { code?: string; message?: string };
+          result = { ok: false, code: d.code, error: d.message };
+        }
+      }
+    }
+  } catch {
+    if (!result) return { ok: false, code: "network" };
+  }
+  return result ?? { ok: false, code: "update_failed" };
+}
+
+// MRHC プロセスの再起動依頼（自己更新後の「今すぐ再起動」）。応答後にサーバーは graceful 終了し、
+// 新バイナリで自分自身を起動し直す。
+export function restartApp(): Promise<WriteResult> {
+  return write("POST", "/restart");
+}
+
+// サーバーが応答可能か（再起動からの復帰検出用）。HTTP 応答が返れば true（401 等のステータスも
+// 「起動している」とみなす＝復帰検出には十分）、通信不通なら false。
+export async function pingAlive(): Promise<boolean> {
+  try {
+    await fetch(API + "/status", { credentials: "include", cache: "no-store" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // --- write 操作（方針A: 成功は {executed:true}・封筒を解いて ok/error を返す）---

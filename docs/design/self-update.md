@@ -2,16 +2,21 @@
 
 > MRHC 自身を GitHub Releases の最新版へ入れ替える機能。設計レビュー（コードベース整合＋
 > 更新メカニズム穴の 2 本・2026-06-07）反映済み・Windows 実機 E2E（CLI / Web UI 全段階）合格。
+> 2026-06-09 改修: Web UI の適用を SSE 進捗ストリーミング化・「今すぐ終了」を **「今すぐ再起動」
+> （re-exec で新バイナリ起動）** へ・check に短期キャッシュ追加（H1/H2/M1/M2）。
 > 関連: `cli-onboarding.md`（CLI 面）・`.github/workflows/release.yml`（配布規約の正本）。
 
-## 0. 方針（ユーザー裁定 2026-06-07）
+## 0. 方針（ユーザー裁定 2026-06-07 / 2026-06-09 改修）
 
 1. 入口は2つ: **Web UI のボタン**（遠隔可・ふだん使い）と **`mrhc update` サブコマンド**
    （config 不要＝起動不能な環境からの復旧経路を兼ねる）。コアは `internal/selfupdate` で共通。
-2. 適用＝**バイナリ差し替えまで**。自動再起動はしない。適用後は
-   「**今すぐ終了する**（確認付き・ワールド graceful 停止込み）／あとで自分で再起動」の2択。
-   再「起動」だけは必ず人間が行う（自動起動のポート引き継ぎ・端末切り離し等の難所を持たない）。
-3. 自動チェックのポーリング・コード署名検証はしない（個人配布ツールの脅威モデルに過剰）。
+2. 適用＝**バイナリ差し替えまで**（稼働中ワールドに無影響）。適用後は
+   「**今すぐ再起動する**（ワールド graceful 停止込み→新バイナリで自分自身を起動し直す）／
+   あとで自分で再起動」の2択。再起動は Unix=`syscall.Exec` の同一プロセス置換、Windows=新プロセス
+   起動＋本プロセス終了で行う（いずれも HTTP リスナーを閉じ・ヘッドレスを停止した後＝ポート解放後）。
+   停止モードは通常停止と同じ graceful（`driver.Stop()` の180秒猶予）を維持する。
+3. 自動チェックのポーリング・自動 apply・コード署名検証はしない（個人配布ツールの脅威モデルに過剰）。
+   apply/再起動はすべてユーザー操作起点（勝手に更新・終了することはない）。
 
 ## 1. 配布前提（release.yml が正本）
 
@@ -72,43 +77,56 @@ atomic rename の前提）。手順:
 | sentinel / 状態 | API errCode | CLI |
 |---|---|---|
 | ErrNoRelease | `no_release` (404) | リリース一覧 URL を案内 |
-| ErrUpToDate | `up_to_date` (409) | 「既に最新です」（正常終了） |
-| ErrBusy | `update_busy` (409) | 完了待ち案内 |
-| ErrNotReleaseBuild | `not_release_build` (409) | 「リリースビルドではない」 |
-| fs.ErrPermission | `exe_dir_not_writable` (500) | sudo chown / root 実行を案内 |
-| その他 | `update_failed` (502) | 生メッセージ |
+| ErrUpToDate | `up_to_date` | 「既に最新です」（正常終了） |
+| ErrBusy | `update_busy` | 完了待ち案内 |
+| ErrNotReleaseBuild | `not_release_build` | 「リリースビルドではない」 |
+| fs.ErrPermission | `exe_dir_not_writable` | sudo chown / root 実行を案内 |
+| その他 | `update_failed` | 生メッセージ |
 
-## 4. staged（適用済み・再起動待ち）と終了
+> apply は SSE 化したため、ストリーミング時のエラーは HTTP ステータスではなく `update-error`
+> イベント（`{code, message}`・HTTP 200）で返す。上表の errCode はその `code` に対応する。
+> 非ストリーミング（http.Flusher 非対応）フォールバック時のみ従来の HTTP ステータス＋JSON 封筒。
+
+## 4. staged（適用済み・再起動待ち）と再起動
 
 - 適用成功＝staged。**サーバープロセス内のみ**の状態（メモリ）。再起動後は実体が追いつくので
   永続化しない。CLI で適用した場合、稼働中サーバーの staged 表示には反映されない（仕様）。
 - staged 中の再適用: latest が staged と同じなら**再DLせず冪等応答**。より新しい latest が
   出ていれば上書き適用（.old が実行中イメージでも §3-7 の一意名退避で成功する）。
-- **POST /api/v1/shutdown**: 応答を返してから main へ終了依頼（チャネル）→ Ctrl+C と同じ
-  graceful 経路（ヘッドレス停止を最大 185s 待つ→HTTP shutdown）。UI は依頼成功で
-  全画面を静止画面（ShutdownScreen）に差し替え＝Shell unmount で SSE 再接続ループを残さない。
-- 副作用: systemd 等の自動再起動付き運用では「終了→新版で自動起動」になる（非公式だが無害）。
+- **POST /api/v1/restart**: 応答を返してから main へ再起動依頼（チャネル）→ Ctrl+C と同じ
+  graceful 経路（ヘッドレス停止を最大 185s 待つ→HTTP shutdown）を経た**後**、`relaunch()` で
+  新バイナリを起動し直す（Unix=`syscall.Exec`／Windows=新プロセス起動＋本プロセス終了）。
+  UI は依頼成功で全画面を再起動中画面（RestartingScreen）に差し替え＝Shell unmount で停止中の
+  SSE 再接続エラーループを残さない。同画面は `/status` をポーリングし、応答が返り次第 reload。
+- 停止が重いワールドで遅いと、再起動完了（UI 復帰）まで最大数分かかりうる（停止モードは
+  graceful 維持の裁定）。Ctrl+C/SIGTERM での終了は従来どおり「ただ終了」（re-exec しない）。
 
 ## 5. API / CLI / UI
 
 - `GET /api/v1/update/check`（requireAuth）→
   `{current, latest, updateAvailable, currentIsRelease, staged?, goos, checkFailed?, checkError?}`。
-  GitHub への問い合わせは呼ばれた時のみ（フロントもポーリングしない）。
+  GitHub への問い合わせは呼ばれた時のみ（フロントもポーリングしない）。結果は**サーバー側で
+  短期キャッシュ**（TTL 10分・表示用途のみ。apply 冪等判定は常に最新を引く・適用成功で破棄）。
   **GitHub 不達でも 200 で返す**: staged/current/goos はローカル情報なので常に有効とし、
   失敗は `checkFailed:true` ＋ `checkError:"<errCode>"` で通知する（エラー応答にすると
-  適用済み＝再起動待ちの表示と「今すぐ終了」導線が UI から消えるため）。フロントも
-  staged 保持中は null（MRHC 自体に不達）で表示を上書きしない。
-- `POST /api/v1/update/apply`（requireAuth）→ `{staged}`。**同期**だが Apply は
-  `context.Background()` で実行＝ブラウザ切断でも中断しない（全体上限は DLClient の
-  Timeout 15min）。応答を取り逃しても check の staged で回収できる。
+  適用済み＝再起動待ちの表示と「今すぐ再起動」導線が UI から消えるため・不達はキャッシュしない）。
+  フロントも staged 保持中は null（MRHC 自体に不達）で表示を上書きしない。
+- `POST /api/v1/update/apply`（requireAuth）→ **SSE ストリーミング**（`text/event-stream`）。
+  イベント: `update-progress`(`{downloaded,total}`) / `update-result`(`{staged}`) /
+  `update-error`(`{code,message}`)。Apply は `context.Background()` で実行＝ブラウザ切断でも
+  中断しない（全体上限は DLClient の Timeout 15min）。応答を取り逃しても check の staged で回収。
+  http.Flusher 非対応の writer では従来の同期 JSON（`{staged}`／エラーは HTTP ステータス）へ
+  フォールバック。フロントは fetch + ReadableStream で読む（EventSource は POST 不可）。
+- `POST /api/v1/restart`（requireAuth）→ `{accepted}`。§4 参照。
 - CLI `mrhc update`: **ウィザード分岐より前**に dispatch（新規環境でウィザードを起動させない）・
-  config 不要（言語は config があれば LangOrDefault・無ければ OS 検出）。
+  config 不要（言語は config があれば LangOrDefault・無ければ OS 検出）。進捗 SSE は Web 専用で
+  CLI は従来どおり（`Apply` を progress=nil で呼ぶ）。
 - UI: ログイン後に**1回だけ**自動チェック → ⋮ に赤丸（Indicator）。メニュー「更新を確認」
   （staged 中は「再起動待ち（vX）」）→ UpdateModal。モーダルは開くたび再チェックし、
-  最新/開発ビルド/更新あり/適用済みの4状態を check 結果から導出。適用済みビューは
-  「今すぐ終了する」＋OS 別（check の goos）の手動再起動手順を1画面で表示。
-  文言の正本は `web/src/locales/{ja,en}.json` の `update.*`/`shutdown.*`・`topbar.checkUpdate`/
-  `topbar.updatePending`、CLI は `internal/i18n/catalog.go` の `main.update.*`。
+  最新/開発ビルド/更新あり/適用済みの4状態を check 結果から導出。適用中は進捗バー表示。
+  適用済みビューは「今すぐ再起動する」＋OS 別（check の goos）の手動再起動手順を1画面で表示。
+  文言の正本は `web/src/locales/{ja,en}.json` の `update.*`/`restarting.*`・`topbar.checkUpdate`/
+  `topbar.updatePending`、CLI は `internal/i18n/catalog.go` の `main.update.*`/`main.restart.*`。
 
 ## 6. 起動時掃除（selfupdate.CleanupStale・runServer 冒頭）
 
@@ -123,11 +141,15 @@ atomic rename の前提）。手順:
 
 - 単体（internal/selfupdate）: タグ抽出/semver/404/不正リダイレクト・SHA 改竄・symlink 拒否・
   別アーキ/非バイナリ拒否・ロック（busy/stale）・.old 削除不可の一意名退避・掃除の自己ガード等。
-- HTTP 層（internal/server/update_test.go）: errCode マップ・staged・shutdown コールバック・401。
+- HTTP 層（internal/server/update_test.go）: errCode マップ（SSE `update-error`）・staged の
+  SSE `update-result`・check の TTL キャッシュ・restart コールバック・401。
 - E2E: **`MRHC_UPDATE_BASE`**（main で読んで注入。selfupdate 内では env を読まない）を
   ローカルの偽 GitHub サーバー（`/releases/latest` 302 ＋ `/releases/download/<tag>/` 配信）に
   向け、実バイナリ v0.0.1→v0.0.2 で実施。2026-06-07 Windows 実機で CLI・Web UI とも全段階合格
-  （実行中イメージの rename・「今すぐ終了」の graceful exit・起動時ログ・掃除を含む）。
+  （実行中イメージの rename・graceful exit・起動時ログ・掃除を含む）。
+  **2026-06-09 改修（re-exec／SSE 進捗）は両 OS の実機 E2E 未実施＝要確認**:
+  Windows の `relaunch`（子プロセス起動・コンソール挙動・ポート再bind）と、再起動後の
+  RestartingScreen 自動復帰を Linux/Windows 双方で確認すること。
 
 ## 8. 手動復旧（README にも記載）
 

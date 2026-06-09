@@ -1,12 +1,14 @@
 ﻿package server
 
 // 自己更新 HTTP 層のテスト。スワップ・抽出の実体は internal/selfupdate の単体で網羅済みのため、
-// ここでは HTTP セマンティクス（応答形・errCode マップ・staged・shutdown 依頼）のみ検証する。
+// ここでは HTTP セマンティクス（応答形・errCode マップ・staged・SSE 進捗・restart 依頼）のみ検証する。
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
@@ -40,20 +42,37 @@ func testUpdater(baseURL, version string) *selfupdate.Updater {
 	}
 }
 
-// assertErrCode は {ok:false, error:{code}} の code を検証する（body は consume される）。
-func assertErrCode(t *testing.T, resp *http.Response, want string) {
+// applySSEResult は apply の SSE 応答を読み、最終の update-result/update-error の
+// イベント名と data(JSON) を返す（body は consume される）。
+func applySSEResult(t *testing.T, resp *http.Response) (event string, data map[string]any) {
 	t.Helper()
-	var env struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/event-stream") {
+		t.Fatalf("Content-Type=%q, want text/event-stream", ct)
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if env.Error.Code != want {
-		t.Errorf("errCode = %q, want %q", env.Error.Code, want)
+	for _, block := range strings.Split(string(body), "\n\n") {
+		var ev, d string
+		for _, line := range strings.Split(block, "\n") {
+			switch {
+			case strings.HasPrefix(line, "event:"):
+				ev = strings.TrimSpace(line[len("event:"):])
+			case strings.HasPrefix(line, "data:"):
+				d += strings.TrimSpace(line[len("data:"):])
+			}
+		}
+		if ev == "update-result" || ev == "update-error" {
+			event = ev
+			data = map[string]any{}
+			_ = json.Unmarshal([]byte(d), &data)
+		}
 	}
+	if event == "" {
+		t.Fatalf("update-result/error イベントが見つかりません: %q", body)
+	}
+	return event, data
 }
 
 func TestUpdateCheck(t *testing.T) {
@@ -114,16 +133,20 @@ func TestUpdateCheckFailedKeepsStaged(t *testing.T) {
 	}
 }
 
+// apply はエラーも SSE（update-error・HTTP 200）で返す（httptest の writer は http.Flusher）。
 func TestUpdateApplyUpToDate(t *testing.T) {
 	ts, pw, _, srv := newSteamServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "v2.0.0").URL, "v2.0.0")) // 最新 == 現行
 
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusConflict {
-		t.Fatalf("status=%d, want 409", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d, want 200（SSE）", resp.StatusCode)
 	}
-	assertErrCode(t, resp, "up_to_date")
+	ev, data := applySSEResult(t, resp)
+	if ev != "update-error" || data["code"] != "up_to_date" {
+		t.Errorf("event/code = %q/%v, want update-error/up_to_date", ev, data["code"])
+	}
 }
 
 func TestUpdateApplyNotReleaseBuild(t *testing.T) {
@@ -132,25 +155,64 @@ func TestUpdateApplyNotReleaseBuild(t *testing.T) {
 
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusConflict {
-		t.Fatalf("status=%d, want 409", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d, want 200（SSE）", resp.StatusCode)
 	}
-	assertErrCode(t, resp, "not_release_build")
+	ev, data := applySSEResult(t, resp)
+	if ev != "update-error" || data["code"] != "not_release_build" {
+		t.Errorf("event/code = %q/%v, want update-error/not_release_build", ev, data["code"])
+	}
 }
 
-func TestShutdownRequest(t *testing.T) {
+// 適用済み（staged==latest）の再 apply は再DLせず update-result を即返す（冪等・SSE）。
+func TestUpdateApplyStagedStreamsResult(t *testing.T) {
+	ts, pw, _, srv := newSteamServer(t)
+	srv.SetUpdater(testUpdater(fakeLatest(t, "v2.1.0").URL, "v2.0.0"))
+	srv.setStagedVersion("v2.1.0")
+
+	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d, want 200", resp.StatusCode)
+	}
+	ev, data := applySSEResult(t, resp)
+	if ev != "update-result" || data["staged"] != "v2.1.0" {
+		t.Errorf("event/staged = %q/%v, want update-result/v2.1.0", ev, data["staged"])
+	}
+}
+
+// check は TTL 内はキャッシュで返す（GitHub を落としても latest を保つ）。
+func TestUpdateCheckCached(t *testing.T) {
+	ts, pw, _, srv := newSteamServer(t)
+	gh := fakeLatest(t, "v2.1.0")
+	srv.SetUpdater(testUpdater(gh.URL, "v2.0.0"))
+
+	var env okEnv[updateCheckResp]
+	if code := authGet(t, ts.URL+"/api/v1/update/check", pw, &env); code != http.StatusOK || !env.Data.UpdateAvailable {
+		t.Fatalf("1回目の check が失敗: code=%d data=%+v", code, env.Data)
+	}
+	gh.Close() // GitHub 不達にしても TTL 内はキャッシュで返るはず
+	if code := authGet(t, ts.URL+"/api/v1/update/check", pw, &env); code != http.StatusOK {
+		t.Fatalf("2回目の check status=%d, want 200", code)
+	}
+	if env.Data.Latest != "v2.1.0" || !env.Data.UpdateAvailable || env.Data.CheckFailed {
+		t.Errorf("キャッシュ応答が想定外: %+v", env.Data)
+	}
+}
+
+func TestRestartRequest(t *testing.T) {
 	ts, pw, _, srv := newSteamServer(t)
 
 	// 未注入（テスト既定）→ 503
-	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/shutdown", pw, "", "")
+	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/restart", pw, "", "")
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("未注入で status=%d, want 503", resp.StatusCode)
 	}
 
 	called := make(chan struct{}, 1)
-	srv.SetShutdownRequest(func() { called <- struct{}{} })
-	resp = authReq(t, http.MethodPost, ts.URL+"/api/v1/shutdown", pw, "", "")
+	srv.SetRestartRequest(func() { called <- struct{}{} })
+	resp = authReq(t, http.MethodPost, ts.URL+"/api/v1/restart", pw, "", "")
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d, want 200", resp.StatusCode)
@@ -158,7 +220,7 @@ func TestShutdownRequest(t *testing.T) {
 	select {
 	case <-called:
 	default:
-		t.Error("終了依頼コールバックが呼ばれていません")
+		t.Error("再起動依頼コールバックが呼ばれていません")
 	}
 }
 
@@ -167,7 +229,7 @@ func TestUpdateRequiresAuth(t *testing.T) {
 	for _, ep := range []struct{ method, path string }{
 		{http.MethodGet, "/api/v1/update/check"},
 		{http.MethodPost, "/api/v1/update/apply"},
-		{http.MethodPost, "/api/v1/shutdown"},
+		{http.MethodPost, "/api/v1/restart"},
 	} {
 		req, _ := http.NewRequest(ep.method, ts.URL+ep.path, nil)
 		resp, err := http.DefaultClient.Do(req)

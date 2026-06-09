@@ -506,13 +506,15 @@
     "available": "{{latest}} is available (current: {{current}})",
     "releaseNotes": "View release notes",
     "apply": "Update",
+    "applying": "Applying...",
+    "downloading": "Downloading {{pct}}%",
     "applied": "Replaced with {{version}}",
     "appliedBody": "The running MRHC is still {{current}}. Restart MRHC to switch to {{version}}.",
     "pendingTitle": "Restart pending ({{version}})",
-    "shutdownNow": "Shut down now",
-    "shutdownNowNote": "Worlds will be stopped in order before exiting. After shutdown this page can no longer control MRHC (it stays down until you start it again on the PC where MRHC runs).",
-    "shutdownLater": "Or restart it yourself later:",
-    "shutdownFailed": "Failed to request shutdown.",
+    "restartNow": "Restart now",
+    "restartNowNote": "Worlds will be stopped in order, then MRHC restarts itself. This page cannot be used during the restart (it may take a few minutes if stopping is slow). It reconnects automatically when done.",
+    "restartLater": "Or restart it yourself later:",
+    "restartFailed": "Failed to request restart.",
     "step1Windows": "Press Ctrl + C in the MRHC window (the black console) → worlds are stopped in order, then MRHC exits",
     "step1WarnWindows": "Do not close the window with the × button (the Resonite process would be left behind and the next start would fail)",
     "step2Windows": "Start mrhc.exe again (double-click is fine)",
@@ -528,11 +530,11 @@
     "errFailed": "Update failed",
     "errNetwork": "Network error"
   },
-  "shutdown": {
-    "title": "MRHC has shut down",
-    "bodyWindows": "On the PC where MRHC runs, start mrhc.exe again (double-click is fine), then reload this page.",
-    "bodyLinux": "On the PC where MRHC runs, start ./mrhc again, then reload this page.",
-    "stagedNote": "{{version}} takes effect from the next start.",
-    "reload": "Reload"
+  "restarting": {
+    "title": "Restarting MRHC",
+    "body": "Stopping worlds and restarting MRHC. It reconnects automatically when done (this may take a few minutes if stopping is slow).",
+    "stagedNote": "{{version}} takes effect after the restart.",
+    "reload": "Reload now",
+    "manualHint": "If it does not come back after a few minutes, check MRHC on the PC where it runs and start it again manually if needed."
   }
 }

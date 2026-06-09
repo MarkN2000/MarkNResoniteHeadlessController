@@ -50,12 +50,18 @@ type Server struct {
 	// 自己更新（docs/design/self-update.md）。updater は main が注入する
 	// （SetUpdater。未注入＝テストでは update API が 503 を返す）。
 	updater      *selfupdate.Updater
-	updateMu     sync.Mutex // updateStaged の保護
+	updateMu     sync.Mutex // updateStaged / updateCheck* の保護
 	updateStaged string     // 適用済み・再起動待ちの版（プロセス内のみ。再起動後は実体が追いつく）
 
-	// requestShutdown は MRHC プロセスの終了依頼を main へ伝える（自己更新後の
-	// 「今すぐ終了」）。main が Listen 前に設定する（serving 中の書き換えはしない）。
-	requestShutdown func()
+	// updateCheck は check 結果の短期キャッシュ（ログイン/リロード毎の GitHub 往復を抑える）。
+	// 表示用途のみ。apply の冪等判定では使わず常に最新を引く（updater.Check）。
+	updateCheck   *selfupdate.Info
+	updateCheckAt time.Time
+
+	// requestRestart は MRHC プロセスの再起動依頼を main へ伝える（自己更新後の
+	// 「今すぐ再起動」）。graceful 停止後に新バイナリを起動し直す。main が Listen 前に
+	// 設定する（serving 中の書き換えはしない）。
+	requestRestart func()
 
 	// checkDeps は依存検出（R-C）。本番は platform.CheckHeadlessDeps・テストで偽装する。
 	checkDeps func(goos, goarch string) []platform.DepIssue
@@ -255,11 +261,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/steam/status", s.requireAuth(s.handleSteamStatus))
 	mux.HandleFunc("GET /api/v1/steam/events", s.requireAuth(s.handleSteamEvents)) // SSE（進捗/ログ/結果）
 
-	// 自己更新（docs/design/self-update.md）: チェックは要求時のみ・適用は同期（数秒〜十数秒）・
-	// shutdown は graceful 終了（ヘッドレス停止込み）を main 経由で起動する。
+	// 自己更新（docs/design/self-update.md）: チェックは要求時のみ（短期キャッシュ付き）・
+	// 適用は SSE で進捗をストリーミング・restart は graceful 終了（ヘッドレス停止込み）後に
+	// 新バイナリを起動し直す処理を main 経由で起動する。
 	mux.HandleFunc("GET /api/v1/update/check", s.requireAuth(s.handleUpdateCheck))
 	mux.HandleFunc("POST /api/v1/update/apply", s.requireAuth(s.handleUpdateApply))
-	mux.HandleFunc("POST /api/v1/shutdown", s.requireAuth(s.handleShutdown))
+	mux.HandleFunc("POST /api/v1/restart", s.requireAuth(s.handleRestart))
 
 	// ワールドお気に入り（favorites.json・新規セッションの検索→保存／一覧）。
 	mux.HandleFunc("GET /api/v1/favorites", s.requireAuth(s.handleFavoritesList))
