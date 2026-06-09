@@ -394,6 +394,14 @@ var catalog = map[string]map[Lang]string{
 		Ja: "終了しました。",
 		En: "Shutdown complete.",
 	},
+	"main.restart.requestedWeb": {
+		Ja: "Web UI から再起動が要求されました。ヘッドレスを停止して再起動します...（Ctrl+C で中断）",
+		En: "Restart requested from the Web UI. Stopping the headless server and restarting... (press Ctrl+C to abort)",
+	},
+	"main.restart.relaunchFailed": {
+		Ja: "再起動（新バイナリの起動）に失敗しました: %v。手動で起動し直してください。",
+		En: "Restart (launching the new binary) failed: %v. Please start MRHC again manually.",
+	},
 
 	// ── フラグ説明（mrhc -h・OS 検出言語）──────────────────────────
 	"main.flag.data": {

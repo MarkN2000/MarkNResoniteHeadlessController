@@ -12,7 +12,7 @@ import { AccountSetupModal } from "./components/AccountSetupModal";
 import { UpdateModal } from "./components/UpdateModal";
 import { ConfirmHost } from "./components/ConfirmHost";
 import { useConfirm } from "./hooks/useConfirm";
-import { ShutdownScreen } from "./components/ShutdownScreen";
+import { RestartingScreen } from "./components/RestartingScreen";
 import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
 import { SessionTab } from "./tabs/session/SessionTab";
@@ -25,9 +25,10 @@ import { LogsTab } from "./tabs/logs/LogsTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  // MRHC 終了依頼後の静止画面（自己更新の「今すぐ終了」）。Shell ごと差し替えて
-  // SSE 購読等を unmount する（サーバー停止後の再接続ループを残さない）。
-  const [shutdownInfo, setShutdownInfo] = useState<UpdateInfo | null>(null);
+  // 自己更新の「今すぐ再起動」後の画面（再起動中）。Shell ごと差し替えて SSE 購読等を unmount し、
+  // 専用画面側でサーバー復帰を制御ポーリングする（停止中の SSE 再接続エラーループを残さない）。
+  // oldBoot は再起動を投げる直前に捕捉した旧プロセスの boot（新プロセス検出の基準）。
+  const [restart, setRestart] = useState<{ info: UpdateInfo; oldBoot: string | null } | null>(null);
 
   // 初回: 既存 Cookie セッションを確認
   useEffect(() => {
@@ -42,11 +43,19 @@ export default function App() {
     );
   }
   if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
-  if (shutdownInfo) return <ShutdownScreen info={shutdownInfo} />;
-  return <Shell onLogout={() => setAuthed(false)} onShutdownDone={setShutdownInfo} />;
+  if (restart) return <RestartingScreen info={restart.info} oldBoot={restart.oldBoot} />;
+  return (
+    <Shell onLogout={() => setAuthed(false)} onRestarting={(info, oldBoot) => setRestart({ info, oldBoot })} />
+  );
 }
 
-function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownDone: (info: UpdateInfo) => void }) {
+function Shell({
+  onLogout,
+  onRestarting,
+}: {
+  onLogout: () => void;
+  onRestarting: (info: UpdateInfo, oldBoot: string | null) => void;
+}) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -276,13 +285,13 @@ function Shell({ onLogout, onShutdownDone }: { onLogout: () => void; onShutdownD
     {/* 初回オンボーディング: アカウント未設定時にログイン直後 1 回自動表示（バナーからも開ける）。 */}
     <AccountSetupModal opened={setupOpen} onClose={() => setSetupOpen(false)} onSaved={refreshCred} />
 
-    {/* 自己更新（⋮ メニューから。適用→再起動手順／「今すぐ終了」→ App が静止画面へ差し替え）。 */}
+    {/* 自己更新（⋮ メニューから。適用→「今すぐ再起動」→ App が再起動中画面へ差し替え）。 */}
     <UpdateModal
       opened={updateOpen}
       onClose={() => setUpdateOpen(false)}
       info={updateInfo}
       onInfoChange={setUpdateInfo}
-      onShutdownDone={onShutdownDone}
+      onRestarting={onRestarting}
     />
     </>
   );

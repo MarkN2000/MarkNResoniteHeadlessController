@@ -22,13 +22,24 @@ import (
 const maxSumsSize = 1 << 20
 
 // lockStaleAfter はこの時間より古いロックファイルを中断の残骸とみなす閾値。
-// 正常な Apply は DLClient の Timeout（15分）までに必ず終わるため、それより長く取る。
-const lockStaleAfter = time.Hour
+// 正常な Apply は DLClient の Timeout（15分）までに必ず終わるため、それより長く取りつつ、
+// CLI 更新がクラッシュした際に過度に長く ErrBusy を返さないよう安全マージン込みで 30 分とする。
+const lockStaleAfter = 30 * time.Minute
+
+// ProgressFunc は本体ダウンロードの進捗を通知するコールバック。downloaded は受信済みバイト数、
+// total は Content-Length（不明なら -1）。呼び出しは間引かれる（おおよそ 100ms 間隔＋完了時）。
+type ProgressFunc func(downloaded, total int64)
 
 // Apply は最新リリースへ自分自身を入れ替え、適用したタグ（例 "v2.1.0"）を返す。
 // 成功後も実行中のプロセスは旧版のまま動き続け、次回起動から新版になる。
 // 更新不要なら ErrUpToDate、進行中の更新があれば ErrBusy（いずれも sentinel）。
 func (u *Updater) Apply(ctx context.Context) (string, error) {
+	return u.ApplyWithProgress(ctx, nil)
+}
+
+// ApplyWithProgress は Apply に本体DLの進捗通知（progress）を加えたもの。progress が nil なら
+// 通知しない（＝Apply と等価）。Web UI が SSE で進捗を流すために使う。
+func (u *Updater) ApplyWithProgress(ctx context.Context, progress ProgressFunc) (string, error) {
 	if !semver.IsValid(u.Version) {
 		return "", ErrNotReleaseBuild
 	}
@@ -72,7 +83,7 @@ func (u *Updater) Apply(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dlErr := u.fetchToWriter(ctx, base+"/"+assetFile, tmp)
+	dlErr := u.fetchToWriter(ctx, base+"/"+assetFile, tmp, progress)
 	closeErr := tmp.Close()
 	if dlErr != nil {
 		return "", dlErr
@@ -109,20 +120,48 @@ func (u *Updater) Apply(ctx context.Context) (string, error) {
 }
 
 // fetchToWriter は url の内容を w へストリームコピーする（サイズ上限つき）。
-func (u *Updater) fetchToWriter(ctx context.Context, url string, w io.Writer) error {
+// progress が非 nil なら受信バイト数を間引いて通知する（total は Content-Length・不明なら -1）。
+func (u *Updater) fetchToWriter(ctx context.Context, url string, w io.Writer, progress ProgressFunc) error {
 	resp, err := u.get(ctx, url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	n, err := io.Copy(w, io.LimitReader(resp.Body, maxBinarySize+1))
+	var dst io.Writer = w
+	var pw *progressWriter
+	if progress != nil {
+		pw = &progressWriter{total: resp.ContentLength, fn: progress}
+		dst = io.MultiWriter(w, pw)
+	}
+	n, err := io.Copy(dst, io.LimitReader(resp.Body, maxBinarySize+1))
 	if err != nil {
 		return fmt.Errorf("ダウンロード中の読み込みに失敗: %w", err)
 	}
 	if n > maxBinarySize {
 		return fmt.Errorf("ダウンロードがサイズ上限（%d MiB）を超えています", maxBinarySize>>20)
 	}
+	if pw != nil {
+		pw.fn(pw.n, pw.total) // 最終値（100%）を必ず1回通知する
+	}
 	return nil
+}
+
+// progressWriter は書き込み量を数えて間引きつつ progress を呼ぶ io.Writer。
+// io.MultiWriter 経由で実体の書込とは別に集計する（実体の書込結果には影響しない）。
+type progressWriter struct {
+	total int64
+	n     int64
+	last  time.Time
+	fn    ProgressFunc
+}
+
+func (p *progressWriter) Write(b []byte) (int, error) {
+	p.n += int64(len(b))
+	if time.Since(p.last) >= 100*time.Millisecond {
+		p.last = time.Now()
+		p.fn(p.n, p.total)
+	}
+	return len(b), nil
 }
 
 // fetchExpectedSHA は SHA256SUMS（"hex␣␣filename" 行の列挙）から file の期待ハッシュを取り出す。

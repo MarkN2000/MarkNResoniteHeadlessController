@@ -506,13 +506,15 @@
     "available": "{{latest}} が利用可能です（現在 {{current}}）",
     "releaseNotes": "リリースノートを見る",
     "apply": "アップデート",
+    "applying": "適用しています...",
+    "downloading": "ダウンロード中 {{pct}}%",
     "applied": "{{version}} への差し替えが完了しました",
-    "appliedBody": "動作中の MRHC は {{current}} のままです。MRHC を起動し直すと {{version}} になります。",
+    "appliedBody": "動作中の MRHC は {{current}} のままです。MRHC を再起動すると {{version}} になります。",
     "pendingTitle": "再起動待ち（{{version}}）",
-    "shutdownNow": "今すぐ終了する",
-    "shutdownNowNote": "ワールドも順に停止してから終了します。終了後はこの画面から操作できません（MRHC がある PC で起動し直すまで停止したままです）。",
-    "shutdownLater": "あとで自分で再起動する場合:",
-    "shutdownFailed": "終了の依頼に失敗しました。",
+    "restartNow": "今すぐ再起動する",
+    "restartNowNote": "ワールドを順に停止してから MRHC を再起動します。再起動中はこの画面を操作できません（停止に時間がかかると数分かかることがあります）。完了すると自動的に再接続します。",
+    "restartLater": "あとで自分で再起動する場合:",
+    "restartFailed": "再起動の依頼に失敗しました。",
     "step1Windows": "MRHC のウィンドウ（黒い画面）で Ctrl + C を押す → ワールドも順に停止してから終了します",
     "step1WarnWindows": "ウィンドウの × で閉じない（Resoniteのプロセスが残り、次回起動に失敗します）",
     "step2Windows": "mrhc.exe をもう一度起動する（ダブルクリックで OK）",
@@ -528,11 +530,11 @@
     "errFailed": "アップデートに失敗しました",
     "errNetwork": "通信に失敗しました"
   },
-  "shutdown": {
-    "title": "MRHC を終了しました",
-    "bodyWindows": "MRHC がある PC で mrhc.exe を起動し直し（ダブルクリックで OK）、このページを再読み込みしてください。",
-    "bodyLinux": "MRHC がある PC で ./mrhc を起動し直し、このページを再読み込みしてください。",
-    "stagedNote": "次回起動から {{version}} になります。",
-    "reload": "再読み込み"
+  "restarting": {
+    "title": "MRHC を再起動しています",
+    "body": "ワールドの停止と再起動を行っています。完了すると自動的に再接続します（停止に時間がかかると数分かかることがあります）。",
+    "stagedNote": "再起動後は {{version}} になります。",
+    "reload": "今すぐ再読み込み",
+    "manualHint": "数分待っても戻らない場合は、MRHC がある PC で起動状態を確認し、必要なら手動で起動し直してください。"
   }
 }

@@ -113,6 +113,12 @@ func main() {
 func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	lang := cfg.LangOrDefault()
 
+	// 自己再起動（自己更新後の「今すぐ再起動」）で起動し直す実行ファイルのパスを、
+	// 自己更新の swap より前＝今のうちに確定しておく。swap は実行中 exe を <exe>.old へ
+	// リネームして新版を元名に置くため、swap 後に os.Executable() を呼ぶと .old（旧版）を
+	// 指してしまう。ここで捕捉した元名のパスには、再起動時には新版が載っている。
+	selfExe, exeErr := os.Executable()
+
 	// 前回起動以降に自己更新が適用されていれば、残骸（退避された旧バイナリ等）を掃除して
 	// その旨をログする（版が変わった痕跡は .old の存在だけなので、ここで一度だけ可視化する）。
 	if selfupdate.CleanupStale() {
@@ -144,10 +150,10 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	} else {
 		log.Print(i18n.T(lang, "main.update.failed", err)) // update API は 503 になるが起動は続行
 	}
-	shutdownReq := make(chan struct{}, 1)
-	srv.SetShutdownRequest(func() {
+	restartReq := make(chan struct{}, 1)
+	srv.SetRestartRequest(func() {
 		select {
-		case shutdownReq <- struct{}{}:
+		case restartReq <- struct{}{}:
 		default: // 既に依頼済み
 		}
 	})
@@ -175,17 +181,19 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 		}
 	}()
 
-	// SIGINT/SIGTERM または Web UI の終了依頼（自己更新後の「今すぐ終了」）で graceful 終了。
+	// SIGINT/SIGTERM または Web UI の再起動依頼（自己更新後の「今すぐ再起動」）で graceful 終了。
 	// 稼働中のヘッドレスを shutdown して orphan（管理不能な残存プロセス）を防ぐ。
-	// もう一度シグナルが来たら即終了。
+	// もう一度シグナルが来たら即終了。Web 経路のみ、停止後に新バイナリを起動し直す（doRelaunch）。
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	doRelaunch := false
 	select {
 	case <-sigCh:
 		fmt.Println()
 		fmt.Println(i18n.T(lang, "main.shutdown.received"))
-	case <-shutdownReq:
-		fmt.Println(i18n.T(lang, "main.shutdown.requestedWeb"))
+	case <-restartReq:
+		doRelaunch = true
+		fmt.Println(i18n.T(lang, "main.restart.requestedWeb"))
 		// select 以前に届いていたシグナルが buffer に残っていると、下の force-quit goroutine が
 		// それを「2発目」として即終了に使ってしまう。1発目は graceful 扱い＝ここで読み捨てる
 		//（旧コードの「最初のシグナルは必ず graceful」を web 終了経路でも保つ）。
@@ -215,6 +223,18 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 	defer cancel()
 	_ = httpServer.Shutdown(ctx)
 	fmt.Println(i18n.T(lang, "main.shutdown.done"))
+
+	// 自己更新後の「今すぐ再起動」: ヘッドレス停止＋HTTP shutdown が済んだ今、新バイナリで
+	// 自分自身を起動し直す（ポートは解放済み・selfExe には swap 済みの新版が載っている）。
+	// Unix は syscall.Exec で同一プロセス置換のため成功時はここへ戻らない。Windows は新プロセスを
+	// 起動して関数を抜け、本プロセスは終了する。起動時に exe パスを取れていなければ再起動は諦める。
+	if doRelaunch {
+		if exeErr != nil {
+			log.Print(i18n.T(lang, "main.restart.relaunchFailed", exeErr))
+		} else if err := relaunch(selfExe, os.Args[1:]); err != nil {
+			log.Print(i18n.T(lang, "main.restart.relaunchFailed", err))
+		}
+	}
 }
 
 // newUpdater は自己更新の実行器を返す（CLI の update サブコマンドと Web UI 経路で共用）。
