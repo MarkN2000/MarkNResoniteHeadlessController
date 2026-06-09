@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MRHC</title>
+    <!-- アイコン類は public/ 直下（Vite が dist/ 直下へコピー → go:embed で同梱）。
+         .webmanifest でなく .json なのは Go 側 FileServer の MIME を確実にするため。 -->
+    <link rel="icon" href="./favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" href="./icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#11151d" />
   </head>
   <body>
     <div id="root"></div>
