@@ -44,12 +44,13 @@ MRHC を使うには、次の準備が必要です。
 <a id="install-linux"></a>
 ### Linux（x64 / ARM）
 
-置きたい場所へ移動し、次の 1 行を実行します。x64・ARM のどちらも同じコマンドで、アーキテクチャは自動で判定されます。
+次の 1 行を実行します。x64・ARM のどちらも同じコマンドで、アーキテクチャは自動で判定されます。**特にこだわりがなければ、今いる場所（ログイン直後ならホーム）のまま実行して構いません**（展開先はカレントディレクトリなので、別の場所に置きたいときだけ先に `cd` してください）。
 
 ```sh
-cd ~   # 置きたい場所へ（例: Home直下）
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
+
+> **`sudo` は付けないでください。** root で展開するとフォルダの所有者が root になり、MRHC の自己更新が実行ファイルの隣に書き込めず失敗します。普段使いのユーザーのまま実行してください。
 
 実行した場所に `mrhc-linux-amd64/`（ARM では `mrhc-linux-arm64/`）が作られるので、その中で起動します。
 

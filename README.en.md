@@ -43,12 +43,13 @@ Once it's running, open `http://localhost:8080` (default) in your browser to use
 <a id="install-linux"></a>
 ### Linux (x64 / ARM)
 
-Move to where you want it, then run this single line. The command is the same for x64 and ARM (the architecture is detected automatically).
+Run this single line. The command is the same for x64 and ARM (the architecture is detected automatically). **If you have no particular preference, just run it where you are (your home directory right after logging in)** (it extracts into the current directory, so only `cd` somewhere first if you want it elsewhere).
 
 ```sh
-cd ~   # wherever you want it (e.g. your home directory — it always exists)
 curl -fsSL https://github.com/MarkN2000/MarkNResoniteHeadlessController/releases/latest/download/install.sh | sh
 ```
+
+> **Don't use `sudo`.** Extracting as root makes the folder owned by root, so MRHC's self-update can't write next to the executable and will fail. Run it as your regular user.
 
 This creates `mrhc-linux-amd64/` (or `mrhc-linux-arm64/` on ARM) where you ran it, so start it from inside that folder.
 
