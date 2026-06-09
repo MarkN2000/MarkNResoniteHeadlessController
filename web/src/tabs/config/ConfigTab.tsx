@@ -13,7 +13,15 @@ import { ConfigList } from "./ConfigList";
 import type { ConfigMap } from "./configModel";
 
 // config 名のバリデーション（backend の SanitizeName と同じ・パストラバーサル防止）。
-const NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
+// 文字(\p{L})・数字(\p{N})・結合文字(\p{M})・_・- のみ。日本語（かな・漢字・長音符）も \p{L} で許可。
+const NAME_RE = /^[\p{L}\p{N}\p{M}_-]{1,64}$/u;
+// Windows 予約名（CON/NUL/COM1 等・大小無視）。backend 同様に全 OS で拒否する。
+const RESERVED_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+// 入力名を NFC 正規化してから検証する（backend の pathFor 正規化と一致させ、表記ゆれを吸収）。
+const isValidName = (raw: string): boolean => {
+  const name = raw.normalize("NFC");
+  return NAME_RE.test(name) && !RESERVED_RE.test(name);
+};
 
 // コンフィグタブの container（§3.14）。一覧/読込/保存/複製/削除と未保存ガードを集約。
 // working map（cfg）を単一の真実とし、未知/レア項目はキーを落とさず温存される。
@@ -37,10 +45,17 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
 
   // dirty = working≠original または名前変更（キー順は in-place 編集で保持）。
   // 即時作成方式によりエディタは常に保存済み config を編集する＝未保存ドラフト特例（original=null）は無い。
-  const dirty = cfg !== null && (JSON.stringify(cfg) !== JSON.stringify(original) || draftName !== selected);
+  const dirty =
+    cfg !== null && (JSON.stringify(cfg) !== JSON.stringify(original) || draftName.normalize("NFC") !== selected);
   // 名前の検証は親に一元化。エラー文言は「入力済みで不正」な時だけ出す（空の新規欄を即赤にしない）。
-  const nameValid = NAME_RE.test(draftName.trim());
-  const nameError = draftName.trim() !== "" && !nameValid ? t("config.invalidName") : undefined;
+  const trimmedName = draftName.trim();
+  const nameValid = isValidName(trimmedName);
+  const nameError =
+    trimmedName !== "" && !nameValid
+      ? RESERVED_RE.test(trimmedName.normalize("NFC"))
+        ? t("config.reservedName")
+        : t("config.invalidName")
+      : undefined;
   const canSave = dirty && nameValid; // 保存ボタンの活性＝変更あり かつ 名前が有効
 
   const refreshList = async () => {
@@ -108,8 +123,8 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const save = () => {
     if (!cfg) return;
     const body = cfg;
-    const name = draftName.trim();
-    if (!NAME_RE.test(name)) return;
+    const name = draftName.trim().normalize("NFC"); // 送信名を正準形へ（backend pathFor と一致）
+    if (!isValidName(name)) return;
     const from = selected !== null && selected !== name ? selected : undefined;
     const persist = async () => {
       const r = await api.saveConfig(name, body, from);

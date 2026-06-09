@@ -42,12 +42,14 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// configName は非空ならフォーマットのみ検証（実在は問わない＝後で削除され得るため・起動時に解決）。
-	for _, sc := range body.Scheduled {
-		if sc.ConfigName != "" {
-			if err := hlconfig.SanitizeName(sc.ConfigName); err != nil {
+	// 検証後は NFC 正準形へそろえて保存する（発火時にディスク上の正準名と一致させる）。
+	for i := range body.Scheduled {
+		if body.Scheduled[i].ConfigName != "" {
+			if err := hlconfig.SanitizeName(body.Scheduled[i].ConfigName); err != nil {
 				writeErr(w, http.StatusBadRequest, "bad_request", "予定の config 名が不正です: "+err.Error())
 				return
 			}
+			body.Scheduled[i].ConfigName = hlconfig.NormalizeName(body.Scheduled[i].ConfigName)
 		}
 	}
 	s.cfgMu.Lock()
@@ -145,6 +147,7 @@ func (s *Server) handleRestartTrigger(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
 			return
 		}
+		name = hlconfig.NormalizeName(name) // 空（=前回config）はそのまま・非空は正準形へ
 	}
 	if err := s.restart.Trigger("manual", name); err != nil {
 		switch {

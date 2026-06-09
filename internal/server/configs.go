@@ -125,7 +125,7 @@ func writeConfigErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hlconfig.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "config_not_found", "指定のコンフィグが見つかりません")
-	case errors.Is(err, hlconfig.ErrInvalidName):
+	case errors.Is(err, hlconfig.ErrInvalidName), errors.Is(err, hlconfig.ErrReservedName):
 		writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
 	case errors.Is(err, hlconfig.ErrStartWorldsType), errors.Is(err, hlconfig.ErrInvalidJSON):
 		writeErr(w, http.StatusBadRequest, "invalid_config", err.Error())
@@ -252,6 +252,9 @@ func (s *Server) loadLastUsed() string {
 }
 
 func (s *Server) recordLastUsed(name string) {
+	// 保存名は NFC 正準形にそろえる（ドロップダウンの選択肢=List も正準形のため、選択が一致する）。
+	// handleStart/orchestrator/crash-monitor のどの経路から来ても、ここで一括正規化する。
+	name = hlconfig.NormalizeName(name)
 	s.runtimeMu.Lock()
 	defer s.runtimeMu.Unlock()
 	st := s.loadRuntimeStateLocked()

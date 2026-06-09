@@ -19,12 +19,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const schemaURL = "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json"
 
 var (
-	ErrInvalidName     = errors.New("不正な config 名（英数・_・- のみ、1〜64文字）")
+	ErrInvalidName     = errors.New("不正な config 名（文字・数字・_・- のみ、1〜64文字）")
+	ErrReservedName    = errors.New("この名前は予約語のため使用できません")
 	ErrNotFound        = errors.New("config が見つかりません")
 	ErrStartWorldsType = errors.New("startWorlds は配列である必要があります")
 	ErrInvalidJSON     = errors.New("不正な JSON")
@@ -34,8 +37,14 @@ var (
 	ErrFolderCreate = errors.New("フォルダを作成できません")
 )
 
-// nameRe は config 名の許可文字。`/` `\` `.` を含まないためパストラバーサル不可。
-var nameRe = regexp.MustCompile(`^[A-Za-z0-9_\-]{1,64}$`)
+// nameRe は config 名の許可文字。文字(\p{L})・数字(\p{N})・結合文字(\p{M})・`_`・`-` のみ許可し、
+// `/` `\` `.` や空白・記号を含まないためパストラバーサル不可。日本語（かな・漢字・長音符ー等）は
+// \p{L}、濁点等の結合文字（NFD 入力で分解された分）は \p{M} で受理する。{1,64} はルーン数。
+var nameRe = regexp.MustCompile(`^[\p{L}\p{N}\p{M}_\-]{1,64}$`)
+
+// reservedNameRe は Windows のデバイス予約名（CON.json のように拡張子付きでも予約扱い）。
+// Linux で作った config 名を Windows へ移しても壊れないよう、全 OS で拒否する（大小無視）。
+var reservedNameRe = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[1-9]|lpt[1-9])$`)
 
 // Credentials は起動時に注入する Resonite アカウント。
 type Credentials struct {
@@ -50,15 +59,27 @@ type Summary struct {
 	WorldCount int    `json:"worldCount"`
 }
 
-// SanitizeName は config 名を検証する（パストラバーサル防止）。
+// SanitizeName は config 名を検証する（パストラバーサル防止）。許可文字・長さを正規表現で確認し、
+// 続けて Windows 予約名（CON/NUL/COM1 等・大小無視）を拒否する。NFC 正規化はファイル名生成側
+// （pathFor）が一手に担うため、ここでは形を問わず検証する（NFC/NFD どちらも \p{L}+\p{M} で受理）。
 func SanitizeName(name string) error {
 	if !nameRe.MatchString(name) {
 		return ErrInvalidName
 	}
+	if reservedNameRe.MatchString(name) {
+		return ErrReservedName
+	}
 	return nil
 }
 
-func pathFor(dir, name string) string { return filepath.Join(dir, name+".json") }
+// NormalizeName は config 名を Unicode NFC へ正規化する。pathFor を通さない経路（表示・last-used
+// 記録・起動ラベル・スケジュール保存）で表記ゆれ（NFC/NFD）をそろえ、ディスク上の正準名と一致させる。
+// ファイル操作側の正規化は pathFor が担うため、ファイル名の生成にこの関数を使う必要はない。
+func NormalizeName(name string) string { return norm.NFC.String(name) }
+
+// pathFor は config 名から保存パスを組み立てる唯一の関所。名前を NFC へ正規化してから連結するため、
+// 入力が NFC/NFD どちらでもディスク上の実体は常に正準形になり、作成・取得・削除・起動の往復が安定する。
+func pathFor(dir, name string) string { return filepath.Join(dir, norm.NFC.String(name)+".json") }
 
 // readRaw は config を map として読む（内部用・password を含む）。
 func readRaw(dir, name string) (map[string]any, error) {
@@ -138,7 +159,10 @@ func WriteRenamed(dir, oldName, newName string, body map[string]any) error {
 	if err := SanitizeName(oldName); err != nil {
 		return err
 	}
-	if oldName == newName {
+	// 同名判定は NFC 正準形で行う。生バイトのままだと NFC/NFD 違いで「別名＝改名」と誤判定し、
+	// 「新名で書き込み → pathFor の正規化で同一ファイルに上書き → 旧名（=同一ファイル）を削除」で
+	// 保存内容を失う。pathFor が NFC 化するので、等価判定もそれに合わせる。
+	if norm.NFC.String(oldName) == norm.NFC.String(newName) {
 		return Write(dir, newName, body)
 	}
 	if _, err := os.Stat(pathFor(dir, oldName)); err != nil {
@@ -284,18 +308,20 @@ func EnsureDefault(dir, dataDir string) error {
 }
 
 // pickUniqueName は base, base2, base3, … の最初の未使用名を返す（即時作成の自動命名）。
-// 64文字（nameRe 上限）を超える場合は base 側を切り詰める（名前は ASCII のみ＝バイト切詰で安全）。
+// 64文字（nameRe 上限・ルーン単位）を超える場合は base 側をルーン単位で切り詰める。
+// 日本語名の複製 {name}-copy 等で base がマルチバイトでも、文字の途中で切れて壊れない
+// （suffix は ASCII 数字＝バイト長＝ルーン数なので len(suffix) をそのまま使える）。
 func pickUniqueName(dir, base string) (string, error) {
 	for n := 1; n <= 9999; n++ {
 		suffix := ""
 		if n >= 2 {
 			suffix = strconv.Itoa(n)
 		}
-		b := base
+		b := []rune(base)
 		if len(b)+len(suffix) > 64 {
 			b = b[:64-len(suffix)]
 		}
-		cand := b + suffix
+		cand := string(b) + suffix
 		if _, err := os.Stat(pathFor(dir, cand)); os.IsNotExist(err) {
 			return cand, nil
 		}

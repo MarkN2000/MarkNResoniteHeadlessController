@@ -7,20 +7,89 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 func TestSanitizeName(t *testing.T) {
-	ok := []string{"default", "my-world", "event_2026", "ABC123"}
+	ok := []string{
+		"default", "my-world", "event_2026", "ABC123",
+		"config",                      // 予約名 con を含むが完全一致ではない＝有効
+		"日本語", "とらぞ会場_2026", "イベント-春", // 日本語（かな・漢字・長音符）
+		"ABC日本123", strings.Repeat("あ", 64), // 英数混在・64ルーン上限ちょうど
+	}
 	for _, n := range ok {
 		if err := SanitizeName(n); err != nil {
 			t.Errorf("valid name %q rejected: %v", n, err)
 		}
 	}
-	bad := []string{"", "a/b", "a\\b", "..", "../x", "a.b", "a b", "secret!", strings.Repeat("x", 65)}
+	bad := []string{
+		"", "a/b", "a\\b", "..", "../x", "a.b", "a b", "secret!", // パストラバーサル・記号・空白
+		"CON", "nul", "com1", "LPT9", // Windows 予約名（大小無視）
+		"春・夏", "会場（メイン）", "🎮game", // 中黒・全角括弧・絵文字（\p{L}でない記号）
+		strings.Repeat("x", 65), strings.Repeat("あ", 65), // 65ルーン超過
+	}
 	for _, n := range bad {
 		if err := SanitizeName(n); err == nil {
 			t.Errorf("invalid name %q accepted", n)
 		}
+	}
+	// 予約名は専用エラーを返す（HTTP 400 マップ・writeConfigErr 用）。
+	if err := SanitizeName("CON"); !errors.Is(err, ErrReservedName) {
+		t.Errorf("CON は ErrReservedName を返すべき: %v", err)
+	}
+}
+
+// TestUnicodeNameNormalization は NFD 入力で保存した config が NFC でも解決でき、
+// List がディスク上の正準形（NFC）を返すことを確認する（pathFor の正規化チョークポイント）。
+func TestUnicodeNameNormalization(t *testing.T) {
+	dir := t.TempDir()
+	nfd := "が世界" // 「が世界」NFD（か + 結合濁点 U+3099）
+	nfc := norm.NFC.String(nfd)
+	nfd = norm.NFD.String(nfd) // ソースが NFC 保存でも明示分解して NFD 前提を保証する
+	if nfd == nfc {
+		t.Fatal("テスト前提が崩れている（NFD と NFC が同一）")
+	}
+	if err := Write(dir, nfd, map[string]any{"startWorlds": []any{}}); err != nil {
+		t.Fatalf("Write(NFD) 失敗: %v", err)
+	}
+	if _, err := ReadMasked(dir, nfc); err != nil {
+		t.Fatalf("ReadMasked(NFC) が NFD 保存を見つけられない: %v", err)
+	}
+	l, err := List(dir)
+	if err != nil || len(l) != 1 {
+		t.Fatalf("List 失敗: err=%v len=%d", err, len(l))
+	}
+	if l[0].Name != nfc {
+		t.Errorf("List 名が正準形(NFC)でない: got %q want %q", l[0].Name, nfc)
+	}
+}
+
+// TestWriteRenamed_NFCvsNFD_NoDataLoss は「見た目同じ（NFC/NFD 違い）」の改名が同名扱いになり、
+// 内容を失わない（書いた直後に同一ファイルを削除しない）ことを確認する回帰テスト。
+func TestWriteRenamed_NFCvsNFD_NoDataLoss(t *testing.T) {
+	dir := t.TempDir()
+	nfc := "が"                 // が（NFC・合成済み）
+	nfd := "が"                // が（NFD・か + 結合濁点）
+	nfd = norm.NFD.String(nfc) // ソースが NFC でも明示分解（nfc と見た目同じ・バイトのみ違う）
+	if nfd == nfc {
+		t.Fatal("テスト前提が崩れている（NFD と NFC が同一）")
+	}
+	if err := Write(dir, nfc, map[string]any{"comment": "keep", "startWorlds": []any{}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRenamed(dir, nfc, nfd, map[string]any{"comment": "updated", "startWorlds": []any{}}); err != nil {
+		t.Fatalf("WriteRenamed 失敗: %v", err)
+	}
+	m, err := ReadMasked(dir, nfc)
+	if err != nil {
+		t.Fatalf("改名後に config が消えた（データ消失バグ）: %v", err)
+	}
+	if m["comment"] != "updated" {
+		t.Errorf("内容が更新されていない: got %v", m["comment"])
+	}
+	if l, _ := List(dir); len(l) != 1 {
+		t.Errorf("ファイル数が想定外（消失/重複）: %d", len(l))
 	}
 }
 

@@ -384,6 +384,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
 		return
 	}
+	name = hlconfig.NormalizeName(name) // 起動ラベル/last-used/解決を正準形にそろえる（pathFor と一致）
 	headlessPath, launchPath, err := s.resolveLaunch(name)
 	if err != nil {
 		if errors.Is(err, hlconfig.ErrNotFound) {

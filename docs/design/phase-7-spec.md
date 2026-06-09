@@ -79,7 +79,7 @@ PUT    /api/v1/headless-credentials        中央既定アカウント登録 {us
 ```
 **設計（保存型・最小検証）**: 実装は `internal/hlconfig`（HTTP 非依存）+ `internal/server/configs.go`（薄い HTTP 層）。
 - **保存型**: フロントが完成 JSON を送り、バックエンドは name サニタイズ・最小検証（有効JSON + startWorlds が配列）・`$schema` 付与・0600 保存
-- **name サニタイズ**: `^[A-Za-z0-9_\-]{1,64}$`（`/`・`\`・`.` 不可＝パストラバーサル防止）【必須】
+- **name サニタイズ**: `^[\p{L}\p{N}\p{M}_\-]{1,64}$`（文字・数字・結合文字・`_`・`-` のみ＝`/`・`\`・`.`・空白・記号 不可＝パストラバーサル防止。日本語可・{1,64}はルーン数）＋ Windows 予約名（CON/NUL/COM1 等・大小無視）を全 OS で拒否【必須】。名前は `pathFor` で NFC 正規化してからファイル化するため、NFC/NFD どちらの入力でもディスク上は正準形に揃う（往復安定・改名の同名判定も NFC 比較）
 - **保存先**: `headlessConfigDir`（既定固定 `{dataDir}/headless-configs`、Settings で上級者のみ変更）
 - **同梱デフォルト**: 起動時に config dir が空なら `default.json`（accessLevel=Anyone・公式スキーマ全項目を明示・1ワールド・creds 空）を自動生成（`EnsureDefault`）。フロント `defaultConfig()`/`defaultWorld()` と同一方針（UI 表示＝保存値の一致／未設定は null）
 - **dataFolder/cacheFolder の既定値（UI改善⑤）**: 雛形の `dataFolder`/`cacheFolder` には `{dataDir}/headless-data`・`{dataDir}/headless-cache` の**絶対パス**を焼き込む（相対は headless 即クラッシュのため必ず Abs。`-data` 未指定なら mrhc 実行ファイルと同階層）。導出は `hlconfig.DefaultFolders` が単一情報源で、`EnsureDefault`（default.json）と `GET /api/v1/headless-config-defaults`（UI 新規作成・リセットマーカー）の両方が使う。`logsFolder` は null のまま。起動時（`resolveLaunch`）に config の dataFolder/cacheFolder（絶対パスのみ）を `MkdirAll`（`hlconfig.EnsureFolders`・失敗は起動を止めて 409 で可視化）。既存の default.json は書き換えない（マイグレーション無し方針）
