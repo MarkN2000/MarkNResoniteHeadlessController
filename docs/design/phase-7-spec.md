@@ -125,6 +125,7 @@ POST /api/v1/sessions/{idx}/spawn-impulse {"templateId":"..."} or {"itemUrl":"..
 #     itemUrl 空は impulse のみ）。詳細は announce-templates.md。
 # ※ コマンド組み立ては headless.SpawnCmd / DynamicImpulseStringCmd（純関数）。告知③(§3.16(2))と共有。
 GET  /api/v1/spawn-templates                 スポーン＆パルステンプレ一覧（announce-templates と同機構の別リスト）
+GET  /api/v1/item-spawn-templates            単体スポーンテンプレ一覧（同機構・tag 任意。spawn 単体の選択肢に使用）
 
 # セッションライフサイクル  — ExecGroup(focus idx → cmd)
 POST /api/v1/sessions/{idx}/restart                                         → restart

@@ -640,6 +640,7 @@ async function getItemTemplates(path: string): Promise<ItemTemplate[]> {
 }
 export const getAnnounceTemplates = () => getItemTemplates("/announce-templates");
 export const getSpawnTemplates = () => getItemTemplates("/spawn-templates");
+export const getItemSpawnTemplates = () => getItemTemplates("/item-spawn-templates"); // 単体スポーン用（tag 任意）
 
 export type RestartType = "once" | "weekly" | "daily";
 

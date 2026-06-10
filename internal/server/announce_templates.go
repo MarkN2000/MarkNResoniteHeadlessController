@@ -4,9 +4,11 @@ package server
 // 取得・キャッシュ・解決を担う。アイテム URL の差し替え・テンプレ追加をアプリのリリースなしに
 // 全インスタンスへ配信する。正本: docs/design/announce-templates.md
 //
-// リストは2系統（templateStore の2インスタンス・スキーマ/機構は共通）:
+// リストは3系統（templateStore の3インスタンス・スキーマ/機構は共通）:
 //   - 告知テンプレ（assets/announce-templates.json・事前アクション③が参照）
 //   - スポーン＆パルステンプレ（assets/spawn-templates.json・セッションタブが参照）
+//   - 単体スポーンテンプレ（assets/item-spawn-templates.json・セッションタブのアイテムスポーンが参照。
+//     tag を使わないため tag 任意＝requireTag=false）
 //
 // フォールバック連鎖（常にこの順・最悪でも焼き込みビルトイン＝従来同等の動作に退化する）:
 //   メモリキャッシュ(TTL内) → リモート取得 → -data の永続キャッシュ(最終取得分) → ビルトイン
@@ -26,8 +28,9 @@ import (
 
 // 既定の取得元（main ブランチ＝リリースと独立に更新できる）。テストでは templateStore.url を差し替える。
 const (
-	announceTemplatesURL = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/announce-templates.json"
-	spawnTemplatesURL    = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/spawn-templates.json"
+	announceTemplatesURL  = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/announce-templates.json"
+	spawnTemplatesURL     = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/spawn-templates.json"
+	itemSpawnTemplatesURL = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/item-spawn-templates.json"
 )
 
 // itemTemplatesTTL はメモリキャッシュの有効期間。raw.githubusercontent.com の
@@ -80,35 +83,52 @@ var builtinSpawnTemplates = []itemTemplate{
 	},
 }
 
+// builtinItemSpawnTemplates は単体スポーンテンプレの最終フォールバック
+// （assets/item-spawn-templates.json のスナップショット）。
+var builtinItemSpawnTemplates = []itemTemplate{
+	{
+		ID:    "tts-loop",
+		Label: map[string]string{"ja": "テキスト読み上げループ", "en": "Text-to-speech loop"},
+		URL:   "resrec:///U-MarkN/R-019ead5f-846d-7ee4-abb3-1db92b61068a",
+		Tag:   "MRHC.play",
+	},
+}
+
 // templateStore は1系統のテンプレリストの取得・キャッシュ・解決器。
 type templateStore struct {
-	url     string         // 取得元（テストで差し替え）
-	client  *http.Client   // 取得用（timeout 込み）
-	path    string         // -data の永続キャッシュのフルパス（""=永続なし・テスト等）
-	builtin []itemTemplate // 全フォールバック失敗時の最終手段
+	url        string         // 取得元（テストで差し替え）
+	client     *http.Client   // 取得用（timeout 込み）
+	path       string         // -data の永続キャッシュのフルパス（""=永続なし・テスト等）
+	builtin    []itemTemplate // 全フォールバック失敗時の最終手段
+	requireTag bool           // tag を必須として検証するか（impulse を送る系統＝告知/スポーン＆パルスは true）
 
 	mu      sync.Mutex
 	cache   []itemTemplate // 最終取得成功分のメモリキャッシュ
 	fetched time.Time      // cache の取得時刻（TTL 判定。永続分から復元したときはゼロ）
 }
 
-func newTemplateStore(url, path string, builtin []itemTemplate) *templateStore {
+func newTemplateStore(url, path string, builtin []itemTemplate, requireTag bool) *templateStore {
 	return &templateStore{
-		url:     url,
-		path:    path,
-		builtin: builtin,
-		client:  &http.Client{Timeout: 10 * time.Second},
+		url:        url,
+		path:       path,
+		builtin:    builtin,
+		requireTag: requireTag,
+		client:     &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-// validItemTemplates は id/url/tag いずれか空のエントリを除いて返す
+// valid は不正エントリ（id/url が空・requireTag の系統では tag 空も）を除いて返す
 // （壊れた1件で全体を捨てない）。label は任意＝UI が id へフォールバックする。
-func validItemTemplates(list []itemTemplate) []itemTemplate {
+func (st *templateStore) valid(list []itemTemplate) []itemTemplate {
 	out := make([]itemTemplate, 0, len(list))
 	for _, t := range list {
-		if t.ID != "" && t.URL != "" && t.Tag != "" {
-			out = append(out, t)
+		if t.ID == "" || t.URL == "" {
+			continue
 		}
+		if st.requireTag && t.Tag == "" {
+			continue
+		}
+		out = append(out, t)
 	}
 	return out
 }
@@ -134,7 +154,7 @@ func (st *templateStore) fetch(ctx context.Context) ([]itemTemplate, error) {
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&list); err != nil {
 		return nil, err
 	}
-	got := validItemTemplates(list.Templates)
+	got := st.valid(list.Templates)
 	if len(got) == 0 {
 		return nil, fmt.Errorf("有効なテンプレートが0件")
 	}
@@ -164,7 +184,7 @@ func (st *templateStore) templates(ctx context.Context) ([]itemTemplate, string)
 	}
 	if st.path != "" {
 		persisted := readJSONFile[itemTemplateList](st.path)
-		if got := validItemTemplates(persisted.Templates); len(got) > 0 {
+		if got := st.valid(persisted.Templates); len(got) > 0 {
 			st.cache = got // fetched はゼロのまま＝次回も再取得を試みる
 			return got, "cache"
 		}
@@ -213,4 +233,9 @@ func (s *Server) handleAnnounceTemplates(w http.ResponseWriter, r *http.Request)
 // handleSpawnTemplates: GET /api/v1/spawn-templates（スポーン＆パルステンプレ一覧）
 func (s *Server) handleSpawnTemplates(w http.ResponseWriter, r *http.Request) {
 	writeTemplates(w, r, s.spawnTpl)
+}
+
+// handleItemSpawnTemplates: GET /api/v1/item-spawn-templates（単体スポーンテンプレ一覧）
+func (s *Server) handleItemSpawnTemplates(w http.ResponseWriter, r *http.Request) {
+	writeTemplates(w, r, s.itemSpawnTpl)
 }

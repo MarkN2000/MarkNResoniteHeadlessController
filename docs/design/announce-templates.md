@@ -3,12 +3,13 @@
 spawn するアイテム＋impulse タグのテンプレート一覧を、アプリに焼き込まず **リポジトリから配信**
 する仕組み。本ドキュメントが正本（2026-06-10 確定・同日スポーン＆パルスで2系統に拡張）。
 
-利用箇所は2系統（機構・スキーマは共通＝`templateStore` の2インスタンス）:
+利用箇所は3系統（機構・スキーマは共通＝`templateStore` の3インスタンス）:
 
-| 系統 | 配信ファイル | 利用箇所 | API |
-|---|---|---|---|
-| 告知 | `assets/announce-templates.json` | 事前アクション③（§3.16(2)・全ワールド対象） | `GET /api/v1/announce-templates` |
-| スポーン＆パルス | `assets/spawn-templates.json` | セッションタブ（フォーカス中ワールドのみ。**アイテムスポーン単体も同リストを流用**） | `GET /api/v1/spawn-templates` |
+| 系統 | 配信ファイル | 利用箇所 | tag | API |
+|---|---|---|---|---|
+| 告知 | `assets/announce-templates.json` | 事前アクション③（§3.16(2)・全ワールド対象） | 必須 | `GET /api/v1/announce-templates` |
+| スポーン＆パルス | `assets/spawn-templates.json` | セッションタブ（フォーカス中ワールドのみ） | 必須 | `GET /api/v1/spawn-templates` |
+| 単体スポーン | `assets/item-spawn-templates.json` | セッションタブのアイテムスポーン（impulse を送らない） | **任意** | `GET /api/v1/item-spawn-templates` |
 
 ## 1. 目的
 
@@ -47,10 +48,9 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
 - `label` は言語コード→表示名のマップ。**JSON 側への言語追加と UI 側の対応言語追加は互いに独立**
   （UI は 現在言語→en→ja→先頭→id の順でフォールバック表示・`web/src/lib/itemTemplates.ts`）。
 - main ブランチ参照のため反映はリリースと無関係に即時（raw の CDN キャッシュ約5分以内）。
-- 不正エントリ（id/url/tag いずれか空）は読み手側でスキップされる。有効0件は取得失敗扱い。
-- **`tag` は全エントリ必須**（スポーン単体でしか使わないアイテムもダミー値を入れる・2026-06-10 裁定）。
-  スポーン専用アイテムが本格的に増えたら「tag 任意化＋スポーン＆パルス側で tag 無しテンプレを非表示」
-  への緩和を再検討する。
+- 不正エントリ（id/url が空、tag 必須の系統では tag 空も）は読み手側でスキップされる。有効0件は取得失敗扱い。
+- **`tag` の要否は系統ごと**（`templateStore.requireTag`・2026-06-10 裁定）: impulse を送る告知/スポーン＆パルスは
+  必須、単体スポーンは使わないため任意（省略可。当初の「共用リスト＋ダミー tag 必須」は専用リスト分離に伴い廃止）。
 
 ## 3. 利用箇所のセマンティクス
 
@@ -81,9 +81,10 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
 
 ### 3c. アイテムスポーン単体（セッションタブ・既存 `POST /api/v1/sessions/{idx}/spawn`）
 
-- スポーン＆パルスと**同じリストを流用**してテンプレ選択 UI を提供（2026-06-10）。選択中のテンプレの
-  `url` を**クライアント側で**そのまま既存 spawn API に渡すだけ（backend 無変更・`tag`/`message` は未使用）。
-  保存される設定ではなくその場実行のため、告知のような実行時サーバー解決は行わない。
+- **専用リスト `item-spawn-templates.json`** からテンプレ選択 UI を提供（2026-06-10。当初はスポーン＆パルスと
+  共用だったが、impulse 受信機構を持たない飾りアイテム等で選択肢が混ざらないよう同日分離）。
+- 選択中のテンプレの `url` を**クライアント側で**そのまま既存 spawn API に渡すだけ（実行系 backend 無変更・
+  `tag`/`message` は未使用）。保存される設定ではなくその場実行のため、告知のような実行時サーバー解決は行わない。
 - `active`/`persistent` のチェックボックスはテンプレ選択と独立に効く（単体スポーンの存在意義）。
 
 ## 4. 取得・フォールバック（`internal/server/announce_templates.go` の `templateStore`）
@@ -92,12 +93,12 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
 
 ```
 メモリキャッシュ(TTL 10分) → リモート取得(timeout 10s・1MB上限)
-  → -data/{announce,spawn}-templates.json(最終取得成功分の永続キャッシュ) → 焼き込みビルトイン
+  → -data/{announce,spawn,item-spawn}-templates.json(最終取得成功分の永続キャッシュ) → 焼き込みビルトイン
 ```
 
 - 取得成功時にメモリ＋永続キャッシュを更新。`source` は remote / cache / builtin。
-- ビルトイン（`builtinAnnounceTemplates` / `builtinSpawnTemplates`）は配信 JSON のスナップショット。
-  **告知ビルトインの先頭 id は `config.DefaultRestart()` と同期すること**。
+- ビルトイン（`builtinAnnounceTemplates` / `builtinSpawnTemplates` / `builtinItemSpawnTemplates`）は
+  配信 JSON のスナップショット。**告知ビルトインの先頭 id は `config.DefaultRestart()` と同期すること**。
 - 取得元はテスト用に `templateStore.url` で差し替え可能。
 
 ## 5. 検証 / UI
@@ -115,17 +116,18 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
 ## 6. アイテムを更新/追加する手順（運用者向け）
 
 1. Resonite で新しいアイテムをインベントリ保存し、resrec URL を控える。
-2. 対象系統の JSON（`assets/announce-templates.json` または `assets/spawn-templates.json`）の該当エントリの
+2. 対象系統の JSON（`assets/{announce,spawn,item-spawn}-templates.json`）の該当エントリの
    `url` を書き換える（追加なら新エントリ。id は新規・恒久）。
 3. main へコミット/プッシュ。数分以内に全インスタンスの次回実行・UI 一覧へ反映される。
 4. ビルトイン同期: `internal/server/announce_templates.go` の `builtinAnnounceTemplates` /
-   `builtinSpawnTemplates` も同じ内容に更新しておく（必須ではないが、オフライン初回起動時の
-   フォールバック品質を保つ）。
+   `builtinSpawnTemplates` / `builtinItemSpawnTemplates` も同じ内容に更新しておく（必須ではないが、
+   オフライン初回起動時のフォールバック品質を保つ）。
 
 ## 7. テスト
 
 `internal/server/announce_templates_test.go`: フォールバック連鎖（remote/cache/builtin）・TTL・
-不正エントリスキップ・有効0件・2系統の独立性・resolveAnnounce（手動/テンプレ/未知id）・PUT 検証・
+不正エントリスキップ・有効0件・3系統の独立性・系統別 tag 検証（必須/任意）・
+resolveAnnounce（手動/テンプレ/未知id）・PUT 検証・
 orchestrator 実行時解決（解決済み URL で spawn / 未解決はスキップ）・spawn-impulse エンドポイント
 （手動/テンプレ/impulse のみ/未知id 400/タグ欠落 400・fakehl 統合）。
 `internal/config/restart_test.go`: テンプレ参照時はタグ空でも Validate を通る。

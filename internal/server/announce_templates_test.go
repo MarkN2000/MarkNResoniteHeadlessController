@@ -127,18 +127,41 @@ func TestItemTemplates_AllInvalidFallsBack(t *testing.T) {
 	}
 }
 
-// 2系統は独立したキャッシュ/取得元を持つ（announce の取得が spawn に混ざらない）。
-func TestItemTemplates_TwoStoresIndependent(t *testing.T) {
+// 各系統は独立したキャッシュ/取得元を持つ（announce の取得が spawn 系に混ざらない）。
+func TestItemTemplates_StoresIndependent(t *testing.T) {
 	s, _ := newTplServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(tplJSON))
 	})
 	s.spawnTpl.url = deadURL()
+	s.itemSpawnTpl.url = deadURL()
 	if list, source := s.announceTpl.templates(context.Background()); source != "remote" || len(list) != 2 {
 		t.Fatalf("announce 側が remote にならない: %s %+v", source, list)
 	}
 	list, source := s.spawnTpl.templates(context.Background())
 	if source != "builtin" || len(list) != 1 || list[0].ID != "tts-loop" {
 		t.Fatalf("spawn 側がビルトイン(tts-loop)にならない: %s %+v", source, list)
+	}
+	list, source = s.itemSpawnTpl.templates(context.Background())
+	if source != "builtin" || len(list) != 1 || list[0].ID != "tts-loop" {
+		t.Fatalf("item-spawn 側がビルトイン(tts-loop)にならない: %s %+v", source, list)
+	}
+}
+
+// 単体スポーンリストは tag 任意（requireTag=false）。同じ応答でも告知側は tag 無しエントリを弾く。
+func TestItemTemplates_TagOptionalPerStore(t *testing.T) {
+	body := `{"version":1,"templates":[
+		{"id":"deco","url":"resrec:///deco"},
+		{"id":"tagged","url":"resrec:///tagged","tag":"T"}
+	]}`
+	s, _ := newTplServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	})
+	s.itemSpawnTpl.url = s.announceTpl.url // 同じ取得元を見せて検証差だけを比較する
+	if list, _ := s.itemSpawnTpl.templates(context.Background()); len(list) != 2 {
+		t.Fatalf("tag 任意の系統で tag 無しエントリが弾かれた: %+v", list)
+	}
+	if list, _ := s.announceTpl.templates(context.Background()); len(list) != 1 || list[0].ID != "tagged" {
+		t.Fatalf("tag 必須の系統で tag 無しエントリが通った: %+v", list)
 	}
 }
 

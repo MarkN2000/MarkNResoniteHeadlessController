@@ -33,25 +33,24 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
   const urlValid = isResoniteUrl(url);
   const tagValid = tag.trim() !== "";
 
-  // テンプレ一覧（アイテムスポーン単体とスポーン＆パルスで共用・取得前は手動入力に退化）。
-  const templates = useItemTemplates(api.getSpawnTemplates);
-
-  // アイテムスポーン単体のテンプレ選択（未操作なら先頭テンプレ・2026-06-10）。テンプレの url
-  // だけを使い tag は使わない（スポーン専用アイテムもリスト上はダミー tag 必須の運用）。
-  // active/persistent は選択と独立に効く（単体スポーンの存在意義なので残す）。
+  // アイテムスポーン単体のテンプレ選択（未操作なら先頭テンプレ・専用リスト=tag任意・2026-06-10）。
+  // テンプレの url だけを使い tag は使わない。active/persistent は選択と独立に効く
+  // （単体スポーンの存在意義なので残す）。取得前は手動入力に退化。
+  const spawnTemplates = useItemTemplates(api.getItemSpawnTemplates);
   const [spawnSel, setSpawnSel] = useState<string | null>(null);
-  const spawnKey = spawnSel ?? templates[0]?.id ?? MANUAL_TEMPLATE;
+  const spawnKey = spawnSel ?? spawnTemplates[0]?.id ?? MANUAL_TEMPLATE;
   const spawnManual = spawnKey === MANUAL_TEMPLATE;
   const spawnData = buildTemplateSelectData(
-    templates,
+    spawnTemplates,
     spawnManual ? "" : spawnKey,
     i18n.language,
     t("session.spawnPulseManual"),
   );
-  const spawnUrl = spawnManual ? url.trim() : (templates.find((tpl) => tpl.id === spawnKey)?.url ?? "");
+  const spawnUrl = spawnManual ? url.trim() : (spawnTemplates.find((tpl) => tpl.id === spawnKey)?.url ?? "");
   const spawnReady = spawnManual ? urlValid : spawnUrl !== "";
 
-  // スポーン＆パルス。選択は未操作なら先頭テンプレを既定にする。
+  // スポーン＆パルス（専用リスト・tag必須）。選択は未操作なら先頭テンプレを既定にする。
+  const templates = useItemTemplates(api.getSpawnTemplates);
   const [spSel, setSpSel] = useState<string | null>(null);
   const [spUrl, setSpUrl] = useState("");
   const [spTag, setSpTag] = useState("");
