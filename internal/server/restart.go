@@ -41,6 +41,14 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	// テンプレ参照の告知は templateId の実在を検証（有効時のみ＝テンプレが消えても無効化保存は妨げない）。
+	// リスト取得不能時もビルトインまで連鎖するため、オフラインでも既定テンプレは通る。
+	if an := body.PreActions.Announce; an.Enabled && an.TemplateID != "" {
+		if _, ok := s.lookupAnnounceTemplate(r.Context(), an.TemplateID); !ok {
+			writeErr(w, http.StatusBadRequest, "bad_request", "告知テンプレートが見つかりません: "+an.TemplateID)
+			return
+		}
+	}
 	// configName は非空ならフォーマットのみ検証（実在は問わない＝後で削除され得るため・起動時に解決）。
 	// 検証後は NFC 正準形へそろえて保存する（発火時にディスク上の正準名と一致させる）。
 	for i := range body.Scheduled {

@@ -61,6 +61,14 @@ type Server struct {
 	updateCheck   *selfupdate.Info
 	updateCheckAt time.Time
 
+	// 告知テンプレートのリモートリスト（announce_templates.go・docs/design/announce-templates.md）。
+	// tplURL/tplClient はテストで差し替える。tplCache は最終取得成功分のメモリキャッシュ。
+	tplMu      sync.Mutex
+	tplCache   []announceTemplate
+	tplFetched time.Time // tplCache の取得時刻（TTL 判定。永続分から復元したときはゼロ）
+	tplURL     string
+	tplClient  *http.Client
+
 	// requestRestart は MRHC プロセスの再起動依頼を main へ伝える（自己更新後の
 	// 「今すぐ再起動」）。graceful 停止後に新バイナリを起動し直す。main が Listen 前に
 	// 設定する（serving 中の書き換えはしない）。
@@ -133,6 +141,8 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		webFS:     webFS,
 		resonite:  reso,
 		checkDeps: platform.CheckHeadlessDeps,
+		tplURL:    announceTemplatesURL,
+		tplClient: &http.Client{Timeout: 10 * time.Second},
 	}
 	s.auth = newAuthManager(cfg, &s.cfgMu)
 	s.restart = newRestartOrchestrator(s)
@@ -218,6 +228,7 @@ func (s *Server) Handler() http.Handler {
 	// スケジュール（Phase 8・§3.16）: 自動再起動 設定/状態（P8-1）＋手動トリガー/中止（P8-3b）。
 	mux.HandleFunc("GET /api/v1/restart-config", s.requireAuth(s.handleRestartConfigGet))
 	mux.HandleFunc("PUT /api/v1/restart-config", s.requireAuth(s.handleRestartConfigPut))
+	mux.HandleFunc("GET /api/v1/announce-templates", s.requireAuth(s.handleAnnounceTemplates)) // 告知テンプレ一覧（リモートリスト）
 	mux.HandleFunc("GET /api/v1/restart-status", s.requireAuth(s.handleRestartStatus))
 	mux.HandleFunc("POST /api/v1/restart/trigger", s.requireAuth(s.handleRestartTrigger))
 	mux.HandleFunc("POST /api/v1/restart/cancel", s.requireAuth(s.handleRestartCancel))

@@ -1,6 +1,6 @@
 // スケジュールタブの表示ヘルパ（純関数）。Phase 8・§3.16。
-import { ANNOUNCE_TEMPLATES, ANNOUNCE_COMMON_TAG } from "../../api";
 import type {
+  AnnounceTemplate,
   RestartAnnounce,
   RestartCrashRecovery,
   RestartSessionChanges,
@@ -79,11 +79,18 @@ export function defaultCrashRecovery(): RestartCrashRecovery {
   return { enabled: true, maxCrashes: 3, windowMinutes: 10 };
 }
 export function defaultAnnounce(): RestartAnnounce {
-  // 告知は既定 OFF だが、ON 時に即使えるよう既定テンプレ（とらぞ閉店アナウンス）＋共通タグを入れる。
-  return { enabled: false, itemUrl: ANNOUNCE_TEMPLATES[0].url, impulseTag: ANNOUNCE_COMMON_TAG, message: "" };
+  // 告知は既定 OFF だが、ON 時に即使えるよう既定テンプレ（とらぞ閉店アナウンス）の id を入れる。
+  // URL/タグは backend が告知時にリモートリストから解決するため保存しない。
+  return { enabled: false, templateId: "torazo-close", itemUrl: "", impulseTag: "", message: "" };
 }
 export function defaultSessionChanges(): RestartSessionChanges {
   return { setPrivate: false, setMaxUsersOne: true, renameEnabled: false, renameTo: "" };
+}
+
+// テンプレ表示名の言語フォールバック: 現在言語 → en → ja → 先頭のラベル → id。
+// リモートJSON側の言語追加とUI側の対応言語追加が互いに独立でも壊れないようにする。
+export function templateLabel(tpl: AnnounceTemplate, locale: string): string {
+  return tpl.label?.[locale] ?? tpl.label?.en ?? tpl.label?.ja ?? Object.values(tpl.label ?? {})[0] ?? tpl.id;
 }
 
 // 稼働時間/残り時間を言語非依存の短い表記にする（例: "1d 2h" / "2h 34m" / "34m"）。

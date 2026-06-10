@@ -513,7 +513,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **(2) 事前アクション**
 - **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn "<itemUrl>" true false` → `dynamicimpulsestring "<tag>" "<message>"`（R14 で `headless.SpawnCmd`/`DynamicImpulseStringCmd` 純関数に統一＝セッションの spawn/impulse 書き込み API と同一組み立て。spawn は help 確定の3引数〔旧 `spawn <url> true` の2引数を修正〕・告知アイテムは一時的なので persistent=false）。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
   - **実装**: **spawn → impulse の間に約10秒待機**（spawn したアイテムがワールド内で実体化してから impulse を送る・v1 `ITEM_SPAWN_DELAY` 踏襲・固定定数）。**2パス**で実行（全ワールド spawn → 10秒 sleep → 全ワールド impulse）。待機中は execMu を解放し他コマンドを妨げない。`itemUrl` 空なら spawn を省略し impulse のみ（常設受け機構前提）。
-  - **実装（UI・5b-1 追補）**: `itemUrl` は **テンプレ選択（v1 main 由来の2種＝とらぞセッション閉店アナウンス/テキスト読み上げ）＋手動入力** の `Select`。テンプレ選択で `itemUrl`＋**共通タグ `MRHC.play`**（`ANNOUNCE_COMMON_TAG`）を自動設定し URL/タグ欄を隠す。手動入力時のみ URL/タグ欄を表示。**`tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
+  - **実装（UI・5b-1 追補→2026-06-10 リモートリスト化で改訂）**: 告知アイテムは **テンプレ選択＋手動入力** の `Select`。テンプレ一覧は**リポジトリ配信のリモートリスト**（`GET /api/v1/announce-templates`・正本 [announce-templates.md](announce-templates.md)）から取得し、選択すると **`templateId` のみ保存**（URL/タグは告知実行時に backend が解決＝アイテム更新がアプリのリリース・再保存なしに全 config へ反映される）。手動入力時のみ URL/タグ欄を表示（`templateId=""`＋`itemUrl`/`impulseTag` を保存）。**手動時の `tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
 - **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。
   - **各項目は独立トグル（全OFF可）**＝「Private化はしたくない」なら setPrivate=OFF のままにできる。既定は **maxusers=1 のみ ON・Private と改名は OFF**。
 
@@ -537,7 +537,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
   ],
   "waitControl":  { "quietWaitMin": 58, "announceWaitMin": 2 },   // 2区間（R9）: 締切 = quiet+announce
   "preActions": {
-    "announce":       { "enabled":true, "itemUrl":"resrec:///...", "impulseTag":"MRHC.play", "message":"まもなく再起動します" },
+    "announce":       { "enabled":true, "templateId":"torazo-close", "itemUrl":"", "impulseTag":"", "message":"まもなく再起動します" },  // templateId 非空=テンプレ参照（URL/タグは告知時に解決）/ 空=手動（itemUrl/impulseTag を使用）
     "sessionChanges": { "setPrivate":false, "setMaxUsersOne":true, "renameEnabled":false, "renameTo":"" }
   },
   "crashRecovery": { "enabled":true, "maxCrashes":3, "windowMinutes":10 }
@@ -548,7 +548,8 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **(6) API / SSE**
 ```
 GET  /api/v1/restart-config                  restart 設定を返す
-PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック）
+PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック。告知有効かつ templateId 非空は実在検証）
+GET  /api/v1/announce-templates              告知テンプレ一覧（リモートリスト＋フォールバック・announce-templates.md）
 GET  /api/v1/restart-status                  次回予定 / 最終起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
 POST /api/v1/restart/trigger {configName?}   手動「通常再起動」を即受付（非同期）。空=前回config
 POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続。通常停止の中止にも共用）
@@ -564,7 +565,7 @@ POST /api/v1/stop/graceful                   通常停止を即受付（非同�
 3. **予定リストカード**: 各行（有効トグル / 種別・時刻 / config / 編集✎ / 削除×〔**直接削除**＝未保存ゆえ保存前は取り消し可〕）＋`[＋新規]`・空時「予定がありません」。編集は**モーダル**（type 選択で日時欄を出し分け〔once=年月日+時分/weekly=曜日+時分/daily=時分〕・config `Select`〔#prev 番兵〕・ドラフト→`[OK]` で working 配列へ反映/`[キャンセル]` 破棄）。
    - **実装**: 新規 id は `scheduleModel.genId()`（`crypto.randomUUID` はセキュアコンテキスト限定＝LAN/HTTP で不可のため `getRandomValues`→`Math.random` にフォールバック・[[lan-http-no-secure-context-apis]]）。**インライン検証**（時/分の範囲＋once 暦実在＝JS Date 往復で 2/30 等を弾き [OK] 無効化、年下限 `MIN_YEAR=2000` は backend 準拠）。daily/weekly へ切替時は once 専用の year/month/day をクリアして保存JSONを汚さない。日付入力は `@mantine/dates` 不使用で `NumberInput`。**once の年月日はスマホ向けに縦並び（R8）**＝full-width 入力を縦 Stack に積み、各入力の右に `年/月/日` 単位ラベル（固定幅で右端整列）。狭幅でも横はみ出しなし。時刻（時:分）は横並びのまま。
 4. **待機制御カード**（2区間モデル R9）: `quietWaitMin`（静かに待つ）/ `announceWaitMin`（告知後に待つ）。各 0〜1440・相互依存なし。
-5. **事前アクションカード**: 告知（有効 / itemUrl〔テンプレ選択+手動入力〕 / impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。message は任意（空可）。詳細は §3.16(2) 実装注記。
+5. **事前アクションカード**: 告知（有効 / 告知アイテム〔テンプレ選択（リモートリスト）＋手動入力〕 / 手動時のみ itemUrl・impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。message は任意（空可）。詳細は §3.16(2) 実装注記＋[announce-templates.md](announce-templates.md)。
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
 - 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。

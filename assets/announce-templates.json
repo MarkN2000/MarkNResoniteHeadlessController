@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "torazo-close",
+      "label": {
+        "ja": "とらぞセッション閉店アナウンス",
+        "en": "Torazo session closing announce"
+      },
+      "url": "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4",
+      "tag": "MRHC.play"
+    },
+    {
+      "id": "tts-loop",
+      "label": {
+        "ja": "テキスト読み上げループ",
+        "en": "Text-to-speech loop"
+      },
+      "url": "resrec:///U-MarkN/R-019ead5f-846d-7ee4-abb3-1db92b61068a",
+      "tag": "MRHC.play"
+    }
+  ]
+}

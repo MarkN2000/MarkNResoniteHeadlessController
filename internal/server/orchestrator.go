@@ -71,6 +71,9 @@ type restartOrchestrator struct {
 	recordUsed  func(name string)
 	recordStart func(trigger, at string)                      // 最終起動の記録（§3.16(9)）
 	beforeStart func(ctx context.Context, triggerType string) // ④ 停止後・起動前のフック（予定再起動時の更新・P9-B・nil可）
+	// resolveAnnounce は告知の templateId → URL/タグ解決（server 注入・announce_templates.go）。
+	// nil（テスト等）かつ templateId 指定の告知は安全側＝スキップする。
+	resolveAnnounce func(ctx context.Context, a config.AnnounceAction) (config.AnnounceAction, bool)
 
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。
 	minute           time.Duration // quiet/announce 待機の「分」単位（本番 time.Minute）
@@ -100,6 +103,7 @@ func newRestartOrchestrator(s *Server) *restartOrchestrator {
 		recordUsed:       s.recordLastUsed,
 		recordStart:      s.recordLastStart,
 		beforeStart:      s.maybeScheduledUpdate, // 予定再起動時の更新フック（P9-B）
+		resolveAnnounce:  s.resolveAnnounce,      // 告知テンプレの実行時解決
 		minute:           time.Minute,
 		waitInterval:     10 * time.Second,
 		spawnDelay:       10 * time.Second,
@@ -410,7 +414,21 @@ func (o *restartOrchestrator) applySessionChanges(ctx context.Context, sc config
 
 // announce は ③ dynamicImpulse 告知。itemUrl 非空なら全ワールドに spawn → spawnDelay 待機 → 全ワールドに impulse。
 // itemUrl 空＝常設受け機構前提で spawn を省略し impulse のみ（§3.16(2)）。
+// テンプレ参照（templateId 非空）は実行直前に URL/タグへ解決する＝リモートリストの更新が
+// 保存済み config にも即反映される（docs/design/announce-templates.md）。
 func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAction) {
+	if a.TemplateID != "" {
+		if o.resolveAnnounce == nil {
+			log.Printf("[restart] 告知テンプレートの解決手段が無いため告知をスキップ: %s", a.TemplateID)
+			return
+		}
+		resolved, ok := o.resolveAnnounce(ctx, a)
+		if !ok {
+			log.Printf("[restart] 告知テンプレートを解決できないため告知をスキップ: %s", a.TemplateID)
+			return
+		}
+		a = resolved
+	}
 	if a.ItemURL != "" {
 		// 告知アイテムは一時的なので active=true / persistent=false（ワールド保存に残さない）。
 		spawnCmd := headless.SpawnCmd(a.ItemURL, true, false)

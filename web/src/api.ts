@@ -618,13 +618,18 @@ export const steamCancel = () => post("/steam/cancel");
 // --- スケジュール（自動再起動）タブ（Phase 8・§3.16）---
 // restart 設定は単一オブジェクト（config.Restart のミラー）。完全オブジェクトを PUT する（pointer 設計前提）。
 
-// 告知アイテムのテンプレート（v1 main の登録 2 種を踏襲）。選択で itemUrl を設定。
-// 受信タグは全テンプレ共通（v1 restartManager の固定値）＝下の ANNOUNCE_COMMON_TAG。
-export const ANNOUNCE_TEMPLATES = [
-  { label: "とらぞセッション閉店アナウンス", url: "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4" },
-  { label: "テキスト読み上げループ", url: "resrec:///U-MarkN/R-019ead5f-846d-7ee4-abb3-1db92b61068a" },
-] as const;
-export const ANNOUNCE_COMMON_TAG = "MRHC.play";
+// 告知アイテムのテンプレート（backend がリモートリストから取得・フォールバック込みで常に返す。
+// docs/design/announce-templates.md）。id が永続キーで、選択すると announce.templateId に保存される。
+export interface AnnounceTemplate {
+  id: string;
+  label: Record<string, string>; // 言語コード→表示名（現在言語→en→ja→先頭→id でフォールバック）
+  url: string;
+  tag: string;
+}
+export async function getAnnounceTemplates(): Promise<AnnounceTemplate[]> {
+  const d = await getData<{ templates: AnnounceTemplate[] }>("/announce-templates");
+  return d?.templates ?? [];
+}
 
 export type RestartType = "once" | "weekly" | "daily";
 
@@ -646,8 +651,9 @@ export interface RestartWaitControl {
 }
 export interface RestartAnnounce {
   enabled: boolean;
-  itemUrl: string;
-  impulseTag: string;
+  templateId: string; // 非空=テンプレ参照（URL/タグは backend が告知時に解決）。空=手動入力
+  itemUrl: string; // 手動入力時のみ使用
+  impulseTag: string; // 手動入力時のみ使用
   message: string;
 }
 export interface RestartSessionChanges {

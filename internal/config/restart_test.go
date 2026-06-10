@@ -52,6 +52,13 @@ func TestRestartValidate(t *testing.T) {
 		t.Fatalf("メッセージ空の告知が弾かれた（任意のはず）: %v", err)
 	}
 
+	// テンプレ参照（templateId 非空）は URL/タグを実行時解決するため、タグ空でも妥当。
+	tplRef := DefaultRestart()
+	tplRef.PreActions.Announce = AnnounceAction{Enabled: true, TemplateID: "torazo-close"}
+	if err := tplRef.Validate(); err != nil {
+		t.Fatalf("テンプレ参照の告知が弾かれた（タグは実行時解決のはず）: %v", err)
+	}
+
 	bad := func(mut func(r *Restart)) {
 		t.Helper()
 		r := DefaultRestart()

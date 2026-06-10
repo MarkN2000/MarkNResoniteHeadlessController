@@ -54,10 +54,13 @@ type PreActions struct {
 }
 
 // AnnounceAction は dynamicImpulse 告知（spawn したアイテムに impulse を送る）。
+// TemplateID 非空＝テンプレ参照（URL/タグは告知実行時にリモートリストから解決＝
+// docs/design/announce-templates.md）。空＝手動入力（ItemURL/ImpulseTag を使う）。
 type AnnounceAction struct {
 	Enabled    bool   `json:"enabled"`
-	ItemURL    string `json:"itemUrl"`    // spawn するアイテム（空=spawn しない＝常設受け機構前提）
-	ImpulseTag string `json:"impulseTag"` // dynamicimpulsestring のタグ（例 MRHC.play）
+	TemplateID string `json:"templateId"` // 告知テンプレートの永続キー（空=手動入力）
+	ItemURL    string `json:"itemUrl"`    // 手動: spawn するアイテム（空=spawn しない＝常設受け機構前提）
+	ImpulseTag string `json:"impulseTag"` // 手動: dynamicimpulsestring のタグ（例 MRHC.play）
 	Message    string `json:"message"`    // 送る文字列（固定文）
 }
 
@@ -77,12 +80,13 @@ type CrashRecovery struct {
 }
 
 // DefaultRestart は restart 未設定時の既定値（§3.16）。
-// 告知は既定 OFF だが、ON にしたとき即使えるよう itemUrl/tag に既定テンプレ
-// （とらぞ閉店アナウンス＋共通タグ MRHC.play）を入れておく。メッセージは既定で空。
+// 告知は既定 OFF だが、ON にしたとき即使えるよう templateId に既定テンプレ
+// （とらぞ閉店アナウンス）を入れておく。URL/タグは実行時に解決するため保存しない。
 // セッション変更は maxusers=1 のみ ON、クラッシュ復帰は ON（10分に3回で停止）、
 // 待機は静かに58分＋告知後2分（合計60分）。
 // 予定再起動時の更新は既定 ON（Steam 未設定なら no-op なので安全・P9-B）。
-// itemUrl/tag はフロント web/src/api.ts の ANNOUNCE_TEMPLATES[0] と同期すること。
+// templateId は server の builtinAnnounceTemplates 先頭・フロント
+// web/src/tabs/schedule/scheduleModel.ts の defaultAnnounce() と同期すること。
 func DefaultRestart() Restart {
 	return Restart{
 		Scheduled:   []ScheduledRestart{},
@@ -90,8 +94,7 @@ func DefaultRestart() Restart {
 		PreActions: PreActions{
 			Announce: AnnounceAction{
 				Enabled:    false,
-				ItemURL:    "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4",
-				ImpulseTag: "MRHC.play",
+				TemplateID: "torazo-close",
 				Message:    "",
 			},
 			SessionChanges: SessionChanges{SetMaxUsersOne: true},
@@ -135,8 +138,10 @@ func (r Restart) Validate() error {
 		return fmt.Errorf("クラッシュ復帰の集計ウィンドウは 1〜1440 分で指定してください")
 	}
 	an := r.PreActions.Announce
-	if an.Enabled {
-		// インパルスタグは dynamicimpulse の宛先指定に必須。
+	if an.Enabled && an.TemplateID == "" {
+		// 手動入力時のみ: インパルスタグは dynamicimpulse の宛先指定に必須。
+		// テンプレ参照時は URL/タグとも実行時にリストから解決するため検証しない
+		// （templateId の実在は server 層が PUT 時に検証する）。
 		// メッセージは任意（空可）＝受信アイテムが固定内容でメッセージを使わない場合があるため。
 		if strings.TrimSpace(an.ImpulseTag) == "" {
 			return fmt.Errorf("告知を有効にする場合はインパルスタグを入力してください")
