@@ -117,7 +117,12 @@
     "impulseTagPlaceholder": "例: MRHC.play",
     "impulseValue": "値（String）",
     "impulseValuePlaceholder": "（任意）",
-    "impulseSend": "送信"
+    "impulseSend": "送信",
+    "spawnPulseSection": "スポーン＆パルス",
+    "spawnPulseItem": "アイテム",
+    "spawnPulseManual": "手動入力",
+    "spawnPulseMessage": "メッセージ",
+    "spawnPulseRun": "実行"
   },
   "friends": {
     "source": "ユーザー検索",
@@ -494,7 +499,8 @@
     "messageDone": "メッセージを送信しました",
     "newSessionDone": "セッションを開きました",
     "spawnDone": "アイテムをスポーンしました",
-    "impulseDone": "インパルスを送信しました"
+    "impulseDone": "インパルスを送信しました",
+    "spawnPulseDone": "スポーン＆パルスを実行しました"
   },
   "update": {
     "title": "MRHC のアップデート",

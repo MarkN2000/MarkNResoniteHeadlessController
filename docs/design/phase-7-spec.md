@@ -119,7 +119,12 @@ POST /api/v1/sessions/{idx}/hidefromlisting {"hide":true}                   → 
 # セッション内コンテンツ操作  — ExecGroup(focus idx → cmd)・R14
 POST /api/v1/sessions/{idx}/spawn   {"url":"...","active":true,"persistent":false} → spawn "<url>" <active> <persistent>（3引数・help 確定）
 POST /api/v1/sessions/{idx}/impulse {"tag":"MRHC.play","value":"..."}            → dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
+POST /api/v1/sessions/{idx}/spawn-impulse {"templateId":"..."} or {"itemUrl":"...","impulseTag":"...","message":"..."}
+#   → スポーン＆パルス＝告知③のセッション版（spawn→実体化待ち約5秒→impulse を1リクエストで完走・
+#     templateId はスポーン＆パルステンプレ〔リモートリスト〕から実行直前に解決・spawn は active=true/persistent=false 固定・
+#     itemUrl 空は impulse のみ）。詳細は announce-templates.md。
 # ※ コマンド組み立ては headless.SpawnCmd / DynamicImpulseStringCmd（純関数）。告知③(§3.16(2))と共有。
+GET  /api/v1/spawn-templates                 スポーン＆パルステンプレ一覧（announce-templates と同機構の別リスト）
 
 # セッションライフサイクル  — ExecGroup(focus idx → cmd)
 POST /api/v1/sessions/{idx}/restart                                         → restart

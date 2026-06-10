@@ -44,7 +44,7 @@ func (s *Server) handleRestartConfigPut(w http.ResponseWriter, r *http.Request) 
 	// テンプレ参照の告知は templateId の実在を検証（有効時のみ＝テンプレが消えても無効化保存は妨げない）。
 	// リスト取得不能時もビルトインまで連鎖するため、オフラインでも既定テンプレは通る。
 	if an := body.PreActions.Announce; an.Enabled && an.TemplateID != "" {
-		if _, ok := s.lookupAnnounceTemplate(r.Context(), an.TemplateID); !ok {
+		if _, ok := s.announceTpl.lookup(r.Context(), an.TemplateID); !ok {
 			writeErr(w, http.StatusBadRequest, "bad_request", "告知テンプレートが見つかりません: "+an.TemplateID)
 			return
 		}

@@ -1,12 +1,15 @@
 package server
 
-// announce_templates.go は告知テンプレート（事前アクションで spawn するアイテム）のリモートリスト
-// 取得・キャッシュ・解決を担う。正本はリポジトリ assets/announce-templates.json（main ブランチ）で、
-// アイテム URL の差し替え・テンプレ追加をアプリのリリースなしに全インスタンスへ配信する。
-// 設計: docs/design/announce-templates.md
+// announce_templates.go はアイテムテンプレート（spawn するアイテム＋impulse タグ）のリモートリスト
+// 取得・キャッシュ・解決を担う。アイテム URL の差し替え・テンプレ追加をアプリのリリースなしに
+// 全インスタンスへ配信する。正本: docs/design/announce-templates.md
+//
+// リストは2系統（templateStore の2インスタンス・スキーマ/機構は共通）:
+//   - 告知テンプレ（assets/announce-templates.json・事前アクション③が参照）
+//   - スポーン＆パルステンプレ（assets/spawn-templates.json・セッションタブが参照）
 //
 // フォールバック連鎖（常にこの順・最悪でも焼き込みビルトイン＝従来同等の動作に退化する）:
-//   メモリキャッシュ(TTL内) → リモート取得 → -data/announce-templates.json(最終取得分) → ビルトイン
+//   メモリキャッシュ(TTL内) → リモート取得 → -data の永続キャッシュ(最終取得分) → ビルトイン
 
 import (
 	"context"
@@ -15,41 +18,43 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 )
 
-// announceTemplatesURL は既定の取得元（main ブランチ＝リリースと独立に更新できる）。
-// テストでは Server.tplURL で差し替える。
-const announceTemplatesURL = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/announce-templates.json"
+// 既定の取得元（main ブランチ＝リリースと独立に更新できる）。テストでは templateStore.url を差し替える。
+const (
+	announceTemplatesURL = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/announce-templates.json"
+	spawnTemplatesURL    = "https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main/assets/spawn-templates.json"
+)
 
-// announceTemplatesTTL はメモリキャッシュの有効期間。raw.githubusercontent.com の
+// itemTemplatesTTL はメモリキャッシュの有効期間。raw.githubusercontent.com の
 // CDN キャッシュ（約5分）より長めに取り、UI 操作のたびの往復を抑える。
-const announceTemplatesTTL = 10 * time.Minute
+const itemTemplatesTTL = 10 * time.Minute
 
-// announceTemplate は告知テンプレート1件。ID は config（announce.templateId）から参照される
-// 永続キー＝リモートリストでの改名・削除は既存 config の参照を切るため運用上禁止
+// itemTemplate はテンプレート1件。ID は config（announce.templateId）や実行リクエストから参照される
+// 永続キー＝リモートリストでの改名・削除は既存の参照を切るため運用上禁止
 // （アイテムの更新は url の書き換えで行う）。
-type announceTemplate struct {
+type itemTemplate struct {
 	ID    string            `json:"id"`
 	Label map[string]string `json:"label"` // 言語コード→表示名。UI 側で 現在言語→en→ja→先頭→id の順に解決
 	URL   string            `json:"url"`   // spawn する resrec:/// URL
 	Tag   string            `json:"tag"`   // dynamicimpulsestring のタグ
 }
 
-// announceTemplateList は配信 JSON のルート。Version は情報用で互換判定には使わない
+// itemTemplateList は配信 JSON のルート。Version は情報用で互換判定には使わない
 // （変更はフィールド追加のみ＝未知キー無視で互換、という前提を配信側が守る）。
-type announceTemplateList struct {
-	Version   int                `json:"version"`
-	Templates []announceTemplate `json:"templates"`
+type itemTemplateList struct {
+	Version   int            `json:"version"`
+	Templates []itemTemplate `json:"templates"`
 }
 
-// builtinAnnounceTemplates は全フォールバック失敗時の最終手段
+// builtinAnnounceTemplates は告知テンプレの最終フォールバック
 // （assets/announce-templates.json のスナップショット）。
 // 先頭の ID は config.DefaultRestart() の TemplateID と同期すること。
-var builtinAnnounceTemplates = []announceTemplate{
+var builtinAnnounceTemplates = []itemTemplate{
 	{
 		ID:    "torazo-close",
 		Label: map[string]string{"ja": "とらぞセッション閉店アナウンス", "en": "Torazo session closing announce"},
@@ -64,15 +69,42 @@ var builtinAnnounceTemplates = []announceTemplate{
 	},
 }
 
-// announceTplPath は最終取得分の永続キャッシュの置き場（-data 配下・jsonstate 系）。
-func (s *Server) announceTplPath() string {
-	return filepath.Join(s.dataDir, "announce-templates.json")
+// builtinSpawnTemplates はスポーン＆パルステンプレの最終フォールバック
+// （assets/spawn-templates.json のスナップショット）。
+var builtinSpawnTemplates = []itemTemplate{
+	{
+		ID:    "tts-loop",
+		Label: map[string]string{"ja": "テキスト読み上げループ", "en": "Text-to-speech loop"},
+		URL:   "resrec:///U-MarkN/R-019ead5f-846d-7ee4-abb3-1db92b61068a",
+		Tag:   "MRHC.play",
+	},
 }
 
-// validAnnounceTemplates は id/url/tag いずれか空のエントリを除いて返す
+// templateStore は1系統のテンプレリストの取得・キャッシュ・解決器。
+type templateStore struct {
+	url     string         // 取得元（テストで差し替え）
+	client  *http.Client   // 取得用（timeout 込み）
+	path    string         // -data の永続キャッシュのフルパス（""=永続なし・テスト等）
+	builtin []itemTemplate // 全フォールバック失敗時の最終手段
+
+	mu      sync.Mutex
+	cache   []itemTemplate // 最終取得成功分のメモリキャッシュ
+	fetched time.Time      // cache の取得時刻（TTL 判定。永続分から復元したときはゼロ）
+}
+
+func newTemplateStore(url, path string, builtin []itemTemplate) *templateStore {
+	return &templateStore{
+		url:     url,
+		path:    path,
+		builtin: builtin,
+		client:  &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+// validItemTemplates は id/url/tag いずれか空のエントリを除いて返す
 // （壊れた1件で全体を捨てない）。label は任意＝UI が id へフォールバックする。
-func validAnnounceTemplates(list []announceTemplate) []announceTemplate {
-	out := make([]announceTemplate, 0, len(list))
+func validItemTemplates(list []itemTemplate) []itemTemplate {
+	out := make([]itemTemplate, 0, len(list))
 	for _, t := range list {
 		if t.ID != "" && t.URL != "" && t.Tag != "" {
 			out = append(out, t)
@@ -81,16 +113,16 @@ func validAnnounceTemplates(list []announceTemplate) []announceTemplate {
 	return out
 }
 
-// fetchAnnounceTemplates はリモートから1回取得する。HTTP/JSON 失敗・有効0件はエラー。
-func (s *Server) fetchAnnounceTemplates(ctx context.Context) ([]announceTemplate, error) {
-	if s.tplClient == nil || s.tplURL == "" {
+// fetch はリモートから1回取得する。HTTP/JSON 失敗・有効0件はエラー。
+func (st *templateStore) fetch(ctx context.Context) ([]itemTemplate, error) {
+	if st.client == nil || st.url == "" {
 		return nil, fmt.Errorf("取得元が未設定")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.tplURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, st.url, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.tplClient.Do(req)
+	res, err := st.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -98,67 +130,67 @@ func (s *Server) fetchAnnounceTemplates(ctx context.Context) ([]announceTemplate
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", res.StatusCode)
 	}
-	var list announceTemplateList
+	var list itemTemplateList
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&list); err != nil {
 		return nil, err
 	}
-	got := validAnnounceTemplates(list.Templates)
+	got := validItemTemplates(list.Templates)
 	if len(got) == 0 {
 		return nil, fmt.Errorf("有効なテンプレートが0件")
 	}
 	return got, nil
 }
 
-// announceTemplates は現在有効なテンプレ一覧と出所（remote|cache|builtin）を返す。
+// templates は現在有効なテンプレ一覧と出所（remote|cache|builtin）を返す。
 // 取得成功時はメモリ＋永続キャッシュを更新する。失敗時の cache は
 // 「過去に取得成功したリスト」（期限切れメモリ または -data の永続分）。
-func (s *Server) announceTemplates(ctx context.Context) ([]announceTemplate, string) {
-	s.tplMu.Lock()
-	defer s.tplMu.Unlock()
-	if len(s.tplCache) > 0 && time.Since(s.tplFetched) < announceTemplatesTTL {
-		return s.tplCache, "remote"
+func (st *templateStore) templates(ctx context.Context) ([]itemTemplate, string) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if len(st.cache) > 0 && time.Since(st.fetched) < itemTemplatesTTL {
+		return st.cache, "remote"
 	}
-	got, err := s.fetchAnnounceTemplates(ctx)
+	got, err := st.fetch(ctx)
 	if err == nil {
-		s.tplCache, s.tplFetched = got, time.Now()
-		if s.dataDir != "" {
-			writeJSONFile(s.announceTplPath(), announceTemplateList{Version: 1, Templates: got})
+		st.cache, st.fetched = got, time.Now()
+		if st.path != "" {
+			writeJSONFile(st.path, itemTemplateList{Version: 1, Templates: got})
 		}
 		return got, "remote"
 	}
-	log.Printf("[announce-templates] リモート取得に失敗（キャッシュへフォールバック）: %v", err)
-	if len(s.tplCache) > 0 {
-		return s.tplCache, "cache"
+	log.Printf("[item-templates] リモート取得に失敗（キャッシュへフォールバック）: %v", err)
+	if len(st.cache) > 0 {
+		return st.cache, "cache"
 	}
-	if s.dataDir != "" {
-		st := readJSONFile[announceTemplateList](s.announceTplPath())
-		if got := validAnnounceTemplates(st.Templates); len(got) > 0 {
-			s.tplCache = got // tplFetched はゼロのまま＝次回も再取得を試みる
+	if st.path != "" {
+		persisted := readJSONFile[itemTemplateList](st.path)
+		if got := validItemTemplates(persisted.Templates); len(got) > 0 {
+			st.cache = got // fetched はゼロのまま＝次回も再取得を試みる
 			return got, "cache"
 		}
 	}
-	return builtinAnnounceTemplates, "builtin"
+	return st.builtin, "builtin"
 }
 
-// lookupAnnounceTemplate は id のテンプレをフォールバック連鎖の結果から探す。
-func (s *Server) lookupAnnounceTemplate(ctx context.Context, id string) (announceTemplate, bool) {
-	list, _ := s.announceTemplates(ctx)
+// lookup は id のテンプレをフォールバック連鎖の結果から探す。
+func (st *templateStore) lookup(ctx context.Context, id string) (itemTemplate, bool) {
+	list, _ := st.templates(ctx)
 	for _, t := range list {
 		if t.ID == id {
 			return t, true
 		}
 	}
-	return announceTemplate{}, false
+	return itemTemplate{}, false
 }
 
-// resolveAnnounce は templateId を URL/タグへ解決した AnnounceAction を返す。
+// resolveAnnounce は告知の templateId を URL/タグへ解決した AnnounceAction を返す。
 // templateId 空（手動入力）はそのまま。未解決（リストから id が消えた等の異常系）は
 // ok=false＝呼び出し側（orchestrator）が告知をスキップしてログに残す。
 func (s *Server) resolveAnnounce(ctx context.Context, a config.AnnounceAction) (config.AnnounceAction, bool) {
 	if a.TemplateID == "" {
 		return a, true
 	}
-	t, ok := s.lookupAnnounceTemplate(ctx, a.TemplateID)
+	t, ok := s.announceTpl.lookup(ctx, a.TemplateID)
 	if !ok {
 		return a, false
 	}
@@ -166,9 +198,19 @@ func (s *Server) resolveAnnounce(ctx context.Context, a config.AnnounceAction) (
 	return a, true
 }
 
-// handleAnnounceTemplates: GET /api/v1/announce-templates
+// writeTemplates は GET テンプレ一覧の共通実装。
 // フォールバック連鎖により常に 200 で何かしらの一覧を返す（フロントの選択肢用）。
-func (s *Server) handleAnnounceTemplates(w http.ResponseWriter, r *http.Request) {
-	list, source := s.announceTemplates(r.Context())
+func writeTemplates(w http.ResponseWriter, r *http.Request, st *templateStore) {
+	list, source := st.templates(r.Context())
 	writeOK(w, map[string]any{"templates": list, "source": source})
+}
+
+// handleAnnounceTemplates: GET /api/v1/announce-templates（告知テンプレ一覧）
+func (s *Server) handleAnnounceTemplates(w http.ResponseWriter, r *http.Request) {
+	writeTemplates(w, r, s.announceTpl)
+}
+
+// handleSpawnTemplates: GET /api/v1/spawn-templates（スポーン＆パルステンプレ一覧）
+func (s *Server) handleSpawnTemplates(w http.ResponseWriter, r *http.Request) {
+	writeTemplates(w, r, s.spawnTpl)
 }

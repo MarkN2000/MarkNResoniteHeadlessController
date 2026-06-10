@@ -57,6 +57,14 @@ const testPassword = "test-pass"
 // 認証は Bearer パスワード（testPassword）でテストする（cookie 経路は auth_test.go）。
 func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 	t.Helper()
+	ts, pw, _ = newTestServerFull(t)
+	return ts, pw
+}
+
+// newTestServerFull は newTestServer に加えて *Server も返す
+// （テンプレ取得元の差し替え・待機短縮などフィールド調整が要るテスト用）。
+func newTestServerFull(t *testing.T) (ts *httptest.Server, pw string, srv *Server) {
+	t.Helper()
 	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
 	cfg := &config.Config{
 		Version:           config.SchemaVersion,
@@ -84,10 +92,10 @@ func newTestServer(t *testing.T) (ts *httptest.Server, pw string) {
 		t.Fatalf("fakehl never became ready")
 	}
 
-	srv := New(cfg, "", drv, resonite.NewClient(), nil) // webFS=nil → '/' ハンドラは未登録（テストでは不要）
+	srv = New(cfg, "", drv, resonite.NewClient(), nil) // webFS=nil → '/' ハンドラは未登録（テストでは不要）
 	ts = httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close) // LIFO: ts.Close → stopFakehl の順で走る
-	return ts, testPassword
+	return ts, testPassword, srv
 }
 
 // stopFakehl は fakehl を確実に終了させる（graceful shutdown → 猶予 → pid 強制終了）。

@@ -298,6 +298,59 @@ func (s *Server) handleSessionImpulse(w http.ResponseWriter, r *http.Request) {
 	s.execSession(w, r, idx, headless.DynamicImpulseStringCmd(body.Tag, body.Value))
 }
 
+// handleSessionSpawnImpulse: スポーン＆パルス＝告知③のセッション版（フォーカス中ワールドのみ）。
+// spawn → 実体化待ち（spawnImpulseDelay）→ dynamicimpulsestring を1リクエストで完走する
+// （途中でブラウザを閉じても impulse まで届く）。templateId 非空＝スポーン＆パルステンプレから
+// URL/タグを実行直前に解決・空＝手動（itemUrl/impulseTag を使用）。告知③と同じく itemUrl 空は
+// spawn 省略で impulse のみ・spawn は active=true / persistent=false 固定（一時アイテム）。
+// 待機中は execMu を保持しない（spawn と impulse を別 ExecGroup に分ける＝他リクエストを妨げない）。
+func (s *Server) handleSessionSpawnImpulse(w http.ResponseWriter, r *http.Request) {
+	idx, ok := reqIdx(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		TemplateID string `json:"templateId"`
+		ItemURL    string `json:"itemUrl"`
+		ImpulseTag string `json:"impulseTag"`
+		Message    string `json:"message"`
+	}
+	if !decodeBody(w, r, &body) {
+		return
+	}
+	url, tag := body.ItemURL, body.ImpulseTag
+	if body.TemplateID != "" {
+		tpl, found := s.spawnTpl.lookup(r.Context(), body.TemplateID)
+		if !found {
+			writeErr(w, http.StatusBadRequest, "bad_request", "テンプレートが見つかりません: "+body.TemplateID)
+			return
+		}
+		url, tag = tpl.URL, tpl.Tag
+	}
+	if !requireField(w, "impulseTag", tag) {
+		return
+	}
+	if url != "" {
+		err := s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
+			if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+				return e
+			}
+			_, e := tx.Exec(headless.SpawnCmd(url, true, false))
+			return e
+		})
+		if err != nil {
+			writeExecErr(w, err)
+			return
+		}
+		select { // spawn したアイテムの実体化（アセット読込）を待ってから impulse
+		case <-r.Context().Done():
+			return
+		case <-time.After(s.spawnImpulseDelay):
+		}
+	}
+	s.execSession(w, r, idx, headless.DynamicImpulseStringCmd(tag, body.Message))
+}
+
 // handleSessionStart: 稼働中に新規ワールドを開始（/start のプロセス起動とは別物）。
 //   - mode=url      → startworldurl "<url>"
 //   - mode=template → startWorldTemplate "<name>"（テンプレ名に空白があり得るため引用。要実機検証）

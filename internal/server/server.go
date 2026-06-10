@@ -61,13 +61,13 @@ type Server struct {
 	updateCheck   *selfupdate.Info
 	updateCheckAt time.Time
 
-	// 告知テンプレートのリモートリスト（announce_templates.go・docs/design/announce-templates.md）。
-	// tplURL/tplClient はテストで差し替える。tplCache は最終取得成功分のメモリキャッシュ。
-	tplMu      sync.Mutex
-	tplCache   []announceTemplate
-	tplFetched time.Time // tplCache の取得時刻（TTL 判定。永続分から復元したときはゼロ）
-	tplURL     string
-	tplClient  *http.Client
+	// アイテムテンプレートのリモートリスト2系統（announce_templates.go・docs/design/announce-templates.md）。
+	announceTpl *templateStore // 告知（事前アクション③）
+	spawnTpl    *templateStore // スポーン＆パルス（セッションタブ）
+
+	// spawnImpulseDelay はスポーン＆パルスの spawn→impulse 間の実体化待ち（本番5秒・テストで縮める）。
+	// 告知③の10秒（orchestrator.spawnDelay）より短い＝対話操作は失敗しても即再実行できるため。
+	spawnImpulseDelay time.Duration
 
 	// requestRestart は MRHC プロセスの再起動依頼を main へ伝える（自己更新後の
 	// 「今すぐ再起動」）。graceful 停止後に新バイナリを起動し直す。main が Listen 前に
@@ -141,9 +141,17 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		webFS:     webFS,
 		resonite:  reso,
 		checkDeps: platform.CheckHeadlessDeps,
-		tplURL:    announceTemplatesURL,
-		tplClient: &http.Client{Timeout: 10 * time.Second},
+
+		spawnImpulseDelay: 5 * time.Second,
 	}
+	tplPath := func(name string) string {
+		if dataDir == "" {
+			return ""
+		}
+		return filepath.Join(dataDir, name)
+	}
+	s.announceTpl = newTemplateStore(announceTemplatesURL, tplPath("announce-templates.json"), builtinAnnounceTemplates)
+	s.spawnTpl = newTemplateStore(spawnTemplatesURL, tplPath("spawn-templates.json"), builtinSpawnTemplates)
 	s.auth = newAuthManager(cfg, &s.cfgMu)
 	s.restart = newRestartOrchestrator(s)
 	s.scheduler = newRestartScheduler(s)
@@ -229,6 +237,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/restart-config", s.requireAuth(s.handleRestartConfigGet))
 	mux.HandleFunc("PUT /api/v1/restart-config", s.requireAuth(s.handleRestartConfigPut))
 	mux.HandleFunc("GET /api/v1/announce-templates", s.requireAuth(s.handleAnnounceTemplates)) // 告知テンプレ一覧（リモートリスト）
+	mux.HandleFunc("GET /api/v1/spawn-templates", s.requireAuth(s.handleSpawnTemplates))       // スポーン＆パルステンプレ一覧（同機構）
 	mux.HandleFunc("GET /api/v1/restart-status", s.requireAuth(s.handleRestartStatus))
 	mux.HandleFunc("POST /api/v1/restart/trigger", s.requireAuth(s.handleRestartTrigger))
 	mux.HandleFunc("POST /api/v1/restart/cancel", s.requireAuth(s.handleRestartCancel))
@@ -252,6 +261,7 @@ func (s *Server) Handler() http.Handler {
 	// セッション内コンテンツ操作（focus idx → <cmd>・R14）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/spawn", s.requireAuth(s.handleSessionSpawn))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/impulse", s.requireAuth(s.handleSessionImpulse))
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/spawn-impulse", s.requireAuth(s.handleSessionSpawnImpulse)) // スポーン＆パルス（spawn→待機→impulse）
 	// セッションライフサイクル（focus idx → <cmd>）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/restart", s.requireAuth(s.sessionCmdOp("restart", headless.WithTimeout(restartTimeout))))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/save", s.requireAuth(s.sessionCmdOp("save", headless.WithTimeout(saveTimeout))))

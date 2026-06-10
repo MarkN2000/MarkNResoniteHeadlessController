@@ -1,6 +1,5 @@
 // スケジュールタブの表示ヘルパ（純関数）。Phase 8・§3.16。
 import type {
-  AnnounceTemplate,
   RestartAnnounce,
   RestartCrashRecovery,
   RestartSessionChanges,
@@ -86,12 +85,7 @@ export function defaultAnnounce(): RestartAnnounce {
 export function defaultSessionChanges(): RestartSessionChanges {
   return { setPrivate: false, setMaxUsersOne: true, renameEnabled: false, renameTo: "" };
 }
-
-// テンプレ表示名の言語フォールバック: 現在言語 → en → ja → 先頭のラベル → id。
-// リモートJSON側の言語追加とUI側の対応言語追加が互いに独立でも壊れないようにする。
-export function templateLabel(tpl: AnnounceTemplate, locale: string): string {
-  return tpl.label?.[locale] ?? tpl.label?.en ?? tpl.label?.ja ?? Object.values(tpl.label ?? {})[0] ?? tpl.id;
-}
+// テンプレ表示名の言語フォールバック等は lib/itemTemplates.ts（セッションタブと共用）。
 
 // 稼働時間/残り時間を言語非依存の短い表記にする（例: "1d 2h" / "2h 34m" / "34m"）。
 export function formatDuration(sec: number): string {

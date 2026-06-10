@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Divider, Stack, Switch } from "@mantine/core";
 import * as api from "../../api";
-import type { AnnounceTemplate, RestartAnnounce, RestartConfig, RestartSessionChanges } from "../../api";
+import type { RestartAnnounce, RestartConfig, RestartSessionChanges } from "../../api";
 import {
   InspectorCard,
   FieldRow,
@@ -12,10 +11,9 @@ import {
 } from "../../components/inspector";
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
-import { defaultAnnounce, defaultSessionChanges, templateLabel } from "./scheduleModel";
-
-// 「手動入力」を表す番兵（テンプレ id には使わない "#" を含むため実テンプレ id と衝突しない）。
-const MANUAL = "#manual";
+import { useItemTemplates } from "../../hooks/useItemTemplates";
+import { MANUAL_TEMPLATE, buildTemplateSelectData } from "../../lib/itemTemplates";
+import { defaultAnnounce, defaultSessionChanges } from "./scheduleModel";
 
 // ⑤事前アクションカード（§3.16(2)(7)）。告知（dynamicImpulse・フル設定型）＋セッション変更。
 // 他カードと同じ value/onChange の1組で受け、preActions スライスの合成はカード内に閉じる。
@@ -32,16 +30,7 @@ export function PreActionsCard({
   const s = value.sessionChanges;
 
   // 告知テンプレ一覧（backend がリモートリスト＋フォールバックで常に何かしら返す）。
-  const [templates, setTemplates] = useState<AnnounceTemplate[]>([]);
-  useEffect(() => {
-    let alive = true;
-    void api.getAnnounceTemplates().then((list) => {
-      if (alive) setTemplates(list);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const templates = useItemTemplates(api.getAnnounceTemplates);
   const setAnnounce = (announce: RestartAnnounce) => onChange({ ...value, announce });
   const setSession = (sessionChanges: RestartSessionChanges) => onChange({ ...value, sessionChanges });
 
@@ -57,24 +46,17 @@ export function PreActionsCard({
       }),
   });
 
-  // 告知アイテム＝テンプレ選択 or 手動入力。保存値（templateId）から選択状態を導出する。
-  // 保存済み id が一覧に無い間（取得前 / リストから消えた異常系）も選択表示が消えないよう
-  // id をそのままラベルにした項目を補う。
-  const itemKey = a.templateId !== "" ? a.templateId : MANUAL;
-  const isManual = itemKey === MANUAL;
-  const itemData = [
-    ...templates.map((tpl) => ({ value: tpl.id, label: templateLabel(tpl, i18n.language) })),
-    ...(isManual || templates.some((tpl) => tpl.id === a.templateId)
-      ? []
-      : [{ value: a.templateId, label: a.templateId }]),
-    { value: MANUAL, label: t("schedule.announceManual") },
-  ];
+  // 告知アイテム＝テンプレ選択 or 手動入力。保存値（templateId）から選択状態を導出する
+  // （選択肢の組み立て＝消滅id補完含む は lib/itemTemplates と共用）。
+  const itemKey = a.templateId !== "" ? a.templateId : MANUAL_TEMPLATE;
+  const isManual = itemKey === MANUAL_TEMPLATE;
+  const itemData = buildTemplateSelectData(templates, a.templateId, i18n.language, t("schedule.announceManual"));
 
   // テンプレ選択＝templateId のみ保存（URL/タグは backend が告知時に解決）。
   // 手動＝templateId を空にして itemUrl/impulseTag の入力欄を開く。
   const selectItem = (v: string | null) => {
     if (!v) return;
-    if (v === MANUAL) setAnnounce({ ...a, templateId: "" });
+    if (v === MANUAL_TEMPLATE) setAnnounce({ ...a, templateId: "" });
     else setAnnounce({ ...a, templateId: v, itemUrl: "", impulseTag: "" });
   };
 

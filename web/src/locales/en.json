@@ -117,7 +117,12 @@
     "impulseTagPlaceholder": "e.g. MRHC.play",
     "impulseValue": "Value (String)",
     "impulseValuePlaceholder": "(optional)",
-    "impulseSend": "Send"
+    "impulseSend": "Send",
+    "spawnPulseSection": "Spawn & Pulse",
+    "spawnPulseItem": "Item",
+    "spawnPulseManual": "Manual input",
+    "spawnPulseMessage": "Message",
+    "spawnPulseRun": "Run"
   },
   "friends": {
     "source": "User search",
@@ -494,7 +499,8 @@
     "messageDone": "Message sent",
     "newSessionDone": "Session opened",
     "spawnDone": "Item spawned",
-    "impulseDone": "Impulse sent"
+    "impulseDone": "Impulse sent",
+    "spawnPulseDone": "Spawn & Pulse executed"
   },
   "update": {
     "title": "MRHC update",
