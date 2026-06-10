@@ -8,7 +8,7 @@ spawn するアイテム＋impulse タグのテンプレート一覧を、アプ
 | 系統 | 配信ファイル | 利用箇所 | API |
 |---|---|---|---|
 | 告知 | `assets/announce-templates.json` | 事前アクション③（§3.16(2)・全ワールド対象） | `GET /api/v1/announce-templates` |
-| スポーン＆パルス | `assets/spawn-templates.json` | セッションタブ（フォーカス中ワールドのみ） | `GET /api/v1/spawn-templates` |
+| スポーン＆パルス | `assets/spawn-templates.json` | セッションタブ（フォーカス中ワールドのみ。**アイテムスポーン単体も同リストを流用**） | `GET /api/v1/spawn-templates` |
 
 ## 1. 目的
 
@@ -48,6 +48,9 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
   （UI は 現在言語→en→ja→先頭→id の順でフォールバック表示・`web/src/lib/itemTemplates.ts`）。
 - main ブランチ参照のため反映はリリースと無関係に即時（raw の CDN キャッシュ約5分以内）。
 - 不正エントリ（id/url/tag いずれか空）は読み手側でスキップされる。有効0件は取得失敗扱い。
+- **`tag` は全エントリ必須**（スポーン単体でしか使わないアイテムもダミー値を入れる・2026-06-10 裁定）。
+  スポーン専用アイテムが本格的に増えたら「tag 任意化＋スポーン＆パルス側で tag 無しテンプレを非表示」
+  への緩和を再検討する。
 
 ## 3. 利用箇所のセマンティクス
 
@@ -75,6 +78,13 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
   impulse のみ。待機中は execMu を保持しない（spawn/impulse を別 ExecGroup に分離）。
 - 設定としては保存しない（その場実行・UI 状態のみ）。
 - 未知の `templateId` は 400（対話操作なのでエラーを即返す。告知の「スキップしてログ」とは異なる）。
+
+### 3c. アイテムスポーン単体（セッションタブ・既存 `POST /api/v1/sessions/{idx}/spawn`）
+
+- スポーン＆パルスと**同じリストを流用**してテンプレ選択 UI を提供（2026-06-10）。選択中のテンプレの
+  `url` を**クライアント側で**そのまま既存 spawn API に渡すだけ（backend 無変更・`tag`/`message` は未使用）。
+  保存される設定ではなくその場実行のため、告知のような実行時サーバー解決は行わない。
+- `active`/`persistent` のチェックボックスはテンプレ選択と独立に効く（単体スポーンの存在意義）。
 
 ## 4. 取得・フォールバック（`internal/server/announce_templates.go` の `templateStore`）
 

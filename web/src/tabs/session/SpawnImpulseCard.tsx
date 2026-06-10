@@ -15,7 +15,7 @@ import { MANUAL_TEMPLATE, buildTemplateSelectData } from "../../lib/itemTemplate
 import { isResoniteUrl } from "../../lib/resoniteUrl";
 
 // スポーン / インパルス（R14・フォーカス中セッションへ）。
-//   アイテムスポーン       = spawn "<url>" <active> <persistent>
+//   アイテムスポーン       = spawn "<url>" <active> <persistent>（テンプレ選択 or 手動 URL・2026-06-10）
 //   ダイナミックインパルス = dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
 //   スポーン＆パルス       = テンプレ（リモートリスト）or 手動 → backend が spawn→約5秒→impulse を完走
 //                            （告知③のセッション版・docs/design/announce-templates.md）
@@ -33,8 +33,25 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
   const urlValid = isResoniteUrl(url);
   const tagValid = tag.trim() !== "";
 
-  // スポーン＆パルス。選択は未操作なら先頭テンプレを既定にする（取得前は手動入力に退化）。
+  // テンプレ一覧（アイテムスポーン単体とスポーン＆パルスで共用・取得前は手動入力に退化）。
   const templates = useItemTemplates(api.getSpawnTemplates);
+
+  // アイテムスポーン単体のテンプレ選択（未操作なら先頭テンプレ・2026-06-10）。テンプレの url
+  // だけを使い tag は使わない（スポーン専用アイテムもリスト上はダミー tag 必須の運用）。
+  // active/persistent は選択と独立に効く（単体スポーンの存在意義なので残す）。
+  const [spawnSel, setSpawnSel] = useState<string | null>(null);
+  const spawnKey = spawnSel ?? templates[0]?.id ?? MANUAL_TEMPLATE;
+  const spawnManual = spawnKey === MANUAL_TEMPLATE;
+  const spawnData = buildTemplateSelectData(
+    templates,
+    spawnManual ? "" : spawnKey,
+    i18n.language,
+    t("session.spawnPulseManual"),
+  );
+  const spawnUrl = spawnManual ? url.trim() : (templates.find((tpl) => tpl.id === spawnKey)?.url ?? "");
+  const spawnReady = spawnManual ? urlValid : spawnUrl !== "";
+
+  // スポーン＆パルス。選択は未操作なら先頭テンプレを既定にする。
   const [spSel, setSpSel] = useState<string | null>(null);
   const [spUrl, setSpUrl] = useState("");
   const [spTag, setSpTag] = useState("");
@@ -64,24 +81,29 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
   return (
     <InspectorCard title={t("session.spawnImpulse")}>
       <Stack gap={10}>
-        {/* アイテムスポーン */}
+        {/* アイテムスポーン（テンプレ選択 or 手動 URL。スポーン＆パルスと同パターン） */}
         <Text size="xs" fw={700} c="dimmed">
           {t("session.spawnSection")}
         </Text>
-        <FieldRow label={t("session.spawnUrl")} align="start">
-          <Stack gap={4}>
-            <InspectorTextInput
-              value={url}
-              onChange={(e) => setUrl(e.currentTarget.value)}
-              placeholder={t("session.spawnUrlPlaceholder")}
-            />
-            {url.trim() !== "" && !urlValid && (
-              <Text size="xs" c="dimmed">
-                {t("session.spawnUrlHint")}
-              </Text>
-            )}
-          </Stack>
+        <FieldRow label={t("session.spawnPulseItem")}>
+          <InspectorSelect data={spawnData} value={spawnKey} onChange={(v) => v && setSpawnSel(v)} />
         </FieldRow>
+        {spawnManual && (
+          <FieldRow label={t("session.spawnUrl")} align="start">
+            <Stack gap={4}>
+              <InspectorTextInput
+                value={url}
+                onChange={(e) => setUrl(e.currentTarget.value)}
+                placeholder={t("session.spawnUrlPlaceholder")}
+              />
+              {url.trim() !== "" && !urlValid && (
+                <Text size="xs" c="dimmed">
+                  {t("session.spawnUrlHint")}
+                </Text>
+              )}
+            </Stack>
+          </FieldRow>
+        )}
         <Group justify="space-between" wrap="wrap" gap="xs">
           <Group gap="md">
             <Checkbox
@@ -98,10 +120,8 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
             />
           </Group>
           <InspectorButton
-            disabled={busy || !urlValid}
-            onClick={() =>
-              void run(() => api.spawnItem(idx, url.trim(), active, persistent), t("toast.spawnDone"))
-            }
+            disabled={busy || !spawnReady}
+            onClick={() => void run(() => api.spawnItem(idx, spawnUrl, active, persistent), t("toast.spawnDone"))}
           >
             {t("session.spawn")}
           </InspectorButton>
