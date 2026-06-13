@@ -191,7 +191,7 @@ func (s *Server) handleRestartCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGracefulStop: POST /api/v1/stop/graceful
-// 「通常停止」を即受付（非同期・R7）。事前アクション→固定2分の猶予→停止（起動しない）。
+// 「通常停止」を即受付（非同期・R7）。事前アクション→固定1分の猶予→停止（起動しない）。
 // orchestrator の統一フローを終端=停止で流用。進行/中止は restart-status・restart/cancel と共通。
 func (s *Server) handleGracefulStop(w http.ResponseWriter, r *http.Request) {
 	if err := s.restart.TriggerStop(); err != nil {

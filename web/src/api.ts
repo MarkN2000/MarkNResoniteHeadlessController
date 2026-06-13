@@ -728,10 +728,10 @@ export async function getSystemMetrics(): Promise<SystemMetrics | null> {
   return getData<SystemMetrics>("/system/metrics");
 }
 
-// 手動「通常再起動」を受付（configName 空=前回 config）。
+// 手動「通常再起動」を受付（configName 空=前回 config）。即応＝即告知＋最長1分（backend で固定上書き）。
 export const triggerRestart = (configName?: string) =>
   post("/restart/trigger", { configName: configName ?? "" });
 // 進行中の再起動を中止（①②③のみ）。通常停止の中止にも共用。
 export const cancelRestart = () => post("/restart/cancel");
-// 通常停止（事前アクション→2分→停止・R7）。orchestrator 統一フローを終端=停止で流用。
+// 通常停止（事前アクション→1分→停止・R7）。orchestrator 統一フローを終端=停止で流用。
 export const gracefulStop = () => post("/stop/graceful");

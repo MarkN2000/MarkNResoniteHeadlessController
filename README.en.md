@@ -222,7 +222,7 @@ Resonite's headless server is distributed as a **private beta**, and a "headless
 Manage your entire headless server from a browser on your LAN.
 
 **Start / stop / monitoring**
-- Start / graceful stop (stops safely in about 2 minutes) / force stop / restart of the headless (Resonite process)
+- Start / graceful stop (announces, locks the session, then stops as soon as everyone leaves or after 1 minute at most) / force stop / restart of the headless (Resonite process)
 - Live status: participants (present/away), world info, uptime, session URL
 - Live log of Resonite output (SSE), plus viewing and copying log files
 - Server resource usage (CPU / memory / free disk)

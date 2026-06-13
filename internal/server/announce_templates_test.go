@@ -220,7 +220,7 @@ func TestAnnounce_TemplateResolvedAtRuntime(t *testing.T) {
 		a.ItemURL, a.ImpulseTag = "resrec:///resolved", "TAG.resolved"
 		return a, true
 	}
-	if err := o.Trigger("manual", "day"); err != nil {
+	if err := o.Trigger("scheduled", "day"); err != nil { // 予定経路＝config の待機制御で告知タイミングを検証
 		t.Fatalf("trigger 失敗: %v", err)
 	}
 	waitUntil(t, func() bool { _, _, starts, _ := d.snap(); return starts == 1 }, 5*time.Second, "再起動完了")
@@ -244,7 +244,7 @@ func TestAnnounce_UnresolvableTemplateSkipsAnnounce(t *testing.T) {
 	o.resolveAnnounce = func(_ context.Context, a config.AnnounceAction) (config.AnnounceAction, bool) {
 		return a, false
 	}
-	if err := o.Trigger("manual", "day"); err != nil {
+	if err := o.Trigger("scheduled", "day"); err != nil { // 予定経路＝config の待機制御で告知タイミングを検証
 		t.Fatalf("trigger 失敗: %v", err)
 	}
 	waitUntil(t, func() bool { _, _, starts, _ := d.snap(); return starts == 1 }, 5*time.Second, "再起動完了")

@@ -214,6 +214,38 @@ func TestTrigger_ZeroUsersImmediate(t *testing.T) {
 	}
 }
 
+// 手動「通常再起動」は config の待機制御を無視し、固定の即応（即告知＋最長1分＝immediateManualWait）で動く。
+// config に「実質止まらない」待機を入れても、在席ありで ①即セッション変更 → ③即告知 → 締切で再起動する
+// （present=2 固定なので「0人化による即時」ではなく「締切＝上書きされた短い待機」による再起動であることを担保）。
+func TestTrigger_ManualUsesImmediateWait(t *testing.T) {
+	d := &fakeDriver{state: headless.StateRunning}
+	fw := &fakeWorlds{present: 2} // 在席し続ける（0人即時ではない）
+	rc := config.DefaultRestart()
+	rc.WaitControl = config.WaitControl{QuietWaitMin: 100000, AnnounceWaitMin: 0} // 予定なら実質止まらない＝手動上書きの証明用
+	rc.PreActions.SessionChanges = config.SessionChanges{SetMaxUsersOne: true}
+	rc.PreActions.Announce = config.AnnounceAction{Enabled: true, ItemURL: "resrec:///x", ImpulseTag: "MRHC.play", Message: "再起動します"}
+	o := newTestOrch(d, fw, rc, "night")
+	o.minute = 20 * time.Millisecond // 締切=約20ms（即告知の観測に余裕を持たせ flaky を避ける）
+
+	if err := o.Trigger("manual", ""); err != nil {
+		t.Fatalf("trigger 失敗: %v", err)
+	}
+	// 手動は {0,1} に上書きされるので、config の長大な待機に関係なく素早く再起動する。
+	waitUntil(t, func() bool { _, _, starts, _ := d.snap(); return starts == 1 }, 2*time.Second, "即応再起動")
+	waitUntil(t, func() bool { return !o.snapshot().inProgress }, 2*time.Second, "進行終了")
+
+	cmds := fw.commands()
+	if !hasCmd(cmds, "maxusers 1") {
+		t.Fatalf("① セッション変更が即発火していない: %v", cmds)
+	}
+	if !hasCmd(cmds, `dynamicimpulsestring "MRHC.play" "再起動します"`) {
+		t.Fatalf("③ 即告知が出ていない: %v", cmds)
+	}
+	if _, _, starts, label := d.snap(); starts != 1 || label != "night" {
+		t.Fatalf("再起動が想定外: starts=%d label=%q", starts, label)
+	}
+}
+
 func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	fw := &fakeWorlds{present: 2} // 常に在席→締切で強制
@@ -223,7 +255,7 @@ func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 	rc.PreActions.Announce = config.AnnounceAction{Enabled: true, ItemURL: "resrec:///x", ImpulseTag: "MRHC.play", Message: "再起動します"}
 	o := newTestOrch(d, fw, rc, "night")
 
-	if err := o.Trigger("manual", "day"); err != nil {
+	if err := o.Trigger("scheduled", "day"); err != nil { // 予定経路＝config の待機制御を honors（手動は別途固定化を検証）
 		t.Fatalf("trigger 失敗: %v", err)
 	}
 	waitUntil(t, func() bool { _, _, starts, _ := d.snap(); return starts == 1 }, 5*time.Second, "強制再起動完了")
@@ -252,7 +284,7 @@ func TestTrigger_CancelDuringWaiting(t *testing.T) {
 	rc.PreActions.Announce.Enabled = false
 	o := newTestOrch(d, fw, rc, "night")
 
-	if err := o.Trigger("manual", ""); err != nil {
+	if err := o.Trigger("scheduled", ""); err != nil { // 予定経路＝config の長い待機を honors（待機にとどめてから cancel）
 		t.Fatalf("trigger 失敗: %v", err)
 	}
 	waitUntil(t, func() bool { return o.snapshot().phase == phaseWaiting }, 2*time.Second, "待機到達")
@@ -275,10 +307,10 @@ func TestTrigger_DoubleRejected(t *testing.T) {
 	rc.PreActions.Announce.Enabled = false
 	o := newTestOrch(d, fw, rc, "night")
 
-	if err := o.Trigger("manual", ""); err != nil {
+	if err := o.Trigger("scheduled", ""); err != nil { // 予定経路＝config の長い待機で進行中にとどめる
 		t.Fatalf("1回目の trigger 失敗: %v", err)
 	}
-	if err := o.Trigger("manual", ""); err != errRestartInProgress {
+	if err := o.Trigger("scheduled", ""); err != errRestartInProgress {
 		t.Fatalf("2回目は errRestartInProgress のはず: %v", err)
 	}
 	_ = o.Cancel()
@@ -294,7 +326,7 @@ func TestTrigger_HeadlessStopsDuringWait(t *testing.T) {
 	rc.PreActions.Announce.Enabled = false
 	o := newTestOrch(d, fw, rc, "night")
 
-	if err := o.Trigger("manual", ""); err != nil {
+	if err := o.Trigger("scheduled", ""); err != nil { // 予定経路＝config の長い待機で待機にとどめてからクラッシュ模擬
 		t.Fatalf("trigger 失敗: %v", err)
 	}
 	waitUntil(t, func() bool { return o.snapshot().phase == phaseWaiting }, 2*time.Second, "待機到達")
@@ -367,7 +399,7 @@ func TestTriggerStop_ZeroUsersImmediate(t *testing.T) {
 	}
 }
 
-// 在席ありなら ①セッション変更を即発火 → 固定2分猶予 → 停止（起動しない）。
+// 在席ありなら ①セッション変更を即発火 → 即応（固定1分）猶予 → 停止（起動しない）。
 func TestTriggerStop_WithUsers_SessionThenStop(t *testing.T) {
 	d := &fakeDriver{state: headless.StateRunning}
 	fw := &fakeWorlds{present: 2}
