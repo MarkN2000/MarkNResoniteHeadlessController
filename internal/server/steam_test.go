@@ -18,6 +18,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/steam"
 )
 
 // newSteamServer は認証つきのテストサーバー一式を返す（steam・update 系テストで共用。
@@ -157,15 +158,17 @@ func TestSteamStatus_Idle(t *testing.T) {
 
 // TestMaybeScheduledUpdate_NoopGating は更新を「走らせない」3条件を検証する（実DLしないことを担保）。
 // 実際に更新する経路（scheduled+ON+設定済み）は internal/steam の偽DD e2e で網羅する。
-func TestMaybeScheduledUpdate_NoopGating(t *testing.T) {
+func TestMaybeUpdate_Gating(t *testing.T) {
 	tmp := t.TempDir()
 	cfgPath := filepath.Join(tmp, "mrhc.config.json")
 	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
 	fullSteam := &config.Steam{Username: "u", Password: "p", BranchCode: "b", InstallDir: "/i"}
 
-	mk := func(steamCfg *config.Steam, toggle bool) *Server {
+	// updateResonite seam を偽装して実 DD を走らせず、更新が呼ばれた回数だけ数える。
+	mk := func(steamCfg *config.Steam, scheduled, manual bool) (*Server, *int) {
 		rc := config.DefaultRestart()
-		rc.UpdateOnScheduledRestart = toggle
+		rc.UpdateOnScheduledRestart = scheduled
+		rc.UpdateBeforeManualStart = manual
 		cfg := &config.Config{
 			Version: config.SchemaVersion, AdminPasswordHash: string(hash),
 			SessionSecret: "x", Port: 8080,
@@ -174,24 +177,33 @@ func TestMaybeScheduledUpdate_NoopGating(t *testing.T) {
 		if err := cfg.SaveTo(cfgPath); err != nil {
 			t.Fatal(err)
 		}
-		return New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
+		s := New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
+		calls := 0
+		s.updateResonite = func(context.Context, steam.UpdateParams) error { calls++; return nil }
+		return s, &calls
 	}
 
 	cases := []struct {
-		name    string
-		trigger string
-		steam   *config.Steam
-		toggle  bool
+		name              string
+		trigger           string
+		steam             *config.Steam
+		scheduled, manual bool
+		wantCalls         int
 	}{
-		{"manual は対象外", "manual", fullSteam, true},
-		{"トグル OFF は更新しない", "scheduled", fullSteam, false},
-		{"Steam 未設定は更新しない", "scheduled", nil, true},
+		{"scheduled+ON+Steam → 更新", "scheduled", fullSteam, true, true, 1},
+		{"manual+ON+Steam → 更新", "manual", fullSteam, true, true, 1},
+		{"scheduled トグル OFF → 更新しない", "scheduled", fullSteam, false, true, 0},
+		{"manual トグル OFF → 更新しない", "manual", fullSteam, true, false, 0},
+		{"Steam 未設定は更新しない", "scheduled", nil, true, true, 0},
+		{"stop は対象外", "stop", fullSteam, true, true, 0},
 	}
 	for _, c := range cases {
-		s := mk(c.steam, c.toggle)
-		s.maybeScheduledUpdate(context.Background(), c.trigger)
-		if st := s.steam.Status().State; st != "idle" {
-			t.Errorf("%s: 更新が走ってしまった（state=%q・期待 idle）", c.name, st)
+		s, calls := mk(c.steam, c.scheduled, c.manual)
+		if err := s.maybeUpdate(context.Background(), c.trigger, nil); err != nil {
+			t.Errorf("%s: maybeUpdate が err を返した: %v", c.name, err)
+		}
+		if *calls != c.wantCalls {
+			t.Errorf("%s: 更新コール=%d want=%d", c.name, *calls, c.wantCalls)
 		}
 	}
 }

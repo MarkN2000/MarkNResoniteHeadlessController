@@ -214,6 +214,9 @@ function Shell({
         const msg =
           r.code === "headless_not_installed" ? t("toast.errHeadlessNotInstalled") : r.error || t("toast.errGeneric");
         notifyError(msg, t("toast.startFailTitle"));
+      } else if (r.updating) {
+        // 更新（DepotDownloader）を伴う起動受付（進捗は設定タブ・結果はコンソールの sys ログ）。
+        notifyInfo(t("toast.startUpdating"));
       } else if (r.runtimePrepare) {
         // .NET ランタイムの設置を伴う起動受付（進捗は設定タブ・結果はコンソールの sys ログ）。
         notifyInfo(t("toast.startRuntimePrepare"));

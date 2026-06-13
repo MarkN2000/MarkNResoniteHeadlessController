@@ -325,6 +325,10 @@ var catalog = map[string]map[Lang]string{
 		Ja: "起動に失敗しました: %v",
 		En: "Failed to start: %v",
 	},
+	"update.sysStartCancelled": {
+		Ja: "更新を中止したため起動を見送りました。もう一度起動してください。",
+		En: "Update cancelled, so startup was skipped. Start again when ready.",
+	},
 
 	// ── reset-password サブコマンド ─────────────────────────────
 	"reset.header": {

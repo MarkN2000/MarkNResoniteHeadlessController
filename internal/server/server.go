@@ -84,7 +84,8 @@ type Server struct {
 	localSatisfies  func(installDir string, req platform.RuntimeRequirement, goarch string) bool
 	systemSatisfies func(goos, goarch string, req platform.RuntimeRequirement) bool
 	installRuntime  func(ctx context.Context, installDir string) error
-	steamRunning    func() bool // Steam 更新が進行中か（ガード経路の起動見送り判定）
+	steamRunning    func() bool                                            // Steam 更新が進行中か（ガード経路の起動見送り判定）
+	updateResonite  func(ctx context.Context, p steam.UpdateParams) error // Resonite 更新（既定 s.steam.Update・テストで偽装）
 
 	// sysDotnetOK は「システム .NET が要求を満たす」と確認できた組のキャッシュ
 	// （installDir+要求版）。Steam クライアント併用等でローカル設置が恒久に無い環境が、
@@ -170,6 +171,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		return s.steam.InstallRuntime(ctx, installDir)
 	}
 	s.steamRunning = func() bool { return s.steam.Status().State == "running" }
+	s.updateResonite = func(ctx context.Context, p steam.UpdateParams) error { return s.steam.Update(ctx, p) }
 	s.sysSampler = sysmetrics.NewSampler()
 	return s
 }
@@ -422,6 +424,28 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		}
 		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
 		return
+	}
+	// 起動前更新（手動コールド起動・UpdateBeforeManualStart）。トグル ON かつ Steam 設定済みのときだけ、
+	// 受付を返して goroutine で「更新→（.NET ガード）→起動」を行う（DD 実行＝最新確認＋適用・方式C）。
+	// Steam 未設定なら下の従来経路に落として即起動する（未更新時の挙動は不変）。
+	s.cfgMu.RLock()
+	updateBeforeStart := s.cfg.RestartOrDefault().UpdateBeforeManualStart
+	s.cfgMu.RUnlock()
+	if updateBeforeStart {
+		if _, perr := s.steamParams(); perr == nil { // Steam 設定済みのみ（未設定は従来どおり即起動）
+			if s.driver.Status().State != headless.StateStopped {
+				writeErr(w, http.StatusConflict, "start_failed", headless.ErrAlreadyRunning.Error())
+				return
+			}
+			if s.steamRunning() {
+				writeErr(w, http.StatusConflict, "update_in_progress",
+					"Resonite の更新が進行中です。完了してから起動してください。")
+				return
+			}
+			go s.startWithUpdate(name, headlessPath, launchPath)
+			writeOK(w, map[string]any{"accepted": true, "updating": true})
+			return
+		}
 	}
 	// 既定パス（{dataDir}/resonite）にまだ Resonite が無い＝未DL のときは、
 	// 実行失敗の素っ気ないメッセージでなく取得導線を案内する（R-A）。

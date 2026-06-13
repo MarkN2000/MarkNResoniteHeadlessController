@@ -63,10 +63,11 @@ type Steam struct {
 }
 
 // config.Restart に追加（更新トグルはスケジュールタブで設定する＝Restart配下）
-UpdateOnScheduledRestart bool `json:"updateOnScheduledRestart"`
+UpdateOnScheduledRestart bool `json:"updateOnScheduledRestart"` // 予定再起動の前に更新
+UpdateBeforeManualStart  bool `json:"updateBeforeManualStart"`  // 手動起動（トップバー）・手動「通常再起動」の前に更新
 ```
 
-- `DefaultRestart()` で `UpdateOnScheduledRestart = true`（**新規インストールは ON**）。
+- `DefaultRestart()` で両トグルとも `true`（**新規インストールは ON**）。
   Steam 未設定なら実行時 no-op なので安全。既存保存 config（フィールド欠落）は false＝opt-in。
 - 公開 API（`steam/config`）は秘密を返さず `hasPassword`/`hasBranchCode` を返す。
 - PW は **ASCII 限定・最大 64 文字**（Steam 仕様）→ PUT で検証。
@@ -147,20 +148,30 @@ cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残�
 同じ single-flight スロット・SSE・Status を使う。`Status`/result に `RunKind: "update"|"runtime"` を
 持ち、表示層が「更新」/「ランタイム設置」を出し分ける。
 
-### 予定再起動への統合（restart-orchestrator）
+### 起動/再起動への統合（共通フック `maybeUpdate`）
 
-`doRestart`（終端④ stop→start）の間に更新ステップを挿入。**対象は scheduled トリガーのみ**
-（手動再起動・userZero・クラッシュ復帰は素早さ優先で挟まない）。
+更新の判定・実行は **`maybeUpdate(ctx, triggerType, onUpdating)`** に一本化し、トリガー別トグルで
+ゲーティングする（`scheduled`→`UpdateOnScheduledRestart` / `manual`→`UpdateBeforeManualStart` / 他→no-op）。
+「更新確認」= DD 差分実行（走らせること自体が確認＋適用。VDF事前チェックは持たない）。クラッシュ復帰・
+通常停止は対象外（素早さ優先・前者は `driver.Start` 直叩きで本フックを通らない）。
+
+**① 予定再起動・手動「通常再起動」**（orchestrator 経由）: `doRestart`（終端④ stop→start）の間に
+`beforeFlowStart`→`maybeUpdate` を挿入。進捗は /steam/events、restart-status の phase = "updating"。
 
 ```
 ③告知 → ④ shutdown → 完全停止待ち(StateStopped)
-        → 【更新】Restart.UpdateOnScheduledRestart=ON && Steam設定済 のとき Manager.Update()
-              ・進捗は /steam/events、restart-status の phase = "updating"
-              ・「更新確認」= DD 差分実行（走らせること自体が確認＋適用。VDF事前チェックは持たない）
+        → 【更新】maybeUpdate(triggerType)＝対応トグル ON && Steam設定済 のとき updateResonite()
         → 選択 config で Start
 ```
 
-- **更新が失敗しても必ず Start**（可用性優先。古い版で起動・状態に「最終更新失敗」を記録）。
+**② 手動コールド起動**（トップバー「起動」・`handleStart`）: 停止状態から `UpdateBeforeManualStart` ON
+&& Steam設定済 のとき、`{accepted, updating:true}` を返して goroutine `startWithUpdate` ＝
+`maybeUpdate("manual")` → 既存 `startWithRuntimeGuard`（.NETガード→起動→記録）を再利用。進捗は
+/steam/events（設定タブ）。更新進行中の起動押下は `409 update_in_progress`。更新をユーザーが
+**キャンセルしたときだけ起動を見送る**（明確な中止意思を尊重）。
+
+- **更新が失敗しても必ず Start**（可用性優先。古い版で起動）。再起動経路はキャンセルでも Start 継続
+  （④到達後）／コールド起動のみキャンセルで Start 見送り。
 - **打ち切り = 進捗停滞で中断**（既定 5 分進捗なし → ハングとみなし中断 → Start）。遅いが進捗している
   DL は誤って殺さない。総時間上限ではなく stall（無進捗）タイムアウト。
 - 更新 ctx は stall タイムアウト付き＋親 bg ctx 連動（MRHC 終了で中断 / ④はユーザー cancel 不可）。

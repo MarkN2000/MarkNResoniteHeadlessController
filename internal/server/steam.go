@@ -196,31 +196,50 @@ func (s *Server) steamParams() (steam.UpdateParams, error) {
 	return steam.BuildUpdateParams(user, pw, code, platform.ExpandHome(installDir), platform.HeadlessBinaryName())
 }
 
-// maybeScheduledUpdate は予定再起動の停止→起動の間に呼ばれる（orchestrator.beforeStart）。
-// triggerType=="scheduled" かつトグルON かつ Steam 設定済みのときだけ Resonite を更新する。
-// 更新が失敗しても起動は継続させる（可用性優先＝呼び出し側は本関数の後で必ず起動する・設計 §7）。
-// ctx は orchestrator の親 ctx（shutdown で更新も中断）。同期的に完了まで待つ。
-func (s *Server) maybeScheduledUpdate(ctx context.Context, triggerType string) {
-	if triggerType != "scheduled" {
-		return // 予定再起動のみ対象（手動/userZero/クラッシュ復帰は素早さ優先で挟まない）
-	}
+// maybeUpdate は起動/再起動の前に Resonite を更新する共通フック。triggerType と対応するトグル
+// （scheduled→UpdateOnScheduledRestart / manual→UpdateBeforeManualStart）が ON かつ Steam 設定済みの
+// ときだけ DepotDownloader を実行する（＝最新確認＋適用）。それ以外（stop・クラッシュ復帰など）は no-op。
+// 更新の成否（失敗・キャンセル）は err で返し、起動を続けるか中止するかは呼び出し側が決める
+// （予定/通常再起動は失敗でも起動継続＝可用性優先・設計 §7／コールド起動はキャンセル時のみ見送り）。
+// onUpdating は「実際に更新を開始する」直前に1回だけ呼ぶ（進行表示の差し込み用・nil 可）。
+// ctx は呼び出し側の親（shutdown で更新も中断）。同期的に完了まで待つ。
+func (s *Server) maybeUpdate(ctx context.Context, triggerType string, onUpdating func()) error {
 	s.cfgMu.RLock()
-	enabled := s.cfg.RestartOrDefault().UpdateOnScheduledRestart
+	rc := s.cfg.RestartOrDefault()
 	s.cfgMu.RUnlock()
+	var enabled bool
+	switch triggerType {
+	case "scheduled":
+		enabled = rc.UpdateOnScheduledRestart
+	case "manual":
+		enabled = rc.UpdateBeforeManualStart
+	default:
+		return nil // stop・クラッシュ復帰などは対象外（素早さ優先で更新を挟まない）
+	}
 	if !enabled {
-		return
+		return nil
 	}
 	params, err := s.steamParams()
 	if err != nil {
-		return // Steam 未設定 → 更新せず通常の再起動を続行
+		return nil // Steam 未設定 → 更新せず通常どおり起動を続行
 	}
-	s.restart.setPhase(phaseUpdating)
-	log.Printf("[restart] 予定再起動: Resonite の更新を実行します")
-	if err := s.steam.Update(ctx, params); err != nil {
-		log.Printf("[restart] 予定再起動の更新に失敗（古い版のまま起動を継続）: %v", err)
-		return
+	if onUpdating != nil {
+		onUpdating()
 	}
-	log.Printf("[restart] 予定再起動: Resonite の更新が完了しました")
+	log.Printf("[update] %s: Resonite の更新を実行します", triggerType)
+	if err := s.updateResonite(ctx, params); err != nil {
+		log.Printf("[update] %s: 更新に失敗（古い版のまま）: %v", triggerType, err)
+		return err
+	}
+	log.Printf("[update] %s: 更新が完了しました", triggerType)
+	return nil
+}
+
+// beforeFlowStart は再起動フロー（予定／手動「通常再起動」）の停止後・起動前フック
+// （orchestrator.beforeStart）。maybeUpdate を進行表示（phaseUpdating）付きで呼ぶ。更新の失敗・
+// キャンセルがあっても起動は継続する（doRestart は本関数の後で必ず起動する・可用性優先）。
+func (s *Server) beforeFlowStart(ctx context.Context, triggerType string) {
+	_ = s.maybeUpdate(ctx, triggerType, func() { s.restart.setPhase(phaseUpdating) })
 }
 
 // writeSteamErr は steam パッケージのセンチネルエラーを HTTP ステータスへ写す。

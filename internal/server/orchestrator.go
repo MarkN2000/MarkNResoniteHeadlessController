@@ -103,7 +103,7 @@ func newRestartOrchestrator(s *Server) *restartOrchestrator {
 		lastUsed:         s.loadLastUsed,
 		recordUsed:       s.recordLastUsed,
 		recordStart:      s.recordLastStart,
-		beforeStart:      s.maybeScheduledUpdate, // 予定再起動時の更新フック（P9-B）
+		beforeStart:      s.beforeFlowStart, // 停止後・起動前の更新フック（予定＋手動「通常再起動」・P9-B）
 		resolveAnnounce:  s.resolveAnnounce,      // 告知テンプレの実行時解決
 		minute:           time.Minute,
 		waitInterval:     10 * time.Second,

@@ -126,8 +126,10 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
                   <PreActionsCard value={rc.preActions} onChange={(preActions) => patch({ preActions })} />
                   <CrashRecoveryCard value={rc.crashRecovery} onChange={(crashRecovery) => patch({ crashRecovery })} />
                   <UpdateOnRestartCard
-                    value={rc.updateOnScheduledRestart}
-                    onChange={(updateOnScheduledRestart) => patch({ updateOnScheduledRestart })}
+                    scheduled={rc.updateOnScheduledRestart}
+                    manual={rc.updateBeforeManualStart}
+                    onScheduledChange={(updateOnScheduledRestart) => patch({ updateOnScheduledRestart })}
+                    onManualChange={(updateBeforeManualStart) => patch({ updateBeforeManualStart })}
                   />
                   <SaveBar dirty={dirty} saving={apply.busy} onSave={save} />
                 </Stack>

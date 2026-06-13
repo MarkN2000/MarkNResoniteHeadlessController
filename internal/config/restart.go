@@ -19,6 +19,11 @@ type Restart struct {
 	// （手動/userZero/クラッシュ復帰は対象外）。Steam 未設定なら no-op。
 	// 設計: docs/design/steam-depotdownloader.md §7
 	UpdateOnScheduledRestart bool `json:"updateOnScheduledRestart"`
+	// UpdateBeforeManualStart は「手動起動（トップバー）・手動『通常再起動』の前に Resonite を更新する」
+	// トグル。ON かつ Steam(A) 設定済みのとき、起動/再起動の前に DepotDownloader を実行（＝最新確認＋適用）
+	// してから起動する（予定再起動の UpdateOnScheduledRestart と対をなす）。Steam 未設定なら no-op。
+	// クラッシュ復帰・通常停止は対象外。設計: docs/design/steam-depotdownloader.md §7
+	UpdateBeforeManualStart bool `json:"updateBeforeManualStart"`
 }
 
 // ScheduledRestart は1件の再起動予定。Type により使うフィールドが変わる（独自形式・cron不使用）。
@@ -84,7 +89,7 @@ type CrashRecovery struct {
 // （とらぞ閉店アナウンス）を入れておく。URL/タグは実行時に解決するため保存しない。
 // セッション変更は maxusers=1 のみ ON、クラッシュ復帰は ON（10分に3回で停止）、
 // 待機は静かに58分＋告知後2分（合計60分）。
-// 予定再起動時の更新は既定 ON（Steam 未設定なら no-op なので安全・P9-B）。
+// 予定再起動時の更新／手動起動・通常再起動前の更新はいずれも既定 ON（Steam 未設定なら no-op・P9-B）。
 // templateId は server の builtinAnnounceTemplates 先頭・フロント
 // web/src/tabs/schedule/scheduleModel.ts の defaultAnnounce() と同期すること。
 func DefaultRestart() Restart {
@@ -101,6 +106,7 @@ func DefaultRestart() Restart {
 		},
 		CrashRecovery:            CrashRecovery{Enabled: true, MaxCrashes: 3, WindowMinutes: 10},
 		UpdateOnScheduledRestart: true,
+		UpdateBeforeManualStart:  true,
 	}
 }
 

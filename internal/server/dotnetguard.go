@@ -33,6 +33,21 @@ func (s *Server) runtimeGuardNeeded(headlessPath string) bool {
 	return !s.sysDotnetCached(installDir, req)
 }
 
+// startWithUpdate はコールド起動（停止状態からの手動起動）の「更新→起動」を非同期で行う。
+// 先に maybeUpdate("manual") で Resonite を更新し（失敗は古い版のまま続行）、その後は既存の
+// startWithRuntimeGuard（.NET ガード→起動→記録）に委ねる＝共通化。更新をユーザーが中止したときだけ
+// 起動を見送る（明確な中止意思を尊重・.NET ガードの中止作法に揃える）。HTTP には受付返済済み。
+func (s *Server) startWithUpdate(name, headlessPath, launchPath string) {
+	lang := s.langSnapshot()
+	// 進捗は Steam SSE（設定タブ）に出る。コールド起動なので orchestrator の進行表示は使わない（onUpdating=nil）。
+	err := s.maybeUpdate(s.backgroundCtx(), "manual", nil)
+	if errors.Is(err, steam.ErrCancelled) || errors.Is(err, context.Canceled) {
+		s.driver.PublishSys(i18n.T(lang, "update.sysStartCancelled"))
+		return
+	}
+	s.startWithRuntimeGuard(name, headlessPath, launchPath)
+}
+
 // startWithRuntimeGuard は「（必要なら）設置→起動」を非同期で行う。HTTP には受付を返済済みの
 // ため、以後の進捗は steam SSE（設定タブ）、結果・失敗は sys ログ（UI コンソール）で示す。
 func (s *Server) startWithRuntimeGuard(name, headlessPath, launchPath string) {

@@ -146,21 +146,24 @@ export async function getStatus(): Promise<Status | null> {
 }
 
 // 起動はコンフィグ名必須（無config起動はワールドが公開になるため backend が 400）。
-// runtimePrepare=true は「.NET ランタイムを設置してから起動する」非同期受付
-// （進捗は steam SSE・結果はコンソールの sys ログ）。
+// runtimePrepare=true は「.NET ランタイムを設置してから起動する」非同期受付。
+// updating=true は「Resonite を更新してから起動する」非同期受付（UpdateBeforeManualStart）。
+// いずれも進捗は steam SSE（設定タブ）・結果はコンソールの sys ログ。
 export async function start(
   config: string,
-): Promise<{ ok: boolean; status: number; error?: string; code?: string; runtimePrepare?: boolean }> {
+): Promise<{ ok: boolean; status: number; error?: string; code?: string; runtimePrepare?: boolean; updating?: boolean }> {
   const res = await req("/start", { method: "POST", body: JSON.stringify({ config }) });
   if (res.ok) {
     let runtimePrepare: boolean | undefined;
+    let updating: boolean | undefined;
     try {
       const j = await res.json();
       if (j?.data?.runtimePrepare === true) runtimePrepare = true;
+      if (j?.data?.updating === true) updating = true;
     } catch {
       /* ignore */
     }
-    return { ok: true, status: res.status, runtimePrepare };
+    return { ok: true, status: res.status, runtimePrepare, updating };
   }
   let error: string | undefined;
   let code: string | undefined;
@@ -684,6 +687,7 @@ export interface RestartConfig {
   preActions: { announce: RestartAnnounce; sessionChanges: RestartSessionChanges };
   crashRecovery: RestartCrashRecovery;
   updateOnScheduledRestart: boolean; // 予定再起動時に Resonite を更新（P9-B・Steam未設定なら no-op）
+  updateBeforeManualStart: boolean; // 手動起動・通常再起動の前に Resonite を更新（Steam未設定なら no-op）
 }
 
 // restart-status の応答（internal/server.restartStatus）。

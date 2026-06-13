@@ -309,3 +309,50 @@ func TestHandleStart_RuntimeGuardAccepted(t *testing.T) {
 		}
 	}
 }
+
+// TestHandleStart_UpdateBeforeStartAccepted は UpdateBeforeManualStart ON＋Steam 設定済みのとき、
+// コールド起動が {accepted, updating:true} を返し、goroutine が更新（seam）を実行することを確認する。
+func TestHandleStart_UpdateBeforeStartAccepted(t *testing.T) {
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, "mrhc.config.json")
+	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
+	rc := config.DefaultRestart() // UpdateBeforeManualStart=true
+	cfg := &config.Config{
+		Version:           config.SchemaVersion,
+		AdminPasswordHash: string(hash),
+		SessionSecret:     "guardtest-secret",
+		HeadlessConfigDir: filepath.Join(tmp, "configs"),
+		Restart:           &rc,
+		Steam:             &config.Steam{Username: "u", Password: "p", BranchCode: "b"},
+	}
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		t.Fatal(err)
+	}
+	srv := New(cfg, cfgPath, headless.NewDriver(nil), resonite.NewClient(), nil)
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	applyGuardSeams(srv, guardSeams{readOK: false}) // .NET ガードは素通り・steamRunning=false
+	updatedCh := make(chan struct{}, 1)
+	srv.updateResonite = func(context.Context, steam.UpdateParams) error { updatedCh <- struct{}{}; return nil }
+
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/w", testPassword, "application/json",
+		`{"startWorlds":[{"sessionName":"W"}]}`)
+	resp.Body.Close()
+
+	startResp := authReq(t, http.MethodPost, ts.URL+"/api/v1/start", testPassword, "application/json", `{"config":"w"}`)
+	defer startResp.Body.Close()
+	var got okEnv[map[string]any]
+	if err := json.NewDecoder(startResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if startResp.StatusCode != http.StatusOK || got.Data["accepted"] != true || got.Data["updating"] != true {
+		t.Fatalf("更新付き起動の受付応答が想定外: status=%d data=%+v", startResp.StatusCode, got.Data)
+	}
+
+	select {
+	case <-updatedCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("コールド起動の goroutine が更新（seam）を呼ばない")
+	}
+}
