@@ -127,7 +127,7 @@ func writeConfigErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusNotFound, "config_not_found", "指定のコンフィグが見つかりません")
 	case errors.Is(err, hlconfig.ErrInvalidName), errors.Is(err, hlconfig.ErrReservedName):
 		writeErr(w, http.StatusBadRequest, "invalid_config_name", err.Error())
-	case errors.Is(err, hlconfig.ErrStartWorldsType), errors.Is(err, hlconfig.ErrInvalidJSON):
+	case errors.Is(err, hlconfig.ErrStartWorldsType), errors.Is(err, hlconfig.ErrInvalidJSON), errors.Is(err, hlconfig.ErrUDPPortConflict):
 		writeErr(w, http.StatusBadRequest, "invalid_config", err.Error())
 	default:
 		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())

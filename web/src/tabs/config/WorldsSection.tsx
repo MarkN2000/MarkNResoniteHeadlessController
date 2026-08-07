@@ -25,7 +25,7 @@ import {
   asStr,
   csvToArray,
   defaultWorld,
-  getDuplicateQUICPorts,
+  getDuplicateUDPPorts,
   getForcePort,
   getStringArray,
   getWorlds,
@@ -67,7 +67,7 @@ export function WorldsSection({
   const confirm = useConfirm();
   const idx = Math.min(active, worlds.length - 1); // 削除でズレたとき安全に丸める
   const world: WorldMap = worlds[idx] ?? {};
-  const duplicateQUICPorts = getDuplicateQUICPorts(cfg);
+  const duplicateUDPPorts = getDuplicateUDPPorts(cfg);
 
   const setW = (key: string, value: unknown) => onChange(setWorld(cfg, idx, { ...world, [key]: value }));
   // 数値フィールドの onChange ファクトリ。空欄のとき map に書く値だけが異なる:
@@ -342,6 +342,11 @@ export function WorldsSection({
                   max={65535}
                   allowNegative={false}
                   placeholder={t("config.forcePortAuto")}
+                  error={
+                    duplicateUDPPorts.has(Number(getForcePort(world, "lnl")))
+                      ? t("config.udpPortDuplicate")
+                      : undefined
+                  }
                 />
               </FieldRow>
               <FieldRow
@@ -356,8 +361,8 @@ export function WorldsSection({
                   allowNegative={false}
                   placeholder={t("config.forcePortAuto")}
                   error={
-                    duplicateQUICPorts.has(Number(getForcePort(world, "quic")))
-                      ? t("config.quicPortDuplicate")
+                    duplicateUDPPorts.has(Number(getForcePort(world, "quic")))
+                      ? t("config.udpPortDuplicate")
                       : undefined
                   }
                 />

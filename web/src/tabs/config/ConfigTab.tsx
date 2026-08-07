@@ -10,7 +10,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { SplitColumns } from "../../components/SplitColumns";
 import { ConfigEditor } from "./ConfigEditor";
 import { ConfigList } from "./ConfigList";
-import { getDuplicateQUICPorts } from "./configModel";
+import { getDuplicateUDPPorts } from "./configModel";
 import type { ConfigMap } from "./configModel";
 
 // config 名のバリデーション（backend の SanitizeName と同じ・パストラバーサル防止）。
@@ -57,8 +57,8 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
         ? t("config.reservedName")
         : t("config.invalidName")
       : undefined;
-  const portsValid = cfg === null || getDuplicateQUICPorts(cfg).size === 0;
-  const canSave = dirty && nameValid && portsValid; // 起動対象ワールドの QUIC 固定ポート重複も保存前に拒否
+  const portsValid = cfg === null || getDuplicateUDPPorts(cfg).size === 0;
+  const canSave = dirty && nameValid && portsValid; // 起動対象ワールドの LNL/QUIC 固定UDPポート重複も保存前に拒否
 
   const refreshList = async () => {
     const l = await api.getConfigs();
@@ -124,7 +124,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   //   リネーム先が既存名なら上書き確認を挟む。無効名は保存ガード（ボタンも disabled）。
   const save = () => {
     if (!cfg) return;
-    if (getDuplicateQUICPorts(cfg).size > 0) return;
+    if (getDuplicateUDPPorts(cfg).size > 0) return;
     const body = cfg;
     const name = draftName.trim().normalize("NFC"); // 送信名を正準形へ（backend pathFor と一致）
     if (!isValidName(name)) return;
@@ -218,7 +218,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
                 draftName={draftName}
                 onDraftNameChange={setDraftName}
                 nameError={nameError}
-                portsError={portsValid ? undefined : t("config.quicPortDuplicateSummary")}
+                portsError={portsValid ? undefined : t("config.udpPortDuplicateSummary")}
                 cfg={cfg}
                 onChange={setCfg}
                 canSave={canSave}

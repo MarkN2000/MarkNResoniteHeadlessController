@@ -31,6 +31,7 @@ var (
 	ErrNotFound        = errors.New("config が見つかりません")
 	ErrStartWorldsType = errors.New("startWorlds は配列である必要があります")
 	ErrInvalidJSON     = errors.New("不正な JSON")
+	ErrUDPPortConflict = errors.New("起動対象の LNL/QUIC 固定ポートが重複しています")
 	// ErrFolderCreate は EnsureFolders（起動前の dataFolder/cacheFolder 作成）の失敗。
 	// config に書かれたパス起因＝ユーザーが直せるエラーのため、HTTP 層は 409 にマップする
 	// （500 だと「サーバー内部エラー」に見えて原因に辿り着けない）。
@@ -188,6 +189,10 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 			return ErrStartWorldsType
 		}
 	}
+	normalizeForcePorts(body)
+	if err := validateUDPPortConflicts(body); err != nil {
+		return err
+	}
 	if pw, _ := body["loginPassword"].(string); pw == "" {
 		if existing, err := readRaw(dir, maskSource); err == nil {
 			if oldPw, ok := existing["loginPassword"].(string); ok && oldPw != "" {
@@ -195,7 +200,6 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 			}
 		}
 	}
-	normalizeForcePorts(body)
 	body["$schema"] = schemaURL
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -249,6 +253,58 @@ func normalizeForcePorts(m map[string]any) {
 	}
 }
 
+// validateUDPPortConflicts は、起動対象ワールドの LNL/QUIC 固定 UDP ポートが
+// 同一ワールド内またはワールド間で重複していないことを確認する。
+func validateUDPPortConflicts(m map[string]any) error {
+	worlds, ok := m["startWorlds"].([]any)
+	if !ok {
+		return nil
+	}
+
+	used := make(map[uint16]struct{})
+	for _, item := range worlds {
+		world, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if enabled, exists := world["isEnabled"].(bool); exists && !enabled {
+			continue
+		}
+		ports, ok := world["forcePorts"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, protocol := range []string{"lnl", "quic"} {
+			port, ok := fixedPortNumber(ports[protocol])
+			if !ok {
+				continue
+			}
+			if _, exists := used[port]; exists {
+				return fmt.Errorf("%w: %d", ErrUDPPortConflict, port)
+			}
+			used[port] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func fixedPortNumber(value any) (uint16, bool) {
+	switch port := value.(type) {
+	case float64:
+		if port < 1 || port > 65535 || port != float64(uint16(port)) {
+			return 0, false
+		}
+		return uint16(port), true
+	case int:
+		if port < 1 || port > 65535 {
+			return 0, false
+		}
+		return uint16(port), true
+	default:
+		return 0, false
+	}
+}
+
 // Delete は config を削除する。
 func Delete(dir, name string) error {
 	if err := SanitizeName(name); err != nil {
@@ -283,6 +339,9 @@ func ResolveForLaunch(dir, name string, central Credentials, runDir string) (str
 		m["loginPassword"] = central.Password
 	}
 	normalizeForcePorts(m)
+	if err := validateUDPPortConflicts(m); err != nil {
+		return "", err
+	}
 	m["$schema"] = schemaURL
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return "", err

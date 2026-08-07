@@ -428,6 +428,10 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusConflict, "folder_create_failed", err.Error())
 			return
 		}
+		if errors.Is(err, hlconfig.ErrUDPPortConflict) {
+			writeErr(w, http.StatusConflict, "udp_port_conflict", err.Error())
+			return
+		}
 		writeErr(w, http.StatusInternalServerError, "config_error", err.Error())
 		return
 	}

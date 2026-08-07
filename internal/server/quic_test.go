@@ -82,8 +82,16 @@ func TestQUICConfig_GetPutPreservesUnknownFields(t *testing.T) {
 		t.Fatalf("unknown top-level field lost: %#v", stored)
 	}
 	q := stored["quicConfig"].(map[string]any)
-	if q["publicIP"] != "2001:db8::1" || q["future"] != "keep" {
+	if q["publicIP"] != "[2001:db8::1]" || q["future"] != "keep" {
 		t.Fatalf("quicConfig was not merged: %#v", q)
+	}
+
+	var gotIPv6 okEnv[quicConfigResp]
+	if code := authGet(t, ts.URL+"/api/v1/quic-config", pw, &gotIPv6); code != http.StatusOK {
+		t.Fatalf("GET bracketed IPv6 status=%d", code)
+	}
+	if gotIPv6.Data.PublicIP != "2001:db8::1" {
+		t.Fatalf("GET bracketed IPv6 publicIP=%q", gotIPv6.Data.PublicIP)
 	}
 }
 
@@ -93,11 +101,25 @@ func TestQUICConfig_ClearAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":"not-an-ip"}`)
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("invalid IP status=%d", resp.StatusCode)
+	for _, value := range []string{"not-an-ip", "[203.0.113.1]", "[2001:db8::1"} {
+		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":"`+value+`"}`)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("invalid IP %q status=%d", value, resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":"[2001:db8::2]"}`)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("bracketed IPv6 status=%d", resp.StatusCode)
 	}
 	resp.Body.Close()
+	stored, _, err := readHeadlessConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stored["quicConfig"].(map[string]any)["publicIP"]; got != "[2001:db8::2]" {
+		t.Fatalf("bracketed IPv6 was not normalized: %q", got)
+	}
 	for _, body := range []string{`null`, `{}`, `{"publicIP":null}`} {
 		resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", body)
 		if resp.StatusCode != http.StatusBadRequest {
@@ -111,7 +133,7 @@ func TestQUICConfig_ClearAndValidation(t *testing.T) {
 		t.Fatalf("clear status=%d", resp.StatusCode)
 	}
 	resp.Body.Close()
-	stored, _, err := readHeadlessConfig(configPath)
+	stored, _, err = readHeadlessConfig(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}

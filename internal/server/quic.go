@@ -87,7 +87,40 @@ func publicIPFrom(m map[string]any) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%w: quicConfig.publicIP は文字列である必要があります", errQUICConfigInvalid)
 	}
+	// Resonite が QUIC の公開 URI を組み立てる際、IPv6 は Config.json 上でも
+	// [IPv6] の形でないとポートとの区切りを解釈できない。UI/API は通常の
+	// IPリテラルを扱うため、保存済みの角括弧は読み取り時だけ外して返す。
+	if len(ip) >= 2 && ip[0] == '[' && ip[len(ip)-1] == ']' {
+		inner := ip[1 : len(ip)-1]
+		if strings.Contains(inner, ":") && net.ParseIP(inner) != nil {
+			return inner, nil
+		}
+	}
 	return ip, nil
+}
+
+// normalizePublicIP は UI/API 用のIPリテラルと Config.json に保存する値を返す。
+// IPv6だけはResoniteの公開URI生成に必要な角括弧を付ける。既に角括弧付きの
+// IPv6がAPIへ渡された場合も一重に正規化する。
+func normalizePublicIP(value string) (display, stored string, ok bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", "", true
+	}
+	candidate := value
+	if len(value) >= 2 && value[0] == '[' && value[len(value)-1] == ']' {
+		candidate = value[1 : len(value)-1]
+		if !strings.Contains(candidate, ":") {
+			return "", "", false
+		}
+	}
+	if net.ParseIP(candidate) == nil {
+		return "", "", false
+	}
+	if strings.Contains(candidate, ":") {
+		return candidate, "[" + candidate + "]", true
+	}
+	return candidate, candidate, true
 }
 
 // atomicWriteJSON は同一ディレクトリの一時ファイルを完全に書いてから置き換える。
@@ -175,8 +208,8 @@ func (s *Server) handleQUICConfigPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正なリクエスト")
 		return
 	}
-	publicIP := strings.TrimSpace(*body.PublicIP)
-	if publicIP != "" && net.ParseIP(publicIP) == nil {
+	publicIP, storedPublicIP, valid := normalizePublicIP(*body.PublicIP)
+	if !valid {
 		writeErr(w, http.StatusBadRequest, "invalid_public_ip", "IPアドレスの形式が不正です")
 		return
 	}
@@ -225,7 +258,7 @@ func (s *Server) handleQUICConfigPut(w http.ResponseWriter, r *http.Request) {
 			q = map[string]any{}
 			m["quicConfig"] = q
 		}
-		q["publicIP"] = publicIP
+		q["publicIP"] = storedPublicIP
 	}
 
 	if err := atomicWriteJSON(path, m); err != nil {

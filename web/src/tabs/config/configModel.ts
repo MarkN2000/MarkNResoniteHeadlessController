@@ -117,14 +117,17 @@ export function setForcePort(
 
 export const hasLegacyForcePort = (world: WorldMap): boolean => hasOwn(world, "forcePort");
 
-// NAT パンチスルー未実装の QUIC は、起動対象ワールドごとに固有の固定ポートが必要。
-export function getDuplicateQUICPorts(cfg: ConfigMap): Set<number> {
+// LNL と QUIC はどちらも UDP リスナーを使う。同一ワールド内か別ワールドかを問わず、
+// 起動対象の全ワールドで両プロトコルの固定ポートが重複しないようにする。
+export function getDuplicateUDPPorts(cfg: ConfigMap): Set<number> {
   const counts = new Map<number, number>();
   for (const world of getWorlds(cfg)) {
     if (world.isEnabled === false) continue;
-    const port = getForcePort(world, "quic");
-    if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) continue;
-    counts.set(port, (counts.get(port) ?? 0) + 1);
+    for (const protocol of ["lnl", "quic"] as const) {
+      const port = getForcePort(world, protocol);
+      if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+      counts.set(port, (counts.get(port) ?? 0) + 1);
+    }
   }
   return new Set([...counts].filter(([, count]) => count > 1).map(([port]) => port));
 }

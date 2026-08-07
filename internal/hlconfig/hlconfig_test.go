@@ -231,6 +231,66 @@ func TestWrite_NormalizesLegacyForcePort(t *testing.T) {
 	}
 }
 
+func TestWrite_RejectsDuplicateUDPPorts(t *testing.T) {
+	tests := []struct {
+		name   string
+		worlds []any
+		want   bool
+	}{
+		{
+			name: "同一ワールドのLNLとQUIC",
+			worlds: []any{map[string]any{
+				"forcePorts": map[string]any{"lnl": float64(12000), "quic": float64(12000)},
+			}},
+			want: true,
+		},
+		{
+			name: "ワールド間のLNLとQUIC",
+			worlds: []any{
+				map[string]any{"forcePorts": map[string]any{"lnl": float64(12000)}},
+				map[string]any{"forcePorts": map[string]any{"quic": float64(12000)}},
+			},
+			want: true,
+		},
+		{
+			name: "無効ワールドは対象外",
+			worlds: []any{
+				map[string]any{"forcePorts": map[string]any{"lnl": float64(12000)}},
+				map[string]any{"isEnabled": false, "forcePorts": map[string]any{"quic": float64(12000)}},
+			},
+		},
+		{
+			name: "TCPとの同値は許可",
+			worlds: []any{map[string]any{
+				"forcePorts": map[string]any{"lnl": float64(12000), "tcp": float64(12000)},
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Write(t.TempDir(), "cfg", map[string]any{"startWorlds": tt.worlds})
+			if got := errors.Is(err, ErrUDPPortConflict); got != tt.want {
+				t.Fatalf("ErrUDPPortConflict = %v, want %v (err=%v)", got, tt.want, err)
+			}
+		})
+	}
+}
+
+func TestResolveForLaunch_RejectsDuplicateUDPPorts(t *testing.T) {
+	dir := t.TempDir()
+	writeRawFile(t, dir, "cfg", map[string]any{
+		"startWorlds": []any{map[string]any{
+			"forcePorts": map[string]any{"lnl": float64(12000), "quic": float64(12000)},
+		}},
+	})
+
+	_, err := ResolveForLaunch(dir, "cfg", Credentials{}, t.TempDir())
+	if !errors.Is(err, ErrUDPPortConflict) {
+		t.Fatalf("expected ErrUDPPortConflict, got %v", err)
+	}
+}
+
 func TestWrite_PreservesPasswordOnEmpty(t *testing.T) {
 	dir := t.TempDir()
 	// 初回: password あり
