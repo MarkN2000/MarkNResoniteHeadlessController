@@ -269,7 +269,7 @@ LAN 内のブラウザから、ヘッドレスサーバーを丸ごと運用で�
 
 ```sh
 # 1) フロントエンドをビルド（web/dist を生成 → Go が埋め込む）
-cd web && npm install && npm run build && cd ..
+cd web && npm ci --ignore-scripts && npm run build && cd ..
 
 # 2) バイナリをビルド
 go build -o bin/mrhc ./cmd/mrhc                                              # 現在の OS 向け

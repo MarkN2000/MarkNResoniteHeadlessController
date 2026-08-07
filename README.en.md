@@ -275,7 +275,7 @@ Prerequisites: **Go 1.26+** and **Node 20+**.
 
 ```sh
 # 1) Build the frontend (generates web/dist → embedded by Go)
-cd web && npm install && npm run build && cd ..
+cd web && npm ci --ignore-scripts && npm run build && cd ..
 
 # 2) Build the binary
 go build -o bin/mrhc ./cmd/mrhc                                              # for the current OS
