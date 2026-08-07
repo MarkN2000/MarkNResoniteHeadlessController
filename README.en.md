@@ -171,7 +171,7 @@ Putting the VPS and your local device on the same Tailscale network (tailnet) ma
 Even without opening a port, others can join your session through Resonite's relay (with extra latency). Only set this up if you want lower latency via a direct connection. A cloud VM's firewall has **two layers** (the cloud-side security rule + the VM's own), and both must be opened.
 
 1. **Fix a port for each world** — In the web UI "Config" tab, open the world's advanced settings and set whichever of `LNL fixed port`, `QUIC fixed port`, and `TCP fixed port` you need, then save. A blank protocol uses a random port. LNL and QUIC both use UDP, so their fixed ports must be unique across all enabled worlds. TCP uses a separate transport and may use the same number.
-2. **For QUIC outside the LAN, set the public IP** — Enter the server's actual IPv4 or IPv6 address under "QUIC settings" on the "Settings" tab. MRHC automatically adds URI brackets when storing an IPv6 address. It applies on the next Resonite Headless launch. It is not required for LAN-only QUIC connections.
+2. **For QUIC outside the LAN, set the public IPv4 address** — Enter the server's actual IPv4 address under "QUIC settings" on the "Settings" tab. IPv6 causes world startup to fail in Resonite 2026.8.7.887 and cannot be used. It applies on the next Resonite Headless launch. It is not required for LAN-only QUIC connections.
 3. **Open the cloud side** — Oracle Cloud console → the relevant VCN's "Security List" (or NSG) → add an ingress rule. Use `UDP` for LNL and QUIC or `TCP` for TCP, with the destination port you configured (for example, `32100`).
 4. **Open the VM side (Ubuntu)** — Oracle's Ubuntu uses raw iptables (ufw is disabled by default). This example opens UDP port `32100`.
 

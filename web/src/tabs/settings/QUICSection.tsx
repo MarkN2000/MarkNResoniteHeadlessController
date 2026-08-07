@@ -20,35 +20,7 @@ const isIPv4 = (value: string): boolean => {
   );
 };
 
-const ipv6PartCount = (section: string): number | null => {
-  if (section === "") return 0;
-  const parts = section.split(":");
-  let count = 0;
-  for (let i = 0; i < parts.length; i += 1) {
-    const part = parts[i];
-    if (part === "") return null;
-    if (part.includes(".")) {
-      if (i !== parts.length - 1 || !isIPv4(part)) return null;
-      count += 2;
-    } else {
-      if (!/^[0-9a-f]{1,4}$/i.test(part)) return null;
-      count += 1;
-    }
-  }
-  return count;
-};
-
-const isIPv6 = (value: string): boolean => {
-  if (!value.includes(":")) return false;
-  const sections = value.split("::");
-  if (sections.length > 2) return false;
-  const left = ipv6PartCount(sections[0]);
-  const right = sections.length === 2 ? ipv6PartCount(sections[1]) : 0;
-  if (left === null || right === null) return false;
-  return sections.length === 2 ? left + right < 8 : left === 8;
-};
-
-const isValidIP = (value: string): boolean => value === "" || isIPv4(value) || isIPv6(value);
+const isValidIPv4 = (value: string): boolean => value === "" || isIPv4(value);
 
 // Resonite Headless の Config.json にある quicConfig.publicIP だけを編集する。
 // QUIC 対応可否は起動ログでしか判定できないため、状態化・自動再起動は行わない。
@@ -74,7 +46,7 @@ export function QUICSection() {
   }, [load]);
 
   const normalized = publicIP.trim();
-  const valid = isValidIP(normalized);
+  const valid = isValidIPv4(normalized);
   const dirty = orig !== null && normalized !== orig.publicIP;
   const save = () =>
     apply.run(async () => {

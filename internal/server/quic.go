@@ -87,9 +87,8 @@ func publicIPFrom(m map[string]any) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%w: quicConfig.publicIP は文字列である必要があります", errQUICConfigInvalid)
 	}
-	// Resonite が QUIC の公開 URI を組み立てる際、IPv6 は Config.json 上でも
-	// [IPv6] の形でないとポートとの区切りを解釈できない。UI/API は通常の
-	// IPリテラルを扱うため、保存済みの角括弧は読み取り時だけ外して返す。
+	// v2.2.1 が保存した角括弧付き IPv6 も画面から変更・削除できるよう、
+	// 読み取り時だけ角括弧を外す。GET では保存ファイル自体を変更しない。
 	if len(ip) >= 2 && ip[0] == '[' && ip[len(ip)-1] == ']' {
 		inner := ip[1 : len(ip)-1]
 		if strings.Contains(inner, ":") && net.ParseIP(inner) != nil {
@@ -99,28 +98,19 @@ func publicIPFrom(m map[string]any) (string, error) {
 	return ip, nil
 }
 
-// normalizePublicIP は UI/API 用のIPリテラルと Config.json に保存する値を返す。
-// IPv6だけはResoniteの公開URI生成に必要な角括弧を付ける。既に角括弧付きの
-// IPv6がAPIへ渡された場合も一重に正規化する。
-func normalizePublicIP(value string) (display, stored string, ok bool) {
+// normalizePublicIPv4 は Config.json に保存できる IPv4 または空文字へ正規化する。
+// Resonite 2026.8.7.887 は IPv6 の QUIC 公開 URI を生成できないため、IPv4 射影形式を含む
+// IPv6 も拒否する。
+func normalizePublicIPv4(value string) (string, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return "", "", true
+		return "", true
 	}
-	candidate := value
-	if len(value) >= 2 && value[0] == '[' && value[len(value)-1] == ']' {
-		candidate = value[1 : len(value)-1]
-		if !strings.Contains(candidate, ":") {
-			return "", "", false
-		}
+	ip := net.ParseIP(value)
+	if strings.Contains(value, ":") || ip == nil || ip.To4() == nil {
+		return "", false
 	}
-	if net.ParseIP(candidate) == nil {
-		return "", "", false
-	}
-	if strings.Contains(candidate, ":") {
-		return candidate, "[" + candidate + "]", true
-	}
-	return candidate, candidate, true
+	return value, true
 }
 
 // atomicWriteJSON は同一ディレクトリの一時ファイルを完全に書いてから置き換える。
@@ -208,9 +198,9 @@ func (s *Server) handleQUICConfigPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正なリクエスト")
 		return
 	}
-	publicIP, storedPublicIP, valid := normalizePublicIP(*body.PublicIP)
+	publicIP, valid := normalizePublicIPv4(*body.PublicIP)
 	if !valid {
-		writeErr(w, http.StatusBadRequest, "invalid_public_ip", "IPアドレスの形式が不正です")
+		writeErr(w, http.StatusBadRequest, "invalid_public_ip", "IPv4 アドレスの形式が不正です")
 		return
 	}
 
@@ -258,7 +248,7 @@ func (s *Server) handleQUICConfigPut(w http.ResponseWriter, r *http.Request) {
 			q = map[string]any{}
 			m["quicConfig"] = q
 		}
-		q["publicIP"] = storedPublicIP
+		q["publicIP"] = publicIP
 	}
 
 	if err := atomicWriteJSON(path, m); err != nil {

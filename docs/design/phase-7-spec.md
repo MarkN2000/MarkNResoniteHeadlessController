@@ -464,7 +464,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
    （秘密は hasXxx 表示・空=維持）＋「今すぐ更新」（停止中のみ）＋ SSE `/steam/events` で進捗/ログ/結果の
    ライブ表示・中止。既定 install 先は空＝`{dataDir}/resonite`（R-A）。詳細仕様は
    `docs/design/steam-depotdownloader.md`（§6 runner・§7 manager・§9 SSE・§13 M-x64 確定事項）。
-5. **QUIC設定（2026-08-08、IPv6補訂）**：右カラムの独立したカードで、`{InstallDirOrDefault}/Headless/Config.json` の `quicConfig.publicIP` だけを編集する。IPv4/IPv6の構文だけを検証し、パブリックIP判定・自動検出はしない。UI/APIでは通常のIPリテラルを扱い、IPv6は Resonite が生成する `quic://[IPv6]:port` を正しい URI として解釈できるよう、`Config.json` への保存時だけ角括弧付き（例: `[2001:db8::1]`）へ正規化する。GETでは既存の角括弧付きIPv6を角括弧なしで返し、GETだけではファイルを書き換えない。空欄は `publicIP` を削除し、`quicConfig` が空ならオブジェクトも削除する。既存ファイルのトップレベル項目・`quicConfig` 内の未知項目・認証情報等は温存し、ファイル全文をブラウザへ返さない。同一ディレクトリの一時ファイルからatomic writeし、`Headless` ディレクトリが無ければ作らずエラーにする。稼働中も保存可能だが現在のプロセスやスケジュールには介入せず、「次回起動から反映」と表示する。
+5. **QUIC 設定（2026-08-08、IPv4 限定へ訂正）**：右カラムの独立したカードで、`{InstallDirOrDefault}/Headless/Config.json` の `quicConfig.publicIP` だけを編集する。Resonite 2026.8.7.887 は角括弧なし・角括弧付きのどちらの IPv6 でも `QUIC_Listener.GlobalUris` が `UriFormatException` となりワールド起動を完了できないことを実機確認したため、保存できる値は IPv4 または空欄だけとする。IPv4 の構文だけを検証し、パブリックアドレスかどうかの判定・自動検出はしない。v2.2.1 が保存した角括弧付き IPv6 を含む既存値は GET で表示して IPv4 への変更または削除を可能にするが、GET だけではファイルを書き換えず、IPv6 の再保存は拒否する。空欄は `publicIP` を削除し、`quicConfig` が空ならオブジェクトも削除する。既存ファイルのトップレベル項目・`quicConfig` 内の未知項目・認証情報等は温存し、ファイル全文をブラウザへ返さない。同一ディレクトリの一時ファイルから atomic write し、`Headless` ディレクトリが無ければ作らずエラーにする。稼働中も保存可能だが現在のプロセスやスケジュールには介入せず、「次回起動から反映」と表示する。
 6. **キャッシュ管理**：停止時の自動削除・サイズ確認・停止中の手動全削除。詳細は §3.17。
 
 **QUICの非対象事項（2026-08-08）**：`QUIC supported: True/False` のログ解析・Status API化・前回結果保持、依存関係の自動導入、ヘッドレスの自動停止/再起動、スケジュール連携、ファイアウォール自動設定は行わない。OS依存関係、起動ログでの確認方法、LAN外では `publicIP` とUDPポート開放が必要なことをREADMEで案内する。

@@ -47,7 +47,7 @@ func TestQUICConfig_GetPutPreservesUnknownFields(t *testing.T) {
 	original := map[string]any{
 		"loginCredential": "secret-user",
 		"unknown":         map[string]any{"keep": true},
-		"quicConfig":      map[string]any{"publicIP": "203.0.113.1", "future": "keep"},
+		"quicConfig":      map[string]any{"publicIP": "[2001:db8::1]", "future": "keep"},
 	}
 	b, _ := json.Marshal(original)
 	if err := os.WriteFile(configPath, b, 0o600); err != nil {
@@ -58,14 +58,14 @@ func TestQUICConfig_GetPutPreservesUnknownFields(t *testing.T) {
 	if code := authGet(t, ts.URL+"/api/v1/quic-config", pw, &got); code != http.StatusOK {
 		t.Fatalf("GET status=%d", code)
 	}
-	if got.Data["publicIP"] != "203.0.113.1" {
+	if got.Data["publicIP"] != "2001:db8::1" {
 		t.Fatalf("GET publicIP=%q", got.Data["publicIP"])
 	}
 	if len(got.Data) != 1 {
 		t.Fatalf("GET must not expose other Config.json fields: %#v", got.Data)
 	}
 
-	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":"2001:db8::1"}`)
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":" 198.51.100.2 "}`)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("PUT status=%d", resp.StatusCode)
 	}
@@ -82,16 +82,8 @@ func TestQUICConfig_GetPutPreservesUnknownFields(t *testing.T) {
 		t.Fatalf("unknown top-level field lost: %#v", stored)
 	}
 	q := stored["quicConfig"].(map[string]any)
-	if q["publicIP"] != "[2001:db8::1]" || q["future"] != "keep" {
+	if q["publicIP"] != "198.51.100.2" || q["future"] != "keep" {
 		t.Fatalf("quicConfig was not merged: %#v", q)
-	}
-
-	var gotIPv6 okEnv[quicConfigResp]
-	if code := authGet(t, ts.URL+"/api/v1/quic-config", pw, &gotIPv6); code != http.StatusOK {
-		t.Fatalf("GET bracketed IPv6 status=%d", code)
-	}
-	if gotIPv6.Data.PublicIP != "2001:db8::1" {
-		t.Fatalf("GET bracketed IPv6 publicIP=%q", gotIPv6.Data.PublicIP)
 	}
 }
 
@@ -101,34 +93,31 @@ func TestQUICConfig_ClearAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, value := range []string{"not-an-ip", "[203.0.113.1]", "[2001:db8::1"} {
+	for _, value := range []string{
+		"not-an-ip", "[203.0.113.1]", "2001:db8::1", "[2001:db8::1]", "::ffff:203.0.113.1",
+	} {
 		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":"`+value+`"}`)
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Fatalf("invalid IP %q status=%d", value, resp.StatusCode)
 		}
 		resp.Body.Close()
 	}
-	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":"[2001:db8::2]"}`)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("bracketed IPv6 status=%d", resp.StatusCode)
-	}
-	resp.Body.Close()
 	stored, _, err := readHeadlessConfig(configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := stored["quicConfig"].(map[string]any)["publicIP"]; got != "[2001:db8::2]" {
-		t.Fatalf("bracketed IPv6 was not normalized: %q", got)
+	if got := stored["quicConfig"].(map[string]any)["publicIP"]; got != "203.0.113.1" {
+		t.Fatalf("rejected IPv6 must not change publicIP: %q", got)
 	}
 	for _, body := range []string{`null`, `{}`, `{"publicIP":null}`} {
-		resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", body)
+		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", body)
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Fatalf("missing publicIP body=%s status=%d", body, resp.StatusCode)
 		}
 		resp.Body.Close()
 	}
 
-	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":""}`)
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/quic-config", pw, "application/json", `{"publicIP":""}`)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("clear status=%d", resp.StatusCode)
 	}
