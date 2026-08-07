@@ -184,6 +184,8 @@ Even without opening a port, others can join your session through Resonite's rel
 
 QUIC platform support can only be checked after Resonite Headless starts, in the `QUIC supported: True/False` log entry. Do not stop or restart running worlds just to perform this check. If the next normal launch reports `False`, install [Microsoft's QUIC platform dependencies](https://learn.microsoft.com/dotnet/fundamentals/networking/quic/quic-overview#platform-dependencies) and check again on the following normal launch. MRHC does not install these dependencies, change firewall rules, automatically stop/restart the headless, or interrupt the restart schedule.
 
+On Arch Linux, if you already use an AUR helper, install [`msquic`](https://aur.archlinux.org/packages/msquic) with `yay -S msquic` (or `paru -S msquic`).
+
 > Anyone will be able to join the session, but access control is handled by Resonite's accessLevel, not the firewall.
 
 ## Updating

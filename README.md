@@ -185,6 +185,8 @@ VPS と手元の端末を同じ Tailscale ネットワーク（tailnet）に入�
 
 QUIC の環境対応は、設定中ではなく Resonite Headless の起動後にログの `QUIC supported: True/False` で確認できます。確認だけを目的に稼働中のワールドを停止・再起動する必要はありません。次の通常起動で `False` だった場合は、[Microsoft の QUIC プラットフォーム依存関係](https://learn.microsoft.com/dotnet/fundamentals/networking/quic/quic-overview#platform-dependencies)を導入し、その次の通常起動で再確認してください。MRHC は依存関係の自動導入、ファイアウォール設定、自動停止・再起動、予定再起動への割り込みを行いません。
 
+Arch Linux では、AUR ヘルパーを導入済みなら `yay -S msquic`（または `paru -S msquic`）で [`msquic`](https://aur.archlinux.org/packages/msquic) をインストールできます。
+
 ## アップデート
 
 MRHC 本体は、内蔵の自己更新機能でアップデートできます。
