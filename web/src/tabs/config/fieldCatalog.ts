@@ -60,6 +60,7 @@ export const WORLD_DEDICATED_KEYS: ReadonlySet<string> = new Set([
   "saveAsOwner",
   "enableResoniteLink",
   "forceResoniteLinkPort",
+  "forcePorts",
   "forcePort",
 ]);
 

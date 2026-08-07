@@ -235,7 +235,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 | 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
 | 4 | **コンフィグ** | (編集) | v1 同等 CRUD（フォームのみ・タブ式複数ワールド・§3.14） | ✅ 使える |
 | 5 | **スケジュール** | — | 自動再起動（手動通常/scheduled・安全再起動フロー・事前アクション・クラッシュ復帰）＋予定リスト/編集モーダル＋状態表示（P8・§3.16・**P8-1〜P8-5b 実装済＝Phase 8 完了**） | ✅ 使える |
-| 6 | **設定** | — | 管理PW変更 / Resoniteアカウント / アプリ設定 / Steam設定 / キャッシュ管理（実装済・§3.15・§3.17） | ✅ 使える |
+| 6 | **設定** | — | 管理PW変更 / Resoniteアカウント / アプリ設定 / Steam設定 / QUIC設定 / キャッシュ管理（実装済・§3.15・§3.17） | ✅ 使える |
 | 7 | **コマンド** | — | SSE ライブログ + コマンド直送（上級者用） | 「起動してください」 |
 | 8 | **ログ** | — | Resonite ログファイル閲覧（読み取り専用・選択→表示→コピー・§3.18） | ✅ 使える |
 
@@ -400,10 +400,10 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 
 ### 3.14 コンフィグタブ (7-4) の確定仕様（実装前・本節がレビュー確定の単一情報源）
 
-Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エディタを v1 同等で作り直す。**バックエンド CRUD は実装済**（§2.3・`internal/hlconfig`＋`internal/server/configs.go`）のため **フロントのみ**（7-2/7-3/P9-A と同様・改修ゼロ）。決定経緯は 2026-05-31 のレビュー（v1 `main:frontend/src/routes/+page.svelte` 監査含む）。
+Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エディタを v1 同等で作り直す。**バックエンド CRUD は実装済**（§2.3・`internal/hlconfig`＋`internal/server/configs.go`）で、当初はフロントのみの予定だった。2026-08-08 の `forcePorts` 対応では、旧 `forcePort` の保存・起動互換に限ってバックエンドへ正規化処理を追加する。決定経緯は 2026-05-31 のレビュー（v1 `main:frontend/src/routes/+page.svelte` 監査含む）。
 
 **前提（バックエンドの性質）**
-- config は**不透明な JSON map**。MRHC は name サニタイズ・`loginPassword` マスク/保持・`$schema` 付与・`startWorlds` 配列検証のみ。**未知フィールドは保持**。
+- config は**不透明な JSON map**。MRHC は name サニタイズ・`loginPassword` マスク/保持・`$schema` 付与・`startWorlds` 配列検証のみ。**未知フィールドは保持**。ただし、廃止予定の `startWorlds[].forcePort` から `forcePorts` への変換だけは、保存済み config の互換性を維持するための明示的な正規化対象とする（下記「プロトコル別固定ポート」）。
 - 値の意味検証はしない（accessLevel/preset 名の正当性は Resonite が権威）→ フォームがガードレール役。
 - name = ファイル名（`^[A-Za-z0-9_\-]{1,64}$`）。PUT は上書き（`?from=` で保存リネーム・§2.3）。GET は `loginPassword=""` マスク。
 
@@ -432,11 +432,14 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 - **-1=無効フィールドを必ず数値に（R6）**: `awayKickMinutes`/`idleRestartInterval`/`forcedRestartInterval`/`autosaveInterval` は **未設定なら既定値を表示**（`asNumOr`・既定=スキーマ値 -1/1800/-1/-1）し、**空欄は -1（無効）へスナップ**（`sentinelW`＝map に `""` を書かない）。UI 方式は「数値入力＋一般ヒント `config.sentinelNote`」（トグルは不採用）。入力欄は `SentinelNumberInput`（`min=-1` を一元化・B）。なお数値欄は既定で**整数のみ＋範囲外を入力時点で抑止**（B・`InspectorNumberInput` 既定 `allowDecimal=false`/`clampBehavior=strict`）。
 - **customSessionId prefix 自動入力（R12）**: 中央アカウント保存時に `username→UserID` を解決（backend `resonite.ResolveUserID`・`normalizedUsername` 完全一致・メール/未一致は空・§2.x credentials）し `headless-credentials.userId` に保持。設定タブに **UserID を読み取り表示**＋アカウント名 placeholder から「/ メール」削除（解決成功率↑）。config タブは中央 UserID を取得し `CustomSessionIdInput` の `autoPrefix` に渡す＝**prefix が空なら自動シード（上書き可・表示のみ初期化で未編集なら map 未書込・編集時に commit）**。UserID が後着でも `key` 再シードで反映。
 - **ResoniteLink 項目（R13）**: `enableResoniteLink`（Switch）＋`forceResoniteLinkPort`（数値・**空＝自動**＝`undefined` で保存JSONから省く・`portW`）。port は `placeholder` で「空＝自動」を示す。当初は運用折りたたみ内だが**点5で基本へ繰り上げ**。
-- **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`forcePort`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。（`enableResoniteLink`/`forceResoniteLinkPort` は R13 でフォーム化＝下記）
+- **プロトコル別固定ポート（2026-08-08）**: 現行形式は `forcePorts` に一本化し、ワールド上級設定へ `lnl`・`quic`・`tcp` の3行を常時表示する。各値は整数 `1..65535`、空欄はそのプロトコルを辞書から削除する。UI操作で3プロトコルとも空になり、未知プロトコルも無ければ `forcePorts` 自体を削除する。プロトコルが辞書に無い場合は Resonite が設定範囲内のランダムポートを使う。QUIC 等の有効/無効スイッチ、プロトコル間やLNL/TCPの重複検証は追加しない。辞書内の未知プロトコルは編集時も温存する。起動対象（`isEnabled != false`）の複数ワールドに同じ `forcePorts.quic` がある場合だけ、通知で明示された「ワールドごとに固有のQUICポート」という制約に従い保存を抑止する。
+- **旧 `forcePort` 互換（2026-08-08）**: `forcePort` は互換入力としてのみ扱い、旧値を LNL として表示する。`forcePorts.lnl` が無ければ旧値を補完し、両方に値がある場合は新形式を優先する。`forcePort: null` は未指定として扱う。UI は旧形式であることと次回保存時に新形式へ移行することを表示するが、移行だけを理由に保存ボタンを有効化する特別な状態や競合確認ダイアログは追加しない。新規作成・UI編集・サンプル・文書は `forcePorts` のみを使い、旧形式を生成しない。
+- **正規化のタイミング（2026-08-08）**: アプリ起動時や GET 時に保存ファイルを自動変更しない。明示的な保存時は `forcePorts` へ正規化して `forcePort` を削除し、保存成功後は正規化済み内容を再読込する。ワールド起動時は一時起動用 config だけ同じ規則で正規化し、元の保存ファイルは変更しない。これにより、未保存の旧 config も将来 Resonite 側からレガシー項目が削除された後まで起動可能にする。旧 Resonite 向けの `forcePort` 併記・互換モードは設けない。
+- **温存のみ（UI 非搭載）**：`universeId`・`useCustomJoinVerifier`・`keepOriginalRoles`・`defaultUserRoles`・各 `*CloudVariable`・`parentSessionIds`・`autoInvite*`・`saveAsOwner`・`overrideCorrespondingWorldId` ＋未知フィールド。（`enableResoniteLink`/`forceResoniteLinkPort` は R13、`forcePorts` は 2026-08-08 にフォーム化）
 
 **安全/堅牢**
 - 新規 config の `accessLevel` 既定は **Anyone**（2026-06-03 変更。旧既定は安全側の Private だったが、ユーザー判断で公開既定に変更）。**雛形は公式スキーマ全項目を明示し、UI 表示＝保存値を一致させる方針**（旧来の「表示専用フォールバックで値を見せるが保存JSONにはキーが無い」ズレを排除。未設定は null）。no-config 起動や誤 accessLevel が公開事故になりうる点は domain-facts §7 のとおりで、**起動は config 必須**（無 config 起動ボタンを出さない）でカバーする。決定値の一覧は §3.14 末尾／`configModel.ts` コメント参照。
-- **未保存ガード**：dirty 時は **config 切替・新規作成・複製**で破棄確認を挟む（`guardDiscard` で3経路統一・新規/複製はエディタの中身を新 config へ切り替えるため）。複製対象は**ディスク上の保存済み内容**（未保存編集は含まない）。同一 config 内のワールドタブ移動は保存単位が同じため不要。ワールド削除・config 削除は確認ダイアログ。**既知の制限**：コンフィグタブから**他タブへ離脱**すると未保存編集は警告なく失われる（アプリ横断の未保存ガードは未実装＝他タブ方針と整合・MVP 許容）。
+- **未保存ガード**：dirty 時は **config 切替・新規作成・複製**で破棄確認を挟む（`guardDiscard` で3経路統一・新規/複製はエディタの中身を新 config へ切り替えるため）。複製対象は**ディスク上の保存済み内容**（未保存編集は含まない）。旧 `forcePort` が残るだけでは dirty にせず、通常の保存機会に移行する。同一 config 内のワールドタブ移動は保存単位が同じため不要。ワールド削除・config 削除は確認ダイアログ。**既知の制限**：コンフィグタブから**他タブへ離脱**すると未保存編集は警告なく失われる（アプリ横断の未保存ガードは未実装＝他タブ方針と整合・MVP 許容）。
 - **ワールドは最低1つ**（最後の1枚は削除不可）。
 - **稼働中の config 編集は再起動まで未反映**の注記。
 - `loginPassword` は常時マスク（タイプした平文を画面に再表示しない）。
@@ -446,14 +449,14 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **流用部品**：`components/inspector`（InspectorCard/FieldRow/InspectorSelect/InspectorTextInput/InspectorNumberInput/InspectorTextarea/InspectorButton/RefreshButton）・`hooks/useConfirm`＋`ConfirmModal`・`hooks/useAsyncAction`・`lib/notify`（結果トースト自動）・`SplitColumns`。
 
-**バックエンド**：§2.3 の CRUD＋即時作成系（POST 作成/複製・PUT `?from=` リネーム・2026-06-08）。新規雛形はバックエンドのテンプレ（`bakedDefaultJSON`＝`EnsureDefault` と単一情報源・comment 空）から生成。フロント `defaultConfig()`/`defaultWorld()` はリセットマーカー比較値として同方針を維持（UI 表示＝保存値の一致／未設定は null）。
+**バックエンド**：§2.3 の CRUD＋即時作成系（POST 作成/複製・PUT `?from=` リネーム・2026-06-08）。新規雛形はバックエンドのテンプレ（`bakedDefaultJSON`＝`EnsureDefault` と単一情報源・comment 空）から生成。フロント `defaultConfig()`/`defaultWorld()` はリセットマーカー比較値として同方針を維持（UI 表示＝保存値の一致／未設定は null）。`forcePort` 互換変換は単一のバックエンド正規化関数に集約し、保存処理と一時起動 config 生成の双方から呼ぶ。GET はディスク上の形式を変更せず返す。保存時は保存ファイルを新形式へ移行し、保存成功後に再読込する。一時起動時は元ファイルを変更せず、新形式の起動用ファイルを生成する。
 
 ### 3.15 設定タブ (7-5) で確定した実装事項
 
 `mrhc.config.json`（アプリ本体設定）を GUI 化するタブ。停止中でも使える（アプリ/ファイル設定系）。
 §3.3 の「アプリ設定 / パスワード変更 / Steam(P9)」を具体化。**バックエンドは小規模に新設**（credentials は既存流用）。
 
-**構成＝縦積み4セクション**（`InspectorCard`・単一中央カラム maw560・`ScrollArea`）
+**構成＝6セクション**（`InspectorCard`・`SplitColumns`。QUIC設定は右カラム）
 1. **管理パスワード変更**：現PW＋新PW＋確認 → `POST /password`。一致/空はクライアント検証（赤テキスト）、現PW誤り等は 7-7 トースト。
 2. **Resonite アカウント**（重要）：username/password（空=変更なし）。`config` で個別指定が無いとき各ワールドに注入される既定アカウント。**初回モーダル＋未設定バナーで設定を促す**（下記）。**稼働中はアカウント欄の下に Resonite ログイン状態を1行表示**（commit 48703b5/9d0e92c・「ログイン失敗が ready=true で隠れる」残課題の解消）: `/status` の `loginState`（ヘッドレス起動ログを Driver が解析＝`Logging in as`/`Logged in successfully`、実機 fixtures 由来）から、**ログイン済み（U- 付き UserID・緑）／ログイン失敗〔匿名で動作中・赤〕／匿名〔未設定・灰〕**。MRHC 保存アカウントとは独立に「実際にログインできているか」を表面化する（停止中は非表示）。UserID 表示は必ず `U-` を含める（UserID とユーザー名は別物）。
 3. **アプリ設定**：`port`（普通に表示・**MRHC再起動後反映**）＋折りたたみ「上級設定」に `headlessConfigDir`（再起動後反映）。**`encoding` は UI 非搭載**（両OS自動判定が実証済・逃げ道は config 手編集）。Resonite のインストール場所は設定 → Steam の `installDir` に一本化（起動も DL もそこから導出・`config.HeadlessPathOrDefault`＝`InstallDirOrDefault/Headless/<OSバイナリ>`）。
@@ -461,6 +464,10 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
    （秘密は hasXxx 表示・空=維持）＋「今すぐ更新」（停止中のみ）＋ SSE `/steam/events` で進捗/ログ/結果の
    ライブ表示・中止。既定 install 先は空＝`{dataDir}/resonite`（R-A）。詳細仕様は
    `docs/design/steam-depotdownloader.md`（§6 runner・§7 manager・§9 SSE・§13 M-x64 確定事項）。
+5. **QUIC設定（2026-08-08）**：右カラムの独立したカードで、`{InstallDirOrDefault}/Headless/Config.json` の `quicConfig.publicIP` だけを編集する。IPv4/IPv6の構文だけを検証し、パブリックIP判定・自動検出はしない。空欄は `publicIP` を削除し、`quicConfig` が空ならオブジェクトも削除する。既存ファイルのトップレベル項目・`quicConfig` 内の未知項目・認証情報等は温存し、ファイル全文をブラウザへ返さない。同一ディレクトリの一時ファイルからatomic writeし、`Headless` ディレクトリが無ければ作らずエラーにする。稼働中も保存可能だが現在のプロセスやスケジュールには介入せず、「次回起動から反映」と表示する。
+6. **キャッシュ管理**：停止時の自動削除・サイズ確認・停止中の手動全削除。詳細は §3.17。
+
+**QUICの非対象事項（2026-08-08）**：`QUIC supported: True/False` のログ解析・Status API化・前回結果保持、依存関係の自動導入、ヘッドレスの自動停止/再起動、スケジュール連携、ファイアウォール自動設定は行わない。OS依存関係、起動ログでの確認方法、LAN外では `publicIP` とUDPポート開放が必要なことをREADMEで案内する。
 
 **初回オンボーディング（App 全体にはみ出す）**
 - ログイン後 `GET /headless-credentials` を取得（`App` の `refreshCred`）。**未設定**（username 空 or password 無し）なら **初回モーダルを1回自動表示**（`setupShown` ref・「後で」で閉じ可・強制ブロックなし）＋**常設バナー**「Resonite アカウントが未設定です [設定する]」（`Alert` orange・全タブ表示）。

@@ -22,7 +22,7 @@
       "loadWorldURL": null,
       "loadWorldPresetName": "Grid",
       "overrideCorrespondingWorldId": null,
-      "forcePort": null,
+      "forcePorts": {},
       "enableResoniteLink": false,
       "forceResoniteLinkPort": null,
       "keepOriginalRoles": false,

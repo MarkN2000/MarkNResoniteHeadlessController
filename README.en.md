@@ -166,13 +166,14 @@ Putting the VPS and your local device on the same Tailscale network (tailnet) ma
 2. Install [Tailscale](https://tailscale.com/download) on your local PC/phone too and log in with the same account.
 3. Check the VPS's Tailscale IP (run `tailscale ip -4` on the VPS) and open `http://<that IP>:8080` in your local browser.
 
-**4. (Optional) Speed up direct session joins — open a UDP port**
+**4. (Optional) Speed up direct session joins — configure ports per protocol**
 
 Even without opening a port, others can join your session through Resonite's relay (with extra latency). Only set this up if you want lower latency via a direct connection. A cloud VM's firewall has **two layers** (the cloud-side security rule + the VM's own), and both must be opened.
 
-1. **Fix the port number** — In the web UI "Config" tab, open the world, add `forcePort` from "Advanced fields" with any number (e.g. `32100`), save, and restart the headless (the default is a random port, so fixing it is required).
-2. **Open the cloud side** — Oracle Cloud console → the relevant VCN's "Security List" (or NSG) → add an ingress rule (source `0.0.0.0/0`, protocol `UDP`, destination port `32100`).
-3. **Open the VM side (Ubuntu)** — Oracle's Ubuntu uses raw iptables (ufw is disabled by default).
+1. **Fix a port for each world** — In the web UI "Config" tab, open the world's advanced settings and set whichever of `LNL fixed port`, `QUIC fixed port`, and `TCP fixed port` you need, then save. A blank protocol uses a random port. QUIC ports cannot be shared between worlds, so give every enabled world a unique value.
+2. **For QUIC outside the LAN, set the public IP** — Enter the server's actual IPv4 or IPv6 address under "QUIC settings" on the "Settings" tab. It applies on the next Resonite Headless launch. It is not required for LAN-only QUIC connections.
+3. **Open the cloud side** — Oracle Cloud console → the relevant VCN's "Security List" (or NSG) → add an ingress rule. Use `UDP` for LNL and QUIC or `TCP` for TCP, with the destination port you configured (for example, `32100`).
+4. **Open the VM side (Ubuntu)** — Oracle's Ubuntu uses raw iptables (ufw is disabled by default). This example opens UDP port `32100`.
 
    ```sh
    sudo iptables -I INPUT -p udp --dport 32100 -j ACCEPT
@@ -180,6 +181,8 @@ Even without opening a port, others can join your session through Resonite's rel
    ```
 
    `-I INPUT` **inserts the rule at the top** (so it sits before Oracle's default trailing REJECT; with `-A` (append) it would be rejected and have no effect).
+
+QUIC platform support can only be checked after Resonite Headless starts, in the `QUIC supported: True/False` log entry. Do not stop or restart running worlds just to perform this check. If the next normal launch reports `False`, install [Microsoft's QUIC platform dependencies](https://learn.microsoft.com/dotnet/fundamentals/networking/quic/quic-overview#platform-dependencies) and check again on the following normal launch. MRHC does not install these dependencies, change firewall rules, automatically stop/restart the headless, or interrupt the restart schedule.
 
 > Anyone will be able to join the session, but access control is handled by Resonite's accessLevel, not the firewall.
 
@@ -241,7 +244,7 @@ Manage your entire headless server from a browser on your LAN.
 
 **Config (headless settings)**
 - Create, duplicate, rename, and save multiple configs and switch between them
-- Per-world settings following the official schema (access level, tags, AFK kick, autosave, auto-recover, roles, auto-invite, forcePort, etc.)
+- Per-world settings following the official schema (access level, tags, AFK kick, autosave, auto-recover, roles, auto-invite, protocol-specific `forcePorts`, etc.)
 - Add any schema field from "Advanced fields"
 
 **Auto-restart & maintenance**

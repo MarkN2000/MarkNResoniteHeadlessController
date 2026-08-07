@@ -6,6 +6,7 @@ import { AccountSection } from "./AccountSection";
 import { AppSettingsSection } from "./AppSettingsSection";
 import { SteamSection } from "./SteamSection";
 import { CacheSection } from "./CacheSection";
+import { QUICSection } from "./QUICSection";
 
 // 設定タブ（7-5・§3.15）。停止中でも使える（アプリ/ファイル設定系）。
 // レイアウト: 他タブと同じ SplitColumns（xl 以上で左右2カラム＝横幅を活用・未満は1カラム中央寄せ）。
@@ -33,6 +34,7 @@ export function SettingsTab({
           right={
             <Stack gap="md">
               <SteamSection status={status} />
+              <QUICSection />
               <CacheSection status={status} />
             </Stack>
           }

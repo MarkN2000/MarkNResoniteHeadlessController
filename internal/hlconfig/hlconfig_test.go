@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -147,6 +148,89 @@ func TestWrite_StartWorldsMustBeArray(t *testing.T) {
 	}
 }
 
+func TestNormalizeForcePorts(t *testing.T) {
+	tests := []struct {
+		name  string
+		world map[string]any
+		want  map[string]any
+	}{
+		{
+			name:  "旧値をLNLへ移行",
+			world: map[string]any{"forcePort": float64(12000)},
+			want:  map[string]any{"forcePorts": map[string]any{"lnl": float64(12000)}},
+		},
+		{
+			name:  "旧nullは未指定",
+			world: map[string]any{"forcePort": nil},
+			want:  map[string]any{},
+		},
+		{
+			name: "新辞書へ旧LNLを補完し未知キーを温存",
+			world: map[string]any{
+				"forcePort":  float64(12000),
+				"forcePorts": map[string]any{"quic": float64(12001), "future": float64(12003)},
+			},
+			want: map[string]any{
+				"forcePorts": map[string]any{
+					"lnl": float64(12000), "quic": float64(12001), "future": float64(12003),
+				},
+			},
+		},
+		{
+			name: "新LNLを優先",
+			world: map[string]any{
+				"forcePort":  float64(12000),
+				"forcePorts": map[string]any{"lnl": float64(13000), "tcp": float64(12002)},
+			},
+			want: map[string]any{
+				"forcePorts": map[string]any{"lnl": float64(13000), "tcp": float64(12002)},
+			},
+		},
+		{
+			name:  "旧キーがなければ空辞書も変更しない",
+			world: map[string]any{"forcePorts": map[string]any{}},
+			want:  map[string]any{"forcePorts": map[string]any{}},
+		},
+		{
+			name:  "新形式が辞書でなければ旧値も温存",
+			world: map[string]any{"forcePort": float64(12000), "forcePorts": "invalid"},
+			want:  map[string]any{"forcePort": float64(12000), "forcePorts": "invalid"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := map[string]any{"startWorlds": []any{tt.world}}
+			normalizeForcePorts(cfg)
+			if !reflect.DeepEqual(tt.world, tt.want) {
+				t.Fatalf("normalizeForcePorts() = %#v, want %#v", tt.world, tt.want)
+			}
+		})
+	}
+}
+
+func TestWrite_NormalizesLegacyForcePort(t *testing.T) {
+	dir := t.TempDir()
+	body := map[string]any{
+		"startWorlds": []any{map[string]any{"forcePort": float64(12000)}},
+	}
+	if err := Write(dir, "cfg", body); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := readRaw(dir, "cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	world := raw["startWorlds"].([]any)[0].(map[string]any)
+	if _, ok := world["forcePort"]; ok {
+		t.Fatalf("legacy forcePort should be removed: %#v", world)
+	}
+	ports, ok := world["forcePorts"].(map[string]any)
+	if !ok || ports["lnl"] != float64(12000) {
+		t.Fatalf("legacy port should migrate to forcePorts.lnl: %#v", world)
+	}
+}
+
 func TestWrite_PreservesPasswordOnEmpty(t *testing.T) {
 	dir := t.TempDir()
 	// 初回: password あり
@@ -185,6 +269,46 @@ func TestResolveForLaunch_InjectsCentral(t *testing.T) {
 	_ = json.Unmarshal(b, &m)
 	if m["loginCredential"] != "central@e.com" || m["loginPassword"] != "centralpw" {
 		t.Fatalf("central creds not injected: %v / %v", m["loginCredential"], m["loginPassword"])
+	}
+}
+
+func TestResolveForLaunch_NormalizesPortsWithoutChangingSource(t *testing.T) {
+	dir := t.TempDir()
+	runDir := t.TempDir()
+	writeRawFile(t, dir, "cfg", map[string]any{
+		"startWorlds": []any{map[string]any{"forcePort": float64(12000)}},
+	})
+
+	out, err := ResolveForLaunch(dir, "cfg", Credentials{}, runDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var launched map[string]any
+	if err := json.Unmarshal(b, &launched); err != nil {
+		t.Fatal(err)
+	}
+	launchWorld := launched["startWorlds"].([]any)[0].(map[string]any)
+	if _, ok := launchWorld["forcePort"]; ok {
+		t.Fatalf("temporary config should not contain legacy forcePort: %#v", launchWorld)
+	}
+	if ports := launchWorld["forcePorts"].(map[string]any); ports["lnl"] != float64(12000) {
+		t.Fatalf("temporary config should contain forcePorts.lnl: %#v", launchWorld)
+	}
+
+	source, err := readRaw(dir, "cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceWorld := source["startWorlds"].([]any)[0].(map[string]any)
+	if sourceWorld["forcePort"] != float64(12000) {
+		t.Fatalf("saved source should keep legacy forcePort: %#v", sourceWorld)
+	}
+	if _, ok := sourceWorld["forcePorts"]; ok {
+		t.Fatalf("saved source should not be changed during launch: %#v", sourceWorld)
 	}
 }
 
@@ -330,7 +454,7 @@ func TestEnsureDefault(t *testing.T) {
 		t.Fatalf("default idleRestartInterval should be 1800, got %v", w0["idleRestartInterval"])
 	}
 	// ニッチ化に伴い雛形から外したワールド項目は default に存在しないこと（headless 既定へ委譲・スリム化）。
-	for _, k := range []string{"autoRecover", "mobileFriendly", "forcePort", "useCustomJoinVerifier"} {
+	for _, k := range []string{"autoRecover", "mobileFriendly", "forcePort", "forcePorts", "useCustomJoinVerifier"} {
 		if _, ok := w0[k]; ok {
 			t.Fatalf("%s should NOT be in default world template (slimmed to niche): %v", k, w0[k])
 		}

@@ -195,6 +195,7 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 			}
 		}
 	}
+	normalizeForcePorts(body)
 	body["$schema"] = schemaURL
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -204,6 +205,48 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 		return err
 	}
 	return os.WriteFile(pathFor(dir, name), b, 0o600)
+}
+
+// normalizeForcePorts は旧 forcePort を新しいプロトコル別辞書へ正規化する。
+// 旧値は LNL にだけ対応する。新旧が併存して forcePorts.lnl が既にある場合は新形式を優先し、
+// 辞書内の未知プロトコルはそのまま温存する。forcePorts が辞書でない不正な形式なら、
+// 既存値を壊さないよう旧 forcePort も含めて変更しない。
+func normalizeForcePorts(m map[string]any) {
+	worlds, ok := m["startWorlds"].([]any)
+	if !ok {
+		return
+	}
+	for _, item := range worlds {
+		world, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		legacy, hasLegacy := world["forcePort"]
+		if !hasLegacy {
+			continue
+		}
+
+		if legacy == nil {
+			delete(world, "forcePort")
+			continue
+		}
+
+		portsValue, hasPorts := world["forcePorts"]
+		if !hasPorts || portsValue == nil {
+			world["forcePorts"] = map[string]any{"lnl": legacy}
+			delete(world, "forcePort")
+			continue
+		}
+		ports, ok := portsValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasLNL := ports["lnl"]; !hasLNL {
+			ports["lnl"] = legacy
+		}
+		delete(world, "forcePort")
+	}
 }
 
 // Delete は config を削除する。
@@ -239,6 +282,7 @@ func ResolveForLaunch(dir, name string, central Credentials, runDir string) (str
 		m["loginCredential"] = central.Username
 		m["loginPassword"] = central.Password
 	}
+	normalizeForcePorts(m)
 	m["$schema"] = schemaURL
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return "", err
@@ -393,8 +437,8 @@ func EnsureFolders(dir, name string) error {
 
 // defaultConfigJSON は同梱デフォルト config。専用フォーム（①一般＋②上級）のキーのみ明示し、
 // UI 表示と保存値を一致させる（フロント defaultWorld()/defaultConfig() と同方針＝スリム化）。
-// ニッチ項目（universeId/forcePort/各クラウド変数/mobileFriendly/autoRecover 等）は「詳細フィールド」
-// から追加するため雛形には入れない。決定値: accessLevel=Anyone・awayKickMinutes=5・autoSleep=true・
+// 任意項目（universeId/forcePorts/各クラウド変数/mobileFriendly/autoRecover 等）は未設定時に
+// 雛形へ入れない。決定値: accessLevel=Anyone・awayKickMinutes=5・autoSleep=true・
 // idleRestartInterval=1800・強制再起動/自動保存=-1(無効)・creds 空（中央注入）。
 // 注: autoRecover は雛形から外し headless 既定へ委譲（既定値 true は明示しない）。
 //

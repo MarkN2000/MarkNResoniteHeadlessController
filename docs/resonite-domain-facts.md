@@ -227,9 +227,11 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 `$schema = https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json`
 
 - **トップレベル**: `comment`, `universeId`, `tickRate`(60), `maxConcurrentAssetTransfers`(128), `usernameOverride`, `loginCredential`, `loginPassword`, `startWorlds[]`, `autoSpawnItems[]`
-- **startWorlds[] の主なキー**: `isEnabled`, `sessionName`, `customSessionId`, `description`, `maxUsers`, `accessLevel`, `useCustomJoinVerifier`, `hideFromPublicListing`, `tags`, `mobileFriendly`, `loadWorldURL`, `loadWorldPresetName`(Grid等), `overrideCorrespondingWorldId`, `forcePort`, `enableResoniteLink`, `forceResoniteLinkPort`, `keepOriginalRoles`, `defaultUserRoles`, `roleCloudVariable`, `allowUserCloudVariable`, `denyUserCloudVariable`, `requiredUserJoinCloudVariable`, `requiredUserJoinCloudVariableDenyMessage`, `awayKickMinutes`(-1), `parentSessionIds`, `autoInviteUsernames`, `autoInviteMessage`, `saveAsOwner`, `autoRecover`
+- **startWorlds[] の主なキー**: `isEnabled`, `sessionName`, `customSessionId`, `description`, `maxUsers`, `accessLevel`, `useCustomJoinVerifier`, `hideFromPublicListing`, `tags`, `mobileFriendly`, `loadWorldURL`, `loadWorldPresetName`(Grid等), `overrideCorrespondingWorldId`, `forcePorts`, `enableResoniteLink`, `forceResoniteLinkPort`, `keepOriginalRoles`, `defaultUserRoles`, `roleCloudVariable`, `allowUserCloudVariable`, `denyUserCloudVariable`, `requiredUserJoinCloudVariable`, `requiredUserJoinCloudVariableDenyMessage`, `awayKickMinutes`(-1), `parentSessionIds`, `autoInviteUsernames`, `autoInviteMessage`, `saveAsOwner`, `autoRecover`
+- **プロトコル別固定ポート（2026-08-08 更新）**: `forcePorts` はプロトコル名からポート番号への辞書で、現在のキーは `lnl`・`quic`・`tcp`。未記載のプロトコルは設定範囲内のランダムポートを使う。旧 `forcePort` は LNL へ対応付けられるレガシー項目で、MRHC は読込・起動互換を維持する一方、保存時には `forcePorts.lnl` へ移行して旧キーを削除する。
+- **LAN外のQUIC（2026-08-08 更新）**: NATパンチスルー未実装のため、`Headless/Config.json` に `quicConfig.publicIP` を設定し、ワールドごとに固有の `forcePorts.quic` と対応するUDPポート開放が必要。LAN接続では `publicIP` は必須ではない。環境対応は起動ログの `QUIC supported: True/False` で確認するが、MRHCはこの値を状態化せずログとして扱う。
 
-> 公式スキーマが正なので、config生成は**スキーマ準拠を機械的に保証**するのが望ましい（手書きの入れ子構造をやめる）。
+> 原則として公式スキーマを config 生成の正本とする。ただしリリース通知がスキーマ更新より先行する場合があるため、通知済みの変更は本台帳へ日付付きで記録し、スキーマ反映後に再確認する。
 
 ---
 

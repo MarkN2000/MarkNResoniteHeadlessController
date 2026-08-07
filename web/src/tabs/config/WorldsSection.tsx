@@ -25,11 +25,16 @@ import {
   asStr,
   csvToArray,
   defaultWorld,
+  getDuplicateQUICPorts,
+  getForcePort,
   getStringArray,
   getWorlds,
+  hasLegacyForcePort,
   removeWorld,
+  setForcePort,
   setWorld,
 } from "./configModel";
+import type { ForcePortProtocol } from "./configModel";
 import { BufferedTextInput, CustomSessionIdInput, RolePairsInput, SentinelNumberInput, StringListInput } from "./fields";
 import { AdvancedFieldsEditor } from "./AdvancedFieldsEditor";
 import { WORLD_DEDICATED_KEYS, WORLD_NICHE_CATALOG } from "./fieldCatalog";
@@ -62,6 +67,7 @@ export function WorldsSection({
   const confirm = useConfirm();
   const idx = Math.min(active, worlds.length - 1); // 削除でズレたとき安全に丸める
   const world: WorldMap = worlds[idx] ?? {};
+  const duplicateQUICPorts = getDuplicateQUICPorts(cfg);
 
   const setW = (key: string, value: unknown) => onChange(setWorld(cfg, idx, { ...world, [key]: value }));
   // 数値フィールドの onChange ファクトリ。空欄のとき map に書く値だけが異なる:
@@ -86,6 +92,18 @@ export function WorldsSection({
         title: t("common.resetConfirmTitle"),
         message: t("common.resetConfirmMsg", { field: fieldLabel }),
         onConfirm: () => setW(key, defaultWorld()[key]),
+      }),
+  });
+
+  const setProtocolPort = (protocol: ForcePortProtocol, value: number | string) =>
+    onChange(setWorld(cfg, idx, setForcePort(world, protocol, value)));
+  const resetProtocolProps = (protocol: ForcePortProtocol, fieldLabel: string) => ({
+    markerLabel: t("common.resetToDefault"),
+    onMarkerClick: () =>
+      confirm.ask({
+        title: t("common.resetConfirmTitle"),
+        message: t("common.resetConfirmMsg", { field: fieldLabel }),
+        onConfirm: () => setProtocolPort(protocol, ""),
       }),
   });
 
@@ -303,18 +321,63 @@ export function WorldsSection({
                   onChange={(v) => setW("saveAsOwner", !v || v === "unset" ? null : v)}
                 />
               </FieldRow>
-              {/* 固定ポート（forcePort）。ポート開放したPCで直結させたいワールドのUDPポートを固定する。
-                  空＝自動（headless がランダムな空きポートを選ぶ・保存JSONから省く）。詳細フィールドから昇格。 */}
-              <FieldRow label={t("config.forcePort")} {...resetProps("forcePort", t("config.forcePort"))}>
+              {/* プロトコル別固定ポート。空欄のプロトコルは Resonite が範囲内からランダム選択する。
+                  旧 forcePort は LNL の表示用フォールバックとし、いずれかを編集すると新形式へ移行する。 */}
+              <Text size="xs" c="dimmed">
+                {t("config.forcePortsHint")}
+              </Text>
+              {hasLegacyForcePort(world) && (
+                <Text size="xs" c="yellow.7">
+                  {t("config.forcePortLegacyNote")}
+                </Text>
+              )}
+              <FieldRow
+                label={t("config.forcePortLNL")}
+                {...resetProtocolProps("lnl", t("config.forcePortLNL"))}
+              >
                 <InspectorNumberInput
-                  value={asNum(world.forcePort)}
-                  onChange={omitW("forcePort")}
+                  value={getForcePort(world, "lnl")}
+                  onChange={(value) => setProtocolPort("lnl", value)}
                   min={1}
                   max={65535}
                   allowNegative={false}
-                  placeholder={t("config.forcePortHint")}
+                  placeholder={t("config.forcePortAuto")}
                 />
               </FieldRow>
+              <FieldRow
+                label={t("config.forcePortQUIC")}
+                {...resetProtocolProps("quic", t("config.forcePortQUIC"))}
+              >
+                <InspectorNumberInput
+                  value={getForcePort(world, "quic")}
+                  onChange={(value) => setProtocolPort("quic", value)}
+                  min={1}
+                  max={65535}
+                  allowNegative={false}
+                  placeholder={t("config.forcePortAuto")}
+                  error={
+                    duplicateQUICPorts.has(Number(getForcePort(world, "quic")))
+                      ? t("config.quicPortDuplicate")
+                      : undefined
+                  }
+                />
+              </FieldRow>
+              <FieldRow
+                label={t("config.forcePortTCP")}
+                {...resetProtocolProps("tcp", t("config.forcePortTCP"))}
+              >
+                <InspectorNumberInput
+                  value={getForcePort(world, "tcp")}
+                  onChange={(value) => setProtocolPort("tcp", value)}
+                  min={1}
+                  max={65535}
+                  allowNegative={false}
+                  placeholder={t("config.forcePortAuto")}
+                />
+              </FieldRow>
+              <Text size="xs" c="dimmed">
+                {t("config.quicGlobalHint")}
+              </Text>
               {/* ResoniteLink（R13）。port は空＝自動（未設定）＝保存JSONから省く。 */}
               <FieldRow label={t("config.enableResoniteLink")} {...resetProps("enableResoniteLink", t("config.enableResoniteLink"))}>
                 <Switch

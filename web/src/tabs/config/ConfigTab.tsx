@@ -10,6 +10,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { SplitColumns } from "../../components/SplitColumns";
 import { ConfigEditor } from "./ConfigEditor";
 import { ConfigList } from "./ConfigList";
+import { getDuplicateQUICPorts } from "./configModel";
 import type { ConfigMap } from "./configModel";
 
 // config 名のバリデーション（backend の SanitizeName と同じ・パストラバーサル防止）。
@@ -56,7 +57,8 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
         ? t("config.reservedName")
         : t("config.invalidName")
       : undefined;
-  const canSave = dirty && nameValid; // 保存ボタンの活性＝変更あり かつ 名前が有効
+  const portsValid = cfg === null || getDuplicateQUICPorts(cfg).size === 0;
+  const canSave = dirty && nameValid && portsValid; // 起動対象ワールドの QUIC 固定ポート重複も保存前に拒否
 
   const refreshList = async () => {
     const l = await api.getConfigs();
@@ -122,6 +124,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   //   リネーム先が既存名なら上書き確認を挟む。無効名は保存ガード（ボタンも disabled）。
   const save = () => {
     if (!cfg) return;
+    if (getDuplicateQUICPorts(cfg).size > 0) return;
     const body = cfg;
     const name = draftName.trim().normalize("NFC"); // 送信名を正準形へ（backend pathFor と一致）
     if (!isValidName(name)) return;
@@ -129,10 +132,9 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     const persist = async () => {
       const r = await api.saveConfig(name, body, from);
       if (r.ok) {
-        setSelected(name);
-        setDraftName(name);
-        setOriginal(body);
         await refreshList();
+        // backend が旧 forcePort を新形式へ正規化するため、保存結果を再読込して表示と dirty 判定を揃える。
+        await load(name);
       }
       return r;
     };
@@ -216,6 +218,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
                 draftName={draftName}
                 onDraftNameChange={setDraftName}
                 nameError={nameError}
+                portsError={portsValid ? undefined : t("config.quicPortDuplicateSummary")}
                 cfg={cfg}
                 onChange={setCfg}
                 canSave={canSave}

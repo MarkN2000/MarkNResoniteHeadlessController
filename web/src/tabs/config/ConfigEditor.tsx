@@ -1,4 +1,4 @@
-import { Button, Divider, Stack } from "@mantine/core";
+import { Button, Divider, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import type { ConfigDefaults } from "../../api";
 import { FieldRow, InspectorCard, InspectorTextInput } from "../../components/inspector";
@@ -14,6 +14,7 @@ export function ConfigEditor({
   draftName,
   onDraftNameChange,
   nameError,
+  portsError,
   cfg,
   onChange,
   canSave,
@@ -25,9 +26,10 @@ export function ConfigEditor({
   draftName: string;
   onDraftNameChange: (v: string) => void;
   nameError?: string;
+  portsError?: string;
   cfg: ConfigMap;
   onChange: (cfg: ConfigMap) => void;
-  canSave: boolean; // 変更あり かつ 名前が有効（filled 表示＋活性の単一条件）
+  canSave: boolean; // 変更あり かつ 名前・QUIC固定ポートが有効（filled 表示＋活性の単一条件）
   saving: boolean;
   onSave: () => void;
   centralUserId?: string; // customSessionId prefix の自動入力元（R12）
@@ -63,6 +65,11 @@ export function ConfigEditor({
         <GeneralSection cfg={cfg} onChange={onChange} folderDefaults={folderDefaults} />
         <Divider color="dark.4" />
         <WorldsSection cfg={cfg} onChange={onChange} centralUserId={centralUserId} />
+        {portsError && (
+          <Text size="xs" c="red.6">
+            {portsError}
+          </Text>
+        )}
         <Divider color="dark.4" />
         {saveButton(true)}
       </Stack>

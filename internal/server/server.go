@@ -84,7 +84,7 @@ type Server struct {
 	localSatisfies  func(installDir string, req platform.RuntimeRequirement, goarch string) bool
 	systemSatisfies func(goos, goarch string, req platform.RuntimeRequirement) bool
 	installRuntime  func(ctx context.Context, installDir string) error
-	steamRunning    func() bool                                            // Steam 更新が進行中か（ガード経路の起動見送り判定）
+	steamRunning    func() bool                                           // Steam 更新が進行中か（ガード経路の起動見送り判定）
 	updateResonite  func(ctx context.Context, p steam.UpdateParams) error // Resonite 更新（既定 s.steam.Update・テストで偽装）
 
 	// sysDotnetOK は「システム .NET が要求を満たす」と確認できた組のキャッシュ
@@ -101,6 +101,10 @@ type Server struct {
 	// それらを読む経路（auth の署名鍵・起動時の creds/パス読取）の競合を防ぐ。
 	// auth は &cfgMu を共有する。レート制限状態は auth.mu（別ロック）。
 	cfgMu sync.RWMutex
+
+	// quicConfigMu は Headless/Config.json の read-modify-write を直列化し、
+	// publicIP 更新時に同ファイルの未知項目を取りこぼさないようにする。
+	quicConfigMu sync.Mutex
 
 	// runtimeMu は runtime-state.json（last-used / 最終起動）の read-modify-write を直列化する
 	// （handleStart〔HTTP〕と orchestrator/crash-monitor〔goroutine〕からの並行書き込みを防ぐ）。
@@ -236,6 +240,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/password", s.requireAuth(s.handlePasswordChange))
 	mux.HandleFunc("GET /api/v1/app-settings", s.requireAuth(s.handleAppSettingsGet))
 	mux.HandleFunc("PUT /api/v1/app-settings", s.requireAuth(s.handleAppSettingsPut))
+	mux.HandleFunc("GET /api/v1/quic-config", s.requireAuth(s.handleQUICConfigGet))
+	mux.HandleFunc("PUT /api/v1/quic-config", s.requireAuth(s.handleQUICConfigPut))
 
 	// スケジュール（Phase 8・§3.16）: 自動再起動 設定/状態（P8-1）＋手動トリガー/中止（P8-3b）。
 	mux.HandleFunc("GET /api/v1/restart-config", s.requireAuth(s.handleRestartConfigGet))

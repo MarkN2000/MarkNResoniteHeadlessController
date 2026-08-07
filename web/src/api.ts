@@ -554,6 +554,15 @@ export async function getAppSettings(): Promise<AppSettings | null> {
 }
 export const putAppSettings = (s: AppSettings) => write("PUT", "/app-settings", s);
 
+// Resonite Headless 全体の QUIC 設定。Config.json の他項目や秘密値は API に出さない。
+export interface QUICConfig {
+  publicIP: string;
+}
+export async function getQUICConfig(): Promise<QUICConfig | null> {
+  return getData<QUICConfig>("/quic-config");
+}
+export const putQUICConfig = (s: QUICConfig) => write("PUT", "/quic-config", s);
+
 // 管理パスワード変更（成功時 backend が新Cookieを再発行＝このブラウザは継続・他端末は失効）。
 export const changePassword = (currentPassword: string, newPassword: string) =>
   post("/password", { currentPassword, newPassword });

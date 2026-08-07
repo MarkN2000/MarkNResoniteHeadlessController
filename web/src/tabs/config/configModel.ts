@@ -73,6 +73,62 @@ export function getWorlds(cfg: ConfigMap): WorldMap[] {
   return Array.isArray(cfg.startWorlds) ? (cfg.startWorlds as WorldMap[]) : [];
 }
 
+export type ForcePortProtocol = "lnl" | "quic" | "tcp";
+
+const hasOwn = (obj: Record<string, unknown>, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(obj, key);
+
+const forcePortsMap = (world: WorldMap): Record<string, unknown> | null => {
+  const value = world.forcePorts;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+};
+
+// 旧 forcePort は LNL の表示用フォールバックに限る。forcePorts.lnl が存在すれば新形式を優先する。
+export function getForcePort(world: WorldMap, protocol: ForcePortProtocol): number | "" {
+  const ports = forcePortsMap(world);
+  if (ports && hasOwn(ports, protocol)) {
+    return typeof ports[protocol] === "number" ? ports[protocol] : "";
+  }
+  if (protocol === "lnl" && typeof world.forcePort === "number") return world.forcePort;
+  return "";
+}
+
+// UI から1プロトコルだけを更新する。未知のプロトコルは温存し、編集時点で旧キーは新形式へ移行する。
+export function setForcePort(
+  world: WorldMap,
+  protocol: ForcePortProtocol,
+  value: number | string,
+): WorldMap {
+  const ports = { ...(forcePortsMap(world) ?? {}) };
+  if (!hasOwn(ports, "lnl") && typeof world.forcePort === "number") {
+    ports.lnl = world.forcePort;
+  }
+  if (value === "") delete ports[protocol];
+  else ports[protocol] = Number(value);
+
+  const next = { ...world };
+  delete next.forcePort;
+  if (Object.keys(ports).length > 0) next.forcePorts = ports;
+  else delete next.forcePorts;
+  return next;
+}
+
+export const hasLegacyForcePort = (world: WorldMap): boolean => hasOwn(world, "forcePort");
+
+// NAT パンチスルー未実装の QUIC は、起動対象ワールドごとに固有の固定ポートが必要。
+export function getDuplicateQUICPorts(cfg: ConfigMap): Set<number> {
+  const counts = new Map<number, number>();
+  for (const world of getWorlds(cfg)) {
+    if (world.isEnabled === false) continue;
+    const port = getForcePort(world, "quic");
+    if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+    counts.set(port, (counts.get(port) ?? 0) + 1);
+  }
+  return new Set([...counts].filter(([, count]) => count > 1).map(([port]) => port));
+}
+
 export function setWorld(cfg: ConfigMap, index: number, world: WorldMap): ConfigMap {
   const worlds = getWorlds(cfg).slice();
   worlds[index] = world;
