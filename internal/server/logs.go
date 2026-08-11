@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -38,6 +39,38 @@ type logFileInfo struct {
 	Name    string `json:"name"`
 	Size    int64  `json:"size"`
 	ModTime string `json:"modTime"` // RFC3339（UTC）
+}
+
+// openLogFile はパス検証済みのログファイルとメタデータを返す。
+// 閲覧とダウンロードで同じ制約・エラー応答を使い、成功時のファイルは呼び出し側が閉じる。
+func (s *Server) openLogFile(w http.ResponseWriter, name string) (*os.File, fs.FileInfo, bool) {
+	// トラバーサル防止: basename と一致しない（区切り文字や ".." を含む）名前は拒否。
+	if name == "" || name != filepath.Base(name) || name == "." || name == ".." {
+		writeErr(w, http.StatusBadRequest, "bad_request", "不正なログファイル名です")
+		return nil, nil, false
+	}
+	// Logs フォルダ内の想定外ファイルを返さないよう .log のみに限定。
+	if !strings.EqualFold(filepath.Ext(name), ".log") {
+		writeErr(w, http.StatusBadRequest, "bad_request", "ログファイル(.log)のみ指定できます")
+		return nil, nil, false
+	}
+	f, err := os.Open(filepath.Join(s.logsDir(), name))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			writeErr(w, http.StatusNotFound, "log_not_found", "指定のログが見つかりません")
+			return nil, nil, false
+		}
+		// 稼働中の現行ログがロックされている等。握り潰さず明示する。
+		writeErr(w, http.StatusInternalServerError, "log_read_failed", err.Error())
+		return nil, nil, false
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		writeErr(w, http.StatusInternalServerError, "log_read_failed", err.Error())
+		return nil, nil, false
+	}
+	return f, fi, true
 }
 
 // handleLogList: GET /api/v1/logs → []logFileInfo（更新時刻の新しい順＝現行ログが先頭）。
@@ -76,33 +109,12 @@ func (s *Server) handleLogList(w http.ResponseWriter, r *http.Request) {
 // name は basename のみ許可（パストラバーサル防止）。サイズが上限超なら末尾だけ返し truncated=true。
 func (s *Server) handleLogGet(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	// トラバーサル防止: basename と一致しない（区切り文字や ".." を含む）名前は拒否。
-	if name == "" || name != filepath.Base(name) || name == "." || name == ".." {
-		writeErr(w, http.StatusBadRequest, "bad_request", "不正なログファイル名です")
-		return
-	}
-	// Logs フォルダ内の想定外ファイルを返さないよう .log のみに限定。
-	if !strings.EqualFold(filepath.Ext(name), ".log") {
-		writeErr(w, http.StatusBadRequest, "bad_request", "ログファイル(.log)のみ閲覧できます")
-		return
-	}
-	f, err := os.Open(filepath.Join(s.logsDir(), name))
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			writeErr(w, http.StatusNotFound, "log_not_found", "指定のログが見つかりません")
-			return
-		}
-		// 稼働中の現行ログがロックされている等。握り潰さず明示する。
-		writeErr(w, http.StatusInternalServerError, "log_read_failed", err.Error())
+	f, fi, ok := s.openLogFile(w, name)
+	if !ok {
 		return
 	}
 	defer f.Close()
 
-	fi, err := f.Stat()
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "log_read_failed", err.Error())
-		return
-	}
 	size := fi.Size()
 	truncated := false
 	if size > maxLogTailBytes {
@@ -126,4 +138,19 @@ func (s *Server) handleLogGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeOK(w, map[string]any{"name": name, "size": size, "truncated": truncated, "content": content})
+}
+
+// handleLogDownload: GET /api/v1/logs/{name}/download → 元のログファイル全文。
+// 表示用の10MiB上限は適用せず、http.ServeContent でブラウザへ直接ストリーミングする。
+func (s *Server) handleLogDownload(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	f, fi, ok := s.openLogFile(w, name)
+	if !ok {
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	http.ServeContent(w, r, name, fi.ModTime(), f)
 }

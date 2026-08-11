@@ -9,8 +9,8 @@ import { formatBytes } from "../../lib/format";
 import { notifyError, notifyInfo } from "../../lib/notify";
 
 // Resonite ログ閲覧タブ（読み取り専用）。{InstallDir}/Headless/Logs のログを
-// ドロップダウンで選び、本文を等幅表示・コピーできる。稼働中/停止中どちらでも閲覧可。
-// 大きいログは末尾10MiBのみ取得（backend で切り詰め）＝truncated バナーで明示する。
+// ドロップダウンで選び、本文を等幅表示・コピー・全文ダウンロードできる。稼働中/停止中どちらでも閲覧可。
+// 表示とコピーは末尾10MiBのみ取得（backend で切り詰め）、ダウンロードは元ファイルを直接取得する。
 export function LogsTab() {
   const { t } = useTranslation();
   const [files, setFiles] = useState<LogFileInfo[]>([]);
@@ -59,6 +59,17 @@ export function LogsTab() {
     else notifyError(t("logs.copyFailed"));
   };
 
+  const onDownload = () => {
+    if (!selected) return;
+    // 同一オリジンの認証Cookieを使ってブラウザへ直接保存させ、ログ全文をJSメモリへ載せない。
+    const link = document.createElement("a");
+    link.href = api.getLogDownloadUrl(selected);
+    link.download = selected;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const sel = files.find((f) => f.name === selected);
   const options = files.map((f) => ({ value: f.name, label: f.name }));
 
@@ -91,6 +102,9 @@ export function LogsTab() {
           <Group justify="flex-end">
             <InspectorButton onClick={onCopy} disabled={!content || contentLoading}>
               {t("logs.copy")}
+            </InspectorButton>
+            <InspectorButton onClick={onDownload} disabled={!content || contentLoading}>
+              {t("logs.download")}
             </InspectorButton>
           </Group>
         </Stack>

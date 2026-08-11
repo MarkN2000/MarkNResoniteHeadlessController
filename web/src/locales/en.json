@@ -28,9 +28,10 @@
     "file": "File",
     "refresh": "Refresh",
     "copy": "Copy",
+    "download": "Download",
     "copied": "Copied",
     "copyFailed": "Copy failed",
-    "truncated": "File is large — showing the last 10 MiB only (beginning omitted; the log is not cut off mid-stream)",
+    "truncated": "File is large — showing and copying the last 10 MiB only (downloads save the complete file)",
     "noFiles": "No logs",
     "empty": "No logs to display",
     "loadError": "Could not read the log (the current log may be unreadable while running)"

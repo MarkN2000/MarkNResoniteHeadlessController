@@ -313,6 +313,7 @@ func (s *Server) Handler() http.Handler {
 	// Resonite ログ閲覧（{InstallDir}/Headless/Logs・読み取り専用）。稼働中/停止中どちらでも可。
 	mux.HandleFunc("GET /api/v1/logs", s.requireAuth(s.handleLogList))
 	mux.HandleFunc("GET /api/v1/logs/{name}", s.requireAuth(s.handleLogGet))
+	mux.HandleFunc("GET /api/v1/logs/{name}/download", s.requireAuth(s.handleLogDownload))
 
 	// キャッシュ管理（既定 headless-cache）。自動古削除の設定 + サイズ取得 + 手動全削除（停止中のみ）。
 	mux.HandleFunc("GET /api/v1/cache/config", s.requireAuth(s.handleCacheConfigGet))

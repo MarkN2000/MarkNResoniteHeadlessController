@@ -617,11 +617,12 @@ Resonite ヘッドレスのログファイルを Web UI で閲覧する**読み�
 
 - **対象**: `{InstallDirOrDefault}/Headless/Logs/*.log`（`logsFolder`=null の既定。実機確認済・[resonite-domain-facts §1](../resonite-domain-facts.md)）。独自 `logsFolder` を設定した場合は対象外（キャッシュと同じ既定運用前提）。
 - **文字コード**: ログファイルは**両OSとも UTF-8**（コンソール stdout が Win=Shift_JIS なのと別系統・実機249件で確認）。→ **変換せずそのまま返す**。
-- **本文上限**: 末尾 **10MiB**（`maxLogTailBytes`）。超過時は末尾だけ返し `truncated:true`＝UI で「先頭省略（途中で切れたわけではない）」を明示。切り出しはマルチバイト境界を割り得るため**最初の改行まで捨てて行頭から**返す。
-- **UI**: ドロップダウンでファイル選択（更新時刻の新しい順＝現行ログが先頭）→ 読み取り専用の等幅 textarea で表示＋更新＋**コピー**。取得失敗（稼働中の現行ログがロックされている等）は空表示で黙らせず明示。
+- **表示本文上限**: 末尾 **10MiB**（`maxLogTailBytes`）。超過時は末尾だけ返し `truncated:true`＝UI で「先頭省略（途中で切れたわけではない）」を明示。切り出しはマルチバイト境界を割り得るため**最初の改行まで捨てて行頭から**返す。コピーもこの表示本文を対象とする。
+- **ダウンロード**: 選択した元の `.log` ファイルを**全文**ダウンロードする。10MiB の表示上限は適用せず、JSON やブラウザメモリへ全量展開せず HTTP レスポンスへストリーミングする。保存名は元のファイル名とする。
+- **UI**: ドロップダウンでファイル選択（更新時刻の新しい順＝現行ログが先頭）→ 読み取り専用の等幅 textarea で表示＋更新＋**コピー**＋**ダウンロード**。取得失敗（稼働中の現行ログがロックされている等）は空表示で黙らせず明示。
 - **コピーのフォールバック**: `navigator.clipboard` は secure context（https/localhost）専用で **LAN/HTTP では undefined**。`lib/clipboard.ts` で Async Clipboard API → `execCommand("copy")` の順にフォールバック（メモリ `lan-http-no-secure-context-apis`）。
 - **セキュリティ**: `{name}` は `filepath.Base` 一致のみ許可（区切り文字/`..` 拒否）＋`.log` 限定＝パストラバーサル防止。
-- **API**: `GET /api/v1/logs`（[]{name,size,modTime}）・`GET /api/v1/logs/{name}`（{name,size,truncated,content}）。
+- **API**: `GET /api/v1/logs`（[]{name,size,modTime}）・`GET /api/v1/logs/{name}`（{name,size,truncated,content}）・`GET /api/v1/logs/{name}/download`（元ファイル全文・`Content-Disposition: attachment`）。
 
 ---
 

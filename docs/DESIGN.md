@@ -233,7 +233,7 @@ UI専用の内部APIを持たず、**公開HTTP API 1本を Web UI もただの�
 - フレンド/BAN（グローバル・focus不要）: `POST /friendrequests/accept`、`POST /friends/add|remove`、`POST /bans/unban`、`POST /bans/banByID`（ID 指定 BAN・R1）
 - Resonite 公開API プロキシ: `GET /resonite/users?q=`（ユーザー検索・無認証先）
 - 再起動（**Phase 8・実装済**）: `GET/PUT /restart-config`、`GET /restart-status`、`POST /restart/trigger`、`POST /restart/cancel`
-- ログ閲覧（読み取り専用・phase-7-spec §3.18）: `GET /logs`（一覧）、`GET /logs/{name}`（本文・末尾10MiB）
+- ログ閲覧（読み取り専用・phase-7-spec §3.18）: `GET /logs`（一覧）、`GET /logs/{name}`（表示本文・末尾10MiB）、`GET /logs/{name}/download`（元ファイル全文）
 - キャッシュ管理（既定 headless-cache・phase-7-spec §3.17）: `GET/PUT /cache/config`（停止時の自動古削除）、`GET /cache/info`（サイズ）、`POST /cache/clear`（停止中のみ）
 - Steam（**Phase 9・未実装**）: `POST /steam/update`(非同期)、`POST /steam/guard-code`、`GET /steam/config`。Guard要求時はSSE `steam` を `guard-required` 状態にしUIへ入力を促す
 

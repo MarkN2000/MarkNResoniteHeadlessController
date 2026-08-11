@@ -5,8 +5,11 @@ package server
 // 末尾切り詰め・不正名/未存在の拒否を検証する。
 
 import (
+	"io"
+	"mime"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,6 +146,50 @@ func TestLogGet_TailTruncation(t *testing.T) {
 	}
 }
 
+func TestLogDownload_FullContent(t *testing.T) {
+	ts, pw, dir := newLogsServer(t, true)
+	name := "日本語 session.log"
+	full := "BEGIN\n" + strings.Repeat("x", maxLogTailBytes) + "\nEND\n"
+	writeLog(t, dir, name, full, time.Now())
+
+	resp := authReq(t, http.MethodGet, ts.URL+"/api/v1/logs/"+url.PathEscape(name)+"/download", pw, "", "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("code=%d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != full {
+		t.Fatalf("download should return full content: got=%d bytes want=%d", len(body), len(full))
+	}
+	mediaType, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	if err != nil {
+		t.Fatalf("Content-Disposition: %v", err)
+	}
+	if mediaType != "attachment" || params["filename"] != name {
+		t.Fatalf("Content-Disposition=%q params=%v", mediaType, params)
+	}
+	if got := resp.Header.Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("Content-Type=%q", got)
+	}
+}
+
+func TestLogDownload_RequiresAuth(t *testing.T) {
+	ts, _, dir := newLogsServer(t, true)
+	writeLog(t, dir, "session.log", "secret", time.Now())
+
+	resp, err := http.Get(ts.URL + "/api/v1/logs/session.log/download")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("code=%d, want=%d", resp.StatusCode, http.StatusUnauthorized)
+	}
+}
+
 func TestLogGet_RejectsBadNames(t *testing.T) {
 	ts, pw, dir := newLogsServer(t, true)
 	writeLog(t, dir, "ok.log", "x", time.Now())
@@ -154,5 +201,14 @@ func TestLogGet_RejectsBadNames(t *testing.T) {
 	// 存在しない .log は 404
 	if code := authGet(t, ts.URL+"/api/v1/logs/missing.log", pw, nil); code != http.StatusNotFound {
 		t.Fatalf("missing .log should be 404, got %d", code)
+	}
+	// ダウンロードも同じファイル名制約を使う。
+	resp := authReq(t, http.MethodGet, ts.URL+"/api/v1/logs/secret.txt/download", pw, "", "")
+	if code := decodeResp(t, resp, nil); code != http.StatusBadRequest {
+		t.Fatalf("download of non-.log should be 400, got %d", code)
+	}
+	resp = authReq(t, http.MethodGet, ts.URL+"/api/v1/logs/missing.log/download", pw, "", "")
+	if code := decodeResp(t, resp, nil); code != http.StatusNotFound {
+		t.Fatalf("download of missing .log should be 404, got %d", code)
 	}
 }

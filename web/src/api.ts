@@ -271,6 +271,11 @@ export async function getLogContent(name: string): Promise<LogContent | null> {
   return getData<LogContent>(`/logs/${encodeURIComponent(name)}`);
 }
 
+// 元ログ全文のダウンロードURL。ブラウザ標準のダウンロードに渡し、全量をJSメモリへ載せない。
+export function getLogDownloadUrl(name: string): string {
+  return `${API}/logs/${encodeURIComponent(name)}/download`;
+}
+
 // --- 自己更新（MRHC 自身の入れ替え・docs/design/self-update.md） ---
 
 export interface UpdateInfo {

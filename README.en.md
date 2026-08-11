@@ -210,7 +210,7 @@ Resonite's headless server is distributed as a **private beta**, and a "headless
 
 ## Troubleshooting
 
-- **I want to see the headless logs** — In the web UI "Logs" tab, you can pick a Resonite headless log file (`<install dir>/Headless/Logs`) to view and copy (read-only; viewable even while stopped). Large logs show only the tail. The current log of a running server may be unreadable depending on the OS.
+- **I want to see the headless logs** — In the web UI "Logs" tab, you can pick a Resonite headless log file (`<install dir>/Headless/Logs`) to view, copy, or download (read-only; available even while stopped). Large logs show and copy only the tail, while downloads save the complete original file. The current log of a running server may be unreadable depending on the OS.
 - **I'm worried about disk space (cache)** — Under "Cache management" in the Settings tab, you can check the total size of the Resonite cache (default `headless-cache`) and clear it entirely (only while the headless is stopped). Turning on "Auto-delete cache" cleans up, every time it stops, any cache whose last modification is older than a set number of days (default 30). Anything still needed is re-fetched automatically next time.
 - **I forgot the admin password** — Run `./mrhc reset-password` (Windows: `mrhc.exe reset-password`) on the server's command line to reset it without the old password.
 - **An update failed midway and it won't start** — If `mrhc.exe.old` (Linux: `mrhc.old`) remains next to the executable, rename it back to `mrhc.exe` (`mrhc`) to recover the previous version.
@@ -229,7 +229,7 @@ Manage your entire headless server from a browser on your LAN.
 **Start / stop / monitoring**
 - Start / graceful stop (announces, locks the session, then stops as soon as everyone leaves or after 1 minute at most) / force stop / restart of the headless (Resonite process)
 - Live status: participants (present/away), world info, uptime, session URL
-- Live log of Resonite output (SSE), plus viewing and copying log files
+- Live log of Resonite output (SSE), plus viewing, copying, and downloading log files
 - Server resource usage (CPU / memory / free disk)
 - Send arbitrary console commands
 
