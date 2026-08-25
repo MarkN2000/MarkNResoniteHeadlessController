@@ -27,12 +27,12 @@ jobs:
           - { goos: linux,   goarch: amd64, ext: ''     }
           - { goos: linux,   goarch: arm64, ext: ''     } # ARM Linux（Resonite が ARM で動く環境向け）
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # --- フロントエンド（web/dist を生成 → Go が embed.FS で同梱する。go build より前に必須）---
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
       - name: Build frontend
@@ -44,7 +44,7 @@ jobs:
           npm run build
 
       # --- バックエンド（CGO 不要の純 Go。GOOS/GOARCH を変えるだけでクロスビルド可）---
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -79,7 +79,7 @@ jobs:
           fi
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mrhc-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ${{ env.ARTIFACT }}
@@ -95,9 +95,9 @@ jobs:
     permissions:
       contents: write # リリース作成・資産アップロードに必要
     steps:
-      - uses: actions/checkout@v4 # install.sh（タグ時点のもの）を添付するため
+      - uses: actions/checkout@v5 # install.sh（タグ時点のもの）を添付するため
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: mrhc-*
           path: dist
@@ -109,7 +109,7 @@ jobs:
         run: sha256sum mrhc-linux-amd64.tar.gz mrhc-linux-arm64.tar.gz mrhc-windows-amd64.zip > SHA256SUMS
 
       - name: Create release (draft)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # draft で作成し、全アセットが揃ってから下のステップで公開する。
           # 公開済みリリースへ逐次アップロードすると、releases/latest が新タグを指すのに
