@@ -495,7 +495,7 @@ export const sendImpulse = (idx: number, tag: string, value: string) =>
 // 空=手動（itemUrl/impulseTag を使用・itemUrl 空は spawn 省略で impulse のみ）。
 export const spawnImpulse = (
   idx: number,
-  body: { templateId?: string; itemUrl?: string; impulseTag?: string; message: string },
+  body: { templateId?: string; itemUrl?: string; impulseTag?: string; message: string; speakerId?: number },
 ) => post(`/sessions/${idx}/spawn-impulse`, body);
 
 // 新規セッション（稼働中に新ワールドを開始・focus 不要・backend timeout 60s）。
@@ -643,21 +643,37 @@ export const steamCancel = () => post("/steam/cancel");
 // restart 設定は単一オブジェクト（config.Restart のミラー）。完全オブジェクトを PUT する（pointer 設計前提）。
 
 // アイテムテンプレート（backend がリモートリストから取得・フォールバック込みで常に返す。
-// docs/design/announce-templates.md）。2系統: 告知（スケジュール）/ スポーン＆パルス（セッション）。
-// id が永続キーで、告知では announce.templateId として保存される。
+// docs/design/item-templates.md）。actions で各操作の選択肢を区別する。
+// id は永続キーで、告知では announce.templateId として保存される。
+export type ItemTemplateAction = "spawn" | "spawnImpulse" | "announce";
 export interface ItemTemplate {
   id: string;
   label: Record<string, string>; // 言語コード→表示名（現在言語→en→ja→先頭→id でフォールバック）
   url: string;
   tag: string;
+  actions: ItemTemplateAction[];
+  input?: { kind: "ttsVoice" };
 }
-async function getItemTemplates(path: string): Promise<ItemTemplate[]> {
-  const d = await getData<{ templates: ItemTemplate[] }>(path);
+export async function getItemTemplates(): Promise<ItemTemplate[]> {
+  const d = await getData<{ templates: ItemTemplate[] }>("/item-templates");
   return d?.templates ?? [];
 }
-export const getAnnounceTemplates = () => getItemTemplates("/announce-templates");
-export const getSpawnTemplates = () => getItemTemplates("/spawn-templates");
-export const getItemSpawnTemplates = () => getItemTemplates("/item-spawn-templates"); // 単体スポーン用（tag 任意）
+
+// TTS 話者一覧。取得失敗と「正常だが話者0件」を呼び出し側で区別できるよう ok を返す。
+export interface TtsSpeaker {
+  id: number;
+  speakerName: string;
+  styleName: string;
+}
+export interface TtsSpeakersResult {
+  voices: TtsSpeaker[];
+  ok: boolean;
+}
+export async function getTtsSpeakers(): Promise<TtsSpeakersResult> {
+  const data = await getData<{ voices: TtsSpeaker[] }>("/tts-speakers");
+  if (!data || !Array.isArray(data.voices)) return { voices: [], ok: false };
+  return { voices: data.voices, ok: true };
+}
 
 export type RestartType = "once" | "weekly" | "daily";
 
@@ -683,6 +699,7 @@ export interface RestartAnnounce {
   itemUrl: string; // 手動入力時のみ使用
   impulseTag: string; // 手動入力時のみ使用
   message: string;
+  speakerId: number; // ttsVoice テンプレ選択時のみ使用。0 は未選択。
 }
 export interface RestartSessionChanges {
   setPrivate: boolean;

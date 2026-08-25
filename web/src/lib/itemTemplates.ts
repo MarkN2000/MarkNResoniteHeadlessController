@@ -1,6 +1,6 @@
 // アイテムテンプレート（リモートリスト）の表示ヘルパ（純関数）。
 // 告知（スケジュールタブ）とスポーン＆パルス（セッションタブ）の両カードで共用する。
-// 正本: docs/design/announce-templates.md
+// 正本: docs/design/item-templates.md
 import type { ItemTemplate } from "../api";
 
 // 「手動入力」を表す番兵（テンプレ id には使わない "#" を含むため実テンプレ id と衝突しない）。

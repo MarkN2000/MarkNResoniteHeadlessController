@@ -60,13 +60,14 @@ type PreActions struct {
 
 // AnnounceAction は dynamicImpulse 告知（spawn したアイテムに impulse を送る）。
 // TemplateID 非空＝テンプレ参照（URL/タグは告知実行時にリモートリストから解決＝
-// docs/design/announce-templates.md）。空＝手動入力（ItemURL/ImpulseTag を使う）。
+// docs/design/item-templates.md）。空＝手動入力（ItemURL/ImpulseTag を使う）。
 type AnnounceAction struct {
 	Enabled    bool   `json:"enabled"`
 	TemplateID string `json:"templateId"` // 告知テンプレートの永続キー（空=手動入力）
 	ItemURL    string `json:"itemUrl"`    // 手動: spawn するアイテム（空=spawn しない＝常設受け機構前提）
 	ImpulseTag string `json:"impulseTag"` // 手動: dynamicimpulsestring のタグ（例 MRHC.play）
 	Message    string `json:"message"`    // 送る文字列（固定文）
+	SpeakerID  int64  `json:"speakerId"`  // ttsVoice テンプレート用の話者 style ID
 }
 
 // SessionChanges は再起動前のセッション設定変更（各項目は独立トグル・全OFF可）。
@@ -90,7 +91,7 @@ type CrashRecovery struct {
 // セッション変更は maxusers=1 のみ ON、クラッシュ復帰は ON（10分に3回で停止）、
 // 待機は静かに58分＋告知後2分（合計60分）。
 // 予定再起動時の更新／手動起動・通常再起動前の更新はいずれも既定 ON（Steam 未設定なら no-op・P9-B）。
-// templateId は server の builtinAnnounceTemplates 先頭・フロント
+// templateId は server の builtinItemTemplates に含まれる既定ID・フロント
 // web/src/tabs/schedule/scheduleModel.ts の defaultAnnounce() と同期すること。
 func DefaultRestart() Restart {
 	return Restart{

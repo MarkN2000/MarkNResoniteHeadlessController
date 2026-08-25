@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Checkbox, Divider, Group, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
+import type { ItemTemplate } from "../../api";
 import {
   FieldRow,
   InspectorButton,
@@ -9,8 +10,9 @@ import {
   InspectorSelect,
   InspectorTextInput,
 } from "../../components/inspector";
+import { TtsVoiceFields } from "../../components/TtsVoiceFields";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
-import { useItemTemplates } from "../../hooks/useItemTemplates";
+import { useTtsSpeakers } from "../../hooks/useTtsSpeakers";
 import { MANUAL_TEMPLATE, buildTemplateSelectData } from "../../lib/itemTemplates";
 import { isResoniteUrl } from "../../lib/resoniteUrl";
 
@@ -18,10 +20,10 @@ import { isResoniteUrl } from "../../lib/resoniteUrl";
 //   アイテムスポーン       = spawn "<url>" <active> <persistent>（テンプレ選択 or 手動 URL・2026-06-10）
 //   ダイナミックインパルス = dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
 //   スポーン＆パルス       = テンプレ（リモートリスト）or 手動 → backend が spawn→約5秒→impulse を完走
-//                            （告知③のセッション版・docs/design/announce-templates.md）
+//                            （告知③のセッション版・docs/design/item-templates.md）
 // いずれも非破壊操作なので確認ダイアログなし＝実行→受理トースト（方針A・respawn/message と同格）。
 // spawn/impulse はセッションの users/status を変えない（再取得不要）ため onChanged は受け取らない。
-export function SpawnImpulseCard({ idx }: { idx: number }) {
+export function SpawnImpulseCard({ idx, templates }: { idx: number; templates: ItemTemplate[] }) {
   const { t, i18n } = useTranslation();
   const { busy, run } = useAsyncAction();
   const [url, setUrl] = useState("");
@@ -33,10 +35,10 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
   const urlValid = isResoniteUrl(url);
   const tagValid = tag.trim() !== "";
 
-  // アイテムスポーン単体のテンプレ選択（未操作なら先頭テンプレ・専用リスト=tag任意・2026-06-10）。
+  // アイテムスポーン単体のテンプレ選択（未操作なら先頭テンプレ）。
   // テンプレの url だけを使い tag は使わない。active/persistent は選択と独立に効く
   // （単体スポーンの存在意義なので残す）。取得前は手動入力に退化。
-  const spawnTemplates = useItemTemplates(api.getItemSpawnTemplates);
+  const spawnTemplates = templates.filter((template) => template.actions.includes("spawn"));
   const [spawnSel, setSpawnSel] = useState<string | null>(null);
   const spawnKey = spawnSel ?? spawnTemplates[0]?.id ?? MANUAL_TEMPLATE;
   const spawnManual = spawnKey === MANUAL_TEMPLATE;
@@ -49,30 +51,40 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
   const spawnUrl = spawnManual ? url.trim() : (spawnTemplates.find((tpl) => tpl.id === spawnKey)?.url ?? "");
   const spawnReady = spawnManual ? urlValid : spawnUrl !== "";
 
-  // スポーン＆パルス（専用リスト・tag必須）。選択は未操作なら先頭テンプレを既定にする。
-  const templates = useItemTemplates(api.getSpawnTemplates);
+  // スポーン＆パルス。選択は未操作なら先頭テンプレを既定にする。
+  const spawnImpulseTemplates = templates.filter((template) => template.actions.includes("spawnImpulse"));
   const [spSel, setSpSel] = useState<string | null>(null);
   const [spUrl, setSpUrl] = useState("");
   const [spTag, setSpTag] = useState("");
   const [spMessage, setSpMessage] = useState("");
-  const spKey = spSel ?? templates[0]?.id ?? MANUAL_TEMPLATE;
+  const [spSpeakerId, setSpSpeakerId] = useState<number | null>(null);
+  const spKey = spSel ?? spawnImpulseTemplates[0]?.id ?? MANUAL_TEMPLATE;
   const spManual = spKey === MANUAL_TEMPLATE;
   const spData = buildTemplateSelectData(
-    templates,
+    spawnImpulseTemplates,
     spManual ? "" : spKey,
     i18n.language,
     t("session.spawnPulseManual"),
   );
+  const spTemplate = spManual ? undefined : spawnImpulseTemplates.find((tpl) => tpl.id === spKey);
+  const spIsTtsVoice = spTemplate?.input?.kind === "ttsVoice";
+  const ttsSpeakers = useTtsSpeakers(spIsTtsVoice);
   // 手動時のみ url/tag を検証（url は空可＝spawn 省略で impulse のみ・告知③と同条件）。
-  const spReady = !spManual || (spTag.trim() !== "" && (spUrl.trim() === "" || isResoniteUrl(spUrl)));
+  const speakerReady =
+    spSpeakerId !== null && spSpeakerId !== 0 && ttsSpeakers.voices.some((voice) => voice.id === spSpeakerId);
+  const spReady = spIsTtsVoice
+    ? spMessage.trim() !== "" && speakerReady && !ttsSpeakers.loading && !ttsSpeakers.failed
+    : !spManual || (spTag.trim() !== "" && (spUrl.trim() === "" || isResoniteUrl(spUrl)));
   const runSpawnPulse = () =>
     void run(
       () =>
         api.spawnImpulse(
           idx,
-          spManual
-            ? { itemUrl: spUrl.trim(), impulseTag: spTag.trim(), message: spMessage }
-            : { templateId: spKey, message: spMessage },
+          {
+            ...(spManual ? { itemUrl: spUrl.trim(), impulseTag: spTag.trim() } : { templateId: spKey }),
+            message: spMessage,
+            ...(spIsTtsVoice && spSpeakerId !== null ? { speakerId: spSpeakerId } : {}),
+          },
         ),
       t("toast.spawnPulseDone"),
     );
@@ -162,7 +174,20 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
           {t("session.spawnPulseSection")}
         </Text>
         <FieldRow label={t("session.spawnPulseItem")}>
-          <InspectorSelect data={spData} value={spKey} onChange={(v) => v && setSpSel(v)} />
+          <InspectorSelect
+            data={spData}
+            value={spKey}
+            onChange={(v) => {
+              if (!v) return;
+              setSpSel(v);
+              if (
+                v === MANUAL_TEMPLATE ||
+                spawnImpulseTemplates.find((template) => template.id === v)?.input?.kind !== "ttsVoice"
+              ) {
+                setSpSpeakerId(null);
+              }
+            }}
+          />
         </FieldRow>
         {spManual && (
           <>
@@ -189,13 +214,23 @@ export function SpawnImpulseCard({ idx }: { idx: number }) {
             </FieldRow>
           </>
         )}
-        <FieldRow label={t("session.spawnPulseMessage")}>
-          <InspectorTextInput
-            value={spMessage}
-            onChange={(e) => setSpMessage(e.currentTarget.value)}
-            placeholder={t("session.impulseValuePlaceholder")}
+        {spIsTtsVoice ? (
+          <TtsVoiceFields
+            text={spMessage}
+            speakerId={spSpeakerId}
+            speakers={ttsSpeakers}
+            onTextChange={setSpMessage}
+            onSpeakerIdChange={setSpSpeakerId}
           />
-        </FieldRow>
+        ) : (
+          <FieldRow label={t("session.spawnPulseMessage")}>
+            <InspectorTextInput
+              value={spMessage}
+              onChange={(e) => setSpMessage(e.currentTarget.value)}
+              placeholder={t("session.impulseValuePlaceholder")}
+            />
+          </FieldRow>
+        )}
         <Group justify="flex-end">
           <InspectorButton disabled={busy || !spReady} onClick={runSpawnPulse}>
             {t("session.spawnPulseRun")}

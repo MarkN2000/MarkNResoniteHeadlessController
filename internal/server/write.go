@@ -314,20 +314,28 @@ func (s *Server) handleSessionSpawnImpulse(w http.ResponseWriter, r *http.Reques
 		ItemURL    string `json:"itemUrl"`
 		ImpulseTag string `json:"impulseTag"`
 		Message    string `json:"message"`
+		SpeakerID  int64  `json:"speakerId"`
 	}
 	if !decodeBody(w, r, &body) {
 		return
 	}
 	url, tag := body.ItemURL, body.ImpulseTag
+	var tpl *itemTemplate
 	if body.TemplateID != "" {
-		tpl, found := s.spawnTpl.lookup(r.Context(), body.TemplateID)
+		foundTpl, found := s.itemTpl.lookup(r.Context(), body.TemplateID, templateActionSpawnImpulse)
 		if !found {
 			writeErr(w, http.StatusBadRequest, "bad_request", "テンプレートが見つかりません: "+body.TemplateID)
 			return
 		}
+		tpl = &foundTpl
 		url, tag = tpl.URL, tpl.Tag
 	}
 	if !requireField(w, "impulseTag", tag) {
+		return
+	}
+	value, err := impulseValueForTemplate(tpl, body.Message, body.SpeakerID)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 	if url != "" {
@@ -348,7 +356,7 @@ func (s *Server) handleSessionSpawnImpulse(w http.ResponseWriter, r *http.Reques
 		case <-time.After(s.spawnImpulseDelay):
 		}
 	}
-	s.execSession(w, r, idx, headless.DynamicImpulseStringCmd(tag, body.Message))
+	s.execSession(w, r, idx, headless.DynamicImpulseStringCmd(tag, value))
 }
 
 // handleSessionStart: 稼働中に新規ワールドを開始（/start のプロセス起動とは別物）。

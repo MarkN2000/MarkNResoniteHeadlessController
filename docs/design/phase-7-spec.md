@@ -119,13 +119,13 @@ POST /api/v1/sessions/{idx}/hidefromlisting {"hide":true}                   → 
 # セッション内コンテンツ操作  — ExecGroup(focus idx → cmd)・R14
 POST /api/v1/sessions/{idx}/spawn   {"url":"...","active":true,"persistent":false} → spawn "<url>" <active> <persistent>（3引数・help 確定）
 POST /api/v1/sessions/{idx}/impulse {"tag":"MRHC.play","value":"..."}            → dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
-POST /api/v1/sessions/{idx}/spawn-impulse {"templateId":"..."} or {"itemUrl":"...","impulseTag":"...","message":"..."}
+POST /api/v1/sessions/{idx}/spawn-impulse {"templateId":"...","message":"...","speakerId":888753762} or {"itemUrl":"...","impulseTag":"...","message":"..."}
 #   → スポーン＆パルス＝告知③のセッション版（spawn→実体化待ち約5秒→impulse を1リクエストで完走・
 #     templateId はスポーン＆パルステンプレ〔リモートリスト〕から実行直前に解決・spawn は active=true/persistent=false 固定・
-#     itemUrl 空は impulse のみ）。詳細は announce-templates.md。
+#     itemUrl 空は impulse のみ）。ttsVoice テンプレートでは message=text / speakerId=style ID とし、backend が TTS URL 全体を impulse 値にする。詳細は item-templates.md。
 # ※ コマンド組み立ては headless.SpawnCmd / DynamicImpulseStringCmd（純関数）。告知③(§3.16(2))と共有。
-GET  /api/v1/spawn-templates                 スポーン＆パルステンプレ一覧（announce-templates と同機構の別リスト）
-GET  /api/v1/item-spawn-templates            単体スポーンテンプレ一覧（同機構・tag 任意。spawn 単体の選択肢に使用）
+GET  /api/v1/item-templates                  アイテムテンプレ一覧（actions で単体スポーン / スポーン＆パルス / 告知を絞り込み）
+GET  /api/v1/tts-speakers                    話者一覧（backend が固定 TTS サービスの /speakers から取得し {id,speakerName,styleName} に平坦化。ttsVoice の style 選択に使用）
 
 # セッションライフサイクル  — ExecGroup(focus idx → cmd)
 POST /api/v1/sessions/{idx}/restart                                         → restart
@@ -313,7 +313,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **自分（ホスト）への危険操作を無効化（R3）**: `selfUserId`（`status.loginUserId`）と `u.id` が一致する行は **mute/kick/ban/権限プルダウンを `disabled`（グレーアウト）** にし **respawn+message のみ**許可（自 ban 等でセッションを壊す footgun 防止）。バッジ等は付けず**行レイアウトは不変**（disabled で灰色化のみ）。`selfUserId` は App→SessionTab→SessionUsers→UserCard と prop で配線。匿名訪問者(id 空)・匿名起動(loginUserId 空)は非該当＝従来どおり全操作可。
 - **確認ダイアログ**（`components/ConfirmModal`・ラベルは `common.*`）対象 = kick/ban/respawn/silence/unsilence ＋ save/restart/close。危険(kick/ban/close)は確定ボタン赤。メッセージは入力モーダル、適用はバッチ。
 - **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。**トースト＝7-7 第1層（§3.11）／自動 poll・Page Visibility＝7-7 残として実装済（§3.13）**。**status と users は B1（commit bdb54be）で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）に集約済**（focus 往復半減・一貫スナップショット）。`/status`・`/users` は部分再取得用に残置。
-- **スポーン / インパルスカード（R14・`SpawnImpulseCard`）**: 左カラムのセッション設定カードの下に配置。①アイテムスポーン（URL〔`^res[-\w]*://` scheme 検証・不正/空は[スポーン]無効＋ヒント〕＋active〔既定ON〕/persistent〔既定OFF〕チェックボックス＋[スポーン]）／②ダイナミックインパルス（タグ〔必須〕＋値〔任意・空可〕＋[送信]）。**非破壊操作なので確認ダイアログなし**＝実行→受理トースト（方針A・respawn/message と同格）。`useAsyncAction` で busy/トースト集約。spawn/impulse は users/status を変えないため refetch しない。backend = `POST /sessions/{idx}/spawn`・`/impulse`（§2.4）。コマンド組み立ては `headless.SpawnCmd`/`DynamicImpulseStringCmd`（告知③と共有）。
+- **スポーン / インパルスカード（R14・`SpawnImpulseCard`）**: 左カラムのセッション設定カードの下に配置。①アイテムスポーン（URL〔`^res[-\w]*://` scheme 検証・不正/空は[スポーン]無効＋ヒント〕＋active〔既定ON〕/persistent〔既定OFF〕チェックボックス＋[スポーン]）／②ダイナミックインパルス（タグ〔必須〕＋値〔任意・空可〕＋[送信]）／③スポーン＆パルス。③で `input.kind="ttsVoice"` のテンプレートを選択したときは、テキストと backend 経由の話者 `styles` 選択を表示し、`speakerId` を伴って実行する。backend は TTS API リクエスト URL 全体を `dynamicimpulsestring` 値にする。セッションでは TTS の single / loop を選べる。既存のテキストのみテンプレートのUIと動作は維持する。**非破壊操作なので確認ダイアログなし**＝実行→受理トースト（方針A・respawn/message と同格）。`useAsyncAction` で busy/トースト集約。spawn/impulse は users/status を変えないため refetch しない。backend = `POST /sessions/{idx}/spawn`・`/impulse`（§2.4）。コマンド組み立ては `headless.SpawnCmd`/`DynamicImpulseStringCmd`（告知③と共有）。
 - **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定〔セッション設定＋スポーン/インパルス〕/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
 - **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
@@ -527,7 +527,8 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 **(2) 事前アクション**
 - **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn "<itemUrl>" true false` → `dynamicimpulsestring "<tag>" "<message>"`（R14 で `headless.SpawnCmd`/`DynamicImpulseStringCmd` 純関数に統一＝セッションの spawn/impulse 書き込み API と同一組み立て。spawn は help 確定の3引数〔旧 `spawn <url> true` の2引数を修正〕・告知アイテムは一時的なので persistent=false）。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
   - **実装**: **spawn → impulse の間に約10秒待機**（spawn したアイテムがワールド内で実体化してから impulse を送る・v1 `ITEM_SPAWN_DELAY` 踏襲・固定定数）。**2パス**で実行（全ワールド spawn → 10秒 sleep → 全ワールド impulse）。待機中は execMu を解放し他コマンドを妨げない。`itemUrl` 空なら spawn を省略し impulse のみ（常設受け機構前提）。
-  - **実装（UI・5b-1 追補→2026-06-10 リモートリスト化で改訂）**: 告知アイテムは **テンプレ選択＋手動入力** の `Select`。テンプレ一覧は**リポジトリ配信のリモートリスト**（`GET /api/v1/announce-templates`・正本 [announce-templates.md](announce-templates.md)）から取得し、選択すると **`templateId` のみ保存**（URL/タグは告知実行時に backend が解決＝アイテム更新がアプリのリリース・再保存なしに全 config へ反映される）。手動入力時のみ URL/タグ欄を表示（`templateId=""`＋`itemUrl`/`impulseTag` を保存）。**手動時の `tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
+  - **実装（UI・5b-1 追補→リモートリスト化で改訂）**: 告知アイテムは **テンプレ選択＋手動入力** の `Select`。テンプレ一覧は**リポジトリ配信の単一リモートリスト**（`GET /api/v1/item-templates`・正本 [item-templates.md](item-templates.md)）から `announce` action を持つ entry のみ取得し、選択すると **`templateId` のみ保存**（URL/タグは告知実行時に backend が解決＝アイテム更新がアプリのリリース・再保存なしに全 config へ反映される）。手動入力時のみ URL/タグ欄を表示（`templateId=""`＋`itemUrl`/`impulseTag` を保存）。**手動時の `tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
+  - **TTS 音声入力**: テンプレートの `input.kind="ttsVoice"` を選択したときは、`message` をテキスト、正の `speakerId` を話者 style ID として保存する（両方必須）。話者一覧は `GET /api/v1/tts-speakers` を通じて取得し、backend は固定の TTS サービス `https://tts.markn2000.com/speakers` を参照する。実行時は backend が `https://tts.markn2000.com/api/v1/tts?text=<URL encoded>&speaker=<style id>` を組み立て、この URL 全体を `dynamicimpulsestring` の値として送る。スケジュールで選択可能な TTS テンプレートは loop 用のみ。既存のテキストのみテンプレートでは `speakerId=0` とし、既存の message 保存・送信を維持する。
 - **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。
   - **各項目は独立トグル（全OFF可）**＝「Private化はしたくない」なら setPrivate=OFF のままにできる。既定は **maxusers=1 のみ ON・Private と改名は OFF**。
 
@@ -551,7 +552,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
   ],
   "waitControl":  { "quietWaitMin": 58, "announceWaitMin": 2 },   // 2区間（R9）: 締切 = quiet+announce
   "preActions": {
-    "announce":       { "enabled":true, "templateId":"torazo-close", "itemUrl":"", "impulseTag":"", "message":"まもなく再起動します" },  // templateId 非空=テンプレ参照（URL/タグは告知時に解決）/ 空=手動（itemUrl/impulseTag を使用）
+    "announce":       { "enabled":true, "templateId":"torazo-close", "itemUrl":"", "impulseTag":"", "message":"まもなく再起動します", "speakerId":0 },  // templateId 非空=テンプレ参照（URL/タグは告知時に解決）/ 空=手動（itemUrl/impulseTag を使用）。ttsVoice は message=text / speakerId=正の style ID
     "sessionChanges": { "setPrivate":false, "setMaxUsersOne":true, "renameEnabled":false, "renameTo":"" }
   },
   "crashRecovery": { "enabled":true, "maxCrashes":3, "windowMinutes":10 }
@@ -563,7 +564,8 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 ```
 GET  /api/v1/restart-config                  restart 設定を返す
 PUT  /api/v1/restart-config                  保存（cfgMu 保護・SaveTo ロールバック。告知有効かつ templateId 非空は実在検証）
-GET  /api/v1/announce-templates              告知テンプレ一覧（リモートリスト＋フォールバック・announce-templates.md）
+GET  /api/v1/item-templates                  アイテムテンプレ一覧（単一リモートリスト＋フォールバック。actions で告知を絞り込み・item-templates.md）
+GET  /api/v1/tts-speakers                    話者一覧（backend 固定の TTS サービス /speakers 経由。ttsVoice の style 選択に使用）
 GET  /api/v1/restart-status                  次回予定 / 最終起動 / 稼働時間 / 進行状態 / クラッシュ復帰状態
 POST /api/v1/restart/trigger {configName?}   手動「通常再起動」を即受付（非同期）。空=前回config
 POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続。通常停止の中止にも共用）
@@ -579,7 +581,7 @@ POST /api/v1/stop/graceful                   通常停止を即受付（非同�
 3. **予定リストカード**: 各行（有効トグル / 種別・時刻 / config / 編集✎ / 削除×〔**直接削除**＝未保存ゆえ保存前は取り消し可〕）＋`[＋新規]`・空時「予定がありません」。編集は**モーダル**（type 選択で日時欄を出し分け〔once=年月日+時分/weekly=曜日+時分/daily=時分〕・config `Select`〔#prev 番兵〕・ドラフト→`[OK]` で working 配列へ反映/`[キャンセル]` 破棄）。
    - **実装**: 新規 id は `scheduleModel.genId()`（`crypto.randomUUID` はセキュアコンテキスト限定＝LAN/HTTP で不可のため `getRandomValues`→`Math.random` にフォールバック・[[lan-http-no-secure-context-apis]]）。**インライン検証**（時/分の範囲＋once 暦実在＝JS Date 往復で 2/30 等を弾き [OK] 無効化、年下限 `MIN_YEAR=2000` は backend 準拠）。daily/weekly へ切替時は once 専用の year/month/day をクリアして保存JSONを汚さない。日付入力は `@mantine/dates` 不使用で `NumberInput`。**once の年月日はスマホ向けに縦並び（R8）**＝full-width 入力を縦 Stack に積み、各入力の右に `年/月/日` 単位ラベル（固定幅で右端整列）。狭幅でも横はみ出しなし。時刻（時:分）は横並びのまま。
 4. **待機制御カード**（2区間モデル R9）: `quietWaitMin`（静かに待つ）/ `announceWaitMin`（告知後に待つ）。各 0〜1440・相互依存なし。
-5. **事前アクションカード**: 告知（有効 / 告知アイテム〔テンプレ選択（リモートリスト）＋手動入力〕 / 手動時のみ itemUrl・impulseTag / message）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。message は任意（空可）。詳細は §3.16(2) 実装注記＋[announce-templates.md](announce-templates.md)。
+5. **事前アクションカード**: 告知（有効 / 告知アイテム〔テンプレ選択（リモートリスト）＋手動入力〕 / 手動時のみ itemUrl・impulseTag / message。`ttsVoice` 選択時は message=text＋話者 style 選択=`speakerId`）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。スケジュールの TTS は loop 用テンプレートのみを選択肢にする。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。既存テンプレートの message は任意（空可）。詳細は §3.16(2) 実装注記＋[item-templates.md](item-templates.md)。
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
 - 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。

@@ -80,7 +80,7 @@ export function defaultCrashRecovery(): RestartCrashRecovery {
 export function defaultAnnounce(): RestartAnnounce {
   // 告知は既定 OFF だが、ON 時に即使えるよう既定テンプレ（とらぞ閉店アナウンス）の id を入れる。
   // URL/タグは backend が告知時にリモートリストから解決するため保存しない。
-  return { enabled: false, templateId: "torazo-close", itemUrl: "", impulseTag: "", message: "" };
+  return { enabled: false, templateId: "torazo-close", itemUrl: "", impulseTag: "", message: "", speakerId: 0 };
 }
 export function defaultSessionChanges(): RestartSessionChanges {
   return { setPrivate: false, setMaxUsersOne: true, renameEnabled: false, renameTo: "" };

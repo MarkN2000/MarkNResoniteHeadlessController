@@ -12,6 +12,7 @@ import { AccountSetupModal } from "./components/AccountSetupModal";
 import { UpdateModal } from "./components/UpdateModal";
 import { ConfirmHost } from "./components/ConfirmHost";
 import { useConfirm } from "./hooks/useConfirm";
+import { useItemTemplates } from "./hooks/useItemTemplates";
 import { RestartingScreen } from "./components/RestartingScreen";
 import { CommandTab } from "./tabs/CommandTab";
 import { StartPrompt, TabPlaceholder } from "./tabs/Placeholder";
@@ -68,6 +69,7 @@ function Shell({
   const [focusedIdx, setFocusedIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("session");
   const [navOpened, setNavOpened] = useState(false);
+  const itemTemplates = useItemTemplates();
   // SSE ログの重複除去。seq はサーバー側で単調増加（driver.publishLog）なので「見た最大 seq」
   // 1つだけ覚えれば足りる（Set 全件保持は無制限に増えるため不可）。再接続時の履歴再送（重複 seq）も
   // これで弾け、取りこぼした新しい行は履歴から復旧できる。
@@ -231,14 +233,14 @@ function Shell({
     const stopped = (status?.state ?? "stopped") === "stopped";
     if (!def.availableWhenStopped && stopped) return <StartPrompt />;
     if (activeTab === "session")
-      return running ? <SessionTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} /> : <StartPrompt />;
+      return running ? <SessionTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} templates={itemTemplates} /> : <StartPrompt />;
     if (activeTab === "friends")
       return running ? <FriendsTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} /> : <StartPrompt />;
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
     if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} status={status} />;
-    if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} />;
+    if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} templates={itemTemplates} />;
     if (activeTab === "logs") return <LogsTab />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }

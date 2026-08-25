@@ -125,6 +125,13 @@
     "spawnPulseMessage": "Message",
     "spawnPulseRun": "Run"
   },
+  "tts": {
+    "text": "Speech text",
+    "speaker": "Voice",
+    "speakersLoading": "Loading voices…",
+    "speakersLoadFailed": "Failed to load voices",
+    "speakersEmpty": "No voices available"
+  },
   "friends": {
     "source": "User search",
     "searchByName": "Search by username",

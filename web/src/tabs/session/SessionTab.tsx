@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Button, Center, Loader, ScrollArea, Stack, Text } from "@mantine/core";
 import * as api from "../../api";
-import type { UserInfo, WorldStatus } from "../../api";
+import type { ItemTemplate, UserInfo, WorldStatus } from "../../api";
 import { SplitColumns } from "../../components/SplitColumns";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
 import { SessionSettings } from "./SessionSettings";
@@ -15,7 +15,15 @@ import { SpawnImpulseCard } from "./SpawnImpulseCard";
 // ＋ 表示中のみ 10 秒ごとの背景 poll（ユーザーの参加/退出を追従・Page Visibility 連動・§3.4）。
 const POLL_INTERVAL_MS = 10_000;
 
-export function SessionTab({ idx, selfUserId }: { idx: number; selfUserId: string | null }) {
+export function SessionTab({
+  idx,
+  selfUserId,
+  templates,
+}: {
+  idx: number;
+  selfUserId: string | null;
+  templates: ItemTemplate[];
+}) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<WorldStatus | null>(null);
   const [users, setUsers] = useState<UserInfo[]>([]);
@@ -74,7 +82,7 @@ export function SessionTab({ idx, selfUserId }: { idx: number; selfUserId: strin
           left={
             <Stack gap="lg">
               <SessionSettings idx={idx} status={status} onChanged={refetch} refreshing={loading} />
-              <SpawnImpulseCard idx={idx} />
+              <SpawnImpulseCard idx={idx} templates={templates} />
             </Stack>
           }
           right={<SessionUsers idx={idx} users={users} onChanged={refetch} selfUserId={selfUserId} />}

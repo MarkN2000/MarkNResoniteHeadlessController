@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Center, Loader, ScrollArea, Stack } from "@mantine/core";
 import * as api from "../../api";
-import type { ConfigSummary, RestartConfig, RestartStatus, ScheduledRestart, WriteResult } from "../../api";
+import type { ConfigSummary, ItemTemplate, RestartConfig, RestartStatus, ScheduledRestart, WriteResult } from "../../api";
 import { SplitColumns } from "../../components/SplitColumns";
 import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { useTtsSpeakers } from "../../hooks/useTtsSpeakers";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
 import { StatusCard } from "./StatusCard";
 import { ManualCard } from "./ManualCard";
@@ -21,16 +22,40 @@ import { SaveBar } from "./SaveBar";
 // スケジュール（自動再起動）タブ（Phase 8・§3.16(7)）。停止中でも設定編集可（手動再起動のみ稼働中）。
 // レイアウト: SplitColumns 左=運用/状態〔①②〕 右=設定〔③④⑤⑥〕＋一括保存バー。
 // ①状態・②手動は live（poll＋アクション）。③④⑤⑥は単一 working＋dirty 判定で完全オブジェクト PUT。
-export function ScheduleTab({ running, configs }: { running: boolean; configs: ConfigSummary[] }) {
+export function ScheduleTab({
+  running,
+  configs,
+  templates,
+}: {
+  running: boolean;
+  configs: ConfigSummary[];
+  templates: ItemTemplate[];
+}) {
   const { t } = useTranslation();
   const [rs, setRs] = useState<RestartStatus | null>(null);
   const [rc, setRc] = useState<RestartConfig | null>(null);
   const [original, setOriginal] = useState<RestartConfig | null>(null);
   const confirm = useConfirm();
   const apply = useAsyncAction();
+  const announceTemplates = templates.filter((template) => template.actions.includes("announce"));
+  const announce = rc?.preActions.announce;
+  const announceTemplate = announceTemplates.find((template) => template.id === announce?.templateId);
+  // テンプレート一覧の取得前でも、保存済み speakerId があれば TTS 設定として扱って保存を待たせる。
+  const isTtsAnnouncement =
+    announce?.enabled === true &&
+    (announceTemplate?.input?.kind === "ttsVoice" || (announceTemplate === undefined && announce.speakerId > 0));
+  const ttsSpeakers = useTtsSpeakers(isTtsAnnouncement);
 
   // working≠original で dirty 判定（コンフィグタブと同方式・キー順は in-place 編集で保持）。
   const dirty = rc !== null && original !== null && JSON.stringify(rc) !== JSON.stringify(original);
+  const ttsAnnouncementValid =
+    !isTtsAnnouncement ||
+    (announce !== undefined &&
+      announce.message.trim() !== "" &&
+      announce.speakerId !== 0 &&
+      !ttsSpeakers.loading &&
+      !ttsSpeakers.failed &&
+      ttsSpeakers.voices.some((voice) => voice.id === announce.speakerId));
 
   const refetch = useCallback(async () => {
     setRs(await api.getRestartStatus());
@@ -123,7 +148,12 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
                 <Stack gap="lg">
                   <ScheduleListCard schedules={rc.scheduled} configs={configs} onPersist={persist} />
                   <WaitControlCard value={rc.waitControl} onChange={(waitControl) => patch({ waitControl })} />
-                  <PreActionsCard value={rc.preActions} onChange={(preActions) => patch({ preActions })} />
+                  <PreActionsCard
+                    value={rc.preActions}
+                    onChange={(preActions) => patch({ preActions })}
+                    templates={announceTemplates}
+                    ttsSpeakers={ttsSpeakers}
+                  />
                   <CrashRecoveryCard value={rc.crashRecovery} onChange={(crashRecovery) => patch({ crashRecovery })} />
                   <UpdateOnRestartCard
                     scheduled={rc.updateOnScheduledRestart}
@@ -131,7 +161,7 @@ export function ScheduleTab({ running, configs }: { running: boolean; configs: C
                     onScheduledChange={(updateOnScheduledRestart) => patch({ updateOnScheduledRestart })}
                     onManualChange={(updateBeforeManualStart) => patch({ updateBeforeManualStart })}
                   />
-                  <SaveBar dirty={dirty} saving={apply.busy} onSave={save} />
+                  <SaveBar dirty={dirty} valid={ttsAnnouncementValid} saving={apply.busy} onSave={save} />
                 </Stack>
               ) : (
                 <Center h={200}>

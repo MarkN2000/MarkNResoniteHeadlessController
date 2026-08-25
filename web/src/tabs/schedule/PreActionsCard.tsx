@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Divider, Stack, Switch } from "@mantine/core";
-import * as api from "../../api";
-import type { RestartAnnounce, RestartConfig, RestartSessionChanges } from "../../api";
+import type { ItemTemplate, RestartAnnounce, RestartConfig, RestartSessionChanges } from "../../api";
 import {
   InspectorCard,
   FieldRow,
@@ -10,8 +9,9 @@ import {
   InspectorTextarea,
 } from "../../components/inspector";
 import { ConfirmHost } from "../../components/ConfirmHost";
+import { TtsVoiceFields } from "../../components/TtsVoiceFields";
 import { useConfirm } from "../../hooks/useConfirm";
-import { useItemTemplates } from "../../hooks/useItemTemplates";
+import type { TtsSpeakersState } from "../../hooks/useTtsSpeakers";
 import { MANUAL_TEMPLATE, buildTemplateSelectData } from "../../lib/itemTemplates";
 import { defaultAnnounce, defaultSessionChanges } from "./scheduleModel";
 
@@ -21,16 +21,18 @@ import { defaultAnnounce, defaultSessionChanges } from "./scheduleModel";
 export function PreActionsCard({
   value,
   onChange,
+  templates,
+  ttsSpeakers,
 }: {
   value: RestartConfig["preActions"];
   onChange: (v: RestartConfig["preActions"]) => void;
+  templates: ItemTemplate[];
+  ttsSpeakers: TtsSpeakersState;
 }) {
   const { t, i18n } = useTranslation();
   const a = value.announce;
   const s = value.sessionChanges;
 
-  // 告知テンプレ一覧（backend がリモートリスト＋フォールバックで常に何かしら返す）。
-  const templates = useItemTemplates(api.getAnnounceTemplates);
   const setAnnounce = (announce: RestartAnnounce) => onChange({ ...value, announce });
   const setSession = (sessionChanges: RestartSessionChanges) => onChange({ ...value, sessionChanges });
 
@@ -50,14 +52,16 @@ export function PreActionsCard({
   // （選択肢の組み立て＝消滅id補完含む は lib/itemTemplates と共用）。
   const itemKey = a.templateId !== "" ? a.templateId : MANUAL_TEMPLATE;
   const isManual = itemKey === MANUAL_TEMPLATE;
+  const selectedTemplate = isManual ? undefined : templates.find((template) => template.id === itemKey);
+  const isTtsVoice = selectedTemplate?.input?.kind === "ttsVoice";
   const itemData = buildTemplateSelectData(templates, a.templateId, i18n.language, t("schedule.announceManual"));
 
   // テンプレ選択＝templateId のみ保存（URL/タグは backend が告知時に解決）。
   // 手動＝templateId を空にして itemUrl/impulseTag の入力欄を開く。
   const selectItem = (v: string | null) => {
     if (!v) return;
-    if (v === MANUAL_TEMPLATE) setAnnounce({ ...a, templateId: "" });
-    else setAnnounce({ ...a, templateId: v, itemUrl: "", impulseTag: "" });
+    if (v === MANUAL_TEMPLATE) setAnnounce({ ...a, templateId: "", speakerId: 0 });
+    else setAnnounce({ ...a, templateId: v, itemUrl: "", impulseTag: "", speakerId: 0 });
   };
 
   return (
@@ -103,16 +107,29 @@ export function PreActionsCard({
                 </FieldRow>
               </>
             )}
-            <FieldRow
-              label={t("schedule.announceMessage")}
-              align="start"
-              {...resetProps(() => setAnnounce({ ...a, message: defaultAnnounce().message }), t("schedule.announceMessage"))}
-            >
-              <InspectorTextarea
-                value={a.message}
-                onChange={(e) => setAnnounce({ ...a, message: e.currentTarget.value })}
+            {isTtsVoice ? (
+              <TtsVoiceFields
+                text={a.message}
+                speakerId={a.speakerId ?? 0}
+                speakers={ttsSpeakers}
+                onTextChange={(message) => setAnnounce({ ...a, message })}
+                onSpeakerIdChange={(speakerId) => setAnnounce({ ...a, speakerId })}
               />
-            </FieldRow>
+            ) : (
+              <FieldRow
+                label={t("schedule.announceMessage")}
+                align="start"
+                {...resetProps(
+                  () => setAnnounce({ ...a, message: defaultAnnounce().message }),
+                  t("schedule.announceMessage"),
+                )}
+              >
+                <InspectorTextarea
+                  value={a.message}
+                  onChange={(e) => setAnnounce({ ...a, message: e.currentTarget.value })}
+                />
+              </FieldRow>
+            )}
           </>
         )}
 

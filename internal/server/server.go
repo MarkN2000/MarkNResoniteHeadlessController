@@ -61,10 +61,10 @@ type Server struct {
 	updateCheck   *selfupdate.Info
 	updateCheckAt time.Time
 
-	// アイテムテンプレートのリモートリスト3系統（announce_templates.go・docs/design/announce-templates.md）。
-	announceTpl  *templateStore // 告知（事前アクション③）
-	spawnTpl     *templateStore // スポーン＆パルス（セッションタブ）
-	itemSpawnTpl *templateStore // 単体スポーン（セッションタブ・tag 任意）
+	// アイテムテンプレートのリモートリスト（actions で利用可能な操作を制限）。
+	itemTpl        *templateStore
+	ttsSpeakersURL string       // TTS 話者一覧の固定取得元（テストで差し替え）
+	ttsHTTPClient  *http.Client // TTS 話者一覧の取得クライアント（テストで差し替え）
 
 	// spawnImpulseDelay はスポーン＆パルスの spawn→impulse 間の実体化待ち（本番5秒・テストで縮める）。
 	// 告知③の10秒（orchestrator.spawnDelay）より短い＝対話操作は失敗しても即再実行できるため。
@@ -156,9 +156,9 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		}
 		return filepath.Join(dataDir, name)
 	}
-	s.announceTpl = newTemplateStore(announceTemplatesURL, tplPath("announce-templates.json"), builtinAnnounceTemplates, true)
-	s.spawnTpl = newTemplateStore(spawnTemplatesURL, tplPath("spawn-templates.json"), builtinSpawnTemplates, true)
-	s.itemSpawnTpl = newTemplateStore(itemSpawnTemplatesURL, tplPath("item-spawn-templates.json"), builtinItemSpawnTemplates, false)
+	s.itemTpl = newTemplateStore(itemTemplatesURL, tplPath("item-templates.json"), builtinItemTemplates)
+	s.ttsSpeakersURL = ttsSpeakersURL
+	s.ttsHTTPClient = &http.Client{Timeout: 10 * time.Second}
 	s.auth = newAuthManager(cfg, &s.cfgMu)
 	s.restart = newRestartOrchestrator(s)
 	s.scheduler = newRestartScheduler(s)
@@ -246,9 +246,8 @@ func (s *Server) Handler() http.Handler {
 	// スケジュール（Phase 8・§3.16）: 自動再起動 設定/状態（P8-1）＋手動トリガー/中止（P8-3b）。
 	mux.HandleFunc("GET /api/v1/restart-config", s.requireAuth(s.handleRestartConfigGet))
 	mux.HandleFunc("PUT /api/v1/restart-config", s.requireAuth(s.handleRestartConfigPut))
-	mux.HandleFunc("GET /api/v1/announce-templates", s.requireAuth(s.handleAnnounceTemplates))    // 告知テンプレ一覧（リモートリスト）
-	mux.HandleFunc("GET /api/v1/spawn-templates", s.requireAuth(s.handleSpawnTemplates))          // スポーン＆パルステンプレ一覧（同機構）
-	mux.HandleFunc("GET /api/v1/item-spawn-templates", s.requireAuth(s.handleItemSpawnTemplates)) // 単体スポーンテンプレ一覧（同機構・tag任意）
+	mux.HandleFunc("GET /api/v1/item-templates", s.requireAuth(s.handleItemTemplates))
+	mux.HandleFunc("GET /api/v1/tts-speakers", s.requireAuth(s.handleTTSSpeakers))
 	mux.HandleFunc("GET /api/v1/restart-status", s.requireAuth(s.handleRestartStatus))
 	mux.HandleFunc("POST /api/v1/restart/trigger", s.requireAuth(s.handleRestartTrigger))
 	mux.HandleFunc("POST /api/v1/restart/cancel", s.requireAuth(s.handleRestartCancel))

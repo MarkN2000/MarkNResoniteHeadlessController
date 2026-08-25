@@ -125,6 +125,13 @@
     "spawnPulseMessage": "メッセージ",
     "spawnPulseRun": "実行"
   },
+  "tts": {
+    "text": "読み上げテキスト",
+    "speaker": "ボイス",
+    "speakersLoading": "ボイス一覧を取得中…",
+    "speakersLoadFailed": "ボイス一覧の取得に失敗しました",
+    "speakersEmpty": "利用可能なボイスがありません"
+  },
   "friends": {
     "source": "ユーザー検索",
     "searchByName": "ユーザー名で検索",

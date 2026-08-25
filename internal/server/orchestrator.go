@@ -72,7 +72,7 @@ type restartOrchestrator struct {
 	recordUsed  func(name string)
 	recordStart func(trigger, at string)                      // 最終起動の記録（§3.16(9)）
 	beforeStart func(ctx context.Context, triggerType string) // ④ 停止後・起動前のフック（予定再起動時の更新・P9-B・nil可）
-	// resolveAnnounce は告知の templateId → URL/タグ解決（server 注入・announce_templates.go）。
+	// resolveAnnounce は告知の templateId → URL/タグ解決（server 注入・item_templates.go）。
 	// nil（テスト等）かつ templateId 指定の告知は安全側＝スキップする。
 	resolveAnnounce func(ctx context.Context, a config.AnnounceAction) (config.AnnounceAction, bool)
 
@@ -410,7 +410,7 @@ func (o *restartOrchestrator) applySessionChanges(ctx context.Context, sc config
 // announce は ③ dynamicImpulse 告知。itemUrl 非空なら全ワールドに spawn → spawnDelay 待機 → 全ワールドに impulse。
 // itemUrl 空＝常設受け機構前提で spawn を省略し impulse のみ（§3.16(2)）。
 // テンプレ参照（templateId 非空）は実行直前に URL/タグへ解決する＝リモートリストの更新が
-// 保存済み config にも即反映される（docs/design/announce-templates.md）。
+// 保存済み config にも即反映される（docs/design/item-templates.md）。
 func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAction) {
 	if a.TemplateID != "" {
 		if o.resolveAnnounce == nil {

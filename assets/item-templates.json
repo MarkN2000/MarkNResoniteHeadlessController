@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "torazo-close",
+      "label": {
+        "ja": "とらぞセッション閉店アナウンス",
+        "en": "Torazo session closing announce"
+      },
+      "url": "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4",
+      "actions": ["announce"],
+      "tag": "MRHC.play"
+    },
+    {
+      "id": "tts-loop",
+      "label": {
+        "ja": "テキスト読み上げループ",
+        "en": "Text-to-speech loop"
+      },
+      "url": "resrec:///U-MarkN/R-01a038f3-6ea5-79a8-be58-c9673007f5dd",
+      "actions": ["spawn", "spawnImpulse", "announce"],
+      "tag": "MRHC.play"
+    },
+    {
+      "id": "tts-single",
+      "label": {
+        "ja": "テキスト読み上げシングル",
+        "en": "Text-to-speech single"
+      },
+      "url": "resrec:///U-MarkN/R-01a038f6-bf5d-75b6-b74b-2e3610dddb4d",
+      "actions": ["spawnImpulse"],
+      "tag": "MRHC.play"
+    },
+    {
+      "id": "tts-voice-single",
+      "label": {
+        "ja": "テキスト読み上げボイス指定シングル",
+        "en": "Voice-specified text-to-speech single"
+      },
+      "url": "resrec:///U-MarkN/R-01a03937-9bdf-7a44-a0ee-b51f655bc6d1",
+      "actions": ["spawnImpulse"],
+      "tag": "MRHC.play",
+      "input": {
+        "kind": "ttsVoice"
+      }
+    },
+    {
+      "id": "tts-voice-loop",
+      "label": {
+        "ja": "テキスト読み上げボイス指定ループ",
+        "en": "Voice-specified text-to-speech loop"
+      },
+      "url": "resrec:///U-MarkN/R-01a03939-ddd5-786d-a50f-02bc4da83d2a",
+      "actions": ["spawnImpulse", "announce"],
+      "tag": "MRHC.play",
+      "input": {
+        "kind": "ttsVoice"
+      }
+    }
+  ]
+}
