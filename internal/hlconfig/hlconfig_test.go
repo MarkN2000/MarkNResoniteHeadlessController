@@ -140,6 +140,62 @@ func TestWrite_And_ReadMasked(t *testing.T) {
 	}
 }
 
+func TestNormalizeAllowedURLHosts(t *testing.T) {
+	cfg := map[string]any{
+		"allowedUrlHosts": []any{
+			"https://example.com/",
+			legacyTTSAllowedURLHost,
+			ttsAllowedURLHost,
+			"https://ttsapi.markn2000.com/path",
+			float64(1),
+		},
+	}
+	normalizeAllowedURLHosts(cfg)
+	want := []any{
+		"https://example.com/",
+		ttsAllowedURLHost,
+		"https://ttsapi.markn2000.com/path",
+		float64(1),
+	}
+	if got := cfg["allowedUrlHosts"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("allowedUrlHosts = %#v, want %#v", got, want)
+	}
+}
+
+func TestAllowedURLHosts_NormalizedOnReadAndSave(t *testing.T) {
+	dir := t.TempDir()
+	writeRawFile(t, dir, "cfg", map[string]any{
+		"allowedUrlHosts": []any{legacyTTSAllowedURLHost, "https://example.com/"},
+		"startWorlds":     []any{},
+	})
+
+	masked, err := ReadMasked(dir, "cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := masked["allowedUrlHosts"]; !reflect.DeepEqual(got, []any{ttsAllowedURLHost, "https://example.com/"}) {
+		t.Fatalf("読み込み時に正規化されない: %#v", got)
+	}
+	source, err := readRaw(dir, "cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := source["allowedUrlHosts"]; !reflect.DeepEqual(got, []any{legacyTTSAllowedURLHost, "https://example.com/"}) {
+		t.Fatalf("読み込みだけで保存元が変更された: %#v", got)
+	}
+
+	if err := Write(dir, "cfg", masked); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := readRaw(dir, "cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := saved["allowedUrlHosts"]; !reflect.DeepEqual(got, []any{ttsAllowedURLHost, "https://example.com/"}) {
+		t.Fatalf("保存時に正規化が永続化されない: %#v", got)
+	}
+}
+
 func TestWrite_StartWorldsMustBeArray(t *testing.T) {
 	dir := t.TempDir()
 	err := Write(dir, "cfg", map[string]any{"startWorlds": "notarray"})
@@ -372,6 +428,37 @@ func TestResolveForLaunch_NormalizesPortsWithoutChangingSource(t *testing.T) {
 	}
 }
 
+func TestResolveForLaunch_NormalizesAllowedURLHostsWithoutChangingSource(t *testing.T) {
+	dir := t.TempDir()
+	writeRawFile(t, dir, "cfg", map[string]any{
+		"allowedUrlHosts": []any{legacyTTSAllowedURLHost, ttsAllowedURLHost, "https://example.com/"},
+		"startWorlds":     []any{},
+	})
+
+	out, err := ResolveForLaunch(dir, "cfg", Credentials{}, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var launched map[string]any
+	if err := json.Unmarshal(b, &launched); err != nil {
+		t.Fatal(err)
+	}
+	if got := launched["allowedUrlHosts"]; !reflect.DeepEqual(got, []any{ttsAllowedURLHost, "https://example.com/"}) {
+		t.Fatalf("起動用configが正規化されない: %#v", got)
+	}
+	source, err := readRaw(dir, "cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := source["allowedUrlHosts"]; !reflect.DeepEqual(got, []any{legacyTTSAllowedURLHost, ttsAllowedURLHost, "https://example.com/"}) {
+		t.Fatalf("起動時に保存元が変更された: %#v", got)
+	}
+}
+
 func TestResolveForLaunch_PerConfigOverride(t *testing.T) {
 	dir := t.TempDir()
 	runDir := t.TempDir()
@@ -494,6 +581,9 @@ func TestEnsureDefault(t *testing.T) {
 	// logsFolder は対象外＝null のまま。
 	if v, ok := raw["logsFolder"]; !ok || v != nil {
 		t.Fatalf("logsFolder should stay null, got %v (present=%v)", v, ok)
+	}
+	if got := raw["allowedUrlHosts"]; !reflect.DeepEqual(got, []any{ttsAllowedURLHost}) {
+		t.Fatalf("allowedUrlHosts = %#v, want %#v", got, []any{ttsAllowedURLHost})
 	}
 	sw, ok := raw["startWorlds"].([]any)
 	if !ok || len(sw) != 1 {

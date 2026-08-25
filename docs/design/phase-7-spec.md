@@ -423,6 +423,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **(C) フィールド構成＝v1 同等（基本的に全フォーム化）**
 - config トップ（フォーム）：`comment`・`tickRate`・`maxConcurrentAssetTransfers`・`usernameOverride`・`dataFolder`・`cacheFolder`・`logsFolder`・`allowedUrlHosts`（add/remove リスト）・`autoSpawnItems`（カンマ→配列）＋アカウント欄。**点5：常時表示は `comment`（メモ）のみ**とし、他（`tickRate`〜`autoSpawnItems`＋アカウント）は**上級設定（`CollapsibleSection`・既定閉じ）へ畳む**。コンフィグ名（D）はメモと並ぶ基本項目として ConfigEditor 先頭に常時表示。
+  - **`allowedUrlHosts` の TTS 正規化**: 新規既定値は `https://tts.markn2000.com/`。コンフィグの読み込み・保存・起動時に、配列要素が旧 `https://ttsapi.markn2000.com/` と**完全一致**する場合のみ新URLへ置換する。置換後は同一値を重複除去し、他ホストおよび表記が異なるURLはそのまま保持する。読み込み・起動時の正規化はメモリ上だけで行いディスクへ書き戻さず、ディスク永続化は明示的な保存時のみ行う。
 - 各ワールド（startWorlds[]・タブ・フォーム）
   - 基本：`isEnabled`（タブ有効/無効）・`sessionName`・`description`・`accessLevel`・`maxUsers`・`loadWorldPresetName`＋`loadWorldURL`（**両表示**・スキーマ上両立可・どちらが効くかは Resonite 依存＝URL 優先）・`customSessionId`（**prefix/suffix ビルダー**・`:` 分割/結合・**prefix は中央アカウントの解決済 UserID を自動入力＝R12**・上書き可）。
   - 上級設定（**折りたたみ・既定=閉じ**・R11→**点5で再振り分け**）：`forcedRestartInterval`・`autosaveInterval`（`-1=無効` 注記）・`saveOnExit`・`autoRecover`・`mobileFriendly` の**5項目のみ**。

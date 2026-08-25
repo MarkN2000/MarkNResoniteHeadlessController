@@ -23,7 +23,11 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-const schemaURL = "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json"
+const (
+	schemaURL               = "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json"
+	legacyTTSAllowedURLHost = "https://ttsapi.markn2000.com/"
+	ttsAllowedURLHost       = "https://tts.markn2000.com/"
+)
 
 var (
 	ErrInvalidName     = errors.New("不正な config 名（文字・数字・_・- のみ、1〜64文字）")
@@ -140,6 +144,7 @@ func ReadMasked(dir, name string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	normalizeAllowedURLHosts(m)
 	m["loginPassword"] = ""
 	return m, nil
 }
@@ -190,6 +195,7 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 		}
 	}
 	normalizeForcePorts(body)
+	normalizeAllowedURLHosts(body)
 	if err := validateUDPPortConflicts(body); err != nil {
 		return err
 	}
@@ -209,6 +215,41 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 		return err
 	}
 	return os.WriteFile(pathFor(dir, name), b, 0o600)
+}
+
+// normalizeAllowedURLHosts は旧TTSホストと完全一致する配列要素だけを現行ホストへ置換する。
+// 現行ホストが既に含まれる場合は1件へまとめ、その他の要素や不正な型はそのまま保持する。
+func normalizeAllowedURLHosts(m map[string]any) {
+	hosts, ok := m["allowedUrlHosts"].([]any)
+	if !ok {
+		return
+	}
+
+	out := make([]any, 0, len(hosts))
+	seenCurrent := false
+	changed := false
+	for _, host := range hosts {
+		s, isString := host.(string)
+		if !isString {
+			out = append(out, host)
+			continue
+		}
+		if s == legacyTTSAllowedURLHost {
+			s = ttsAllowedURLHost
+			changed = true
+		}
+		if s == ttsAllowedURLHost {
+			if seenCurrent {
+				changed = true
+				continue
+			}
+			seenCurrent = true
+		}
+		out = append(out, s)
+	}
+	if changed {
+		m["allowedUrlHosts"] = out
+	}
 }
 
 // normalizeForcePorts は旧 forcePort を新しいプロトコル別辞書へ正規化する。
@@ -339,6 +380,7 @@ func ResolveForLaunch(dir, name string, central Credentials, runDir string) (str
 		m["loginPassword"] = central.Password
 	}
 	normalizeForcePorts(m)
+	normalizeAllowedURLHosts(m)
 	if err := validateUDPPortConflicts(m); err != nil {
 		return "", err
 	}
@@ -544,7 +586,7 @@ const defaultConfigJSON = `{
   "dataFolder": null,
   "cacheFolder": null,
   "logsFolder": null,
-  "allowedUrlHosts": [ "https://ttsapi.markn2000.com/" ],
+  "allowedUrlHosts": [ "https://tts.markn2000.com/" ],
   "autoSpawnItems": null
 }
 `
