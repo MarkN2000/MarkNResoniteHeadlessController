@@ -23,6 +23,9 @@ interface Props {
   idx: number;
   status: WorldStatus;
   onChanged: () => void; // 適用 / lifecycle 操作後の refetch（方針A）
+  onSessionsChanged: () => void | Promise<void>; // 一覧に出る名前/公開範囲/人数の変更後に worlds を再取得
+  onClosed: () => void | Promise<void>; // close後の一覧再取得・フォーカス補正・詳細再取得
+  onDirtyChange: (dirty: boolean) => void; // 別セッション切替前の破棄確認を駆動
   refreshing?: boolean; // ヘッダ更新アイコンのスピナー（タブ全体の refetch 中）
 }
 
@@ -32,7 +35,15 @@ const sessionWebUrl = (sessionId: string) => `https://go.resonite.com/session/${
 
 // セッション設定（名前/アクセス/最大/説明/一覧から隠す）= バッチ適用。
 // インスペクタ風：1列・項目名(左)/入力欄(右)。lifecycle（保存/再起動/閉じる）は確認ダイアログ経由。
-export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
+export function SessionSettings({
+  idx,
+  status,
+  onChanged,
+  onSessionsChanged,
+  onClosed,
+  onDirtyChange,
+  refreshing,
+}: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState(status.name);
   const [level, setLevel] = useState(status.accessLevel);
@@ -73,17 +84,26 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
     description !== status.description ||
     hide !== status.hiddenFromListing;
 
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
+
   // バッチ適用は各 write を順に実行し、最初の失敗を結果として返す（=その失敗をトースト）。
   // 全成功なら {ok:true} を返し applyDone を緑トースト。1件も dirty でないときは ok のまま無音。
   function doApply() {
     void apply.run(async () => {
+      const listChanged = name !== status.name || level !== status.accessLevel || (muValid && muNum !== status.maxUsers);
       const results: WriteResult[] = [];
       if (name !== status.name) results.push(await api.setSessionName(idx, name));
       if (level !== status.accessLevel) results.push(await api.setAccessLevel(idx, level));
       if (muValid && muNum !== status.maxUsers) results.push(await api.setMaxUsers(idx, muNum));
       if (description !== status.description) results.push(await api.setDescription(idx, description));
       if (hide !== status.hiddenFromListing) results.push(await api.setHideFromListing(idx, hide));
-      return results.find((r) => !r.ok) ?? { ok: true };
+      const result = results.find((r) => !r.ok) ?? { ok: true };
+      // 途中まで成功して後続が失敗した場合も実状態を見せるため、一覧に関わる書き込みを試みたら再取得する。
+      if (listChanged) await onSessionsChanged();
+      return result;
     }, t("toast.applyDone"));
   }
 
@@ -93,7 +113,8 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
     msgKey: string,
     danger: boolean,
     successKey: string,
-    op: () => Promise<unknown>,
+    op: () => Promise<WriteResult>,
+    afterSuccess?: () => void | Promise<void>,
   ) =>
     confirm.ask({
       title: t(titleKey),
@@ -102,7 +123,8 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
       success: t(successKey),
       onConfirm: async () => {
         const r = await op();
-        onChanged();
+        if (r.ok && afterSuccess) await afterSuccess();
+        else onChanged();
         return r;
       },
     });
@@ -178,8 +200,13 @@ export function SessionSettings({ idx, status, onChanged, refreshing }: Props) {
           <InspectorButton
             severity="danger"
             onClick={() =>
-              askLifecycle("session.close", "session.confirmClose", true, "toast.closeDone", () =>
-                api.closeSession(idx),
+              askLifecycle(
+                "session.close",
+                "session.confirmClose",
+                true,
+                "toast.closeDone",
+                () => api.closeSession(idx),
+                onClosed,
               )
             }
           >

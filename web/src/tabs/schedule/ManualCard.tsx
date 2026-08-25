@@ -8,16 +8,18 @@ import { InspectorCard, FieldRow, InspectorSelect, InspectorButton } from "../..
 // 番兵は config 名として無効な文字（"#"）を含むため、実在 config 名（文字・数字・_・- のみ）と衝突しない。
 const PREV = "#prev";
 
-// ②手動カード（§3.16(7)）。通常（安全）再起動を config 選択付きで受け付ける。稼働中のみ有効。
-// 実行確認は親（ScheduleTab）の useConfirm が担当（onRestart に configName を渡す）。
+// ②手動操作カード（§3.16(7)）。通常再起動と退出待ち停止を受け付ける。稼働中のみ有効。
+// 実行確認は親（ScheduleTab）の useConfirm が担当する。
 export function ManualCard({
   running,
   configs,
   onRestart,
+  onStop,
 }: {
   running: boolean;
   configs: ConfigSummary[];
   onRestart: (configName: string) => void;
+  onStop: () => void;
 }) {
   const { t } = useTranslation();
   const [sel, setSel] = useState<string>(PREV);
@@ -41,6 +43,12 @@ export function ManualCard({
         >
           {t("schedule.normalRestart")}
         </InspectorButton>
+        <InspectorButton fullWidth severity="danger" disabled={!running} onClick={onStop}>
+          {t("schedule.waitThenStop")}
+        </InspectorButton>
+        <Text size="xs" c="dimmed" ta="center">
+          {t("schedule.waitThenStopNote")}
+        </Text>
         {!running && (
           <Text size="xs" c="dimmed" ta="center">
             {t("schedule.onlyWhenRunning")}

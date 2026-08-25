@@ -177,16 +177,14 @@ export async function start(
   return { ok: false, status: res.status, error, code };
 }
 
-export async function stop(): Promise<void> {
-  await req("/stop", { method: "POST" });
-}
+export const stop = (): Promise<WriteResult> => post("/stop");
 
 export async function sendCommand(cmd: string): Promise<void> {
   await req("/command", { method: "POST", body: JSON.stringify({ cmd }) });
 }
 
-export async function getSessions(): Promise<World[]> {
-  return (await getData<World[]>("/sessions")) ?? [];
+export async function getSessions(): Promise<World[] | null> {
+  return getData<World[]>("/sessions");
 }
 
 export async function getConfigs(): Promise<ConfigSummary[]> {

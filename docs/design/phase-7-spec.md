@@ -25,7 +25,7 @@ Pre-Phase 7 (バックエンド完成):
   - fakehl 拡張 + 統合テスト
 
 Phase 7 (UI MVP):
-  - React + Mantine AppShell、トップバー主導モデル
+  - React + Mantine AppShell、セッションタブ主導モデル
   - 7 タブ（スケジュールは状態表示のみ、Steam/検索は P9 待ち）
   - SSE ライブログ
 
@@ -198,23 +198,26 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - react-i18next（ja + en 両維持）
 - 既存 `web/` で継続開発
 
-### 3.2 レイアウト: トップバー主導モデル
+### 3.2 レイアウト: セッションタブ主導モデル
 - **Mantine AppShell**（PC=サイドバー / モバイル=ハンバーガー overlay、自動切替）
 - **レベル2 詳細は全画面 drill-down + 戻るボタン**（PC/モバイル統一、master-detail 分割はしない）
 
-#### トップバー（2 モード）
+#### トップバー（状態別表示）
 
 **稼働中**
 ```
-[PC]     │ MRHC │ 🎯[Hub  present2/users3/max8  Public ▾] │ ⋮ │
-[Mobile] │ ☰ │ 🎯[Hub  p2/u3/8  Public ▾] │ ⋮ │
+[PC]     │ MRHC │ ● ヘッドレス稼働中 CPU 12% MEM 43% │ ■ │ ⋮ │
+[Mobile] │ ☰ │ ● CPU 12% MEM 43% │ ■ │ ⋮ │
 ```
-- 🎯ドロップダウン = フォーカス切替（選択で `focus N` 送信 + UI focusedIdx 更新）
-- 各項目に present / users / max + アクセスレベル（= 全セッション一覧の役割を兼ねる）
-- **遅延ロード**: 開いた瞬間キャッシュ表示 → `worlds` 送信 → 応答で最新化（常時 poll しない）
-- ⋮ = 強制停止 / Steam 更新確認 / ログアウト（更新ありの時だけ ⋮ 付近にバッジ）
-- モバイルは MRHC ロゴ等を消し、`☰ + ドロップダウン + ⋮` のみ
-- 稼働中バッジ・稼働時間はトップバーに出さない（状態はトップバーの形が表す）
+- フォーカス切替と全セッション一覧はトップバーへ置かず、セッションタブ先頭の常設カード一覧へ集約する。
+- ● = 稼働状態、■ = 停止（確認あり・参加者待機なしで直ちに `shutdown`）。フォーカス中のセッション名はセッションタブ内で表示する。
+- 起動中も右端の ■ を表示し、起動処理が長引いた場合に停止できるようにする。
+- CPU・メモリはマシン全体の使用率を整数パーセントでコンパクトに表示する。稼働中かつページ表示中のみ 3 秒間隔で取得し、一時的な取得失敗では直前値を維持する。未取得・非対応時は `—`。
+- モバイルの稼働中は幅を確保するため「ヘッドレス稼働中」を非表示にし、緑の状態ドットと CPU・メモリを表示する。PCでは状態文言も併記する。起動中・停止中は CPU・メモリを表示しない。
+- `state=stopping` では「停止中」を表示し、停止ボタンを無効化して二重送信を防ぐ。
+- ⋮ = Steam 更新確認 / 言語 / ログアウト（停止操作は重複配置しない。更新ありの時だけ ⋮ 付近にバッジ）
+- モバイルも PC と同じ操作構造とし、サイドバーだけハンバーガー overlay に畳む。
+- 稼働時間はトップバーに出さない。
 
 **停止中（丸ごと切替）**
 ```
@@ -224,13 +227,13 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - [起動] ボタン + 隣にコンフィグ選択プルダウン（**前回起動コンフィグが初期選択** → 押すだけで起動）
 - 起動ボタンの存在が「停止中」を表す（「起動していません」テキスト不要）
 - config が空 → 「コンフィグタブで作成」へ誘導（起動不可）
-- ⋮ = Steam 更新確認 / ログアウト（強制停止は非表示）
+- ⋮ = Steam 更新確認 / 言語 / ログアウト（停止操作は非表示）
 
 ### 3.3 タブ構成（8 タブ）
 
 | # | タブ | 階層 | 内容 | 停止中 |
 |---|---|---|---|---|
-| 1 | **セッション** | 1 | フォーカス中の設定（名前/アクセス/最大/AFK/説明/保存/再起動/閉じる）+ ユーザー一覧（アイコン/AFK/権限 + respawn/kick/ban/silence/role/message） | 「起動してください」 |
+| 1 | **セッション** | 1 | 全セッションのカード一覧（件数・フォーカス切替）+ フォーカス中の設定（名前/アクセス/最大/AFK/説明/保存/再起動/閉じる）+ ユーザー一覧（アイコン/AFK/権限 + respawn/kick/ban/silence/role/message） | 「起動してください」 |
 | 2 | **フレンド** | 2 | リクエスト一覧 / Ban 一覧 / フォーカス内ユーザー / 検索(P9) → ユーザー操作（承認/申請/解除/invite=フォーカス中へ） | 「起動してください」 |
 | 3 | **新規セッション** | — | テンプレート / URL から起動（実装済・§3.12）＋ ワールド検索→起動の枠を予約（将来） | 「起動してください」 |
 | 4 | **コンフィグ** | (編集) | v1 同等 CRUD（フォームのみ・タブ式複数ワールド・§3.14） | ✅ 使える |
@@ -247,8 +250,10 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **Page Visibility 連動**: タブ非表示で poll 停止、再表示で即 refetch + 再開
 - **コンポーネント unmount で停止**（画面遷移時）
 - **アクティブな表示中タブのみ** poll
+- セッションタブの一覧 = `GET /sessions` をマウント時・手動更新・表示中のみ 15s 自動で再取得。新規セッション開始後、一覧に影響する設定適用後、close 成功後にも再取得する。取得失敗時は直前の一覧を維持する。
 - セッションタブのフォーカス中詳細 = **イベント駆動（フォーカス変更時/操作後/手動更新ボタン）+ 表示中のみ 10s 自動**。1 回の取得 = `ExecGroup(focus→status→users)`
-- フレンド/コンフィグ = onMount + 手動更新ボタン（自動 poll なし）／設定 = onMount（保存後に再評価・自動 poll なし）
+- 詳細取得はフォーカス中の 1 セッションだけとし、一覧の全件に対して detail を取得しない。高速切替時は最新の要求に対応する応答だけを採用する。
+- フレンド/コンフィグ = onMount + 手動更新ボタン（自動 poll なし）／設定 = onMount（保存後に再評価・自動 poll なし）／トップバーのシステム使用率 = 稼働中かつ表示中のみ 3s 自動
 - ライブログ・プロセス状態・Steam 進捗 = SSE
 - write 成功後 = onSuccess で該当データ再取得（方針 A）
 
@@ -279,7 +284,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **ログイン**: シンプルカード（ロゴ + password input + ボタン）、失敗はカード内赤表示、連続失敗 10 回ロック
 - **初回セットアップ**: CLI 対話のまま（Web wizard なし）。セットアップ完了後は auto-continue
 - **セッション期限**: cookie 30 日（絶対失効）
-- **危険操作**（kick/ban/強制停止/close）: 確認モーダル
+- **危険操作**（kick/ban/停止/close）: 確認モーダル
 - **トースト通知**: 操作完了/失敗
 
 ### 3.7 Foundation (7-0) で確定した実装事項
@@ -294,8 +299,8 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - ロゴ = 白(Light)。状態ドット（稼働中トップバー）= running 緑 / 遷移中 黄。
   - **filled ボタンの文字コントラスト = theme `autoContrast`**（commit 16a4a69）。個別の `styles` で文字色を上書きせず、テーマ一括で背景に応じた可読色を自動付与（保存バー dirty 時の brand filled 等）。グローバル CSS で底上げ。
 - **i18n** = ブラウザ言語の**自動判定**（`navigator.languages` を prefix 一致）＋**選択式スイッチャ**（ログイン Select・⋮ メニュー）。対応言語の単一情報源 = `LANGUAGES`（言語追加 = locale JSON + resources + 1行）。手動切替は localStorage に保存し自動判定より優先。
-- **フォーカス/セッション表示 = 2行**（上=セッション名〔長→自動縮小・`<br>`改行→折返し＋半分サイズ・行数 clamp で頭打ち〕／下=小さく `present/users/max · accessLevel`）。トップバーのフォーカスボタンとプルダウンで共用（`SessionTwoLine`）。§3.2 のモックアップの 🎯/1行表記はこの2行・状態ドット形に置換。
-- **モバイル**: 1行トップバーで操作要素（☰/起動/⋮）は `flex-shrink:0`、config Select が `min-width:0` で幅を吸収（起動ボタンの文字が見切れない）。
+- **フォーカス/セッション表示 = セッションタブ先頭のカード一覧**。見出しは `セッション一覧（N）` のみとし、全体の在席合計・参加合計・定員合計は表示しない。見出し右の新規セッション操作は Resonite Green の `+` アイコンボタンとし、`+` はフォントのベースラインに依存させず縦横バーをボタン中央で交差させる。アクセシブル名とツールチップは i18n の「新規セッション」を維持し、スクロールバーと重ならない右余白を確保する。各カードは上段=`#index + セッション名 + フォーカス中`、下段=`在席N（+M離席中）/max・accessLevel`（`M = users - present`）。下段の `在席` ラベルは Resonite Green (`#59eb5c`) を維持し、人数 `N`・定員 `/max`・アクセスレベルはセッション名と同じ `sm`・Light・太さで表示する。`（+M離席中）` だけを `xs`・補助色にする。英語では `Present N (+M away)/max · accessLevel` とする。長い名前は極端に縮小せず 2 行までで省略する。フォーカス中カードはレイアウトを動かさない太い cyan の全周枠と文言で示す（左端だけのアクセントにはしない）。カード一覧と設定カードの間には、フォーカス名や参加情報を重複表示する見出しを置かない。
+- **モバイル**: 1行トップバーで操作要素（☰/起動/■/⋮）は `flex-shrink:0`、config Select が `min-width:0` で幅を吸収（起動ボタンの文字が見切れない）。
 - **開発支援**: `poc/fakehl` を MRHC の `-HeadlessConfig` で起動可能にし、その config の `startWorlds.sessionName` を世界名に使用 → 実機ヘッドレスなしで稼働中モード/セッション名の UI を確認できる（統合テストは configPath="" で従来通り＝無影響）。
 
 ### 3.8 セッションタブ (7-1) で確定した実装事項
@@ -313,8 +318,9 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **自分（ホスト）への危険操作を無効化（R3）**: `selfUserId`（`status.loginUserId`）と `u.id` が一致する行は **mute/kick/ban/権限プルダウンを `disabled`（グレーアウト）** にし **respawn+message のみ**許可（自 ban 等でセッションを壊す footgun 防止）。バッジ等は付けず**行レイアウトは不変**（disabled で灰色化のみ）。`selfUserId` は App→SessionTab→SessionUsers→UserCard と prop で配線。匿名訪問者(id 空)・匿名起動(loginUserId 空)は非該当＝従来どおり全操作可。
 - **確認ダイアログ**（`components/ConfirmModal`・ラベルは `common.*`）対象 = kick/ban/respawn/silence/unsilence ＋ save/restart/close。危険(kick/ban/close)は確定ボタン赤。メッセージは入力モーダル、適用はバッチ。
 - **データ鮮度**: イベント駆動（マウント/フォーカス変更/操作後/手動 ⟳）＋ `useAsyncAction`（操作→完了後 refetch）。**トースト＝7-7 第1層（§3.11）／自動 poll・Page Visibility＝7-7 残として実装済（§3.13）**。**status と users は B1（commit bdb54be）で `GET /sessions/{idx}/detail`（ExecGroup(focus→status→users)）に集約済**（focus 往復半減・一貫スナップショット）。`/status`・`/users` は部分再取得用に残置。
+- **セッション一覧 / フォーカス切替**: タブ先頭に `InspectorCard` とレスポンシブなカードグリッドを置く。PC/モバイルともカード選択で `focusedIdx` を変更し、その下の詳細を更新する同一操作。モバイルだけ別画面へ遷移させない。0件時は一覧の空状態だけを表示し detail API を呼ばない。close 成功後は一覧を再取得し、フォーカス対象が消えた場合は残る先頭へ移す（0件なら詳細を隠す）。設定フォームに未適用の変更がある状態で別カードへ切り替える場合は、破棄確認を表示する。セッション別ドラフトは保持しない。
 - **スポーン / インパルスカード（R14・`SpawnImpulseCard`）**: 左カラムのセッション設定カードの下に配置。①アイテムスポーン（URL〔`^res[-\w]*://` scheme 検証・不正/空は[スポーン]無効＋ヒント〕＋active〔既定ON〕/persistent〔既定OFF〕チェックボックス＋[スポーン]）／②ダイナミックインパルス（タグ〔必須〕＋値〔任意・空可〕＋[送信]）／③スポーン＆パルス。③で `input.kind="ttsVoice"` のテンプレートを選択したときは、テキストと backend 経由の話者 `styles` 選択を表示し、`speakerId` を伴って実行する。backend は TTS API リクエスト URL 全体を `dynamicimpulsestring` 値にする。セッションでは TTS の single / loop を選べる。既存のテキストのみテンプレートのUIと動作は維持する。**非破壊操作なので確認ダイアログなし**＝実行→受理トースト（方針A・respawn/message と同格）。`useAsyncAction` で busy/トースト集約。spawn/impulse は users/status を変えないため refetch しない。backend = `POST /sessions/{idx}/spawn`・`/impulse`（§2.4）。コマンド組み立ては `headless.SpawnCmd`/`DynamicImpulseStringCmd`（告知③と共有）。
-- **レイアウト**: `components/SplitColumns`（再利用）。**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定〔セッション設定＋スポーン/インパルス〕/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
+- **レイアウト**: 一覧は base=1列 / sm=2列 / xl=3列のカードグリッド。詳細は既存 `components/SplitColumns` をそのまま再利用し、**xl(1408px) 未満＝1カラム**（max560・中央）、**xl 以上＝2カラム**（左=設定〔セッション設定＋スポーン/インパルス〕/右=ユーザー、**両パネル560固定**・中央寄せ・ページ全体スクロール）。`SessionSettings` / `SpawnImpulseCard` / `SessionUsers` のインスペクタ風デザイン（左ラベル・右入力欄を含む）は変更しない。スクロールバーは `ScrollArea type="hover"`（スマホは hover 無で非表示）。
 - **開発支援（7-1 追加）**: fakehl にデモユーザー複数＋ role 反映を追加（スタンドインで一覧/即適用を目視確認）。統合テストは fallback で無影響。
 - **対応済**: B1取得集約（commit bdb54be）・`maxUsers`空ガード。レビュー反映: フォーム編集保持(M1=sessionId変化時のみ再同期)・refetch失敗時データ保持(M3=初回のみエラー画面)・UserCard key衝突(L1)・🔇のa11y(L2)。
 - **残課題**: ~~write失敗が現状無音（M2/L4）~~ → **✅ 完了（7-7 第1層・§3.11・commit 61af3e2）**。`useAsyncAction`/`useConfirm` で `WriteResult` を拾い失敗を赤トーストで通知。`getData` が 409(not ready) を区別しない点(L5)のみ現状維持（将来整理）。
@@ -380,7 +386,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
   - **URL** = `InspectorTextInput`（placeholder `resrec://...`）。**scheme をクライアント検証** `^res[-\w]*:\/\//i`（v1 踏襲）。空 or 不一致は [起動] を `disabled`、非空かつ不正時のみ下にヒント文。方針A 上、不正 URL でも backend は HTTP 200 を返し得る（＝無音失敗）ため空振りを減らす狙い。
   - **[起動]は2つともニュートラル灰**（`InspectorButton severity="neutral"`・§3.7「ボタン全般=Mid grey」踏襲。適用のような cyan filled にはしない＝ユーザー決定）。
 - **起動前に確認ダイアログあり**（`useConfirm` + `ConfirmModal`）。`confirm.busy` がモーダルの loading を駆動（startworldurl は最大60s かかり得る）。`onConfirm` が `WriteResult` を return → 結果トーストは 7-7 第1層基盤で自動（成功=緑 `toast.newSessionDone`／失敗=赤）。
-- **起動成功後はトップバーのセッション一覧を再取得**（`App.tsx` の `refreshSessions` を `onStarted` で渡す）→ 新ワールドがプルダウンに出現＝方針A の「再取得で実状態を見せる」。
+- **起動成功後はセッションタブの一覧を再取得**（`App.tsx` の `refreshSessions` を `onStarted` で渡す）。現在のフォーカスは維持し、新ワールドへ自動切替しない。
 - **ワールド検索枠（右・2026-06-04 実装）**: キーワード入力（Enter可）→ `GET /api/v1/resonite/worlds?q=`（`internal/resonite.SearchWorlds`＝go.resonite.com プロキシ）→ 2カラムグリッド（サムネ `Image`／空はプレースホルダ＋名前＋所有者ID）。各カードに **[起動]**＝`useConfirm`+`ConfirmModal`→`startWorldURL(resoniteUrl)`→`onStarted`（左 StartPanel と同形）。状態は **loading / 結果 / 該当なし の3つ**（独立エラー状態なし＝`getData` の null→[] で失敗を「該当なし」に吸収・フレンド検索と同流儀）。`reqId` で連打/順序逆転ガード。
   - **バックエンド**: `html.Parse`（`golang.org/x/net/html`・直接依存）＋再帰ヘルパ（findAll/findFirst/hasClass/textContent）で `a.listing-item` 走査。`href` 内 `/R-`＝レコードID・`/(U\|G)-`＝所有者ID、`h2.listing-item__heading` テキスト＝名前、`img` src＝サムネ（相対は origin で絶対化＝`convertIconURL` ではなく専用 `absolutize`）。`resrec:///<owner>/<record>` を生成。**上位24件**で打ち切り（サムネ読込/描画負荷抑制）。HTTP 定型は `SearchUsers`/`ResolveUserID` と共通 `Client.get(ctx,url,accept)` に集約。テスト=`worlds_test.go`（U-/G-両対応・サムネ有無・エンティティ名・壊れ要素スキップ・24件cap）。
   - **公式 API にワールド検索は無いため go.resonite.com 依存（HTML 構造変更で壊れ得る点は受容）**。一次情報は `docs/resonite-domain-facts.md §ワールド検索`。
@@ -395,7 +401,7 @@ Resonite の write 出力は **コマンドごとにバラバラで信頼でき�
 - **再利用フック `web/src/hooks/useVisiblePolling(fn, intervalMs)`**: 表示中のみ `fn` を一定間隔で実行。**重複起動しない**（再帰 `setTimeout`＝前回完了後に次を予約）／`document.hidden` で停止・再表示で**即時実行＋再開**（`visibilitychange`）／unmount で停止／`fn` は ref 経由で常に最新（依存に入れず interval を再購読させない＝idx 変化でタイマーをリセットしない）。初回 poll は +intervalMs（マウント直後の即時取得と二重化させない）。
 - **`SessionTab`**: `refetch` に `{ silent? }` を追加。背景 poll は `silent:true`＝`loading` を触らず **⟳ スピナーを回さない**（画面のチラつき防止）。手動 ⟳ / マウント / focus 変更 / 操作後は従来どおりスピナー表示。`useVisiblePolling(() => refetch({ silent:true }), 10_000)`（§3.4 の 10 秒）。
 - **背景 poll の失敗は無音**（既存 M3：表示中データを保持・トーストは出さない＝10 秒ごとの赤通知を防ぐ）。
-- **スコープ（§3.4 準拠）**: セッションタブのみ。フレンド/コンフィグ/設定は自動 poll なし。**トップバーの全世界人数（`GET /sessions`＝`worlds`・focus 不要）は poll 対象外** → セッションタブ自身の人数/一覧は 10 秒で追従するが、トップバーのプルダウン人数は手動 ⟳ まで古いまま（既知の制限・要望あれば別途 `worlds` poll を追加可）。
+- **スコープ（§3.4 準拠）**: セッションタブのみ。フォーカス中詳細は 10 秒、全セッション一覧（`GET /sessions`＝`worlds`・focus 不要）は 15 秒で、どちらも Page Visibility 連動。フレンド/コンフィグ/設定は自動 poll なし。
 - **focus 競合**: 背景 poll は `focus idx→status→users` を行うが、MRHC の全 write も毎回 focus し直すため実害は軽微（§2.6 の単一管理者前提で許容済）。10 秒間隔で REPL 競合確率も小。
 
 ### 3.14 コンフィグタブ (7-4) の確定仕様（実装前・本節がレビュー確定の単一情報源）
@@ -572,20 +578,21 @@ POST /api/v1/restart/trigger {configName?}   手動「通常再起動」を即�
 POST /api/v1/restart/cancel                  進行中の再起動を中止（①②③のみ・ヘッドレスは継続。通常停止の中止にも共用）
 POST /api/v1/stop/graceful                   通常停止を即受付（非同期・R7）。事前アクション→固定1分→停止（起動しない）
 ```
-- **通常停止（R7）**: TopBar 右端の赤い停止ボタン（■・⋮「強制停止」の隣）から**確認ダイアログを経て受付**（受理トースト「全員退出で即・最長1分で停止・スケジュールタブで中止可」）。orchestrator の統一フローを**終端=停止**で流用＝0人なら即停止／居たら ①セッション変更→③告知（即時）→最長1分→④停止（**起動しない・最終起動も記録しない**）。待機制御（②）は再起動の長時間設定ではなく**固定の即応**（告知前0分＋告知後1分＝`immediateManualWait`）。進行（待機/告知/`停止中`＋残り時間）と中止はスケジュールタブの状態カードに表示（`restartTriggerType="stop"` で終端フェーズを「停止中」表示）。事前アクション（セッション変更・告知）は再起動と同じ `preActions` 設定に従う（告知 OFF なら無告知＝セッション変更＋最長1分猶予のみ）。
+- **停止**: TopBar 右端の赤い `■` を稼働中・起動中の唯一の即時停止操作とし、表示テキストは置かず、アクセシブル名とツールチップを「停止」とする。確認ダイアログ後に `POST /stop` を呼び、参加者待機・事前アクション・告知を行わず直ちに Resonite へ `shutdown` を送る。⋮ メニューには停止項目を置かない。
+- **退出待ち停止（内部仕様名: 通常停止・R7）**: スケジュールタブの手動操作カードに、意味が直接伝わる `[退出を待って停止]` と補足「全員退出で即時、残っていても最長1分で停止します」を表示し、**確認ダイアログを経て受付**する。orchestrator の統一フローを**終端=停止**で流用＝0人なら即停止／居たら ①セッション変更→③告知（即時）→最長1分→④停止（**起動しない・最終起動も記録しない**）。待機制御（②）は再起動の長時間設定ではなく**固定の即応**（告知前0分＋告知後1分＝`immediateManualWait`）。進行（待機/告知/`停止中`＋残り時間）と中止は同じタブの状態カードに表示（`restartTriggerType="stop"` で終端フェーズを「停止中」表示）。事前アクション（セッション変更・告知）は再起動と同じ `preActions` 設定に従う（告知 OFF なら無告知＝セッション変更＋最長1分猶予のみ）。
 - **進行状態の伝送はポーリング（実装・P8-5 で確定）**: UI が `restart-status` を `useVisiblePolling` で3秒ごと追従（表示中のみ）。restart-status は `inProgress`/`phase`(idle|preparing|waiting|announcing|restarting)/`restartTriggerType`/`restartConfigName`/`deadlineAt`/`lastStartAt`/`lastStartTrigger`/`nextScheduled*` を返す。SSE への進行フェーズ反映は将来拡張（MVP 非採用）。
 
 **(7) UI 構成（スケジュールタブ・インスペクタ風・停止中も編集可）**
 `SplitColumns` で配置。**広い画面（xl以上）は2カラム＝左に運用/状態〔①②③〕・右に設定〔④⑤⑥〕／狭い画面は縦1カラム**にカードを積む:
 1. **ステータスカード**: 稼働時間・**次回予定再起動**（日時+config）・最終起動（時刻/トリガー種別・手動起動を含む全起動）・現在の進行状態・クラッシュ復帰状態。**再起動進行中は現在フェーズ（待機/告知）＋残り時間＋`[中止]`ボタンを表示**（中止後は「セッション設定は変更されたまま」と一言添える）。稼働時間/進行は稼働中のみ。
-2. **手動カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・**稼働中のみ有効**・ボタン色は `severity="warning"`＝セッションタブの再起動と同色）。
+2. **手動操作カード**: `[通常再起動]` ボタン（`ConfirmModal` 確認・config 選択付き〔既定=前回〕・ボタン色は `severity="warning"`）と `[退出を待って停止]` ボタン（`ConfirmModal` 確認・`POST /stop/graceful`・ボタン色は `severity="danger"`）。どちらも**稼働中のみ有効**。
 3. **予定リストカード**: 各行（有効トグル / 種別・時刻 / config / 編集✎ / 削除×〔**直接削除**＝未保存ゆえ保存前は取り消し可〕）＋`[＋新規]`・空時「予定がありません」。編集は**モーダル**（type 選択で日時欄を出し分け〔once=年月日+時分/weekly=曜日+時分/daily=時分〕・config `Select`〔#prev 番兵〕・ドラフト→`[OK]` で working 配列へ反映/`[キャンセル]` 破棄）。
    - **実装**: 新規 id は `scheduleModel.genId()`（`crypto.randomUUID` はセキュアコンテキスト限定＝LAN/HTTP で不可のため `getRandomValues`→`Math.random` にフォールバック・[[lan-http-no-secure-context-apis]]）。**インライン検証**（時/分の範囲＋once 暦実在＝JS Date 往復で 2/30 等を弾き [OK] 無効化、年下限 `MIN_YEAR=2000` は backend 準拠）。daily/weekly へ切替時は once 専用の year/month/day をクリアして保存JSONを汚さない。日付入力は `@mantine/dates` 不使用で `NumberInput`。**once の年月日はスマホ向けに縦並び（R8）**＝full-width 入力を縦 Stack に積み、各入力の右に `年/月/日` 単位ラベル（固定幅で右端整列）。狭幅でも横はみ出しなし。時刻（時:分）は横並びのまま。
 4. **待機制御カード**（2区間モデル R9）: `quietWaitMin`（静かに待つ）/ `announceWaitMin`（告知後に待つ）。各 0〜1440・相互依存なし。
 5. **事前アクションカード**: 告知（有効 / 告知アイテム〔テンプレ選択（リモートリスト）＋手動入力〕 / 手動時のみ itemUrl・impulseTag / message。`ttsVoice` 選択時は message=text＋話者 style 選択=`speakerId`）＋セッション変更（Private化 / maxusers=1 / 改名+名前）。スケジュールの TTS は loop 用テンプレートのみを選択肢にする。**告知 OFF 時は配下欄、改名 OFF 時は名前欄を非表示**（条件レンダリング）。既存テンプレートの message は任意（空可）。詳細は §3.16(2) 実装注記＋[item-templates.md](item-templates.md)。
 6. **クラッシュ復帰カード**: 有効トグル / maxCrashes / windowMinutes。
 - 流用部品: `components/inspector`・`useAsyncAction`・`useConfirm`＋`ConfirmModal`・`lib/notify`・`SplitColumns`。
-- 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動再起動ボタンのみ停止中は無効。
+- 停止中: 全設定編集可（`schedule` は `availableWhenStopped`）。手動操作ボタン（通常再起動・退出を待って停止）のみ停止中は無効。
 - **保存モデル（実装・P8-5 で確定）**: 設定群（③④⑤⑥）は**単一 working オブジェクト＋一括保存バー**＝dirty 判定し**完全オブジェクトを `PUT /restart-config`**（backend の pointer 設計に一致・コンフィグタブと同方式）。①状態・②手動は live（poll＋アクション）で保存対象外。手動 config Select は空値を扱えないため番兵 `#prev`（config 名に無効な `#`）を使い送信時に `""`（=前回）へ変換。
 - **実装状況**: 全カード実装済（`web/src/tabs/schedule/`）。①②（状態カード・手動再起動）＝P8-5a。③予定リスト＋編集モーダル＝P8-5b-2。④⑤⑥＋保存バー＝P8-5b-1。**＝Phase 8 完了**。
 

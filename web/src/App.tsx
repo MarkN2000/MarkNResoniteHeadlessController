@@ -83,6 +83,7 @@ function Shell({
   // （常時ポーリングはしない・docs/design/self-update.md）。失敗（null）はバッジを出さないだけ。
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateOpen, setUpdateOpen] = useState(false);
+  const sessionsRequestId = useRef(0);
   useEffect(() => {
     void api.checkUpdate().then(setUpdateInfo);
   }, []);
@@ -163,8 +164,15 @@ function Shell({
     refreshConfigs();
   }, [refreshConfigs]);
 
-  const refreshSessions = useCallback(() => {
-    api.getSessions().then(setSessions);
+  const refreshSessions = useCallback(async (opts?: { resetFocus?: boolean }) => {
+    const requestId = ++sessionsRequestId.current;
+    const next = await api.getSessions();
+    // 通信失敗は空一覧ではない。直前の一覧とフォーカスを維持し、次回取得で復旧する。
+    if (requestId !== sessionsRequestId.current || next === null) return;
+    setSessions(next);
+    setFocusedIdx((current) =>
+      opts?.resetFocus || !next.some((session) => session.index === current) ? (next[0]?.index ?? 0) : current,
+    );
   }, []);
 
   // アカウント設定状態の再評価（マウント時＋設定タブ/モーダルでの保存後）。
@@ -188,20 +196,24 @@ function Shell({
   // 稼働開始でセッション取得、停止でクリア。
   useEffect(() => {
     if (running) refreshSessions();
-    else setSessions([]);
+    else {
+      sessionsRequestId.current += 1;
+      setSessions([]);
+      setFocusedIdx(0);
+    }
   }, [running, refreshSessions]);
 
-  // トップバー稼働中の赤い停止ボタン用・共通確認。誤タップ対策にワンクッション挟む（R7 で無確認だったが
-  // 常時表示ボタンへ昇格したため確認を追加）。確定で /stop/graceful 受付＝進行/中止はスケジュールタブに出る。
+  // トップバー稼働中の赤い停止ボタン用・共通確認。参加者待機なしで直ちに shutdown を送るため、
+  // 誤タップ対策にワンクッション挟む。退出を待つ停止はスケジュールタブの手動操作へ分離する。
   // 成功/失敗トーストは useConfirm.confirm() が WriteResult を reportWriteResult へ流して処理する。
   const stopConfirm = useConfirm();
-  function onGracefulStop() {
+  function onStop() {
     stopConfirm.ask({
-      title: t("topbar.gracefulStop"),
-      message: t("topbar.gracefulStopConfirm"),
+      title: t("topbar.stop"),
+      message: t("topbar.stopConfirm"),
       danger: true,
-      success: t("topbar.gracefulStopAccepted"),
-      onConfirm: () => api.gracefulStop(),
+      success: t("topbar.stopAccepted"),
+      onConfirm: () => api.stop(),
     });
   }
 
@@ -233,7 +245,20 @@ function Shell({
     const stopped = (status?.state ?? "stopped") === "stopped";
     if (!def.availableWhenStopped && stopped) return <StartPrompt />;
     if (activeTab === "session")
-      return running ? <SessionTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} templates={itemTemplates} /> : <StartPrompt />;
+      return running ? (
+        <SessionTab
+          idx={focusedIdx}
+          sessions={sessions}
+          onFocus={setFocusedIdx}
+          onRefreshSessions={refreshSessions}
+          onSessionClosed={() => refreshSessions({ resetFocus: true })}
+          onOpenNewSession={() => setActiveTab("newSession")}
+          selfUserId={status?.loginUserId ?? null}
+          templates={itemTemplates}
+        />
+      ) : (
+        <StartPrompt />
+      );
     if (activeTab === "friends")
       return running ? <FriendsTab idx={focusedIdx} selfUserId={status?.loginUserId ?? null} /> : <StartPrompt />;
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
@@ -256,12 +281,7 @@ function Shell({
       <AppShell.Header>
         <TopBar
           status={status}
-          sessions={sessions}
-          focusedIdx={focusedIdx}
-          onFocus={(idx) => setFocusedIdx(idx)}
-          onRefreshSessions={refreshSessions}
-          onStop={() => void api.stop()}
-          onGracefulStop={onGracefulStop}
+          onStop={onStop}
           configs={configs}
           selectedConfig={selectedConfig}
           onSelectConfig={setSelectedConfig}
@@ -320,7 +340,7 @@ function Shell({
       </AppShell.Main>
     </AppShell>
 
-    {/* トップバーの通常停止ボタン用の共通確認モーダル（赤い確定ボタン）。 */}
+    {/* トップバーの停止ボタン用の共通確認モーダル（赤い確定ボタン）。 */}
     <ConfirmHost confirm={stopConfirm} />
 
     {/* 初回オンボーディング: アカウント未設定時にログイン直後 1 回自動表示（バナーからも開ける）。 */}

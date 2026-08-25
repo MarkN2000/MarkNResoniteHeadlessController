@@ -84,6 +84,20 @@ export function ScheduleTab({
     });
   };
 
+  const onStop = () => {
+    confirm.ask({
+      title: t("schedule.waitThenStop"),
+      message: t("schedule.confirmStop"),
+      danger: true,
+      success: t("schedule.toastStopAccepted"),
+      onConfirm: async () => {
+        const r = await api.gracefulStop();
+        void refetch();
+        return r;
+      },
+    });
+  };
+
   const onCancel = () => {
     // 進行中が通常停止（R7）なら中止ダイアログ文言を「停止」連動にする（既定は再起動）。
     const isStop = rs?.restartTriggerType === "stop";
@@ -140,7 +154,7 @@ export function ScheduleTab({
               <Stack gap="lg">
                 <StatusCard status={rs} running={running} onCancel={onCancel} />
                 <SystemMetricsCard />
-                <ManualCard running={running} configs={configs} onRestart={onRestart} />
+                <ManualCard running={running} configs={configs} onRestart={onRestart} onStop={onStop} />
               </Stack>
             }
             right={
