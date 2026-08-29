@@ -68,7 +68,7 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
 
 - `ttsVoice` テンプレートでは、UI は従来のテキスト入力に加えて `speakerId` を必須入力とし、backend が取得した話者の
   `styles` から選択する。話者一覧はクライアントが外部サービスへ直接接続せず、`GET /api/v1/tts-speakers` を介して取得する。
-  backend は固定の `https://tts.markn2000.com/speakers` を取得元とし、各 style を
+  backend は固定の `https://tts.markn2000.com/api/v1/speakers` を取得元とし、各 style を
   `{id, speakerName, styleName}` に平坦化して返す。
 - backend はテキストと選択された style ID を URL クエリとしてエンコードし、
   `https://tts.markn2000.com/api/v1/tts?text=<URL encoded>&speaker=<style id>` という**URL全体**を

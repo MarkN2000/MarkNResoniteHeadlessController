@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	ttsSpeakersURL = "https://tts.markn2000.com/speakers"
+	ttsSpeakersURL = "https://tts.markn2000.com/api/v1/speakers"
 	ttsAPIURL      = "https://tts.markn2000.com/api/v1/tts"
 )
 
