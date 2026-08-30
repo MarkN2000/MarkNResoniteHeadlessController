@@ -299,7 +299,7 @@ func (s *Server) handleSessionImpulse(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSessionSpawnImpulse: スポーン＆パルス＝告知③のセッション版（フォーカス中ワールドのみ）。
-// spawn → 実体化待ち（spawnImpulseDelay）→ dynamicimpulsestring を1リクエストで完走する
+// spawn完了行を確認 → 短い猶予（spawnImpulseDelay）→ dynamicimpulsestring を1リクエストで完走する
 // （途中でブラウザを閉じても impulse まで届く）。templateId 非空＝スポーン＆パルステンプレから
 // URL/タグを実行直前に解決・空＝手動（itemUrl/impulseTag を使用）。告知③と同じく itemUrl 空は
 // spawn 省略で impulse のみ・spawn は active=true / persistent=false 固定（一時アイテム）。
@@ -343,14 +343,13 @@ func (s *Server) handleSessionSpawnImpulse(w http.ResponseWriter, r *http.Reques
 			if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
 				return e
 			}
-			_, e := tx.Exec(headless.SpawnCmd(url, true, false))
-			return e
+			return execTemporarySpawn(tx, url)
 		})
 		if err != nil {
 			writeExecErr(w, err)
 			return
 		}
-		select { // spawn したアイテムの実体化（アセット読込）を待ってから impulse
+		select { // 完了確認直後の初期化猶予を置いてから impulse
 		case <-r.Context().Done():
 			return
 		case <-time.After(s.spawnImpulseDelay):

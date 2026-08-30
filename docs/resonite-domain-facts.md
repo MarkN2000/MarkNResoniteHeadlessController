@@ -242,7 +242,20 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 1. `worlds` / `status` / `users` / `listbans` / `friendRequests` の**生出力**（パーサのフィクスチャ）
 2. 各操作系コマンドの**成功/失敗時の出力**（kick/ban/silence/respawn/unban/acceptFriendRequest/invite/accessLevel/role）
 3. Linuxの**文字コード**（UTF-8想定でよいか）。起動方法は判明＝`dotnet Resonite.dll -HeadlessConfig <f>`（.NET10 Runtime、`Headless/`内）
-4. （任意）`spawn` / `dynamicImpulseString` 実行時の出力
+4. （任意）`dynamicImpulseString` 実行時の出力
+
+### spawn 完了出力（2026-08-31 本番ログ採取・Resoniteバージョン不明）
+
+`spawn "resrec:///U-MarkN/R-01a053a5-930f-7672-ac0e-b0f17bd4a325" true false` の実行で、
+読み込み開始時の `Spawning item from URL: <url>` とは別に、完了時は次の行が出ることを確認した。
+
+```text
+Spawned item from URL: resrec:///U-MarkN/R-01a053a5-930f-7672-ac0e-b0f17bd4a325
+```
+
+MRHC は `Spawned item from URL: <実行時URL>` の完全一致を spawn 成功条件に使う。完了行の後に
+プロンプトが戻り、続けて `dynamicimpulsestring "MRHC.play" "こんにちは"` を実行すると
+`Triggered 1 receivers` が出ることも同じログで確認した。
 
 ---
 

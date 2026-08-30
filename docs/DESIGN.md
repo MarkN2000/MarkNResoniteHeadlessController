@@ -154,7 +154,7 @@ type PreRestartAction interface {
 - レジストリ `map[string]PreRestartAction`。設定は配列 `[{type,enabled,params}]`（均一形・前方互換・未知typeは無視）。
 - **v1はchatWarningのみ**。`itemSpawn`等はレジストリに1件追加するだけで拡張。
 - ⚠️ **chatWarningの到達範囲**: Resoniteに全体送信コマンドは無く、`message <friend> <msg>` は**フレンド宛DMのみ**＝非フレンドには届かない。現実解は「`users`列挙→各人へDM(フレンドのみ着)」または「`dynamicImpulseString`でワールド側の通知機構を起動(ワールド対応が前提)」。**v1はこの制約を明示**したうえでDM方式とし、ワールド内通知はitemSpawn/dynamicImpulse拡張で対応。
-- **実装（§3.16）**: 上記プラグインIFは実装せず、事前アクションは **`PreActions{announce, sessionChanges}` の固定2種**に簡素化（YAGNI）。`announce`=**dynamicImpulse 告知（フル設定型・spawn→約10秒→impulse の2パス）**、`sessionChanges`=Private化/maxusers=1/改名（各独立トグル）。**chatWarning（DM方式）は到達不確実のため不採用**。新アクション追加時にプラグイン化を再検討。
+- **実装（§3.16）**: 上記プラグインIFは実装せず、事前アクションは **`PreActions{announce, sessionChanges}` の固定2種**に簡素化（YAGNI）。`announce`=**dynamicImpulse 告知（フル設定型・各ワールドでspawn完了行を確認し、全spawn処理後に500ms待って成功ワールドへimpulse）**、`sessionChanges`=Private化/maxusers=1/改名（各独立トグル）。spawn失敗・完了未確認のワールドにはimpulseを送らず、巡回を続ける。500ms待機中はexecMuを保持しない。**chatWarning（DM方式）は到達不確実のため不採用**。新アクション追加時にプラグイン化を再検討。
 
 ### 5.6 Process Lifecycle Monitor（クラッシュ自動復帰）
 - ヘッドレスの**プロセス終了を監視**。こちらの**意図的な停止**（stop/restart）以外の終了＝異常終了として、

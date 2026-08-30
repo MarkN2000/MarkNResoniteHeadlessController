@@ -66,8 +66,7 @@ type Server struct {
 	ttsSpeakersURL string       // TTS 話者一覧の固定取得元（テストで差し替え）
 	ttsHTTPClient  *http.Client // TTS 話者一覧の取得クライアント（テストで差し替え）
 
-	// spawnImpulseDelay はスポーン＆パルスの spawn→impulse 間の実体化待ち（本番5秒・テストで縮める）。
-	// 告知③の10秒（orchestrator.spawnDelay）より短い＝対話操作は失敗しても即再実行できるため。
+	// spawnImpulseDelay はスポーン完了確認→impulse 間の短い猶予（本番500ms・テストで縮める）。
 	spawnImpulseDelay time.Duration
 
 	// requestRestart は MRHC プロセスの再起動依頼を main へ伝える（自己更新後の
@@ -148,7 +147,7 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 		resonite:  reso,
 		checkDeps: platform.CheckHeadlessDeps,
 
-		spawnImpulseDelay: 5 * time.Second,
+		spawnImpulseDelay: spawnReadyDelay,
 	}
 	tplPath := func(name string) string {
 		if dataDir == "" {
@@ -271,7 +270,7 @@ func (s *Server) Handler() http.Handler {
 	// セッション内コンテンツ操作（focus idx → <cmd>・R14）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/spawn", s.requireAuth(s.handleSessionSpawn))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/impulse", s.requireAuth(s.handleSessionImpulse))
-	mux.HandleFunc("POST /api/v1/sessions/{idx}/spawn-impulse", s.requireAuth(s.handleSessionSpawnImpulse)) // スポーン＆パルス（spawn→待機→impulse）
+	mux.HandleFunc("POST /api/v1/sessions/{idx}/spawn-impulse", s.requireAuth(s.handleSessionSpawnImpulse)) // スポーン＆パルス（spawn完了確認→500ms→impulse）
 	// セッションライフサイクル（focus idx → <cmd>）
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/restart", s.requireAuth(s.sessionCmdOp("restart", headless.WithTimeout(restartTimeout))))
 	mux.HandleFunc("POST /api/v1/sessions/{idx}/save", s.requireAuth(s.sessionCmdOp("save", headless.WithTimeout(saveTimeout))))

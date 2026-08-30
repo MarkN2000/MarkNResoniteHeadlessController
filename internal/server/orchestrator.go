@@ -79,7 +79,7 @@ type restartOrchestrator struct {
 	// タイミング（本番は定数・テストで小さく差し替え可能にする seam）。
 	minute           time.Duration // quiet/announce 待機の「分」単位（本番 time.Minute）
 	waitInterval     time.Duration // ② の人数ポーリング間隔
-	spawnDelay       time.Duration // ③ spawn→impulse の待機（v1 踏襲・固定）
+	spawnDelay       time.Duration // ③ spawn完了確認→impulse の初期化猶予（本番500ms）
 	stopWaitTimeout  time.Duration // ④ stop 後 StateStopped を待つ最大
 	stopPollInterval time.Duration // ④ stop 待ちのポーリング間隔
 
@@ -104,10 +104,10 @@ func newRestartOrchestrator(s *Server) *restartOrchestrator {
 		recordUsed:       s.recordLastUsed,
 		recordStart:      s.recordLastStart,
 		beforeStart:      s.beforeFlowStart, // 停止後・起動前の更新フック（予定＋手動「通常再起動」・P9-B）
-		resolveAnnounce:  s.resolveAnnounce,      // 告知テンプレの実行時解決
+		resolveAnnounce:  s.resolveAnnounce, // 告知テンプレの実行時解決
 		minute:           time.Minute,
 		waitInterval:     10 * time.Second,
-		spawnDelay:       10 * time.Second,
+		spawnDelay:       spawnReadyDelay,
 		stopWaitTimeout:  190 * time.Second,
 		stopPollInterval: 500 * time.Millisecond,
 	}
@@ -407,7 +407,8 @@ func (o *restartOrchestrator) applySessionChanges(ctx context.Context, sc config
 	})
 }
 
-// announce は ③ dynamicImpulse 告知。itemUrl 非空なら全ワールドに spawn → spawnDelay 待機 → 全ワールドに impulse。
+// announce は ③ dynamicImpulse 告知。itemUrl 非空なら全ワールドでspawn完了確認後、
+// execMuを解放してspawnDelay待機し、成功ワールドだけへimpulseする。
 // itemUrl 空＝常設受け機構前提で spawn を省略し impulse のみ（§3.16(2)）。
 // テンプレ参照（templateId 非空）は実行直前に URL/タグへ解決する＝リモートリストの更新が
 // 保存済み config にも即反映される（docs/design/item-templates.md）。
@@ -424,21 +425,42 @@ func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAct
 		}
 		a = resolved
 	}
+	impulseCmd := headless.DynamicImpulseStringCmd(a.ImpulseTag, a.Message)
 	if a.ItemURL != "" {
-		// 告知アイテムは一時的なので active=true / persistent=false（ワールド保存に残さない）。
-		spawnCmd := headless.SpawnCmd(a.ItemURL, true, false)
-		_ = o.worlds.ForEach(ctx, func(_ headless.World, scope headless.Scope) error {
-			_, _ = scope.Exec(spawnCmd, headless.WithTimeout(3*time.Second))
+		spawnedWorlds := make(map[int]string)
+		err := o.worlds.ForEach(ctx, func(world headless.World, scope headless.Scope) error {
+			if err := execTemporarySpawn(scope, a.ItemURL); err != nil {
+				log.Printf("[restart] world #%d の告知アイテムspawn失敗（impulseをスキップ）: %v", world.Index, err)
+				return nil // spawn失敗だけを飛ばし、次ワールドへ進む
+			}
+			spawnedWorlds[world.Index] = world.Name
 			return nil
 		})
-		// spawn したアイテムがワールド内で実体化してから impulse を送る（v1 ITEM_SPAWN_DELAY 踏襲）。
-		select {
+		if err != nil && ctx.Err() == nil {
+			log.Printf("[restart] 告知アイテムspawnのワールド巡回失敗: %v", err)
+		}
+		if len(spawnedWorlds) == 0 {
+			return
+		}
+		select { // ForEachの外で待ち、execMuを500ms保持し続けない
 		case <-ctx.Done():
 			return
 		case <-time.After(o.spawnDelay):
 		}
+		err = o.worlds.ForEach(ctx, func(world headless.World, scope headless.Scope) error {
+			if name, ok := spawnedWorlds[world.Index]; !ok || name != world.Name {
+				return nil
+			}
+			if _, err := scope.Exec(impulseCmd, headless.WithTimeout(2*time.Second)); err != nil {
+				log.Printf("[restart] world #%d の告知impulse送信失敗: %v", world.Index, err)
+			}
+			return nil
+		})
+		if err != nil && ctx.Err() == nil {
+			log.Printf("[restart] 告知impulseのワールド巡回失敗: %v", err)
+		}
+		return
 	}
-	impulseCmd := headless.DynamicImpulseStringCmd(a.ImpulseTag, a.Message)
 	_ = o.worlds.ForEach(ctx, func(_ headless.World, scope headless.Scope) error {
 		_, _ = scope.Exec(impulseCmd, headless.WithTimeout(2*time.Second))
 		return nil

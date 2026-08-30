@@ -85,6 +85,19 @@ func SpawnCmd(url string, active, persistent bool) string {
 	return fmt.Sprintf("spawn %s %t %t", QuoteArg(url), active, persistent)
 }
 
+// SpawnCompleted は spawn コマンドの応答に、指定URLの完了行が含まれるかを判定する。
+// Driver.Exec が返す lines はプロンプト接頭辞を除去済み。Resonite が成功時に出す
+// `Spawned item from URL: <url>` を完全一致で確認し、単なるプロンプト復帰を成功扱いしない。
+func SpawnCompleted(lines []string, url string) bool {
+	expected := "Spawned item from URL: " + url
+	for _, line := range lines {
+		if strings.TrimSpace(line) == expected {
+			return true
+		}
+	}
+	return false
+}
+
 // DynamicImpulseStringCmd は `dynamicimpulsestring <tag> <value>` を組み立てる。
 // tag は "MRHC.play" のように "." を含み得るため SanitizeToken は使えず QuoteArg で引用する。
 // value は表示テキストになり得るため QuoteRichText（改行→<br>）で整形する。

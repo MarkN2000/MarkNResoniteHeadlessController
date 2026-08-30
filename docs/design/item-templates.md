@@ -95,7 +95,12 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
   検証は手動時のみ。旧スキーマの config（templateId 無し）は手動入力として無修正で動き続ける
   （マイグレーション・互換コードは作らない方針）。
 - 既定値（`config.DefaultRestart`）は `templateId: "torazo-close"`（告知ビルトイン先頭・OFF）。
-- 全ワールド対象・spawn→**10秒**→impulse の2パス（v1 実証値。無人・再起動直前の一発勝負のため保守的に）。
+- 全ワールド対象。各ワールドで spawn の応答に `Spawned item from URL: <url>` が含まれることを確認し、
+  全ワールドのspawn処理後に**500ms待機**し、完了確認できたワールドだけへ impulse を送る。
+  spawnコマンドの失敗・完了未確認ではそのワールドのimpulseを省略して巡回を続ける。待機後もindexとセッション名が
+  一致するワールドだけを成功ワールドとして扱う。focus自体の失敗時は
+  `WorldsService.ForEach` の契約どおり巡回を中断する。500ms待機中は execMu を保持しない。
+  spawn コマンドの待機上限は60秒（成功・失敗時はプロンプト復帰で即終了）。
 - テンプレートが `ttsVoice` のときは、`message` をテキスト、`speakerId` を話者 style ID として保存する。スケジュールで
   選択できる TTS テンプレートは loop 用のみである。既存のテキストのみテンプレートでは `speakerId` は使わず、従来の
   保存形式・実行値を維持する。
@@ -103,11 +108,11 @@ https://raw.githubusercontent.com/MarkN2000/MarkNResoniteHeadlessController/main
 ### 3b. スポーン＆パルス（セッションタブ・`POST /api/v1/sessions/{idx}/spawn-impulse`）
 
 - body: `{templateId, itemUrl, impulseTag, message, speakerId?}`（templateId 非空=`spawnImpulse` action のテンプレ参照・空=手動）。
-- **フォーカス中ワールドのみ**を対象に spawn → **5秒** 待機 → impulse を**1リクエストで完走**
-  （その間レスポンスはブロック＝途中でブラウザを閉じても impulse まで届く）。
-  待機が告知の10秒より短いのは、対話操作は失敗しても即再実行できるため（リスク非対称・2026-06-10 裁定）。
+- **フォーカス中ワールドのみ**を対象に、spawn の応答に `Spawned item from URL: <url>` が含まれることを確認し、
+  **完了確認から500ms後**に impulse を**1リクエストで完走**する。完了確認できなければエラーを返して impulse は送らない。
+  spawn コマンドの待機上限は60秒（成功・失敗時はプロンプト復帰で即終了）。
 - spawn は `active=true / persistent=false` 固定（告知③と同じ・一時アイテム）。`itemUrl` 空は spawn 省略で
-  impulse のみ。待機中は execMu を保持しない（spawn/impulse を別 ExecGroup に分離）。
+  impulse のみ。500ms待機中は execMu を保持しない（spawn/impulse を別 ExecGroup に分離）。
 - 設定としては保存しない（その場実行・UI 状態のみ）。
 - 未知の `templateId` は 400（対話操作なのでエラーを即返す。告知の「スキップしてログ」とは異なる）。
 - `ttsVoice` テンプレートでは `message` をテキスト、`speakerId` を話者 style ID として送る。セッションでは single / loop

@@ -164,6 +164,19 @@ func TestSpawnCmd_NoInjection(t *testing.T) {
 	}
 }
 
+func TestSpawnCompleted(t *testing.T) {
+	url := "resrec:///U-MarkN/R-abc"
+	if !SpawnCompleted([]string{"Loading object", "Spawned item from URL: " + url}, url) {
+		t.Fatal("正しい完了行を検出できない")
+	}
+	if SpawnCompleted([]string{"Spawning item from URL: " + url}, url) {
+		t.Fatal("開始行を完了と誤判定した")
+	}
+	if SpawnCompleted([]string{"Spawned item from URL: resrec:///U-MarkN/R-other"}, url) {
+		t.Fatal("別URLの完了行を誤判定した")
+	}
+}
+
 // DynamicImpulseStringCmd は tag を引用（"." を含むタグも安全）し value をリッチテキスト整形する。
 func TestDynamicImpulseStringCmd_QuotesTagAndValue(t *testing.T) {
 	got := DynamicImpulseStringCmd("MRHC.play", "まもなく再起動します")

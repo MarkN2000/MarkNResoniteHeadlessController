@@ -488,7 +488,7 @@ export const spawnItem = (idx: number, url: string, active: boolean, persistent:
   post(`/sessions/${idx}/spawn`, { url, active, persistent });
 export const sendImpulse = (idx: number, tag: string, value: string) =>
   post(`/sessions/${idx}/impulse`, { tag, value });
-// スポーン＆パルス（告知③のセッション版）: spawn→実体化待ち（約5秒）→impulse を backend が完走する
+// スポーン＆パルス（告知③のセッション版）: spawn完了行を確認→500ms→impulse を backend が完走する
 // （リクエストはその間ブロック）。templateId 非空=テンプレ参照（URL/タグは backend が解決）/
 // 空=手動（itemUrl/impulseTag を使用・itemUrl 空は spawn 省略で impulse のみ）。
 export const spawnImpulse = (

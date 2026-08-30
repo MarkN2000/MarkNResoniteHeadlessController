@@ -12,8 +12,9 @@
 // write commands (Pre-7c) are mocked MINIMALLY: accept + return prompt. State
 // changes are limited to kick/ban (drop user), silence/unsilence (flag), and
 // startworld* (append world). Noisy real outputs (UniLog stack traces) are NOT
-// reproduced — the controller uses 方針A (prompt-return = success) so they don't
-// matter for tests. Commands are matched case-insensitively (real headless too).
+// reproduced. Most commands use 方針A（prompt-return = success）だが、spawn は
+// 実機同様の完了行を返して spawn-impulse の確認処理もテストする。
+// Commands are matched case-insensitively (real headless too).
 //
 // Default flags are tuned for integration tests (ambient OFF for deterministic
 // output). For PoC smoke testing with periodic ambient ticks, pass `-ambient=true`.
@@ -322,10 +323,16 @@ func handleCommand(s *state, line string) {
 	case "unban", "unbanbyid":
 		// BAN一覧から該当 userId を除去（解除→一覧から消えるのを確認用に再現）。unbanByID <userId>。
 		s.bans = removeBanByUserID(s.bans, strings.TrimSpace(rest))
-	case "respawn", "invite", "message", "description",
+	case "respawn", "invite", "message", "description", "dynamicimpulsestring",
 		"save", "restart", "close",
 		"sendfriendrequest", "removefriend":
 		// 受理してプロンプトのみ（状態変更は再現しない）
+	case "spawn":
+		// 実機の成功マーカーを再現。spawn-impulse はこの行を照合してからpulseする。
+		itemURL := firstQuotedArg(rest)
+		if itemURL != "" {
+			fmt.Printf("Spawned item from URL: %s\n", itemURL)
+		}
 	case "hidefromlisting":
 		// 受理のみ
 	case "startworldurl", "startworldtemplate":
@@ -423,4 +430,15 @@ func setUserRole(users []userRow, rest string) {
 			users[i].Role = role
 		}
 	}
+}
+
+func firstQuotedArg(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, `"`) {
+		return ""
+	}
+	if end := strings.Index(s[1:], `"`); end >= 0 {
+		return s[1 : 1+end]
+	}
+	return ""
 }

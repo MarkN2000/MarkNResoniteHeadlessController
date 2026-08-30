@@ -19,7 +19,7 @@ import { isResoniteUrl } from "../../lib/resoniteUrl";
 // スポーン / インパルス（R14・フォーカス中セッションへ）。
 //   アイテムスポーン       = spawn "<url>" <active> <persistent>（テンプレ選択 or 手動 URL・2026-06-10）
 //   ダイナミックインパルス = dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
-//   スポーン＆パルス       = テンプレ（リモートリスト）or 手動 → backend が spawn→約5秒→impulse を完走
+//   スポーン＆パルス       = テンプレ（リモートリスト）or 手動 → backend が spawn完了確認→500ms→impulse を完走
 //                            （告知③のセッション版・docs/design/item-templates.md）
 // いずれも非破壊操作なので確認ダイアログなし＝実行→受理トースト（方針A・respawn/message と同格）。
 // spawn/impulse はセッションの users/status を変えない（再取得不要）ため onChanged は受け取らない。
@@ -169,7 +169,7 @@ export function SpawnImpulseCard({ idx, templates }: { idx: number; templates: I
 
         <Divider my={2} color="dark.4" />
 
-        {/* スポーン＆パルス（実行ボタンは backend 完走まで約5秒+α busy のまま） */}
+        {/* スポーン＆パルス（実行ボタンは spawn完了確認＋500ms＋pulse の完走まで busy のまま） */}
         <Text size="xs" fw={700} c="dimmed">
           {t("session.spawnPulseSection")}
         </Text>

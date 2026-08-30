@@ -120,7 +120,7 @@ POST /api/v1/sessions/{idx}/hidefromlisting {"hide":true}                   → 
 POST /api/v1/sessions/{idx}/spawn   {"url":"...","active":true,"persistent":false} → spawn "<url>" <active> <persistent>（3引数・help 確定）
 POST /api/v1/sessions/{idx}/impulse {"tag":"MRHC.play","value":"..."}            → dynamicimpulsestring "<tag>" "<value>"（tag 必須・value 任意）
 POST /api/v1/sessions/{idx}/spawn-impulse {"templateId":"...","message":"...","speakerId":888753762} or {"itemUrl":"...","impulseTag":"...","message":"..."}
-#   → スポーン＆パルス＝告知③のセッション版（spawn→実体化待ち約5秒→impulse を1リクエストで完走・
+#   → スポーン＆パルス＝告知③のセッション版（spawn成功行を確認→500ms→impulse を1リクエストで完走・
 #     templateId はスポーン＆パルステンプレ〔リモートリスト〕から実行直前に解決・spawn は active=true/persistent=false 固定・
 #     itemUrl 空は impulse のみ）。ttsVoice テンプレートでは message=text / speakerId=style ID とし、backend が TTS URL 全体を impulse 値にする。詳細は item-templates.md。
 # ※ コマンド組み立ては headless.SpawnCmd / DynamicImpulseStringCmd（純関数）。告知③(§3.16(2))と共有。
@@ -533,7 +533,7 @@ Phase 7 最大の未着手機能。headless config（`*.json`）の CRUD エデ�
 
 **(2) 事前アクション**
 - **dynamicImpulse 告知（フル設定型）**: 各ワールドに `ForEach` で `spawn "<itemUrl>" true false` → `dynamicimpulsestring "<tag>" "<message>"`（R14 で `headless.SpawnCmd`/`DynamicImpulseStringCmd` 純関数に統一＝セッションの spawn/impulse 書き込み API と同一組み立て。spawn は help 確定の3引数〔旧 `spawn <url> true` の2引数を修正〕・告知アイテムは一時的なので persistent=false）。`itemUrl` / `tag`（例 `MRHC.play`）/ `message` を UI 設定。**固定文**（残り時間差し込み変数なし）。**最終ウィンドウで1回**（カウントダウン繰り返しは将来）。⚠️ dynamicImpulse はワールド側に受け機構が必要＝spawn したアイテムに impulse を送る v1 方式を踏襲（フル設定型ゆえ受け側 tag に合わせられる）。
-  - **実装**: **spawn → impulse の間に約10秒待機**（spawn したアイテムがワールド内で実体化してから impulse を送る・v1 `ITEM_SPAWN_DELAY` 踏襲・固定定数）。**2パス**で実行（全ワールド spawn → 10秒 sleep → 全ワールド impulse）。待機中は execMu を解放し他コマンドを妨げない。`itemUrl` 空なら spawn を省略し impulse のみ（常設受け機構前提）。
+  - **実装**: 各ワールドで spawn 応答の `Spawned item from URL: <url>` を照合し、全ワールドのspawn処理後に**500ms待機**して、完了確認できたワールドだけへ impulse を送る。待機後もindexとセッション名が一致することを確認し、ワールドの入れ替わり時は送らない。spawnコマンドの失敗・完了未確認ではそのワールドを省略して巡回を続け、focus失敗では `WorldsService.ForEach` の契約どおり巡回を中断する。500ms待機中は execMu を保持しない。spawn コマンドの待機上限は60秒（プロンプト復帰で即終了）。`itemUrl` 空なら spawn と待機を省略し impulse のみ送る（常設受け機構前提）。
   - **実装（UI・5b-1 追補→リモートリスト化で改訂）**: 告知アイテムは **テンプレ選択＋手動入力** の `Select`。テンプレ一覧は**リポジトリ配信の単一リモートリスト**（`GET /api/v1/item-templates`・正本 [item-templates.md](item-templates.md)）から `announce` action を持つ entry のみ取得し、選択すると **`templateId` のみ保存**（URL/タグは告知実行時に backend が解決＝アイテム更新がアプリのリリース・再保存なしに全 config へ反映される）。手動入力時のみ URL/タグ欄を表示（`templateId=""`＋`itemUrl`/`impulseTag` を保存）。**手動時の `tag` は必須・`message` は任意（空可＝受信アイテムが固定内容でメッセージを使わない場合がある。`Restart.Validate` も message を必須にしない）**。告知「有効」OFF 時は配下欄を非表示。
   - **TTS 音声入力**: テンプレートの `input.kind="ttsVoice"` を選択したときは、`message` をテキスト、正の `speakerId` を話者 style ID として保存する（両方必須）。話者一覧は `GET /api/v1/tts-speakers` を通じて取得し、backend は固定の TTS サービス `https://tts.markn2000.com/api/v1/speakers` を参照する。実行時は backend が `https://tts.markn2000.com/api/v1/tts?text=<URL encoded>&speaker=<style id>` を組み立て、この URL 全体を `dynamicimpulsestring` の値として送る。スケジュールで選択可能な TTS テンプレートは loop 用のみ。既存のテキストのみテンプレートでは `speakerId=0` とし、既存の message 保存・送信を維持する。
 - **セッション変更**: 各ワールドに `ForEach` で `accesslevel Private`（setPrivate）/ `maxusers 1`（setMaxUsersOne）/ `name "<renameTo>"`（rename）。**トリガー時に即発火**。再起動後は config から再ロードされ名前等は戻る。

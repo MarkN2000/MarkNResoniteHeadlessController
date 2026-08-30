@@ -57,9 +57,12 @@ func (d *fakeDriver) setState(s headless.State) {
 }
 
 type fakeWorlds struct {
-	mu      sync.Mutex
-	present int // orchestrator は在席者数（Present）のみ参照する（R0・B案）
-	cmds    []string
+	mu                      sync.Mutex
+	present                 int // orchestrator は在席者数（Present）のみ参照する（R0・B案）
+	cmds                    []string
+	cmdWorlds               []int
+	worldCount              int
+	spawnCompletionFailures map[int]bool
 }
 
 func (fw *fakeWorlds) List(context.Context) ([]headless.World, error) {
@@ -68,8 +71,17 @@ func (fw *fakeWorlds) List(context.Context) ([]headless.World, error) {
 	return []headless.World{{Index: 0, Name: "W", Present: fw.present}}, nil
 }
 func (fw *fakeWorlds) ForEach(_ context.Context, fn func(headless.World, headless.Scope) error) error {
-	w := headless.World{Index: 0, Name: "W"}
-	return fn(w, &fakeScope{fw: fw, w: w})
+	count := fw.worldCount
+	if count == 0 {
+		count = 1
+	}
+	for i := 0; i < count; i++ {
+		w := headless.World{Index: i, Name: "W"}
+		if err := fn(w, &fakeScope{fw: fw, w: w}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (fw *fakeWorlds) setPresent(n int) {
 	fw.mu.Lock()
@@ -81,6 +93,11 @@ func (fw *fakeWorlds) commands() []string {
 	defer fw.mu.Unlock()
 	return append([]string(nil), fw.cmds...)
 }
+func (fw *fakeWorlds) commandsWithWorlds() ([]string, []int) {
+	fw.mu.Lock()
+	defer fw.mu.Unlock()
+	return append([]string(nil), fw.cmds...), append([]int(nil), fw.cmdWorlds...)
+}
 
 type fakeScope struct {
 	fw *fakeWorlds
@@ -90,10 +107,28 @@ type fakeScope struct {
 func (s *fakeScope) Exec(cmd string, _ ...headless.ExecOption) ([]string, error) {
 	s.fw.mu.Lock()
 	s.fw.cmds = append(s.fw.cmds, cmd)
+	s.fw.cmdWorlds = append(s.fw.cmdWorlds, s.w.Index)
 	s.fw.mu.Unlock()
+	if strings.HasPrefix(cmd, "spawn ") {
+		if itemURL := firstQuotedCommandArg(cmd); itemURL != "" && !s.fw.spawnCompletionFailures[s.w.Index] {
+			return []string{"Spawned item from URL: " + itemURL}, nil
+		}
+	}
 	return nil, nil
 }
 func (s *fakeScope) World() headless.World { return s.w }
+
+func firstQuotedCommandArg(cmd string) string {
+	start := strings.Index(cmd, `"`)
+	if start < 0 {
+		return ""
+	}
+	end := strings.Index(cmd[start+1:], `"`)
+	if end < 0 {
+		return ""
+	}
+	return cmd[start+1 : start+1+end]
+}
 
 // --- ヘルパ ---
 
@@ -274,6 +309,63 @@ func TestTrigger_FullFlow_SessionThenAnnounceThenRestart(t *testing.T) {
 	if _, _, starts, label := d.snap(); starts != 1 || label != "day" {
 		t.Fatalf("再起動の config が想定外: starts=%d label=%q（指定 day のはず）", starts, label)
 	}
+}
+
+func TestAnnounce_SpawnCompletionRequiredBeforeImpulse(t *testing.T) {
+	action := config.AnnounceAction{
+		ItemURL:    "resrec:///x",
+		ImpulseTag: "MRHC.play",
+		Message:    "再起動します",
+	}
+
+	t.Run("完了確認後にimpulseを送る", func(t *testing.T) {
+		fw := &fakeWorlds{}
+		o := newTestOrch(&fakeDriver{state: headless.StateRunning}, fw, config.DefaultRestart(), "night")
+		o.announce(context.Background(), action)
+
+		cmds := fw.commands()
+		if len(cmds) != 2 || !strings.HasPrefix(cmds[0], "spawn ") || !strings.HasPrefix(cmds[1], "dynamicimpulsestring ") {
+			t.Fatalf("spawn完了後にimpulseを送る順序ではない: %v", cmds)
+		}
+	})
+
+	t.Run("完了未確認ならimpulseを送らない", func(t *testing.T) {
+		fw := &fakeWorlds{spawnCompletionFailures: map[int]bool{0: true}}
+		o := newTestOrch(&fakeDriver{state: headless.StateRunning}, fw, config.DefaultRestart(), "night")
+		o.announce(context.Background(), action)
+
+		cmds := fw.commands()
+		if !hasCmd(cmds, `spawn "resrec:///x" true false`) {
+			t.Fatalf("spawnが実行されていない: %v", cmds)
+		}
+		if hasCmd(cmds, "dynamicimpulsestring") {
+			t.Fatalf("spawn完了未確認なのにimpulseが送られた: %v", cmds)
+		}
+	})
+
+	t.Run("失敗ワールドを飛ばして成功ワールドへ送る", func(t *testing.T) {
+		fw := &fakeWorlds{
+			worldCount:              2,
+			spawnCompletionFailures: map[int]bool{0: true},
+		}
+		o := newTestOrch(&fakeDriver{state: headless.StateRunning}, fw, config.DefaultRestart(), "night")
+		o.announce(context.Background(), action)
+
+		var spawnCount, impulseCount, impulseWorld int
+		cmds, worlds := fw.commandsWithWorlds()
+		for i, cmd := range cmds {
+			if strings.HasPrefix(cmd, "spawn ") {
+				spawnCount++
+			}
+			if strings.HasPrefix(cmd, "dynamicimpulsestring ") {
+				impulseCount++
+				impulseWorld = worlds[i]
+			}
+		}
+		if spawnCount != 2 || impulseCount != 1 || impulseWorld != 1 {
+			t.Fatalf("ワールド別の成功判定が反映されていない: spawn=%d impulse=%d world=%d", spawnCount, impulseCount, impulseWorld)
+		}
+	})
 }
 
 func TestTrigger_CancelDuringWaiting(t *testing.T) {
