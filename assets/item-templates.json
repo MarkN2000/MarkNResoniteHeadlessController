@@ -4,7 +4,7 @@
     {
       "id": "torazo-close",
       "label": {
-        "ja": "とらぞセッション閉店アナウンス",
+        "ja": "とらぞ閉店アナウンス",
         "en": "Torazo session closing announce"
       },
       "url": "resrec:///U-MarkN/R-ba48e002-7810-43b6-b12d-41e68863d5c4",
@@ -14,7 +14,7 @@
     {
       "id": "tts-loop",
       "label": {
-        "ja": "テキスト読み上げループ",
+        "ja": "読み上げループ",
         "en": "Text-to-speech loop"
       },
       "url": "resrec:///U-MarkN/R-01a053a5-930f-7672-ac0e-b0f17bd4a325",
@@ -24,7 +24,7 @@
     {
       "id": "tts-single",
       "label": {
-        "ja": "テキスト読み上げシングル",
+        "ja": "読み上げシングル",
         "en": "Text-to-speech single"
       },
       "url": "resrec:///U-MarkN/R-01a053a7-9494-79cd-95bf-4ce508aba0ef",
@@ -34,7 +34,7 @@
     {
       "id": "tts-voice-single",
       "label": {
-        "ja": "テキスト読み上げボイス指定シングル",
+        "ja": "読み上げ指定シングル",
         "en": "Voice-specified text-to-speech single"
       },
       "url": "resrec:///U-MarkN/R-01a0539e-20c9-7f11-b391-ffdebabbb8e5",
@@ -47,7 +47,7 @@
     {
       "id": "tts-voice-loop",
       "label": {
-        "ja": "テキスト読み上げボイス指定ループ",
+        "ja": "読み上げ指定ループ",
         "en": "Voice-specified text-to-speech loop"
       },
       "url": "resrec:///U-MarkN/R-01a053a0-cc5d-79fc-8afd-954b517b325d",
