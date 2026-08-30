@@ -17,7 +17,7 @@
         "ja": "テキスト読み上げループ",
         "en": "Text-to-speech loop"
       },
-      "url": "resrec:///U-MarkN/R-01a038f3-6ea5-79a8-be58-c9673007f5dd",
+      "url": "resrec:///U-MarkN/R-01a053a5-930f-7672-ac0e-b0f17bd4a325",
       "actions": ["spawn", "spawnImpulse", "announce"],
       "tag": "MRHC.play"
     },
@@ -27,7 +27,7 @@
         "ja": "テキスト読み上げシングル",
         "en": "Text-to-speech single"
       },
-      "url": "resrec:///U-MarkN/R-01a038f6-bf5d-75b6-b74b-2e3610dddb4d",
+      "url": "resrec:///U-MarkN/R-01a053a7-9494-79cd-95bf-4ce508aba0ef",
       "actions": ["spawnImpulse"],
       "tag": "MRHC.play"
     },
@@ -37,7 +37,7 @@
         "ja": "テキスト読み上げボイス指定シングル",
         "en": "Voice-specified text-to-speech single"
       },
-      "url": "resrec:///U-MarkN/R-01a03937-9bdf-7a44-a0ee-b51f655bc6d1",
+      "url": "resrec:///U-MarkN/R-01a0539e-20c9-7f11-b391-ffdebabbb8e5",
       "actions": ["spawnImpulse"],
       "tag": "MRHC.play",
       "input": {
@@ -50,7 +50,7 @@
         "ja": "テキスト読み上げボイス指定ループ",
         "en": "Voice-specified text-to-speech loop"
       },
-      "url": "resrec:///U-MarkN/R-01a03939-ddd5-786d-a50f-02bc4da83d2a",
+      "url": "resrec:///U-MarkN/R-01a053a0-cc5d-79fc-8afd-954b517b325d",
       "actions": ["spawnImpulse", "announce"],
       "tag": "MRHC.play",
       "input": {
