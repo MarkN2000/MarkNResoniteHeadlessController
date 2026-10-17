@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Anchor, Button, Checkbox, Group, List, Loader, Modal, Progress, Stack, Text } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
 import * as api from "../api";
 import type { UpdateInfo } from "../api";
 
@@ -27,11 +26,9 @@ export function UpdateModal({
   onRestarting: (info: UpdateInfo, oldBoot: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [includePrereleases, setIncludePrereleases] = useLocalStorage<boolean>({
-    key: "mrhc.includePrereleases",
-    defaultValue: false,
-    getInitialValueInEffect: false,
-  });
+  const includePrereleases = info?.includePrereleases ?? false;
+  const [saving, setSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<number | null>(null); // DL 進捗%（total 不明なら null）
@@ -48,17 +45,30 @@ export function UpdateModal({
     const request = ++checkRequest.current;
     setChecking(true);
     setError(null);
-    void api.checkUpdate(includePrereleases).then((i) => {
+    setSettingsError(null);
+    void api.checkUpdate().then((i) => {
       if (request !== checkRequest.current) return;
       // MRHC 自体に不達（null）のときは保持済みの staged 表示を消さない
       //（staged はローカル状態で、応答が無くても正しさが変わらないため）。
       if (i || !infoRef.current?.staged) onInfoChange(i);
       setChecking(false);
     });
-  }, [onInfoChange, includePrereleases]);
+  }, [onInfoChange]);
   useEffect(() => {
     if (opened) recheck();
   }, [opened, recheck]);
+
+  async function savePrereleases(include: boolean) {
+    setSaving(true);
+    setSettingsError(null);
+    const result = await api.setUpdatePrereleases(include);
+    if (result.ok) {
+      recheck();
+    } else {
+      setSettingsError(t(result.code === "update_busy" ? "update.errBusy" : "update.settingsSaveFailed"));
+    }
+    setSaving(false);
+  }
 
   // 適用エラーの code → locale 変換（モーダル内に赤文字で表示。未知 code は生メッセージ）。
   function applyErrorText(code?: string, raw?: string): string {
@@ -88,11 +98,11 @@ export function UpdateModal({
     setError(null);
     const r = await api.applyUpdate((p) => {
       setProgress(p.total > 0 ? Math.round((p.downloaded / p.total) * 100) : null);
-    }, includePrereleases);
+    });
     if (r.ok && r.staged) {
       // 楽観更新で staged を取りこぼさないよう、サーバー権威の状態を取り直して
       // 表示（バッジ・メニュー・本モーダル）を「再起動待ち」へ切り替える。
-      const fresh = await api.checkUpdate(includePrereleases);
+      const fresh = await api.checkUpdate();
       onInfoChange(fresh ?? (info ? { ...info, staged: r.staged } : null));
     } else {
       setError(applyErrorText(r.code, r.error));
@@ -122,12 +132,12 @@ export function UpdateModal({
   const title = staged ? t("update.pendingTitle", { version: staged }) : t("update.title");
 
   let body: React.ReactNode;
-  if (checking || (info && info.includePrereleases !== includePrereleases && !staged)) {
+  if (checking || saving) {
     body = (
       <Group gap="xs">
         <Loader size="sm" />
         <Text size="sm" c="dimmed">
-          {t("update.checking")}
+          {t(saving ? "update.savingSettings" : "update.checking")}
         </Text>
       </Group>
     );
@@ -270,12 +280,10 @@ export function UpdateModal({
           label={t("update.includePrereleases")}
           description={t("update.prereleaseNote")}
           checked={includePrereleases}
-          onChange={(event) => {
-            setChecking(true);
-            setIncludePrereleases(event.currentTarget.checked);
-          }}
-          disabled={checking || applying || restarting}
+          onChange={(event) => void savePrereleases(event.currentTarget.checked)}
+          disabled={!info || checking || saving || applying || restarting}
         />
+        {settingsError && <Text size="sm" c="red" role="alert">{settingsError}</Text>}
         {body}
       </Stack>
     </Modal>

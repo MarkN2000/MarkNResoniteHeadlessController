@@ -29,8 +29,9 @@
 ## 2. チェック（selfupdate.Check）
 
 - 2026-10-17: Web UI に「プレリリースを含める」（既定 OFF）を追加する。
-  選択はブラウザの localStorage に保存し、ログイン時・モーダル・適用で共用する。
-  サーバー設定や CLI の既定動作は変更しない。
+  選択はサーバーの `mrhc.config.json` の `updateIncludePrereleases`（bool・省略=false）に保存し、
+  全ブラウザ・ログイン時・モーダル・適用・CLI `mrhc update` で共用する。
+  保存後は再起動不要で反映する。以前のブラウザ保存値は参照・移行しない。
 - ON の場合は安定版の取得に加え、`/releases.atom` の公開リリースを標準 XML パーサーで読む。
   正しい semver タグだけを候補にし、安定版と合わせてバージョンが最大のものを選ぶ。
   フィードに掲載された直近のリリースが対象（全履歴の探索はしない）。安定版未公開の 404 は
@@ -124,11 +125,16 @@ atomic rename の前提）。手順:
 
 ## 5. API / CLI / UI
 
-- check / apply は任意のクエリー `includePrereleases=true|false` を受け付ける
-  （省略=false、空値・重複・その他の値は HTTP 400）。check の応答に
-  `includePrereleases` を追加し、キャッシュも選択が一致する場合だけ利用する。
+- `PUT /api/v1/update/settings`（requireAuth）で `{includePrereleases: bool}` を保存し、
+  同じ形の保存済み値を返す。値の省略・null・不正 JSON は HTTP 400。
+  既存の cfgMu と SaveTo を使い、保存失敗は HTTP 500 `save_failed` としてメモリ値も戻す。
+  適用との同時実行は HTTP 409 `update_busy` で拒否する。
+- check / apply はサーバーの保存値を使う（以前の `includePrereleases` クエリーは無視する）。
+  check の応答の `includePrereleases` は保存値を返し、GitHub 不達でも取得できる。
+  キャッシュも選択が一致する場合だけ利用し、保存成功時に破棄する。
   適用時はリクエスト専用の Updater のコピーへ選択と staged の比較下限を渡す。
-  UI は確認中・適用中・再起動中の選択を無効化する。選択欄には不安定な版であること、
+  UI は保存成功後に更新確認し、失敗時は元の選択と保存エラーを表示する。
+  UI は確認中・保存中・適用中・再起動中の選択を無効化する。選択欄には不安定な版であること、
   過去版へ戻せないこと、OFF にしても即座に安定版へ戻らないことを表示する。
 - `GET /api/v1/update/check`（requireAuth）→
   `{current, latest, updateAvailable, currentIsRelease, includePrereleases, staged?, goos, checkFailed?, checkError?}`。

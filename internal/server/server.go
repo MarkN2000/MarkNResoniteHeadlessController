@@ -301,6 +301,7 @@ func (s *Server) Handler() http.Handler {
 	// 適用は SSE で進捗をストリーミング・restart は graceful 終了（ヘッドレス停止込み）後に
 	// 新バイナリを起動し直す処理を main 経由で起動する。
 	mux.HandleFunc("GET /api/v1/update/check", s.requireAuth(s.handleUpdateCheck))
+	mux.HandleFunc("PUT /api/v1/update/settings", s.requireAuth(s.handleUpdateSettingsPut))
 	mux.HandleFunc("POST /api/v1/update/apply", s.requireAuth(s.handleUpdateApply))
 	mux.HandleFunc("POST /api/v1/restart", s.requireAuth(s.handleRestart))
 

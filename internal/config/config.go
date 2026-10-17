@@ -39,6 +39,8 @@ type Config struct {
 	Restart             *Restart            `json:"restart,omitempty"`             // 自動再起動設定（未設定=DefaultRestart・§3.16）
 	Steam               *Steam              `json:"steam,omitempty"`               // Resonite入手/更新用 Steam アカウント(A)（DepotDownloader・P9-B）
 	CacheCleanup        *CacheCleanup       `json:"cacheCleanup,omitempty"`        // 停止時の自動キャッシュ削除（未設定=OFF・CacheCleanupOrDefault）
+
+	UpdateIncludePrereleases bool `json:"updateIncludePrereleases,omitempty"` // MRHC の更新候補にプレリリースを含める（既定 false）
 }
 
 // CacheCleanup は停止時の自動キャッシュ削除設定。ヘッドレス停止時に、既定キャッシュ

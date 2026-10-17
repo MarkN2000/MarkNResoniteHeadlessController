@@ -12,11 +12,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
 )
 
 func TestUpdatePrereleaseSelection(t *testing.T) {
-	ts, pw, _, srv := newSteamServer(t)
+	ts, pw, cfgPath, srv := newSteamServer(t)
 	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/releases/latest" {
 			w.Header().Set("Location", "/releases/tag/v2.1.0")
@@ -34,8 +35,20 @@ func TestUpdatePrereleaseSelection(t *testing.T) {
 	srv.SetUpdater(testUpdater(gh.URL, "v2.0.0"))
 	// 選択を切り替えても直前のキャッシュと混同しない。
 	for _, include := range []bool{false, true, false} {
+		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/update/settings", pw, "application/json", fmt.Sprintf(`{"includePrereleases":%t}`, include))
+		var saved okEnv[map[string]bool]
+		err := json.NewDecoder(resp.Body).Decode(&saved)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || err != nil || saved.Data["includePrereleases"] != include {
+			t.Fatalf("設定保存: status=%d data=%v err=%v", resp.StatusCode, saved.Data, err)
+		}
+		cfg, err := config.LoadFrom(cfgPath)
+		if err != nil || cfg.UpdateIncludePrereleases != include || cfg.Port != 8080 || cfg.SessionSecret != "steam-test-secret" {
+			t.Fatalf("保存後の設定が不正: err=%v", err)
+		}
 		var env okEnv[updateCheckResp]
-		url := fmt.Sprintf("%s/api/v1/update/check?includePrereleases=%t", ts.URL, include)
+		// 古いブラウザが逆のクエリー値を送っても、保存値を全端末で共用する。
+		url := fmt.Sprintf("%s/api/v1/update/check?includePrereleases=%t", ts.URL, !include)
 		code := authGet(t, url, pw, &env)
 		want := "v2.1.0"
 		if include {
@@ -47,7 +60,12 @@ func TestUpdatePrereleaseSelection(t *testing.T) {
 	}
 	srv.setStagedVersion("v2.2.0-beta.1")
 	for _, include := range []bool{true, false} {
-		resp := authReq(t, http.MethodPost, fmt.Sprintf("%s/api/v1/update/apply?includePrereleases=%t", ts.URL, include), pw, "", "")
+		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/update/settings", pw, "application/json", fmt.Sprintf(`{"includePrereleases":%t}`, include))
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("保存失敗: status=%d", resp.StatusCode)
+		}
+		resp = authReq(t, http.MethodPost, fmt.Sprintf("%s/api/v1/update/apply?includePrereleases=%t", ts.URL, !include), pw, "", "")
 		event, data := applySSEResult(t, resp)
 		resp.Body.Close()
 		if include {
@@ -68,22 +86,50 @@ func TestUpdatePrereleaseSelection(t *testing.T) {
 func TestUpdatePrereleaseInvalidAndBusy(t *testing.T) {
 	ts, pw, _, srv := newSteamServer(t)
 	srv.SetUpdater(testUpdater(fakeLatest(t, "v2.1.0").URL, "v2.0.0"))
-	for _, query := range []string{"includePrereleases=", "includePrereleases=yes", "includePrereleases=true&includePrereleases=false"} {
-		for _, ep := range []struct{ method, path string }{{http.MethodGet, "check"}, {http.MethodPost, "apply"}} {
-			resp := authReq(t, ep.method, ts.URL+"/api/v1/update/"+ep.path+"?"+query, pw, "", "")
-			resp.Body.Close()
-			if resp.StatusCode != http.StatusBadRequest {
-				t.Fatalf("status=%d query=%s", resp.StatusCode, query)
-			}
+	for _, body := range []string{"", "{}", `{"includePrereleases":null}`, `{"includePrereleases":"true"}`, `{"includePrereleases":true} {}`, `{"includePrereleases":true,"unknown":1}`, strings.Repeat("x", 1025)} {
+		resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/update/settings", pw, "application/json", body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("status=%d body=%s", resp.StatusCode, body)
 		}
 	}
 	srv.updateApplyMu.Lock()
 	defer srv.updateApplyMu.Unlock()
+	setting := authReq(t, http.MethodPut, ts.URL+"/api/v1/update/settings", pw, "application/json", `{"includePrereleases":true}`)
+	setting.Body.Close()
+	if setting.StatusCode != http.StatusConflict || srv.updateIncludesPrereleases() {
+		t.Fatalf("適用中に設定が変更されました: status=%d", setting.StatusCode)
+	}
 	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
 	defer resp.Body.Close()
 	event, data := applySSEResult(t, resp)
 	if event != "update-error" || data["code"] != "update_busy" {
 		t.Fatalf("event=%s data=%v", event, data)
+	}
+}
+
+func TestUpdateSettingsSaveFailure(t *testing.T) {
+	ts, pw, cfgPath, srv := newSteamServer(t)
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/update/settings", pw, "application/json", `{"includePrereleases":true}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("初期設定の保存に失敗")
+	}
+	srv.cfgPath = t.TempDir() // ファイルの代わりにディレクトリを指定し、保存失敗を確実に起こす。
+	resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/update/settings", pw, "application/json", `{"includePrereleases":false}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError || !srv.updateIncludesPrereleases() {
+		t.Fatalf("保存失敗後に設定が変化しました: status=%d", resp.StatusCode)
+	}
+	cfg, err := config.LoadFrom(cfgPath)
+	if err != nil || !cfg.UpdateIncludePrereleases {
+		t.Fatalf("ディスク上の設定が変化しました: %v", err)
+	}
+	srv.SetUpdater(testUpdater(fakeLatest(t, "").URL, "v2.0.0"))
+	var env okEnv[updateCheckResp]
+	authGet(t, ts.URL+"/api/v1/update/check", pw, &env)
+	if !env.Data.IncludePrereleases || !env.Data.CheckFailed {
+		t.Fatalf("GitHub 不達時にも保存値が必要: %+v", env.Data)
 	}
 }
 
@@ -322,6 +368,7 @@ func TestUpdateRequiresAuth(t *testing.T) {
 	for _, ep := range []struct{ method, path string }{
 		{http.MethodGet, "/api/v1/update/check"},
 		{http.MethodPost, "/api/v1/update/apply"},
+		{http.MethodPut, "/api/v1/update/settings"},
 		{http.MethodPost, "/api/v1/restart"},
 	} {
 		req, _ := http.NewRequest(ep.method, ts.URL+ep.path, nil)

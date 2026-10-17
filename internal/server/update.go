@@ -4,7 +4,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"net/http"
 	"runtime"
@@ -78,17 +80,42 @@ type updateCheckResp struct {
 	CheckError  string `json:"checkError,omitempty"`
 }
 
-// updatePrereleases は省略=false、明示値=true/false のみ受け付ける。
-func updatePrereleases(w http.ResponseWriter, r *http.Request) (bool, bool) {
-	values, present := r.URL.Query()["includePrereleases"]
-	if !present {
-		return false, true
+func (s *Server) updateIncludesPrereleases() bool {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.cfg.UpdateIncludePrereleases
+}
+
+// handleUpdateSettingsPut は更新方針を保存する。保存失敗時は他の設定 API と同じく元に戻す。
+func (s *Server) handleUpdateSettingsPut(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IncludePrereleases *bool `json:"includePrereleases"`
 	}
-	if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
-		writeErr(w, http.StatusBadRequest, "invalid_request", "includePrereleases は true または false を指定してください")
-		return false, false
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil || body.IncludePrereleases == nil || decoder.Decode(&struct{}{}) != io.EOF {
+		writeErr(w, http.StatusBadRequest, "bad_request", "includePrereleases に true または false を指定してください")
+		return
 	}
-	return values[0] == "true", true
+	if !s.updateApplyMu.TryLock() {
+		writeUpdateErr(w, selfupdate.ErrBusy)
+		return
+	}
+	defer s.updateApplyMu.Unlock()
+	s.cfgMu.Lock()
+	old := s.cfg.UpdateIncludePrereleases
+	s.cfg.UpdateIncludePrereleases = *body.IncludePrereleases
+	err := s.cfg.SaveTo(s.cfgPath)
+	if err != nil {
+		s.cfg.UpdateIncludePrereleases = old
+	}
+	s.cfgMu.Unlock()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "save_failed", err.Error())
+		return
+	}
+	s.invalidateCheck()
+	writeOK(w, body)
 }
 
 // handleUpdateCheck: GET /api/v1/update/check → updateCheckResp
@@ -96,10 +123,7 @@ func updatePrereleases(w http.ResponseWriter, r *http.Request) (bool, bool) {
 // staged/current/goos はローカル情報なので、GitHub 不達でも 200 ＋ CheckFailed で返す
 // （エラー応答にすると、適用済み＝再起動待ちの表示と「今すぐ再起動」導線が UI から消えてしまう）。
 func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
-	includePrereleases, valid := updatePrereleases(w, r)
-	if !valid {
-		return
-	}
+	includePrereleases := s.updateIncludesPrereleases()
 	if s.updater == nil {
 		writeErr(w, http.StatusServiceUnavailable, "update_unavailable", "自己更新が初期化されていません")
 		return
@@ -142,10 +166,6 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 // （全体上限は DLClient の Timeout が担う）。応答を取り逃しても check の staged で結果を回収できる。
 // http.Flusher 非対応の writer（想定外）では従来の同期 JSON 応答へフォールバックする。
 func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
-	includePrereleases, valid := updatePrereleases(w, r)
-	if !valid {
-		return
-	}
 	if s.updater == nil {
 		writeErr(w, http.StatusServiceUnavailable, "update_unavailable", "自己更新が初期化されていません")
 		return
@@ -163,7 +183,7 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	}
 	defer s.updateApplyMu.Unlock()
 	u := *s.updater
-	u.IncludePrereleases = includePrereleases
+	u.IncludePrereleases = s.updateIncludesPrereleases()
 	u.MinimumVersion = s.stagedVersion()
 
 	// 適用済み・再起動待ち中の再実行: 最新が staged と同じなら再DLせずそのまま返す（冪等）。

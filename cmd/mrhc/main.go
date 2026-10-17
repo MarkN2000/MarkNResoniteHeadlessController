@@ -256,15 +256,18 @@ func newUpdater() (*selfupdate.Updater, error) {
 // 適用後の有効化は次回起動時（実行中の MRHC があってもファイル入れ替えは安全・無影響）。
 func runUpdate(cfgPath string, osLang i18n.Lang) {
 	lang := osLang
+	includePrereleases := false
 	if config.FileExists(cfgPath) {
 		if cfg, err := config.LoadFrom(cfgPath); err == nil {
 			lang = cfg.LangOrDefault()
+			includePrereleases = cfg.UpdateIncludePrereleases
 		}
 	}
 	u, err := newUpdater()
 	if err != nil {
 		log.Fatal(i18n.T(lang, "main.update.failed", err))
 	}
+	u.IncludePrereleases = includePrereleases
 	// Ctrl+C で中断可能にする（既存バイナリに触るのは全検証後の一瞬だけなので、
 	// どの時点で中断しても現状維持のまま）。
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
