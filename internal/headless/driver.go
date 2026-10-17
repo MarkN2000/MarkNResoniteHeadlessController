@@ -237,6 +237,11 @@ func (d *Driver) PublishSys(text string) { d.publishLog("sys", text) }
 //   - configPath: Resonite に渡す -HeadlessConfig の実ファイルパス（起動時生成の一時ファイル等）
 //   - configLabel: Status().Config に表示する論理名（UI 表示用。一時パスを見せない）
 func (d *Driver) Start(headlessPath, configPath, configLabel string) error {
+	return d.StartWithArgs(headlessPath, configPath, configLabel)
+}
+
+// StartWithArgs は管理側で検証した追加の起動引数を渡す。
+func (d *Driver) StartWithArgs(headlessPath, configPath, configLabel string, extraArgs ...string) error {
 	d.mu.Lock()
 	if d.state != StateStopped {
 		d.mu.Unlock()
@@ -251,7 +256,7 @@ func (d *Driver) Start(headlessPath, configPath, configLabel string) error {
 		return fmt.Errorf("ヘッドレスパスが見つかりません: %s", headlessPath)
 	}
 
-	cmd := platform.BuildHeadlessCommand(headlessPath, configPath)
+	cmd := platform.BuildHeadlessCommand(headlessPath, configPath, extraArgs...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		d.mu.Unlock()

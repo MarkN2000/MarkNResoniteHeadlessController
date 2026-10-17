@@ -17,6 +17,17 @@ function isWriteResult(v: unknown): v is WriteResult {
 // 失敗本文を code から localize する。未知 code は backend の生メッセージ → 汎用文言の順でフォールバック。
 function writeErrorText(r: WriteResult): string {
   switch (r.code) {
+    case "mod_busy":
+      return i18n.t("mods.stopRequired");
+    case "mod_download_failed":
+      return i18n.t("mods.downloadFailed");
+    case "mod_invalid":
+      return i18n.t("mods.invalidInput");
+    case "mod_not_found":
+      return i18n.t("mods.notFound");
+    case "mod_conflict":
+    case "mod_storage_failed":
+      return `${i18n.t("mods.storageFailed")}${r.error ? `: ${r.error}` : ""}`;
     case "not_ready":
       return i18n.t("toast.errNotReady");
     case "timeout":

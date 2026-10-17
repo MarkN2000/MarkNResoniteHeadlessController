@@ -168,6 +168,8 @@ func (s *Server) handleRestartTrigger(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.restart.Trigger("manual", name); err != nil {
 		switch {
+		case errors.Is(err, errModBusy):
+			writeModErr(w, err)
 		case errors.Is(err, errRestartInProgress):
 			writeErr(w, http.StatusConflict, "restart_in_progress", err.Error())
 		case errors.Is(err, errRestartNotRunning):
@@ -205,6 +207,8 @@ func (s *Server) handleRestartCancel(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGracefulStop(w http.ResponseWriter, r *http.Request) {
 	if err := s.restart.TriggerStop(); err != nil {
 		switch {
+		case errors.Is(err, errModBusy):
+			writeModErr(w, err)
 		case errors.Is(err, errRestartInProgress):
 			writeErr(w, http.StatusConflict, "restart_in_progress", err.Error())
 		case errors.Is(err, errRestartNotRunning):

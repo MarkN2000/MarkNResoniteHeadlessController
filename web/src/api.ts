@@ -425,7 +425,11 @@ export interface WriteResult {
 // POST/PUT/DELETE の封筒を解いて WriteResult を返す共通実行（方針A）。
 async function write(method: string, path: string, body?: unknown): Promise<WriteResult> {
   try {
-    const res = await req(path, { method, body: body !== undefined ? JSON.stringify(body) : undefined });
+    const res = await req(path, {
+      method,
+      body: body instanceof Blob ? body : body !== undefined ? JSON.stringify(body) : undefined,
+      ...(body instanceof Blob ? { headers: { "Content-Type": "application/octet-stream" } } : {}),
+    });
     if (res.ok) {
       const j = await res.json().catch(() => null);
       return { ok: true, data: j?.data };
@@ -448,6 +452,27 @@ async function write(method: string, path: string, body?: unknown): Promise<Writ
 function post(path: string, body?: unknown): Promise<WriteResult> {
   return write("POST", path, body);
 }
+
+export interface ModSource { repo: string; tag?: string; asset: string }
+export interface ModVersion { files: { name: string; hash: string }[]; addedAt: string; source?: ModSource }
+export interface ModEntry {
+  id: string; enabled: boolean; current: ModVersion; previous?: ModVersion; updateSource?: ModSource;
+}
+export interface ModsInfo { entries: ModEntry[]; busy: boolean; canModify: boolean }
+export interface ModRelease { tag_name: string; assets: { name: string; size: number }[] }
+export interface ModReleases { releases: ModRelease[]; hasMore: boolean }
+export interface ModCheck {
+  repo: string; tag: string; asset: string; updateAvailable: boolean; versionUnknown: boolean; installed: boolean;
+}
+export const getMods = () => write("GET", "/mods");
+export const getModReleases = (repo: string, page: number) => write("GET", `/mods/releases?${new URLSearchParams({ repo, page: String(page) })}`);
+export const checkMod = (id: string) => post("/mods/check", { id });
+export const uploadMod = (file: File, id = "") => write("POST", `/mods/upload?${new URLSearchParams({ name: file.name, id })}`, file);
+export const downloadMod = (body: { id?: string; repo: string; tag: string; asset: string }) => post("/mods/github", body);
+export const setModEnabled = (id: string, enabled: boolean) => write("PATCH", `/mods/${encodeURIComponent(id)}`, { enabled });
+export const setModSource = (id: string, source: ModSource) => write("PATCH", `/mods/${encodeURIComponent(id)}`, source);
+export const restoreMod = (id: string) => post(`/mods/${encodeURIComponent(id)}/restore`);
+export const deleteMod = (id: string) => write("DELETE", `/mods/${encodeURIComponent(id)}`);
 
 // セッション設定
 export const setSessionName = (idx: number, name: string) => post(`/sessions/${idx}/name`, { name });

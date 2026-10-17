@@ -5,6 +5,7 @@ export type TabId =
   | "friends"
   | "newSession"
   | "config"
+  | "mods"
   | "schedule"
   | "settings"
   | "command"
@@ -23,6 +24,7 @@ export const TABS: TabDef[] = [
   { id: "friends", labelKey: "tabs.friends", availableWhenStopped: false },
   { id: "newSession", labelKey: "tabs.newSession", availableWhenStopped: false },
   { id: "config", labelKey: "tabs.config", availableWhenStopped: true },
+  { id: "mods", labelKey: "tabs.mods", availableWhenStopped: true },
   { id: "schedule", labelKey: "tabs.schedule", availableWhenStopped: true },
   { id: "settings", labelKey: "tabs.settings", availableWhenStopped: true },
   { id: "command", labelKey: "tabs.command", availableWhenStopped: false },

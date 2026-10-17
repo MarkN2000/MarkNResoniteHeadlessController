@@ -100,7 +100,7 @@ func (s *Server) finishGuardStart(name, headlessPath, launchPath string, lang i1
 		return
 	}
 	go s.publishDepGuide() // 同期経路と同じ予防ガイド（R-C 経路③）
-	if err := s.driver.Start(headlessPath, launchPath, name); err != nil {
+	if err := s.startHeadlessLocked(headlessPath, launchPath, name); err != nil {
 		// accepted 応答後の失敗を黙殺しない（sys ログで明示）。
 		s.driver.PublishSys(i18n.T(lang, "dotnet.sysStartFailed", err))
 		return

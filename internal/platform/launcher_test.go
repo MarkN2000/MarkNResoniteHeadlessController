@@ -56,6 +56,16 @@ func TestBuildHeadlessCommandNoConfig(t *testing.T) {
 	}
 }
 
+func TestBuildHeadlessCommandRML(t *testing.T) {
+	for _, name := range []string{"Resonite.exe", "Resonite.dll"} {
+		cmd := BuildHeadlessCommand(filepath.Join("rel", "Headless", name), "config.json", "-LoadAssembly", "Libraries/ResoniteModLoader.dll")
+		args := cmd.Args
+		if args[len(args)-2] != "-LoadAssembly" || args[len(args)-1] != "Libraries/ResoniteModLoader.dll" || configArg(args) == "" {
+			t.Fatal(args)
+		}
+	}
+}
+
 // writeTempFile はテスト用の一時ファイルを書き、そのパスを返す。
 func writeTempFile(t *testing.T, data []byte) string {
 	t.Helper()

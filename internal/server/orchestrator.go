@@ -64,6 +64,8 @@ type restartProgress struct {
 }
 
 type restartOrchestrator struct {
+	operationMu *sync.Mutex
+	start       func(headlessPath, configPath, configLabel string) error
 	driver      restartDriver
 	worlds      headless.WorldsService
 	resolve     func(name string) (headlessPath, launchPath string, err error)
@@ -91,10 +93,12 @@ type restartOrchestrator struct {
 
 func newRestartOrchestrator(s *Server) *restartOrchestrator {
 	return &restartOrchestrator{
-		driver:    s.driver,
-		worlds:    s.worlds,
-		resolve:   s.resolveLaunch,
-		parentCtx: context.Background(),
+		operationMu: &s.operationMu,
+		start:       s.startHeadless,
+		driver:      s.driver,
+		worlds:      s.worlds,
+		resolve:     s.resolveLaunch,
+		parentCtx:   context.Background(),
 		restartCfg: func() config.Restart {
 			s.cfgMu.RLock()
 			defer s.cfgMu.RUnlock()
@@ -157,6 +161,15 @@ func (o *restartOrchestrator) TriggerStop() error {
 // Trigger（再起動）と TriggerStop（停止）が受付処理を共有する＝呼び出し側で稼働確認・rc 準備・
 // configName 解決を済ませてから渡す。停止は name="" を渡す（起動しないので config 不要）。
 func (o *restartOrchestrator) startFlow(rc config.Restart, name, triggerType string, stopOnly bool) error {
+	if o.operationMu != nil {
+		if !o.operationMu.TryLock() {
+			return errModBusy
+		}
+		defer o.operationMu.Unlock()
+		if o.driver.Status().State != headless.StateRunning {
+			return errRestartNotRunning
+		}
+	}
 	o.mu.Lock()
 	if o.p.inProgress {
 		o.mu.Unlock()
@@ -480,7 +493,11 @@ func (o *restartOrchestrator) doRestart(name, triggerType string) {
 		log.Printf("[restart] config 解決に失敗（再起動を中断）: %v", err)
 		return
 	}
-	if err := o.driver.Start(headlessPath, launchPath, name); err != nil {
+	start := o.start
+	if start == nil {
+		start = o.driver.Start
+	}
+	if err := start(headlessPath, launchPath, name); err != nil {
 		log.Printf("[restart] 起動に失敗（再起動を中断）: %v", err)
 		return
 	}

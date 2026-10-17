@@ -182,7 +182,7 @@ cancel = context＋process kill。差分は `.DepotDownloader/staging/` に残�
 | メソッド/パス | 役割 |
 |---|---|
 | `GET /api/v1/steam/config` | `{username, installDir, hasPassword, hasBranchCode}`（秘密は出さない） |
-| `PUT /api/v1/steam/config` | 資格・branchCode・installDir 更新（PW は ASCII/64 検証） |
+| `PUT /api/v1/steam/config` | 資格・branchCode・installDir 更新（PW は ASCII/64 検証）。installDir変更は停止中・起動／再起動／更新処理なしの場合のみ |
 | `POST /api/v1/steam/download` | 入手/更新を非同期開始（停止中のみ・稼働中は 409） |
 | `POST /api/v1/steam/cancel` | 進行中 DL の中止 |
 | `GET /api/v1/steam/status` | `{state, percent, phase, currentFile, lastResult, ...}` |

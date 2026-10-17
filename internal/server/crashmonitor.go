@@ -42,11 +42,15 @@ func newCrashMonitor(s *Server) *crashMonitor {
 		inProgress: func() bool { return s.restart.snapshot().inProgress },
 		lastUsed:   s.loadLastUsed,
 		start: func(name string) error {
+			if !s.operationMu.TryLock() {
+				return errModBusy
+			}
+			defer s.operationMu.Unlock()
 			headlessPath, launchPath, err := s.resolveLaunch(name)
 			if err != nil {
 				return err
 			}
-			return s.driver.Start(headlessPath, launchPath, name)
+			return s.startHeadlessLocked(headlessPath, launchPath, name)
 		},
 		recordStart: s.recordLastStart,
 		now:         time.Now,

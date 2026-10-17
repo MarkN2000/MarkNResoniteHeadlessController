@@ -52,6 +52,11 @@ func (s *Server) handleSteamConfigGet(w http.ResponseWriter, r *http.Request) {
 // handleSteamConfigPut: PUT /api/v1/steam/config {username, password, branchCode, installDir}
 // password / branchCode は空なら既存維持（秘密を空で上書きしない）。保存失敗時は in-memory を巻き戻す。
 func (s *Server) handleSteamConfigPut(w http.ResponseWriter, r *http.Request) {
+	if !s.operationMu.TryLock() {
+		writeModErr(w, errModBusy)
+		return
+	}
+	defer s.operationMu.Unlock()
 	var body struct {
 		Username   string `json:"username"`
 		Password   string `json:"password"`
@@ -71,6 +76,15 @@ func (s *Server) handleSteamConfigPut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.cfgMu.Lock()
+	oldDir := ""
+	if s.cfg.Steam != nil {
+		oldDir = s.cfg.Steam.InstallDir
+	}
+	if strings.TrimSpace(body.InstallDir) != oldDir && s.modBlocked() {
+		s.cfgMu.Unlock()
+		writeModErr(w, errModBusy)
+		return
+	}
 	wasNil := s.cfg.Steam == nil
 	if wasNil {
 		s.cfg.Steam = &config.Steam{}
@@ -104,6 +118,15 @@ func (s *Server) handleSteamConfigPut(w http.ResponseWriter, r *http.Request) {
 // handleSteamDownload: POST /api/v1/steam/download
 // 入手/更新を非同期開始する。更新は「停止中のみ」（稼働中は 409）＝統一原則（設計 §2）。
 func (s *Server) handleSteamDownload(w http.ResponseWriter, r *http.Request) {
+	if !s.operationMu.TryLock() {
+		writeModErr(w, errModBusy)
+		return
+	}
+	defer s.operationMu.Unlock()
+	if s.restart.snapshot().inProgress {
+		writeModErr(w, errModBusy)
+		return
+	}
 	if s.driver.Status().State != headless.StateStopped {
 		writeErr(w, http.StatusConflict, "headless_running",
 			"ヘッドレスが停止中のときのみ更新できます。先に停止してください")
@@ -239,6 +262,8 @@ func (s *Server) maybeUpdate(ctx context.Context, triggerType string, onUpdating
 // （orchestrator.beforeStart）。maybeUpdate を進行表示（phaseUpdating）付きで呼ぶ。更新の失敗・
 // キャンセルがあっても起動は継続する（doRestart は本関数の後で必ず起動する・可用性優先）。
 func (s *Server) beforeFlowStart(ctx context.Context, triggerType string) {
+	s.operationMu.Lock()
+	defer s.operationMu.Unlock()
 	_ = s.maybeUpdate(ctx, triggerType, func() { s.restart.setPhase(phaseUpdating) })
 }
 

@@ -27,6 +27,7 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/hlconfig"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/i18n"
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/mods"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/platform"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/resonite"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
@@ -35,6 +36,10 @@ import (
 )
 
 type Server struct {
+	// ponytail: 単一ヘッドレスのファイル操作・起動準備を1つのロックで排他する。複数プロセス対応時は管理単位へ移す。
+	operationMu sync.Mutex
+	modGitHub   mods.GitHub
+
 	cfg       *config.Config
 	cfgPath   string
 	dataDir   string // cfgPath のディレクトリ（runtime-state / .run / 既定configDir の基点）
@@ -203,6 +208,14 @@ func (s *Server) Start() (stop func()) {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/mods", s.requireAuth(s.handleMods))
+	mux.HandleFunc("GET /api/v1/mods/releases", s.requireAuth(s.handleModReleases))
+	mux.HandleFunc("POST /api/v1/mods/check", s.requireAuth(s.handleModCheck))
+	mux.HandleFunc("POST /api/v1/mods/upload", s.requireAuth(s.handleModUpload))
+	mux.HandleFunc("POST /api/v1/mods/github", s.requireAuth(s.handleModGitHub))
+	mux.HandleFunc("PATCH /api/v1/mods/{id}", s.requireAuth(s.handleModPatch))
+	mux.HandleFunc("POST /api/v1/mods/{id}/restore", s.requireAuth(s.handleModRestore))
+	mux.HandleFunc("DELETE /api/v1/mods/{id}", s.requireAuth(s.handleModDelete))
 
 	// 既存（プロセスライフサイクル・raw コマンド・SSE）
 	mux.HandleFunc("POST /api/v1/login", s.handleLogin)
@@ -402,6 +415,20 @@ func randomBootID() string {
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
+	if !s.operationMu.TryLock() {
+		writeModErr(w, errModBusy)
+		return
+	}
+	unlock := true
+	defer func() {
+		if unlock {
+			s.operationMu.Unlock()
+		}
+	}()
+	if s.restart.snapshot().inProgress || s.steamRunning() {
+		writeModErr(w, errModBusy)
+		return
+	}
 	var body struct {
 		Config string `json:"config"`
 	}
@@ -453,7 +480,8 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 					"Resonite の更新が進行中です。完了してから起動してください。")
 				return
 			}
-			go s.startWithUpdate(name, headlessPath, launchPath)
+			unlock = false
+			go func() { defer s.operationMu.Unlock(); s.startWithUpdate(name, headlessPath, launchPath) }()
 			writeOK(w, map[string]any{"accepted": true, "updating": true})
 			return
 		}
@@ -478,7 +506,8 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusConflict, "start_failed", headless.ErrAlreadyRunning.Error())
 			return
 		}
-		go s.startWithRuntimeGuard(name, headlessPath, launchPath)
+		unlock = false
+		go func() { defer s.operationMu.Unlock(); s.startWithRuntimeGuard(name, headlessPath, launchPath) }()
 		writeOK(w, map[string]any{"accepted": true, "runtimePrepare": true})
 		return
 	}
@@ -487,7 +516,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	// 検出はサブプロセス実行を含むため goroutine で行い start をブロックしない
 	// （sys ログの位置が起動ログと前後しても実用上問題ない）。
 	go s.publishDepGuide()
-	if err := s.driver.Start(headlessPath, launchPath, name); err != nil {
+	if err := s.startHeadlessLocked(headlessPath, launchPath, name); err != nil {
 		writeErr(w, http.StatusConflict, "start_failed", err.Error())
 		return
 	}

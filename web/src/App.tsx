@@ -23,6 +23,7 @@ import { ConfigTab } from "./tabs/config/ConfigTab";
 import { SettingsTab } from "./tabs/settings/SettingsTab";
 import { ScheduleTab } from "./tabs/schedule/ScheduleTab";
 import { LogsTab } from "./tabs/logs/LogsTab";
+import { ModsTab } from "./tabs/mods/ModsTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -267,6 +268,7 @@ function Shell({
     if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} status={status} />;
     if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} templates={itemTemplates} />;
     if (activeTab === "logs") return <LogsTab />;
+    if (activeTab === "mods") return <ModsTab status={status} />;
     return <TabPlaceholder titleKey={def.labelKey} />;
   }
 

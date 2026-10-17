@@ -19,7 +19,7 @@ import (
 //     ARM 等で不一致なら ~/.dotnet/dotnet→PATH のシステム dotnet）。
 //
 // 作業ディレクトリは常に Headless フォルダに設定する。
-func BuildHeadlessCommand(headlessPath, configPath string) *exec.Cmd {
+func BuildHeadlessCommand(headlessPath, configPath string, extraArgs ...string) *exec.Cmd {
 	// cmd.Dir を Headless フォルダに変える（下記）。そのため相対パスのままだと headless 側が
 	// 「自分の cwd(=Headless フォルダ)」基準で解決し、-HeadlessConfig は見つからず即終了
 	// （"Config file not found!"・自前ログも出ない）、exe/dll も取り違える。MRHC の現在の cwd
@@ -62,6 +62,7 @@ func BuildHeadlessCommand(headlessPath, configPath string) *exec.Cmd {
 			}
 		}
 	}
+	cmd.Args = append(cmd.Args, extraArgs...)
 	cmd.Dir = headlessDir
 	return cmd
 }

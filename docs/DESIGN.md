@@ -2,6 +2,7 @@
 
 Resonite Headless Controller を、要件からゼロ再定義して作り直すための設計書。
 関連: コマンド/出力書式などの外部事実は [`resonite-domain-facts.md`](./resonite-domain-facts.md) を参照。
+追加機能: RML・Mod管理の初期版仕様（2026-10-17）は [`design/rml-mods.md`](./design/rml-mods.md) を参照。
 
 > ステータス: 章ごとレビュー反映済（実装着手前）。パーサの出力書式・Linux起動方法など「要検証」項目は実機採取で確定する。
 
