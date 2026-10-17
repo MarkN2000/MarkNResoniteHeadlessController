@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionIcon, Alert, Box, Button, Divider, FileInput, Group, Loader, Menu, Modal, ScrollArea, Select, Stack, Switch, Text, TextInput } from "@mantine/core";
+import { ActionIcon, Alert, Box, Button, Divider, Group, Loader, Menu, Modal, ScrollArea, Select, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
 import { InspectorButton, InspectorCard } from "../../components/inspector";
@@ -7,7 +7,6 @@ import { ConfirmHost } from "../../components/ConfirmHost";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { useVisiblePolling } from "../../hooks/useVisiblePolling";
-import { notifyError } from "../../lib/notify";
 
 const RML_REPO = "resonite-modding-group/ResoniteModLoader";
 type Dialog = { kind: "upload" | "github" | "source"; entry?: api.ModEntry; check?: api.ModCheck };
@@ -122,6 +121,10 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
 }) {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  const [fileError, setFileError] = useState(false);
   const [repo, setRepo] = useState(dialog.check?.repo ?? dialog.entry?.updateSource?.repo ?? "");
   const [releases, setReleases] = useState<api.ModRelease[]>([]);
   const [tag, setTag] = useState<string | null>(null);
@@ -151,9 +154,17 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
     setLoading(false);
   }
 
+  function selectFile(files: File[]) {
+    if (!editable || busy) return;
+    const selected = files.length === 1 ? files[0] : null;
+    const valid = selected !== null && selected.size > 0 && selected.size <= 32 * 1024 * 1024 && selected.name.toLowerCase().endsWith(".dll");
+    setFile(valid ? selected : null);
+    setFileError(!valid);
+  }
+
   function save() {
+    if (!editable || busy) return;
     if (upload && file) {
-      if (file.size > 32 * 1024 * 1024 || !file.name.toLowerCase().endsWith(".dll")) { notifyError(t("mods.invalidFile")); return; }
       onSave(() => api.uploadMod(file, dialog.entry?.id));
     } else if (tag && asset) {
       const source = { repo, tag, asset };
@@ -162,9 +173,29 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
   }
 
   return <Modal opened onClose={onClose} title={title} centered closeOnClickOutside={!busy} closeOnEscape={!busy} withCloseButton={!busy}>
-    <Stack>
+    <Stack onDragOver={(event) => { if (upload) event.preventDefault(); }} onDrop={(event) => { if (upload) event.preventDefault(); }}>
       {dialog.entry && <Text size="sm">{dialog.entry.current.files[0].name}</Text>}
-      {upload ? <FileInput label={t("mods.file")} description={t("mods.fileLimit")} accept=".dll" value={file} onChange={setFile} disabled={busy} clearable /> : <>
+      {upload ? <>
+        <Stack role="region" aria-label={t("mods.file")} aria-disabled={!editable} align="center" gap="xs" p="xl"
+          style={{ border: `2px dashed var(${dragging && editable ? "--mantine-primary-color-filled" : "--mantine-color-dark-3"})`, borderRadius: "var(--mantine-radius-md)", background: dragging && editable ? "var(--mantine-primary-color-light)" : undefined, opacity: editable ? 1 : 0.5 }}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (editable && event.dataTransfer.types.includes("Files")) { dragDepth.current++; setDragging(true); }
+          }}
+          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = editable ? "copy" : "none"; }}
+          onDragLeave={(event) => { event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }}
+          onDrop={(event) => { event.preventDefault(); event.stopPropagation(); dragDepth.current = 0; setDragging(false); selectFile(Array.from(event.dataTransfer.files)); }}>
+          <Text size="sm" ta="center">{t(dragging && editable ? "mods.dropHere" : "mods.dropDLL")}</Text>
+          <Text size="xs" c="dimmed">{t("mods.fileLimit")}</Text>
+          <input ref={fileInput} type="file" accept=".dll" hidden disabled={!editable} aria-label={t("mods.file")} onChange={(event) => {
+            if (event.currentTarget.files?.length) selectFile(Array.from(event.currentTarget.files));
+            event.currentTarget.value = "";
+          }} />
+          <Button disabled={!editable} onClick={() => fileInput.current?.click()}>{t(file ? "mods.chooseAgain" : "mods.chooseFile")}</Button>
+        </Stack>
+        <Text size="sm" aria-live="polite" style={{ overflowWrap: "anywhere" }}>{file ? `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MiB)` : ""}</Text>
+        {fileError && <Text size="sm" c="red" role="alert">{t("mods.invalidFile")}</Text>}
+      </> : <>
         <TextInput label={t("mods.repo")} placeholder="https://github.com/owner/repo" value={repo} disabled={busy || loading} onChange={(e) => { setRepo(e.currentTarget.value); setReleases([]); setTag(null); setAsset(null); setMore(false); }} />
         <Button onClick={() => void fetchReleases()} loading={loading} disabled={!repo.trim() || busy}>{t("mods.fetchReleases")}</Button>
         {failed && <Text c="red" size="sm" role="alert">{t("mods.releasesFailed")}</Text>}
