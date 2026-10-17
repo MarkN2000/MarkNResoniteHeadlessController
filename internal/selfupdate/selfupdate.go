@@ -53,9 +53,11 @@ var (
 
 // Updater は自己更新の実行器。フィールドはテストで差し替えられる。
 type Updater struct {
-	BaseURL string // 取得元（既定 repoBase）
-	Version string // 実行中バイナリの焼込バージョン（main.version）
-	ExePath string // 入れ替え対象（既定 os.Executable()）
+	IncludePrereleases bool   // 公開フィードのプレリリースも候補にする（既定 false）
+	MinimumVersion     string // 適用済み・再起動待ちの版。これ以下への差し替えも拒否する
+	BaseURL            string // 取得元（既定 repoBase）
+	Version            string // 実行中バイナリの焼込バージョン（main.version）
+	ExePath            string // 入れ替え対象（既定 os.Executable()）
 
 	// CheckClient はタグ解決用（リダイレクトを追わず Location を読む）。
 	// DLClient は資産取得用（アセットは objects.githubusercontent.com へ 302 するため

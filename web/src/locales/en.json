@@ -542,6 +542,9 @@
   },
   "update": {
     "title": "MRHC update",
+    "includePrereleases": "Include prereleases",
+    "prereleaseNote": "Development versions may contain bugs. You cannot downgrade after updating. Turning this off keeps your current version until a newer stable release is available. This choice is saved in this browser.",
+    "noNewerStable": "There is no stable release newer than your current version ({{version}}).",
     "checking": "Checking...",
     "checkFailed": "Failed to check for updates.",
     "retry": "Check again",

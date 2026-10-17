@@ -1,10 +1,11 @@
-﻿package server
+package server
 
 // 自己更新 HTTP 層のテスト。スワップ・抽出の実体は internal/selfupdate の単体で網羅済みのため、
 // ここでは HTTP セマンティクス（応答形・errCode マップ・staged・SSE 進捗・restart 依頼）のみ検証する。
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,78 @@ import (
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
 )
+
+func TestUpdatePrereleaseSelection(t *testing.T) {
+	ts, pw, _, srv := newSteamServer(t)
+	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/releases/latest" {
+			w.Header().Set("Location", "/releases/tag/v2.1.0")
+			w.WriteHeader(http.StatusFound)
+			return
+		}
+		if r.URL.Path != "/releases.atom" {
+			t.Errorf("想定外のダウンロード: %s", r.URL)
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, `<feed xmlns="http://www.w3.org/2005/Atom"><entry><link rel="alternate" href="http://%s/releases/tag/v2.2.0-beta.1"/></entry></feed>`, r.Host)
+	}))
+	defer gh.Close()
+	srv.SetUpdater(testUpdater(gh.URL, "v2.0.0"))
+	// 選択を切り替えても直前のキャッシュと混同しない。
+	for _, include := range []bool{false, true, false} {
+		var env okEnv[updateCheckResp]
+		url := fmt.Sprintf("%s/api/v1/update/check?includePrereleases=%t", ts.URL, include)
+		code := authGet(t, url, pw, &env)
+		want := "v2.1.0"
+		if include {
+			want = "v2.2.0-beta.1"
+		}
+		if code != http.StatusOK || env.Data.Latest != want || env.Data.IncludePrereleases != include {
+			t.Fatalf("status=%d data=%+v", code, env.Data)
+		}
+	}
+	srv.setStagedVersion("v2.2.0-beta.1")
+	for _, include := range []bool{true, false} {
+		resp := authReq(t, http.MethodPost, fmt.Sprintf("%s/api/v1/update/apply?includePrereleases=%t", ts.URL, include), pw, "", "")
+		event, data := applySSEResult(t, resp)
+		resp.Body.Close()
+		if include {
+			if event != "update-result" || data["staged"] != "v2.2.0-beta.1" {
+				t.Fatalf("event=%s data=%v", event, data)
+			}
+		} else if event != "update-error" || data["code"] != "up_to_date" {
+			t.Fatalf("古い安定版への適用を拒否しませんでした: %s %v", event, data)
+		}
+	}
+	var env okEnv[updateCheckResp]
+	authGet(t, ts.URL+"/api/v1/update/check", pw, &env)
+	if env.Data.UpdateAvailable || env.Data.Staged != "v2.2.0-beta.1" {
+		t.Fatalf("data=%+v", env.Data)
+	}
+}
+
+func TestUpdatePrereleaseInvalidAndBusy(t *testing.T) {
+	ts, pw, _, srv := newSteamServer(t)
+	srv.SetUpdater(testUpdater(fakeLatest(t, "v2.1.0").URL, "v2.0.0"))
+	for _, query := range []string{"includePrereleases=", "includePrereleases=yes", "includePrereleases=true&includePrereleases=false"} {
+		for _, ep := range []struct{ method, path string }{{http.MethodGet, "check"}, {http.MethodPost, "apply"}} {
+			resp := authReq(t, ep.method, ts.URL+"/api/v1/update/"+ep.path+"?"+query, pw, "", "")
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("status=%d query=%s", resp.StatusCode, query)
+			}
+		}
+	}
+	srv.updateApplyMu.Lock()
+	defer srv.updateApplyMu.Unlock()
+	resp := authReq(t, http.MethodPost, ts.URL+"/api/v1/update/apply", pw, "", "")
+	defer resp.Body.Close()
+	event, data := applySSEResult(t, resp)
+	if event != "update-error" || data["code"] != "update_busy" {
+		t.Fatalf("event=%s data=%v", event, data)
+	}
+}
 
 // テストサーバーは steam_test.go の newSteamServer を共用する（同構成の重複を作らない）。
 

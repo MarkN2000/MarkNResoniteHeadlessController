@@ -28,6 +28,15 @@
 
 ## 2. チェック（selfupdate.Check）
 
+- 2026-10-17: Web UI に「プレリリースを含める」（既定 OFF）を追加する。
+  選択はブラウザの localStorage に保存し、ログイン時・モーダル・適用で共用する。
+  サーバー設定や CLI の既定動作は変更しない。
+- ON の場合は安定版の取得に加え、`/releases.atom` の公開リリースを標準 XML パーサーで読む。
+  正しい semver タグだけを候補にし、安定版と合わせてバージョンが最大のものを選ぶ。
+  フィードに掲載された直近のリリースが対象（全履歴の探索はしない）。安定版未公開の 404 は
+  ON 時のみ許容し、フィード取得・解析の失敗は更新確認失敗とする。GitHub API は使わない。
+- OFF に戻しても古い安定版への変更は行わない。現在より新しい安定版の公開を待つ。
+  更新候補がない場合は「現在のバージョンより新しい安定版はありません」と表示する。
 - `https://github.com/<repo>/releases/latest` へ**リダイレクト無効** GET →
   `Location: …/releases/tag/<tag>` からタグを抽出。GitHub API は使わない
   （API の未認証 60req/h 制限を受けない。Web エンドポイントは対象外）。**API に切り替えないこと。**
@@ -91,8 +100,9 @@ atomic rename の前提）。手順:
 
 - 適用成功＝staged。**サーバープロセス内のみ**の状態（メモリ）。再起動後は実体が追いつくので
   永続化しない。CLI で適用した場合、稼働中サーバーの staged 表示には反映されない（仕様）。
-- staged 中の再適用: latest が staged と同じなら**再DLせず冪等応答**。より新しい latest が
-  出ていれば上書き適用（.old が実行中イメージでも §3-7 の一意名退避で成功する）。
+- staged 中の再適用: latest が staged と同じなら**再DLせず冪等応答**。より古ければ
+  `up_to_date` とし、実行中の版と staged の両方より新しい場合だけ上書き適用する。
+  Web の適用は同時実行を拒否し、先行適用の staged を次の適用で必ず参照する。
 - **POST /api/v1/restart**: 応答を返してから main へ再起動依頼（チャネル）→ Ctrl+C と同じ
   graceful 経路（ヘッドレス停止を最大 185s 待つ→HTTP shutdown）を経た**後**、`relaunch()` で
   新バイナリを起動し直す（Unix=`syscall.Exec`／Windows=新プロセス起動＋本プロセス終了）。
@@ -114,8 +124,14 @@ atomic rename の前提）。手順:
 
 ## 5. API / CLI / UI
 
+- check / apply は任意のクエリー `includePrereleases=true|false` を受け付ける
+  （省略=false、空値・重複・その他の値は HTTP 400）。check の応答に
+  `includePrereleases` を追加し、キャッシュも選択が一致する場合だけ利用する。
+  適用時はリクエスト専用の Updater のコピーへ選択と staged の比較下限を渡す。
+  UI は確認中・適用中・再起動中の選択を無効化する。選択欄には不安定な版であること、
+  過去版へ戻せないこと、OFF にしても即座に安定版へ戻らないことを表示する。
 - `GET /api/v1/update/check`（requireAuth）→
-  `{current, latest, updateAvailable, currentIsRelease, staged?, goos, checkFailed?, checkError?}`。
+  `{current, latest, updateAvailable, currentIsRelease, includePrereleases, staged?, goos, checkFailed?, checkError?}`。
   GitHub への問い合わせは呼ばれた時のみ（フロントもポーリングしない）。結果は**サーバー側で
   短期キャッシュ**（TTL 10分・表示用途のみ。apply 冪等判定は常に最新を引く・適用成功で破棄）。
   **GitHub 不達でも 200 で返す**: staged/current/goos はローカル情報なので常に有効とし、

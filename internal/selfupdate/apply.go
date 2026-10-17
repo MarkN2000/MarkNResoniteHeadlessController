@@ -53,7 +53,7 @@ func (u *Updater) ApplyWithProgress(ctx context.Context, progress ProgressFunc) 
 	if err != nil {
 		return "", err
 	}
-	if semver.Compare(latest, u.Version) <= 0 {
+	if semver.Compare(latest, u.Version) <= 0 || semver.Compare(latest, u.MinimumVersion) <= 0 {
 		return "", ErrUpToDate
 	}
 

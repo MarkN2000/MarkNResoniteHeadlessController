@@ -277,6 +277,7 @@ export function getLogDownloadUrl(name: string): string {
 // --- 自己更新（MRHC 自身の入れ替え・docs/design/self-update.md） ---
 
 export interface UpdateInfo {
+  includePrereleases: boolean; // 確認に使用した選択
   current: string; // 実行中の版（dev 等もありうる）
   latest: string; // 最新リリースタグ
   updateAvailable: boolean; // 実行中の版より新しいリリースがあるか
@@ -289,9 +290,18 @@ export interface UpdateInfo {
   checkError?: string;
 }
 
+// 更新画面と同じ、ブラウザに保存した選択をログイン時の確認にも使う。
+function updateIncludesPrereleases(): boolean {
+  try {
+    return localStorage.getItem("mrhc.includePrereleases") === "true";
+  } catch {
+    return false;
+  }
+}
+
 // 更新チェック。GitHub への問い合わせはこの呼び出し時のみ（常時ポーリングはしない）。失敗時 null。
-export async function checkUpdate(): Promise<UpdateInfo | null> {
-  return getData<UpdateInfo>("/update/check");
+export async function checkUpdate(includePrereleases = updateIncludesPrereleases()): Promise<UpdateInfo | null> {
+  return getData<UpdateInfo>(`/update/check?includePrereleases=${includePrereleases}`);
 }
 
 // 本体DLの進捗（downloaded/total バイト。total は不明なら -1）。
@@ -327,10 +337,10 @@ function parseSSEEvent(chunk: string): { event: string; data: unknown } | null {
 // 成功で staged（次回起動からの版）を返す。失敗理由は code で出し分ける（up_to_date/update_busy/
 // no_release/not_release_build/exe_dir_not_writable/update_failed・通信不通は network）。
 // http.Flusher 非対応のフォールバック（従来 JSON 応答）も受理する。
-export async function applyUpdate(onProgress?: (p: UpdateProgress) => void): Promise<ApplyResult> {
+export async function applyUpdate(onProgress?: (p: UpdateProgress) => void, includePrereleases = updateIncludesPrereleases()): Promise<ApplyResult> {
   let res: Response;
   try {
-    res = await req("/update/apply", { method: "POST" });
+    res = await req(`/update/apply?includePrereleases=${includePrereleases}`, { method: "POST" });
   } catch {
     return { ok: false, code: "network" };
   }

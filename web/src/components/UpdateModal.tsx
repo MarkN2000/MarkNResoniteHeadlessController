@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Anchor, Button, Group, List, Loader, Modal, Progress, Stack, Text } from "@mantine/core";
+import { Anchor, Button, Checkbox, Group, List, Loader, Modal, Progress, Stack, Text } from "@mantine/core";
+import { useLocalStorage } from "@mantine/hooks";
 import * as api from "../api";
 import type { UpdateInfo } from "../api";
 
@@ -26,6 +27,11 @@ export function UpdateModal({
   onRestarting: (info: UpdateInfo, oldBoot: string | null) => void;
 }) {
   const { t } = useTranslation();
+  const [includePrereleases, setIncludePrereleases] = useLocalStorage<boolean>({
+    key: "mrhc.includePrereleases",
+    defaultValue: false,
+    getInitialValueInEffect: false,
+  });
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<number | null>(null); // DL 進捗%（total 不明なら null）
@@ -36,17 +42,20 @@ export function UpdateModal({
   // recheck 再生成→useEffect 再発火のチェックループになる）。
   const infoRef = useRef(info);
   infoRef.current = info;
+  const checkRequest = useRef(0);
 
   const recheck = useCallback(() => {
+    const request = ++checkRequest.current;
     setChecking(true);
     setError(null);
-    void api.checkUpdate().then((i) => {
+    void api.checkUpdate(includePrereleases).then((i) => {
+      if (request !== checkRequest.current) return;
       // MRHC 自体に不達（null）のときは保持済みの staged 表示を消さない
       //（staged はローカル状態で、応答が無くても正しさが変わらないため）。
       if (i || !infoRef.current?.staged) onInfoChange(i);
       setChecking(false);
     });
-  }, [onInfoChange]);
+  }, [onInfoChange, includePrereleases]);
   useEffect(() => {
     if (opened) recheck();
   }, [opened, recheck]);
@@ -79,11 +88,11 @@ export function UpdateModal({
     setError(null);
     const r = await api.applyUpdate((p) => {
       setProgress(p.total > 0 ? Math.round((p.downloaded / p.total) * 100) : null);
-    });
+    }, includePrereleases);
     if (r.ok && r.staged) {
       // 楽観更新で staged を取りこぼさないよう、サーバー権威の状態を取り直して
       // 表示（バッジ・メニュー・本モーダル）を「再起動待ち」へ切り替える。
-      const fresh = await api.checkUpdate();
+      const fresh = await api.checkUpdate(includePrereleases);
       onInfoChange(fresh ?? (info ? { ...info, staged: r.staged } : null));
     } else {
       setError(applyErrorText(r.code, r.error));
@@ -113,7 +122,7 @@ export function UpdateModal({
   const title = staged ? t("update.pendingTitle", { version: staged }) : t("update.title");
 
   let body: React.ReactNode;
-  if (checking) {
+  if (checking || (info && info.includePrereleases !== includePrereleases && !staged)) {
     body = (
       <Group gap="xs">
         <Loader size="sm" />
@@ -234,7 +243,7 @@ export function UpdateModal({
   } else {
     body = (
       <Stack gap="sm">
-        <Text size="sm">{t("update.upToDate", { version: info.current })}</Text>
+        <Text size="sm">{t(includePrereleases ? "update.upToDate" : "update.noNewerStable", { version: info.current })}</Text>
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
             {t("update.close")}
@@ -256,7 +265,19 @@ export function UpdateModal({
       closeOnEscape={!applying && !restarting}
       withCloseButton={!applying && !restarting}
     >
-      {body}
+      <Stack gap="md">
+        <Checkbox
+          label={t("update.includePrereleases")}
+          description={t("update.prereleaseNote")}
+          checked={includePrereleases}
+          onChange={(event) => {
+            setChecking(true);
+            setIncludePrereleases(event.currentTarget.checked);
+          }}
+          disabled={checking || applying || restarting}
+        />
+        {body}
+      </Stack>
     </Modal>
   );
 }

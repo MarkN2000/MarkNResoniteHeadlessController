@@ -76,6 +76,26 @@ func TestApplyLinux(t *testing.T) {
 	}
 }
 
+func TestApplyPrereleaseAndMinimumVersion(t *testing.T) {
+	for _, minimum := range []string{"", "v2.2.0-beta.1", "v2.2.0"} {
+		t.Run(minimum, func(t *testing.T) {
+			newBody := fakeELF(elf.EM_X86_64, "prerelease-binary")
+			u, exe := setupLinuxApply(t, "v2.2.0-beta.1", linuxArchive(t, newBody), nil)
+			u.IncludePrereleases, u.MinimumVersion = true, minimum
+			oldBody := readFile(t, exe)
+			tag, err := u.Apply(context.Background())
+			if minimum != "" {
+				if !errors.Is(err, ErrUpToDate) {
+					t.Fatalf("err=%v, want ErrUpToDate", err)
+				}
+				assertUntouched(t, exe, oldBody)
+			} else if err != nil || tag != "v2.2.0-beta.1" || !bytes.Equal(readFile(t, exe), newBody) {
+				t.Fatalf("プレリリースの適用に失敗: tag=%s err=%v", tag, err)
+			}
+		})
+	}
+}
+
 func TestApplyWindows(t *testing.T) {
 	setPlatform(t, "windows/amd64")
 	dir := t.TempDir()
@@ -206,7 +226,7 @@ func TestApplyRejectsSymlinkEntry(t *testing.T) {
 // 取り出したバイナリの形式・アーキテクチャが合わなければ入れ替え前に拒否する。
 func TestApplyRejectsWrongBinary(t *testing.T) {
 	cases := map[string][]byte{
-		"別アーキのELF":  fakeELF(elf.EM_AARCH64, "arm-binary"),
+		"別アーキのELF": fakeELF(elf.EM_AARCH64, "arm-binary"),
 		"実行ファイル以外": []byte("#!/bin/sh\necho not a binary\n"),
 	}
 	for name, body := range cases {

@@ -85,7 +85,7 @@ function Shell({
   const [updateOpen, setUpdateOpen] = useState(false);
   const sessionsRequestId = useRef(0);
   useEffect(() => {
-    void api.checkUpdate().then(setUpdateInfo);
+    void api.checkUpdate().then((info) => setUpdateInfo((current) => current ?? info));
   }, []);
 
   const running = status?.state === "running";

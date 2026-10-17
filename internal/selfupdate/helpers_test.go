@@ -49,6 +49,9 @@ func newTestUpdater(baseURL, version, exePath string) *Updater {
 func serveRelease(t *testing.T, tag string, files map[string][]byte) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
+	mux.HandleFunc("/releases.atom", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `<feed xmlns="http://www.w3.org/2005/Atom"><entry><link rel="alternate" href="http://%s/releases/tag/%s"/></entry></feed>`, r.Host, tag)
+	})
 	mux.HandleFunc("/releases/latest", func(w http.ResponseWriter, r *http.Request) {
 		if tag == "" {
 			http.NotFound(w, r)

@@ -52,9 +52,10 @@ type Server struct {
 
 	// 自己更新（docs/design/self-update.md）。updater は main が注入する
 	// （SetUpdater。未注入＝テストでは update API が 503 を返す）。
-	updater      *selfupdate.Updater
-	updateMu     sync.Mutex // updateStaged / updateCheck* の保護
-	updateStaged string     // 適用済み・再起動待ちの版（プロセス内のみ。再起動後は実体が追いつく）
+	updater       *selfupdate.Updater
+	updateApplyMu sync.Mutex // Web の適用を直列化し、staged の比較下限を保つ
+	updateMu      sync.Mutex // updateStaged / updateCheck* の保護
+	updateStaged  string     // 適用済み・再起動待ちの版（プロセス内のみ。再起動後は実体が追いつく）
 
 	// updateCheck は check 結果の短期キャッシュ（ログイン/リロード毎の GitHub 往復を抑える）。
 	// 表示用途のみ。apply の冪等判定では使わず常に最新を引く（updater.Check）。

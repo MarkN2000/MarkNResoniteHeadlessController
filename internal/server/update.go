@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/selfupdate"
+	"golang.org/x/mod/semver"
 )
 
 // updateCheckTTL は check 結果を再利用する期間（ログイン/リロード毎の GitHub 往復を抑える）。
@@ -37,10 +38,10 @@ func (s *Server) setStagedVersion(v string) {
 }
 
 // cachedCheck は TTL 内のキャッシュ済み check 結果を返す（無ければ ok=false）。
-func (s *Server) cachedCheck() (selfupdate.Info, bool) {
+func (s *Server) cachedCheck(includePrereleases bool) (selfupdate.Info, bool) {
 	s.updateMu.Lock()
 	defer s.updateMu.Unlock()
-	if s.updateCheck != nil && time.Since(s.updateCheckAt) < updateCheckTTL {
+	if s.updateCheck != nil && s.updateCheck.IncludePrereleases == includePrereleases && time.Since(s.updateCheckAt) < updateCheckTTL {
 		return *s.updateCheck, true
 	}
 	return selfupdate.Info{}, false
@@ -63,12 +64,13 @@ func (s *Server) invalidateCheck() {
 
 // updateCheckResp は GET /api/v1/update/check の応答。
 type updateCheckResp struct {
-	Current          string `json:"current"`          // 実行中の版（焼込値そのまま。dev 等もありうる）
-	Latest           string `json:"latest"`           // 最新リリースタグ
-	UpdateAvailable  bool   `json:"updateAvailable"`  // 実行中の版より新しいリリースがあるか
-	CurrentIsRelease bool   `json:"currentIsRelease"` // 適用可能なリリースビルドか
-	Staged           string `json:"staged,omitempty"` // 適用済み・再起動待ちの版（このプロセスでの適用のみ）
-	Goos             string `json:"goos"`             // 再起動手順の出し分け用（windows / linux）
+	IncludePrereleases bool   `json:"includePrereleases"` // 確認に使用した選択
+	Current            string `json:"current"`            // 実行中の版（焼込値そのまま。dev 等もありうる）
+	Latest             string `json:"latest"`             // 最新リリースタグ
+	UpdateAvailable    bool   `json:"updateAvailable"`    // 実行中の版より新しいリリースがあるか
+	CurrentIsRelease   bool   `json:"currentIsRelease"`   // 適用可能なリリースビルドか
+	Staged             string `json:"staged,omitempty"`   // 適用済み・再起動待ちの版（このプロセスでの適用のみ）
+	Goos               string `json:"goos"`               // 再起動手順の出し分け用（windows / linux）
 
 	// GitHub への確認に失敗したとき true（current/staged/goos のローカル情報のみ有効）。
 	// CheckError はその errCode（no_release / update_failed 等）。
@@ -76,26 +78,46 @@ type updateCheckResp struct {
 	CheckError  string `json:"checkError,omitempty"`
 }
 
+// updatePrereleases は省略=false、明示値=true/false のみ受け付ける。
+func updatePrereleases(w http.ResponseWriter, r *http.Request) (bool, bool) {
+	values, present := r.URL.Query()["includePrereleases"]
+	if !present {
+		return false, true
+	}
+	if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
+		writeErr(w, http.StatusBadRequest, "invalid_request", "includePrereleases は true または false を指定してください")
+		return false, false
+	}
+	return values[0] == "true", true
+}
+
 // handleUpdateCheck: GET /api/v1/update/check → updateCheckResp
 // GitHub への問い合わせは本ハンドラ呼び出し時のみ（常時ポーリングはフロント側でもしない）。
 // staged/current/goos はローカル情報なので、GitHub 不達でも 200 ＋ CheckFailed で返す
 // （エラー応答にすると、適用済み＝再起動待ちの表示と「今すぐ再起動」導線が UI から消えてしまう）。
 func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	includePrereleases, valid := updatePrereleases(w, r)
+	if !valid {
+		return
+	}
 	if s.updater == nil {
 		writeErr(w, http.StatusServiceUnavailable, "update_unavailable", "自己更新が初期化されていません")
 		return
 	}
 	resp := updateCheckResp{
-		Current: s.updater.Version,
-		Staged:  s.stagedVersion(),
-		Goos:    runtime.GOOS,
+		IncludePrereleases: includePrereleases,
+		Current:            s.updater.Version,
+		Staged:             s.stagedVersion(),
+		Goos:               runtime.GOOS,
 	}
 	// TTL 内はキャッシュ応答（ログイン/リロード毎の GitHub 往復を抑える）。GitHub 不達は
 	// キャッシュしない（次回すぐ再試行できるよう・staged 等のローカル情報は常に最新を載せる）。
-	info, ok := s.cachedCheck()
+	info, ok := s.cachedCheck(includePrereleases)
 	if !ok {
 		var err error
-		info, err = s.updater.Check(r.Context())
+		u := *s.updater
+		u.IncludePrereleases = includePrereleases
+		info, err = u.Check(r.Context())
 		if err != nil {
 			resp.CheckFailed = true
 			resp.CheckError = updateErrCode(err)
@@ -106,6 +128,10 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.Latest = info.Latest
 	resp.UpdateAvailable = info.UpdateAvailable
+	if st := s.stagedVersion(); st != "" {
+		resp.Staged = st
+		resp.UpdateAvailable = resp.UpdateAvailable && semver.Compare(info.Latest, st) > 0
+	}
 	resp.CurrentIsRelease = info.CurrentIsRelease
 	writeOK(w, resp)
 }
@@ -116,17 +142,34 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 // （全体上限は DLClient の Timeout が担う）。応答を取り逃しても check の staged で結果を回収できる。
 // http.Flusher 非対応の writer（想定外）では従来の同期 JSON 応答へフォールバックする。
 func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	includePrereleases, valid := updatePrereleases(w, r)
+	if !valid {
+		return
+	}
 	if s.updater == nil {
 		writeErr(w, http.StatusServiceUnavailable, "update_unavailable", "自己更新が初期化されていません")
 		return
 	}
 	fl, streaming := w.(http.Flusher)
+	if !s.updateApplyMu.TryLock() {
+		if streaming {
+			sseHeader(w)
+			writeSSE(w, "update-error", map[string]string{"code": "update_busy", "message": selfupdate.ErrBusy.Error()})
+			fl.Flush()
+		} else {
+			writeUpdateErr(w, selfupdate.ErrBusy)
+		}
+		return
+	}
+	defer s.updateApplyMu.Unlock()
+	u := *s.updater
+	u.IncludePrereleases = includePrereleases
+	u.MinimumVersion = s.stagedVersion()
 
 	// 適用済み・再起動待ち中の再実行: 最新が staged と同じなら再DLせずそのまま返す（冪等）。
-	// staged と異なる latest になっていれば（取り下げで古くなった場合も含め）続行して
-	// latest を適用し直す（実行中の版より古ければ Apply 側が ErrUpToDate で拒否する）。
-	if st := s.stagedVersion(); st != "" {
-		if info, err := s.updater.Check(r.Context()); err == nil && info.Latest == st {
+	// 異なる版は Apply 側で実行中・staged の両方より新しいことを確認する。
+	if st := u.MinimumVersion; st != "" {
+		if info, err := u.Check(r.Context()); err == nil && info.Latest == st {
 			if streaming {
 				sseHeader(w)
 				writeSSE(w, "update-result", map[string]any{"staged": st})
@@ -139,7 +182,7 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !streaming {
-		staged, err := s.updater.Apply(context.Background())
+		staged, err := u.Apply(context.Background())
 		if err != nil {
 			writeUpdateErr(w, err)
 			return
@@ -156,7 +199,7 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, "update-progress", map[string]any{"downloaded": downloaded, "total": total})
 		fl.Flush()
 	}
-	staged, err := s.updater.ApplyWithProgress(context.Background(), progress)
+	staged, err := u.ApplyWithProgress(context.Background(), progress)
 	if err != nil {
 		writeSSE(w, "update-error", map[string]string{"code": updateErrCode(err), "message": err.Error()})
 		fl.Flush()
