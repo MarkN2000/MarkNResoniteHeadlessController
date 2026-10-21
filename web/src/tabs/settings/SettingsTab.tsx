@@ -16,9 +16,11 @@ import { QUICSection } from "./QUICSection";
 export function SettingsTab({
   onCredentialsChanged,
   status,
+  onRestarting,
 }: {
   onCredentialsChanged: () => void;
   status: Status | null;
+  onRestarting: (oldBoot: string | null) => void;
 }) {
   return (
     <ScrollArea h="100%" type="hover">
@@ -28,7 +30,7 @@ export function SettingsTab({
             <Stack gap="md">
               <PasswordSection />
               <AccountSection onSaved={onCredentialsChanged} status={status} />
-              <AppSettingsSection />
+              <AppSettingsSection onRestarting={onRestarting} />
             </Stack>
           }
           right={

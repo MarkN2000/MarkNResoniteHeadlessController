@@ -27,10 +27,10 @@ import { ModsTab } from "./tabs/mods/ModsTab";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  // 自己更新の「今すぐ再起動」後の画面（再起動中）。Shell ごと差し替えて SSE 購読等を unmount し、
+  // MRHC の再起動中画面。Shell ごと差し替えて SSE 購読等を unmount し、
   // 専用画面側でサーバー復帰を制御ポーリングする（停止中の SSE 再接続エラーループを残さない）。
   // oldBoot は再起動を投げる直前に捕捉した旧プロセスの boot（新プロセス検出の基準）。
-  const [restart, setRestart] = useState<{ info: UpdateInfo; oldBoot: string | null } | null>(null);
+  const [restart, setRestart] = useState<{ info: UpdateInfo | null; oldBoot: string | null } | null>(null);
 
   // 初回: 既存 Cookie セッションを確認
   useEffect(() => {
@@ -59,7 +59,7 @@ function Shell({
   onRestarting,
 }: {
   onLogout: () => void;
-  onRestarting: (info: UpdateInfo, oldBoot: string | null) => void;
+  onRestarting: (info: UpdateInfo | null, oldBoot: string | null) => void;
 }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status | null>(null);
@@ -265,7 +265,8 @@ function Shell({
     if (activeTab === "newSession") return running ? <NewSessionTab onStarted={refreshSessions} /> : <StartPrompt />;
     if (activeTab === "command") return <CommandTab logs={logs} onSend={(c) => void api.sendCommand(c)} />;
     if (activeTab === "config") return <ConfigTab onConfigsChanged={refreshConfigs} />;
-    if (activeTab === "settings") return <SettingsTab onCredentialsChanged={refreshCred} status={status} />;
+    if (activeTab === "settings")
+      return <SettingsTab onCredentialsChanged={refreshCred} status={status} onRestarting={(oldBoot) => onRestarting(updateInfo, oldBoot)} />;
     if (activeTab === "schedule") return <ScheduleTab running={running} configs={configs} templates={itemTemplates} />;
     if (activeTab === "logs") return <LogsTab />;
     if (activeTab === "mods") return <ModsTab status={status} />;

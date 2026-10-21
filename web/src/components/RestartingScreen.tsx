@@ -4,12 +4,12 @@ import { Button, Center, Loader, Stack, Text, Title } from "@mantine/core";
 import * as api from "../api";
 import type { UpdateInfo } from "../api";
 
-// 自己更新の「今すぐ再起動」後の画面（docs/design/self-update.md）。サーバーは graceful 停止→
-// 新バイナリ起動の最中で、通常 UI（/api/v1/events の SSE 等）を丸ごと置き換える。サーバー復帰を
+// MRHC の再起動中画面（docs/design/self-update.md）。サーバーは graceful 停止→
+// 再起動の最中で、通常 UI（/api/v1/events の SSE 等）を丸ごと置き換える。サーバー復帰を
 // ポーリングし、新プロセスを検出したら自動でリロードして新版の UI へ戻る（停止が長いと数分かかりうる）。
-// info は再起動直前の更新チェック結果（staged=再起動後の版）。oldBoot は再起動直前に捕捉した旧
+// info は取得済みなら更新チェック結果（staged=再起動後の版）。oldBoot は再起動直前に捕捉した旧
 // プロセスの boot 識別子（新プロセス検出の基準。取得失敗時 null）。
-export function RestartingScreen({ info, oldBoot }: { info: UpdateInfo; oldBoot: string | null }) {
+export function RestartingScreen({ info, oldBoot }: { info: UpdateInfo | null; oldBoot: string | null }) {
   const { t } = useTranslation();
   useEffect(() => {
     let stopped = false;
@@ -45,7 +45,7 @@ export function RestartingScreen({ info, oldBoot }: { info: UpdateInfo; oldBoot:
         <Loader />
         <Title order={3}>{t("restarting.title")}</Title>
         <Text ta="center">{t("restarting.body")}</Text>
-        {info.staged && (
+        {info?.staged && (
           <Text size="sm" c="dimmed">
             {t("restarting.stagedNote", { version: info.staged })}
           </Text>

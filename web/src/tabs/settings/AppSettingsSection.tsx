@@ -6,11 +6,14 @@ import type { AppSettings } from "../../api";
 import {
   CollapsibleSection,
   FieldRow,
+  InspectorButton,
   InspectorCard,
   InspectorNumberInput,
   InspectorTextInput,
 } from "../../components/inspector";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
+import { useConfirm } from "../../hooks/useConfirm";
+import { ConfirmHost } from "../../components/ConfirmHost";
 import { SaveButton } from "./SaveButton";
 
 // 反映タイミングの注記（入力欄の下・右寄せ・控えめ）。
@@ -25,13 +28,14 @@ function Note({ children }: { children: string }) {
 // アプリ設定（port / 上級: コンフィグ保存先）。encoding は UI 非搭載。
 // Resonite のインストール場所は Steam セクション（installDir）に一本化したためここには無い。
 // 反映: port・configDir = MRHC 再起動後。
-export function AppSettingsSection() {
+export function AppSettingsSection({ onRestarting }: { onRestarting: (oldBoot: string | null) => void }) {
   const { t } = useTranslation();
   const [orig, setOrig] = useState<AppSettings | null>(null);
   const [port, setPort] = useState<number | string>("");
   const [dir, setDir] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
   const apply = useAsyncAction();
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const s = await api.getAppSettings();
@@ -63,6 +67,19 @@ export function AppSettingsSection() {
       return r;
     }, t("settings.toastAppSaved"));
 
+  const restart = () =>
+    confirm.ask({
+      title: t("settings.restartApp"),
+      message: t("settings.restartAppConfirm"),
+      danger: true,
+      onConfirm: async () => {
+        const oldBoot = await api.fetchBootID();
+        const r = await api.restartApp();
+        if (r.ok) onRestarting(oldBoot);
+        return r;
+      },
+    });
+
   return (
     <InspectorCard title={t("settings.appSection")}>
       {!orig ? (
@@ -91,6 +108,11 @@ export function AppSettingsSection() {
           <SaveButton label={t("settings.save")} onClick={save} disabled={!canSave} loading={apply.busy} />
         </Stack>
       )}
+      <Divider my="sm" color="dark.4" />
+      <InspectorButton severity="danger" fullWidth onClick={restart} loading={confirm.busy} disabled={apply.busy}>
+        {t("settings.restartApp")}
+      </InspectorButton>
+      <ConfirmHost confirm={confirm} />
     </InspectorCard>
   );
 }

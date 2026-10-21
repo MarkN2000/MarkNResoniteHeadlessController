@@ -378,6 +378,8 @@
     "appSection": "App settings",
     "port": "Port",
     "restartNote": "Applies after MRHC restart",
+    "restartApp": "Restart MRHC",
+    "restartAppConfirm": "Headless will also stop. Start Headless manually after the restart.",
     "advanced": "Advanced",
     "configDir": "Config directory",
     "configDirPlaceholder": "empty = default",
@@ -633,7 +635,7 @@
   },
   "restarting": {
     "title": "Restarting MRHC",
-    "body": "Stopping worlds and restarting MRHC. It reconnects automatically when done (this may take a few minutes if stopping is slow).",
+    "body": "This page reconnects automatically when done (stopping may take a few minutes).",
     "stagedNote": "{{version}} takes effect after the restart.",
     "reload": "Reload now",
     "manualHint": "If it does not come back after a few minutes, check MRHC on the PC where it runs and start it again manually if needed."

@@ -151,6 +151,7 @@ atomic rename の前提）。手順:
   http.Flusher 非対応の writer では従来の同期 JSON（`{staged}`／エラーは HTTP ステータス）へ
   フォールバック。フロントは fetch + ReadableStream で読む（EventSource は POST 不可）。
 - `POST /api/v1/restart`（requireAuth）→ `{accepted}`。§4 参照。
+  設定の「アプリ設定」からも更新なしで利用する。更新情報は再起動中画面の任意情報とし、既知の staged があれば版を表示する。すでに適用済みの更新はこの再起動でも反映される。
 - `GET /api/v1/ping`（**無認証**）→ `{boot}`。プロセス毎の乱数のみ公開（情報漏えいなし）。
   再起動中画面の新プロセス検出専用。§4 参照。
 - CLI `mrhc update`: **ウィザード分岐より前**に dispatch（新規環境でウィザードを起動させない）・

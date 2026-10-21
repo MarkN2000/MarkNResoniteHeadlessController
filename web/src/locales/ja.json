@@ -378,6 +378,8 @@
     "appSection": "アプリ設定",
     "port": "ポート",
     "restartNote": "MRHC 再起動後に反映",
+    "restartApp": "MRHC を再起動",
+    "restartAppConfirm": "ヘッドレスも停止します。再起動後のヘッドレス起動は手動です。",
     "advanced": "上級設定",
     "configDir": "コンフィグ保存先",
     "configDirPlaceholder": "空＝既定",
@@ -633,7 +635,7 @@
   },
   "restarting": {
     "title": "MRHC を再起動しています",
-    "body": "ワールドの停止と再起動を行っています。完了すると自動的に再接続します（停止に時間がかかると数分かかることがあります）。",
+    "body": "完了すると自動的に再接続します（停止に数分かかる場合があります）。",
     "stagedNote": "再起動後は {{version}} になります。",
     "reload": "今すぐ再読み込み",
     "manualHint": "数分待っても戻らない場合は、MRHC がある PC で起動状態を確認し、必要なら手動で起動し直してください。"
