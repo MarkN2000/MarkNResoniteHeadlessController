@@ -89,7 +89,7 @@ func (g GitHub) get(ctx context.Context, address string, max int64) ([]byte, err
 	return b, nil
 }
 
-func (g GitHub) Release(ctx context.Context, repo, tag string) (Release, error) {
+func (g GitHub) Release(ctx context.Context, repo, tag string, includePrereleases bool) (Release, error) {
 	var r Release
 	repo, err := Repository(repo)
 	if err != nil {
@@ -106,13 +106,13 @@ func (g GitHub) Release(ctx context.Context, repo, tag string) (Release, error) 
 	if err = json.Unmarshal(b, &r); err != nil {
 		return r, fmt.Errorf("%w: 応答形式が不正です", ErrDownload)
 	}
-	if r.Draft || r.Prerelease || r.Tag == "" {
-		return r, fmt.Errorf("%w: 正式リリースを指定してください", ErrInvalid)
+	if r.Draft || (r.Prerelease && !includePrereleases) || r.Tag == "" {
+		return r, fmt.Errorf("%w: 指定したリリースは利用できません", ErrInvalid)
 	}
 	return r, nil
 }
 
-func (g GitHub) List(ctx context.Context, repo string, page int) (Releases, error) {
+func (g GitHub) List(ctx context.Context, repo string, page int, includePrereleases bool) (Releases, error) {
 	out := Releases{Releases: []Release{}}
 	repo, err := Repository(repo)
 	if err != nil {
@@ -130,15 +130,15 @@ func (g GitHub) List(ctx context.Context, repo string, page int) (Releases, erro
 		return out, fmt.Errorf("%w: 応答形式が不正です", ErrDownload)
 	}
 	out.HasMore = len(rs) == 30
-	if page == 1 && len(rs) > 0 {
-		latest, e := g.Release(ctx, repo, "")
+	if page == 1 && len(rs) > 0 && !includePrereleases {
+		latest, e := g.Release(ctx, repo, "", false)
 		if e != nil {
 			return out, e
 		}
 		out.Releases = append(out.Releases, latest)
 	}
 	for _, r := range rs {
-		if r.Draft || r.Prerelease || r.Tag == "" {
+		if r.Draft || (r.Prerelease && !includePrereleases) || r.Tag == "" {
 			continue
 		}
 		if len(out.Releases) > 0 && r.Tag == out.Releases[0].Tag {

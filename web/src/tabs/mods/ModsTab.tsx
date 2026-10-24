@@ -126,6 +126,7 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
   const [dragging, setDragging] = useState(false);
   const [fileError, setFileError] = useState(false);
   const [repo, setRepo] = useState(dialog.check?.repo ?? dialog.entry?.updateSource?.repo ?? "");
+  const [includePrereleases, setIncludePrereleases] = useState(false);
   const [releases, setReleases] = useState<api.ModRelease[]>([]);
   const [tag, setTag] = useState<string | null>(null);
   const [asset, setAsset] = useState<string | null>(null);
@@ -139,7 +140,7 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
 
   async function fetchReleases(nextPage = 1) {
     setLoading(true); setFailed(false);
-    const r = await api.getModReleases(repo, nextPage);
+    const r = await api.getModReleases(repo, nextPage, includePrereleases);
     if (r.ok) {
       const data = r.data as api.ModReleases;
       setReleases((prev) => nextPage === 1 ? data.releases : [...prev, ...data.releases.filter((n) => !prev.some((p) => p.tag_name === n.tag_name))]);
@@ -167,7 +168,7 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
     if (upload && file) {
       onSave(() => api.uploadMod(file, dialog.entry?.id));
     } else if (tag && asset) {
-      const source = { repo, tag, asset };
+      const source = { repo, tag, asset, includePrereleases };
       onSave(() => dialog.kind === "source" && dialog.entry ? api.setModSource(dialog.entry.id, source) : api.downloadMod({ ...source, id: dialog.entry?.id }));
     }
   }
@@ -196,11 +197,12 @@ function AddModDialog({ dialog, editable, busy, onClose, onSave }: {
         <Text size="sm" aria-live="polite" style={{ overflowWrap: "anywhere" }}>{file ? `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MiB)` : ""}</Text>
         {fileError && <Text size="sm" c="red" role="alert">{t("mods.invalidFile")}</Text>}
       </> : <>
-        <TextInput label={t("mods.repo")} placeholder="https://github.com/owner/repo" value={repo} disabled={busy || loading} onChange={(e) => { setRepo(e.currentTarget.value); setReleases([]); setTag(null); setAsset(null); setMore(false); }} />
+        <TextInput label={t("mods.repo")} placeholder="https://github.com/owner/repo" value={repo} disabled={busy || loading} onChange={(e) => { setRepo(e.currentTarget.value); setReleases([]); setTag(null); setAsset(null); setPage(0); setMore(false); setFailed(false); }} />
+        <Switch label={t("mods.includePrereleases")} checked={includePrereleases} disabled={busy || loading} onChange={(e) => { setIncludePrereleases(e.currentTarget.checked); setReleases([]); setTag(null); setAsset(null); setPage(0); setMore(false); setFailed(false); }} />
         <Button onClick={() => void fetchReleases()} loading={loading} disabled={!repo.trim() || busy}>{t("mods.fetchReleases")}</Button>
         {failed && <Text c="red" size="sm" role="alert">{t("mods.releasesFailed")}</Text>}
         {page > 0 && !loading && releases.length === 0 && <Text size="sm" c="dimmed">{t("mods.noReleases")}</Text>}
-        <Select label={t("mods.release")} data={releases.map((r) => ({ value: r.tag_name, label: r.tag_name }))} value={tag} disabled={busy || loading} onChange={(value) => { setTag(value); const assets = releases.find((r) => r.tag_name === value)?.assets ?? []; setAsset(assets.length === 1 ? assets[0].name : null); }} />
+        <Select label={t("mods.release")} data={releases.map((r) => ({ value: r.tag_name, label: r.prerelease ? `${r.tag_name} (${t("mods.prerelease")})` : r.tag_name }))} value={tag} disabled={busy || loading} onChange={(value) => { setTag(value); const assets = releases.find((r) => r.tag_name === value)?.assets ?? []; setAsset(assets.length === 1 ? assets[0].name : null); }} />
         {more && <Button size="xs" disabled={busy || loading} onClick={() => void fetchReleases(page + 1)}>{t("mods.older")}</Button>}
         <Select label={t("mods.file")} data={release?.assets.map((a) => a.name) ?? []} value={asset} disabled={busy || loading} onChange={setAsset} />
         {release && release.assets.length === 0 && <Text size="sm" c="dimmed">{t("mods.noAssets")}</Text>}

@@ -45,6 +45,7 @@
 3. そのリリースに添付されたDLLを選び、取得する。
 
 - GitHub Releasesの添付DLLを扱う。
+- 「プレリリースを含める」（既定OFF）をONにすると、公開プレリリースも選択・取得できる。選択は追加／更新元登録ダイアログ内のみで保持し、Modの更新元設定には保存しない。ドラフトは常に対象外。
 - リポジトリ、取得したリリース、選択したDLLを記録し、以後の更新確認に使う。
 - GitHub経由で取得した版はリリースタグで表示する。更新元の登録だけでは、手元のDLLがその版だと見なさない。
 - 更新時も対象DLLだけを取得する。対象を特定できない場合は再選択を求める。
@@ -89,16 +90,17 @@
 | メソッド・パス（`/api/v1` 以下） | 内容 |
 |---|---|
 | `GET /mods` | RML・Mod一覧、変更可能か、処理中かを返す |
-| `GET /mods/releases?repo=...&page=1` | 公開リポジトリの正式リリースとDLL一覧（1ページ30件、次ページあり） |
+| `GET /mods/releases?repo=...&page=1&includePrereleases=false` | 公開リポジトリのリリースとDLL一覧（1ページ30件、次ページあり）。`includePrereleases` は省略時false、trueならプレリリースも含む。不正な真偽値は400 |
 | `POST /mods/check` | `{id}` の更新確認。`rml` は公式リポジトリ、その他は登録済み更新元 |
 | `POST /mods/upload?name=...&id=...` | 本文をDLLとして追加。`id` 指定時はそのModの差し替え |
-| `POST /mods/github` | `{id?,repo,tag,asset}` のDLLを追加／更新。`id:rml` は同じリリースのRML・Harmonyを取得 |
-| `PATCH /mods/{id}` | `{enabled}` または `{repo,tag,asset}`（更新元の登録。導入版は変更しない） |
+| `POST /mods/github` | `{id?,repo,tag,asset,includePrereleases?}` のDLLを追加／更新。`id:rml` は同じリリースのRML・Harmonyを取得 |
+| `PATCH /mods/{id}` | `{enabled}` または `{repo,tag,asset,includePrereleases?}`（更新元の登録。導入版は変更しない） |
 | `POST /mods/{id}/restore` | 前版へ戻す。復元後は前版なし |
 | `DELETE /mods/{id}` | Modを削除 |
 
 - Mod IDは新規登録時に生成する。RMLは固定ID `rml`。
-- GitHub URLは `https://github.com/<owner>/<repo>`。取得時はGitHub APIで正式リリースと添付DLLを再確認する。
+- GitHub URLは `https://github.com/<owner>/<repo>`。取得・更新元登録時はGitHub APIで公開リリースと添付DLLを再確認する。`includePrereleases` は省略時false、trueのときだけプレリリースを受け付ける。
+- 正式版のみの一覧では従来どおりlatestを先頭に置く。プレリリースを含める一覧ではGitHubの一覧順を使い、latestへの追加問い合わせはしない（正式版のないリポジトリにも対応）。
 - 更新確認はGitHubのlatest正式リリースと記録済みタグを比較する。タグ不明は「導入版不明」と表示する。更新候補のasset名が前回と同名なら選択済みとし、それ以外は利用者が選ぶ。
 - 主なエラー：400 `mod_invalid`、404 `mod_not_found`、409 `mod_busy`／`mod_conflict`、502 `mod_download_failed`、500 `mod_storage_failed`。確認失敗はUIに保持して表示する。
 
@@ -106,6 +108,7 @@
 
 - 既存テーマ・部品に合わせ、上にRML欄、下にMod一覧を置く。各行に有効スイッチと更新確認。更新候補があるときに更新操作を表示する。
 - 差し替え・GitHub更新元登録・復元・削除は行の「⋮」へまとめる。追加はDLLアップロード／GitHubの2ボタンと小さなダイアログを使う。
+- GitHubダイアログには「プレリリースを含める」を置き、選択変更で取得済み一覧・選択版・DLL・ページ位置をクリアする。次の取得と保存に同じ選択を渡し、プレリリースには一覧でラベルを付ける。行の更新確認とRMLの通常導入は従来どおり正式版のみ。
 - DLL追加・差し替えダイアログは、ドロップ領域と「ファイルを選択」ボタンを使う（2026-10-18確認済み）。1ファイル・32 MiBまで。選択後にファイル名・サイズを表示し、「追加」／「適用」で送信する。選択とドロップは同じ検査を行い、不正な選択時はエラーを表示して送信不可にする。
 - 稼働中は停止が必要な旨を表示し、変更操作を無効にする。狭い画面では操作を折り返す。
 

@@ -194,7 +194,16 @@ func (s *Server) handleModReleases(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	out, err := s.modGitHub.List(r.Context(), r.URL.Query().Get("repo"), page)
+	includePrereleases := false
+	if value := r.URL.Query().Get("includePrereleases"); value != "" {
+		var err error
+		includePrereleases, err = strconv.ParseBool(value)
+		if err != nil {
+			writeModErr(w, mods.ErrInvalid)
+			return
+		}
+	}
+	out, err := s.modGitHub.List(r.Context(), r.URL.Query().Get("repo"), page, includePrereleases)
 	if err != nil {
 		writeModErr(w, err)
 		return
@@ -231,7 +240,7 @@ func (s *Server) handleModCheck(w http.ResponseWriter, r *http.Request) {
 	if e != nil && e.Current.Source != nil && strings.EqualFold(e.Current.Source.Repo, repo) && e.Current.Source.Asset == asset {
 		tag = e.Current.Source.Tag
 	}
-	release, err := s.modGitHub.Release(r.Context(), repo, "")
+	release, err := s.modGitHub.Release(r.Context(), repo, "", false)
 	if err != nil {
 		writeModErr(w, err)
 		return
@@ -251,10 +260,11 @@ func (s *Server) handleModCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleModGitHub(w http.ResponseWriter, r *http.Request) {
 	s.mutateMods(w, r, func(store *mods.Store, st *mods.State) error {
 		var body struct {
-			ID    string `json:"id"`
-			Repo  string `json:"repo"`
-			Tag   string `json:"tag"`
-			Asset string `json:"asset"`
+			ID                 string `json:"id"`
+			Repo               string `json:"repo"`
+			Tag                string `json:"tag"`
+			Asset              string `json:"asset"`
+			IncludePrereleases bool   `json:"includePrereleases"`
 		}
 		if err := modBody(w, r, &body); err != nil {
 			return err
@@ -273,7 +283,7 @@ func (s *Server) handleModGitHub(w http.ResponseWriter, r *http.Request) {
 		if body.Tag == "" {
 			return mods.ErrInvalid
 		}
-		release, err := s.modGitHub.Release(r.Context(), repo, body.Tag)
+		release, err := s.modGitHub.Release(r.Context(), repo, body.Tag, body.IncludePrereleases)
 		if err != nil {
 			return err
 		}
@@ -300,10 +310,11 @@ func (s *Server) handleModGitHub(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleModPatch(w http.ResponseWriter, r *http.Request) {
 	s.mutateMods(w, r, func(store *mods.Store, st *mods.State) error {
 		var body struct {
-			Enabled *bool  `json:"enabled"`
-			Repo    string `json:"repo"`
-			Tag     string `json:"tag"`
-			Asset   string `json:"asset"`
+			Enabled            *bool  `json:"enabled"`
+			Repo               string `json:"repo"`
+			Tag                string `json:"tag"`
+			Asset              string `json:"asset"`
+			IncludePrereleases bool   `json:"includePrereleases"`
 		}
 		if err := modBody(w, r, &body); err != nil {
 			return err
@@ -313,7 +324,7 @@ func (s *Server) handleModPatch(w http.ResponseWriter, r *http.Request) {
 			return mods.ErrNotFound
 		}
 		if body.Enabled != nil {
-			if body.Repo != "" || body.Tag != "" || body.Asset != "" {
+			if body.Repo != "" || body.Tag != "" || body.Asset != "" || body.IncludePrereleases {
 				return mods.ErrInvalid
 			}
 			e.Enabled = *body.Enabled
@@ -326,7 +337,7 @@ func (s *Server) handleModPatch(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		release, err := s.modGitHub.Release(r.Context(), repo, body.Tag)
+		release, err := s.modGitHub.Release(r.Context(), repo, body.Tag, body.IncludePrereleases)
 		if err != nil {
 			return err
 		}

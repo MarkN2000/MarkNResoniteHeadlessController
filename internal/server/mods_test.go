@@ -201,3 +201,57 @@ func TestModCheckFailureAndUnknownVersion(t *testing.T) {
 		t.Fatal("取得失敗で構成を変更した", err)
 	}
 }
+
+func TestModPrereleasesHTTP(t *testing.T) {
+	ts, pw, _, s := newSteamServer(t)
+	id := seedMod(t, s)
+	downloads := 0
+	s.modGitHub.Client = &http.Client{Transport: modTransport(func(r *http.Request) (*http.Response, error) {
+		body := `{"tag_name":"v2-rc.1","prerelease":true,"assets":[{"name":"Example.dll","size":8,"browser_download_url":"https://github.com/owner/repo/releases/download/v2-rc.1/Example.dll"}]}`
+		if r.URL.Host != "api.github.com" {
+			downloads++
+			return &http.Response{StatusCode: 502, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("download failed"))}, nil
+		}
+		if r.URL.Path == "/repos/owner/repo/releases" {
+			body = "[" + body + "]"
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+	var listed okEnv[mods.Releases]
+	if code := authGet(t, ts.URL+"/api/v1/mods/releases?repo=owner/repo&includePrereleases=true", pw, &listed); code != 200 || len(listed.Data.Releases) != 1 || !listed.Data.Releases[0].Prerelease {
+		t.Fatalf("プレリリース一覧 status=%d: %+v", code, listed)
+	}
+	r := authReq(t, http.MethodGet, ts.URL+"/api/v1/mods/releases?repo=owner/repo&includePrereleases=invalid", pw, "", "")
+	r.Body.Close()
+	if r.StatusCode != 400 {
+		t.Fatal("不正な真偽値を受理した", r.StatusCode)
+	}
+	for _, include := range []bool{false, true} {
+		body := map[string]any{"repo": "owner/repo", "tag": "v2-rc.1", "asset": "Example.dll"}
+		if include {
+			body["includePrereleases"] = true
+		}
+		b, _ := json.Marshal(body)
+		for _, method := range []string{http.MethodPatch, http.MethodPost} {
+			path, want := "/mods/"+id, 400
+			if method == http.MethodPost {
+				path = "/mods/github"
+			}
+			if include {
+				want = 200
+				if method == http.MethodPost {
+					want = 502 // 版の再検証を通過してDLL取得へ進み、模擬サーバーが失敗する。
+				}
+			}
+			r = authReq(t, method, ts.URL+"/api/v1"+path, pw, "application/json", string(b))
+			r.Body.Close()
+			if r.StatusCode != want {
+				t.Fatalf("%s include=%v: status=%d, want %d", method, include, r.StatusCode, want)
+			}
+		}
+	}
+	st, err := s.modRead()
+	if err != nil || downloads != 1 || len(st.Entries) != 1 || st.Entries[0].UpdateSource == nil || st.Entries[0].Current.Source != nil {
+		t.Fatalf("更新元登録・取得失敗の状態: downloads=%d, %+v, %v", downloads, st, err)
+	}
+}

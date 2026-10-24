@@ -261,7 +261,7 @@ func TestGitHubSelectionAndDownloadValidation(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(b)), Header: make(http.Header)}, nil
 	})}}
-	r, err := g.Release(context.Background(), "owner/repo", "")
+	r, err := g.Release(context.Background(), "owner/repo", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,5 +279,64 @@ func TestGitHubSelectionAndDownloadValidation(t *testing.T) {
 	r.Assets[0].Size++
 	if _, err = g.Download(context.Background(), "owner/repo", r, "Mod.dll"); err == nil {
 		t.Fatal("途中切断を受理した")
+	}
+}
+
+func TestGitHubPrereleases(t *testing.T) {
+	ctx := context.Background()
+	stable := Release{Tag: "v1", Assets: []Asset{{Name: "Mod.dll"}, {Name: "readme.txt"}}}
+	pre := Release{Tag: "v2-rc.1", Prerelease: true, Assets: stable.Assets}
+	draft := Release{Tag: "v3", Draft: true, Assets: stable.Assets}
+	latestCalls := 0
+	onlyPrereleases := false
+	g := GitHub{Client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		var data any
+		switch r.URL.Path {
+		case "/repos/owner/repo/releases/latest":
+			latestCalls++
+			data = stable
+		case "/repos/owner/repo/releases/tags/v2-rc.1":
+			data = pre
+		case "/repos/owner/repo/releases/tags/v3":
+			data = draft
+		default:
+			data = []Release{pre, draft, stable, {}}
+			if onlyPrereleases {
+				data = []Release{pre, draft}
+			}
+		}
+		b, _ := json.Marshal(data)
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(b)), Header: make(http.Header)}, nil
+	})}}
+	for _, include := range []bool{false, true} {
+		out, err := g.List(ctx, "owner/repo", 1, include)
+		want, first := 1, "v1"
+		if include {
+			want, first = 2, "v2-rc.1"
+		}
+		if err != nil || len(out.Releases) != want || out.Releases[0].Tag != first || out.HasMore {
+			t.Fatalf("include=%v: %+v, %v", include, out, err)
+		}
+		for _, r := range out.Releases {
+			if len(r.Assets) != 1 || r.Assets[0].Name != "Mod.dll" {
+				t.Fatalf("DLL以外が一覧に含まれる: %+v", r)
+			}
+		}
+		if _, err := g.Release(ctx, "owner/repo", pre.Tag, include); (err == nil) != include {
+			t.Fatalf("プレリリースの取得 include=%v: %v", include, err)
+		}
+		if _, err := g.Release(ctx, "owner/repo", draft.Tag, include); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("ドラフトを受理した: %v", err)
+		}
+	}
+	if latestCalls != 1 {
+		t.Fatalf("プレリリースを含める一覧でlatestへ問い合わせた: %d", latestCalls)
+	}
+	onlyPrereleases = true
+	for _, page := range []int{1, 2} {
+		out, err := g.List(ctx, "owner/repo", page, true)
+		if err != nil || len(out.Releases) != 1 || out.Releases[0].Tag != pre.Tag || latestCalls != 1 {
+			t.Fatalf("正式版なし page=%d: %+v, %v", page, out, err)
+		}
 	}
 }

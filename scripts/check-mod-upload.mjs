@@ -14,6 +14,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   const entry = { id: 'a'.repeat(32), enabled: true, current: { files: [{ name: 'Existing.dll', hash: 'b'.repeat(64) }], addedAt: '2026-10-18T00:00:00Z' } };
   let uploads = [], pendingUpload, finishUpload;
+  const releaseQueries = [], githubWrites = [], sourceWrites = [];
   await page.addInitScript(() => {
     // SSEの現在状態だけを制御して、ダイアログ表示中の稼働開始も検査する。
     window.EventSource = class extends EventTarget {
@@ -31,6 +32,15 @@ try {
     if (url.pathname.endsWith('/configs')) data = [];
     if (url.pathname.endsWith('/headless-credentials')) data = { username: 'test', hasPassword: true };
     if (url.pathname.endsWith('/mods')) data = { entries: [entry], canModify: true, busy: false };
+    if (url.pathname.endsWith('/mods/releases')) {
+      const query = Object.fromEntries(url.searchParams);
+      releaseQueries.push(query);
+      const pre = { tag_name: 'v2-rc.1', prerelease: true, assets: [{ name: 'Preview.dll', size: 8 }] };
+      const stable = { tag_name: 'v1', prerelease: false, assets: [{ name: 'Stable.dll', size: 8 }] };
+      data = { releases: query.page === '2' ? [{ ...pre, tag_name: 'v1-rc.1' }] : query.includePrereleases === 'true' ? [pre, stable] : [stable], hasMore: query.page === '1' };
+    }
+    if (url.pathname.endsWith('/mods/github')) githubWrites.push(route.request().postDataJSON());
+    if (url.pathname.endsWith('/mods/' + entry.id)) sourceWrites.push(route.request().postDataJSON());
     if (url.pathname.endsWith('/mods/upload')) {
       uploads.push({ name: url.searchParams.get('name'), id: url.searchParams.get('id'), body: route.request().postDataBuffer() });
       if (pendingUpload) await pendingUpload;
@@ -102,8 +112,57 @@ try {
   assert.equal(uploads.length, 2);
   assert.equal(uploads[1].id, entry.id);
   assert.deepEqual(uploads[1].body, file.buffer);
+
+  await page.getByRole('button', { name: 'GitHubから追加', exact: true }).click();
+  const include = dialog.getByRole('switch', { name: 'プレリリースを含める', exact: true });
+  const includeLabel = dialog.getByText('プレリリースを含める', { exact: true });
+  const release = dialog.getByRole('textbox', { name: 'リリース', exact: true });
+  const fetchReleases = dialog.getByRole('button', { name: 'リリースを取得', exact: true });
+  assert.equal(await include.isChecked(), false);
+  await dialog.getByRole('textbox', { name: 'リポジトリURL', exact: true }).fill('https://github.com/owner/repo');
+  await fetchReleases.click();
+  await page.waitForFunction(() => document.querySelector('input[value="v1"]') !== null);
+  assert.equal(await release.inputValue(), 'v1');
+  await includeLabel.click();
+  assert.equal(await release.inputValue(), '');
+  assert.equal(await add.isDisabled(), true);
+  assert.equal(await dialog.getByRole('button', { name: '以前のリリースを取得', exact: true }).count(), 0);
+  await fetchReleases.click();
+  await page.waitForFunction(() => document.querySelector('input[value="v2-rc.1 (プレリリース)"]') !== null);
+  assert.equal(await release.inputValue(), 'v2-rc.1 (プレリリース)');
+  await dialog.getByRole('button', { name: '以前のリリースを取得', exact: true }).click();
+  await dialog.getByRole('button', { name: '以前のリリースを取得', exact: true }).waitFor({ state: 'hidden' });
+  assert.deepEqual(releaseQueries.map(q => [q.page, q.includePrereleases]), [['1', 'false'], ['1', 'true'], ['2', 'true']]);
+  await includeLabel.click();
+  assert.equal(await release.inputValue(), '');
+  assert.equal(await add.isDisabled(), true);
+  await includeLabel.click();
+  await fetchReleases.click();
+  await page.waitForFunction(() => document.querySelector('input[value="v2-rc.1 (プレリリース)"]') !== null);
+  assert.equal(releaseQueries.at(-1).page, '1');
+  await add.click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(githubWrites.length, 1);
+  assert.equal(githubWrites[0].includePrereleases, true);
+  assert.equal(githubWrites[0].tag, 'v2-rc.1');
+  assert.equal(githubWrites[0].asset, 'Preview.dll');
+  await page.getByRole('button', { name: 'GitHubから追加', exact: true }).click();
+  assert.equal(await include.isChecked(), false);
+  await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: 'Existing.dllの操作', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'GitHub更新元を登録', exact: true }).click();
+  await dialog.getByRole('textbox', { name: 'リポジトリURL', exact: true }).fill('https://github.com/owner/repo');
+  await includeLabel.click();
+  await fetchReleases.click();
+  await page.waitForFunction(() => document.querySelector('input[value="v2-rc.1 (プレリリース)"]') !== null);
+  await dialog.getByRole('button', { name: '更新元を登録', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(sourceWrites.length, 1);
+  assert.equal(sourceWrites[0].includePrereleases, true);
+  assert.equal(sourceWrites[0].tag, 'v2-rc.1');
   assert.deepEqual(errors, []);
-  console.log('DLL選択・ドロップ・入力検査・稼働中/送信中の拒否・追加/差し替え・狭幅表示: OK');
+  console.log('DLL選択・ドロップ・入力検査・稼働中/送信中の拒否・追加/差し替え・狭幅表示・プレリリース選択/ページ送り/取得/更新元登録: OK');
 } finally {
   await browser?.close();
   await new Promise(resolve => server.httpServer.close(resolve));

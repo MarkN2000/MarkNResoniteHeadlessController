@@ -459,18 +459,18 @@ export interface ModEntry {
   id: string; enabled: boolean; current: ModVersion; previous?: ModVersion; updateSource?: ModSource;
 }
 export interface ModsInfo { entries: ModEntry[]; busy: boolean; canModify: boolean }
-export interface ModRelease { tag_name: string; assets: { name: string; size: number }[] }
+export interface ModRelease { tag_name: string; prerelease: boolean; assets: { name: string; size: number }[] }
 export interface ModReleases { releases: ModRelease[]; hasMore: boolean }
 export interface ModCheck {
   repo: string; tag: string; asset: string; updateAvailable: boolean; versionUnknown: boolean; installed: boolean;
 }
 export const getMods = () => write("GET", "/mods");
-export const getModReleases = (repo: string, page: number) => write("GET", `/mods/releases?${new URLSearchParams({ repo, page: String(page) })}`);
+export const getModReleases = (repo: string, page: number, includePrereleases = false) => write("GET", `/mods/releases?${new URLSearchParams({ repo, page: String(page), includePrereleases: String(includePrereleases) })}`);
 export const checkMod = (id: string) => post("/mods/check", { id });
 export const uploadMod = (file: File, id = "") => write("POST", `/mods/upload?${new URLSearchParams({ name: file.name, id })}`, file);
-export const downloadMod = (body: { id?: string; repo: string; tag: string; asset: string }) => post("/mods/github", body);
+export const downloadMod = (body: { id?: string; repo: string; tag: string; asset: string; includePrereleases?: boolean }) => post("/mods/github", body);
 export const setModEnabled = (id: string, enabled: boolean) => write("PATCH", `/mods/${encodeURIComponent(id)}`, { enabled });
-export const setModSource = (id: string, source: ModSource) => write("PATCH", `/mods/${encodeURIComponent(id)}`, source);
+export const setModSource = (id: string, source: ModSource & { includePrereleases?: boolean }) => write("PATCH", `/mods/${encodeURIComponent(id)}`, source);
 export const restoreMod = (id: string) => post(`/mods/${encodeURIComponent(id)}/restore`);
 export const deleteMod = (id: string) => write("DELETE", `/mods/${encodeURIComponent(id)}`);
 
