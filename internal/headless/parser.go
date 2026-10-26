@@ -18,18 +18,15 @@ import (
 //     2026-05-28 実機採取の範囲では発生せず。検証可能なケースが出たら対応。
 //   - プロンプト末尾検出 (`waitComplete`): ワールド名末尾が '>' のとき誤検出。
 //     極めて稀。Resonite UI で `>` で終わる名前を作るのは通常想定外。
-//   - `worldsLineRe` の `(.+?)` 名前: name に "Users:" 含むと誤分割。
-//     名前に「 Users: 」というスペース＋コロン列を入れるのは想定外で実用上問題なし。
 
 // userIDPat は Resonite UserID（"U-" + 英数/_/-）のトークンパターン。
 // listbans / login など UserID を抽出する箇所で共有し charset を一致させる（SanitizeToken とも整合）。
 const userIDPat = `U-[A-Za-z0-9_-]+`
 
 var (
-	// worlds: `[<idx>] <name padded>\tUsers: N\tPresent: N\tAccessLevel: L\tMaxUsers: N`
-	// 名前と Users の間は空白パディング、それ以降は TAB 区切りが実機観測。
-	// \s+ は両方を吸収する。
-	worldsLineRe = regexp.MustCompile(`^\[(\d+)\]\s+(.+?)\s+Users:\s+(\d+)\s+Present:\s+(\d+)\s+AccessLevel:\s+(\S+)\s+MaxUsers:\s+(\d+)`)
+	// worlds: 名前と Users の間は空白・タブ・区切りなし（2026-10-26 Linux実機で確認）。
+	// 名前内の項目名を誤認しないよう、貪欲に名前を取り末尾側で成立する人数欄を採用する。
+	worldsLineRe = regexp.MustCompile(`^\[(\d+)\]\s+(.+)\s*Users:\s+(\d+)\s+Present:\s+(\d+)\s+AccessLevel:\s+(\S+)\s+MaxUsers:\s+(\d+)`)
 
 	// status: `Key: Value` の行ベース。Key は ':' 区切り左側を trim。
 	statusKVRe = regexp.MustCompile(`^([^:]+):\s*(.*)$`)

@@ -24,6 +24,37 @@ func TestParseWorlds(t *testing.T) {
 	}
 }
 
+func TestParseWorldsNameSeparators(t *testing.T) {
+	// 実機の区切りなし応答と、名前内に項目名がある場合を同じ一覧で検証する。
+	for _, tc := range []struct {
+		label string
+		name  string
+		sep   string
+	}{
+		{"実機応答", "Steel Assault Protocol ver.event", ""},
+		{"空白", "Steel Assault Protocol ver.event", "   "},
+		{"タブ", "Steel Assault Protocol ver.event", "\t"},
+		{"日本語", "日本語のセッション名", ""},
+		{"名前内の項目名", "Test Users: 99 Room", ""},
+		{"名前末尾の項目名", "Test Users:", ""},
+		{"名前内の人数欄", "Test Users: 99 Present: 98 AccessLevel: Private MaxUsers: 100", ""},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			got := ParseWorlds([]string{
+				"[0] Short World    Users: 2\tPresent: 1\tAccessLevel: Private\tMaxUsers: 4",
+				"[1] " + tc.name + tc.sep + "Users: 1\tPresent: 0\tAccessLevel: Anyone\tMaxUsers: 16",
+			})
+			want := []World{
+				{Index: 0, Name: "Short World", Users: 2, Present: 1, AccessLevel: "Private", MaxUsers: 4},
+				{Index: 1, Name: tc.name, Users: 1, Present: 0, AccessLevel: "Anyone", MaxUsers: 16},
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("セッション名または人数欄の解析が不一致\n got=%+v\nwant=%+v", got, want)
+			}
+		})
+	}
+}
+
 // ambient ログが混在しても応答行が取れること（プロンプト剥がしは Driver 済の前提で、
 // パーサは ambient を regex 非一致で無視する責務のみ）。
 func TestParseWorldsHandlesAmbient(t *testing.T) {

@@ -43,7 +43,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 | コマンド | 用途 | 出力書式（例） |
 |---|---|---|
-| `worlds` | セッション一覧 | `[0] セッション名(空白パディング)\tUsers: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 16` ✅ 実機確定 |
+| `worlds` | セッション一覧 | `[0] セッション名(任意の空白)Users: 2\tPresent: 1\tAccessLevel: LAN\tMaxUsers: 16` ✅ 名前と `Users:` の間に空白がない出力も実機確認（2026-10-26） |
 | `focus <index>` | セッションにフォーカス（以降の操作対象を切替） | silent（プロンプトのみ変化） |
 | `status` | フォーカス中セッションの詳細 | `Key: Value` の複数行（下記、13 keys） ✅ 実機確定 |
 | `users` | フォーカス中セッションのユーザー一覧 | `<name>\tID: <id\|空>\tRole: <role>\tPresent: True\tPing: <int> ms\tFPS: <float>\tSilenced: True/False` ✅ 実機確定（**TAB区切り**） |
@@ -129,11 +129,23 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 
 ---
 
+### worlds の名前と人数欄の境界（2026-10-26 実機確認）
+
+Linux Beta 2026.9.18.82 の MRHC コマンド画面で、次の出力を採取した（行頭のプロンプトは除去済み、`\t` は実際のタブ）。
+
+```text
+[0] Steel Assault Protocol ver.eventUsers: 1\tPresent: 0\tAccessLevel: Anyone\tMaxUsers: 16
+```
+
+- 共通 `ParseWorlds` は、名前と `Users:` の間の空白・タブ・区切りなしを受け入れる。名前の文字数で境界を固定しない。
+- 名前内の `Users:` や人数欄に似た文字列を切り出さないよう、末尾側で `Users / Present / AccessLevel / MaxUsers` の並びが成立する位置を採用する。名前の前後の空白除去、各項目の書式、未知の末尾項目を許容する挙動は維持する。
+- 一覧取得とワールド巡回で同じパーサーを使う。戻り値と非一致行の扱いは変更しない（解析失敗のエラー化は別の変更として扱う）。
+
 ## 3. パース正規表現（現行コードの実値）
 
 ```
-# worlds（API側 headlessParsers.ts:39）
-/^\[(?<index>\d+)\]\s+(?<name>.+?)\s+Users:\s+(?<users>\d+)[\s\t]+Present:\s+(?<present>\d+)[\s\t]+AccessLevel:\s+(?<access>\S+)[\s\t]+MaxUsers:\s+(?<max>\d+)/i
+# worlds（Go: internal/headless/parser.go、2026-10-26更新）
+^\[(\d+)\]\s+(.+)\s*Users:\s+(\d+)\s+Present:\s+(\d+)\s+AccessLevel:\s+(\S+)\s+MaxUsers:\s+(\d+)
 
 # users（serverRoutes.ts:444。⚠️ idは空文字あり=`\S+`では取れないので `(?:\S+)?` 等で修正要）
 /^(?<name>\S+)\s+ID:\s+(?<id>\S+)\s+Role:\s+(?<role>\S+)\s+Present:\s+(?<present>True|False)\s+Ping:\s+(?<ping>[0-9.]+)\s+ms\s+FPS:\s+(?<fps>[0-9.]+)\s+Silenced:\s+(?<silenced>True|False)$/i
@@ -154,7 +166,7 @@ Resoniteヘッドレスは**構造化レスポンスを返さない**。コマ�
 /(res[-\w]*:\/\/[^\s]+)/i  →  /S-([a-f0-9-]+)/i
 ```
 
-> ⚠️ **既知の脆さ**: `users`/`listbans` のユーザー名が `\S+`＝**空白を含むユーザー名で破綻**。worldsの名前は `.+?` だが**タブ/空白の並びに依存**。出力書式は**Resoniteのバージョン更新で変わりうる**。Go移植時はRE2（先読み・後方参照なし）で問題ないことを確認（現行に先読みは無し）。名前付きグループは `(?P<name>…)`。
+> ⚠️ **旧Node版の既知の脆さ**: `users`/`listbans` のユーザー名が `\S+`＝**空白を含むユーザー名で破綻**。`worlds` の名前直後の空白依存は、Go版で2026-10-26に修正。出力書式は**Resoniteのバージョン更新で変わりうる**。GoではRE2（先読み・後方参照なし）を使用する。名前付きグループは `(?P<name>…)`。
 
 ---
 
