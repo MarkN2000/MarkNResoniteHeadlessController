@@ -171,11 +171,19 @@ type WorldsService interface {
 | `status`         | `Status{Name, SessionID, CurrentUsers, PresentUsers, MaxUsers, Uptime, AccessLevel, HiddenFromListing, MobileFriendly, Description, Tags, Users}` |
 | `users`          | `[]User{Name, ID, Role, Present, PingMs, FPS, Silenced}` |
 | `listbans`       | `[]Ban{Index, Username, UserID, MachineIDs}` |
-| `friendrequests` | `[]string` (ユーザー名一覧、v1 互換実装。boot ambient 多発時はノイズ可) |
+| `friendrequests` | `[]string` (ユーザー名一覧。既知の非同期ログを除外) |
 
 - 正規表現は `docs/resonite-domain-facts.md` を出典。
 - プロンプト剥がしは **Driver（`stripExactPrompt`）が応答行を返す前に済ませる**ため、各 parser は clean な行へ regex 照合するだけ（per-line 剥がしを parser に持たせない）。
 - ambient/無関係行は正規表現に当たらず自然に無視。
+
+### 2026-10-26 パーサの境界値対応
+
+- `listbans`: 実機のタブ区切りで空白入りユーザー名を保持する。従来の空白区切りにも対応し、名前内に `UserID:` がある場合は末尾側の完全な項目列を採用する。
+- `users`: FPS は項目区切りまで取得して数値変換する。指数表記を受け付け、変換失敗・負値・NaN・無限大はユーザー行を残して `fps: null`（不明）を返す。正常な FPS は従来どおり number。`/sessions/{idx}/users` と `/detail` に共通適用する。
+- `status`: `Current Users` / `Present Users` / `Max Users` の整数変換失敗（桁あふれを含む）を `ParseStatus` の error として返す。`/sessions/{idx}/status` と `/detail` は既存のエラー経路で HTTP 500 / `exec_failed` を返し、誤った0人の成功応答を返さない。未知Keyの許容・重複Keyの先頭優先は維持する。欠落項目の必須化は今回の対象外。
+- `friendrequests`: 採取済みの `SIGNALR: BroadcastStatus` / `BroadcastSession`、`Running refresh on:`、`BOOTSTRAP: Running userspace bootstrap`、日時を含む `Updated: ... -> ...` をログ書式として除外する。SignalRダンプ直後のタブ付き子項目も除外する。通常の空白・日本語・記号を含む名前は制限しない。
+  - 出力は1行1ユーザー名で識別子や枠がないため、未知のログ、既知ログ書式そのものと同じ名前は完全に識別できない。汎用的な「コロンを含む行」「空白を含む行」の除外や公開APIへの照合は行わない。完全な識別には送信側の構造化応答が必要。
 
 ### Phase 6 e2e で発覚した重要事実
 

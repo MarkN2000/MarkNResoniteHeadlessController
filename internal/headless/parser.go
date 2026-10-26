@@ -1,7 +1,9 @@
 package headless
 
 import (
+	"fmt"
 	"log"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,7 +12,7 @@ import (
 
 // 各構造化コマンドの応答パーサ。入力 lines は Executor 側で「行頭の実プロンプト」
 // （stripExactPrompt）も剥がし済みの綺麗な行。各パーサは Key:Value / 行 regex に
-// 当てるだけの純粋関数。ambient/無関係行は regex に当たらず自然に無視される。
+// 当てる純粋関数。friendrequests のみ既知ログ書式の除外が必要。
 //
 // === 既知の理論的限界（実害低）===
 //   - splitCommaList で `status.Users`/`Tags` を分割: ユーザー名/タグに ',' を
@@ -33,10 +35,13 @@ var (
 
 	// users: `Name\tID: <id|empty>\tRole: R\tPresent: B\tPing: N ms\tFPS: F\tSilenced: B`
 	// TAB 区切り（名前に空白が含まれても破綻しない）。ID は空文字を許容。
-	usersLineRe = regexp.MustCompile(`^([^\t]+)\tID:\s*([^\t]*)\tRole:\s+([^\t]+)\tPresent:\s+(True|False)\tPing:\s+(\d+)\s+ms\tFPS:\s+([0-9.]+)\tSilenced:\s+(True|False)$`)
+	usersLineRe = regexp.MustCompile(`^([^\t]+)\tID:\s*([^\t]*)\tRole:\s+([^\t]+)\tPresent:\s+(True|False)\tPing:\s+(\d+)\s+ms\tFPS: *([^\t]*)\tSilenced:\s+(True|False)$`)
 
 	// listbans: `[<idx>] Username: U UserID: U-... MachineIds: ...`
-	listbansLineRe = regexp.MustCompile(`^\[(\d+)\]\s+Username:\s+(\S+)\s+UserID:\s+(` + userIDPat + `)\s+MachineIds:\s+(.*)$`)
+	listbansLineRe = regexp.MustCompile(`^\[(\d+)\]\s+Username:\s+(\S[^\t]*)\s+UserID:\s+(` + userIDPat + `)\s+MachineIds:\s*(.*)$`)
+
+	// 実ログの日時更新行。コロンや空白だけではユーザー名と区別しない。
+	friendUpdatedLogRe = regexp.MustCompile(`^Updated: \d{1,4}/\d{1,2}/\d{1,2} .+ -> \d{1,4}/\d{1,2}/\d{1,2} .+$`)
 )
 
 // statusUnknownKeysWarned: status の未知 Key を「初回1回だけ」警告するため。
@@ -76,15 +81,16 @@ func ParseWorlds(lines []string) []World {
 //   - "SIGNALR: BroadcastStatus - ..." + TAB インデントの子項目群（UserStatus ダンプ）
 //   - "Running refresh on: ..."
 //   - "SIGNALR: BroadcastSession SessionInfo. ... Name: X, ..."（1行・値中に Name: を含む）
+//
 // これらは全て本物の status ブロック（Name: 〜 ResoniteLink:）より前に出現する。
 //
 // 対策:
-//   1. 最初の「既知 Status Key」が現れるまでの行を読み飛ばす（前方 ambient を除外）。
-//      Name 固定ではなく既知 Key で起点を取るため、項目順が変わっても壊れない。
-//   2. 行頭がインデント（TAB/空白）の行は ambient 子項目とみなし無視（保険）。
-//   3. 既知 Key は first-value-wins（万一の重複・衝突でも先頭=本物を保持）。
-//   4. ブロック開始後の未知 Key のみ初回1回だけ警告（Resonite の真の新項目検知は維持）。
-func ParseStatus(lines []string) WorldStatus {
+//  1. 最初の「既知 Status Key」が現れるまでの行を読み飛ばす（前方 ambient を除外）。
+//     Name 固定ではなく既知 Key で起点を取るため、項目順が変わっても壊れない。
+//  2. 行頭がインデント（TAB/空白）の行は ambient 子項目とみなし無視（保険）。
+//  3. 既知 Key は first-value-wins（万一の重複・衝突でも先頭=本物を保持）。
+//  4. ブロック開始後の未知 Key のみ初回1回だけ警告（Resonite の真の新項目検知は維持）。
+func ParseStatus(lines []string) (WorldStatus, error) {
 	var s WorldStatus
 	seen := make(map[string]bool)
 	started := false // 最初の既知 Key を観測したら true（status ブロック開始）
@@ -101,8 +107,12 @@ func ParseStatus(lines []string) WorldStatus {
 		if seen[key] {
 			continue // first-value-wins
 		}
+		known, err := assignStatusField(&s, key, val)
+		if err != nil {
+			return WorldStatus{}, err
+		}
 		switch {
-		case assignStatusField(&s, key, val):
+		case known:
 			seen[key] = true
 			started = true
 		case started:
@@ -113,23 +123,31 @@ func ParseStatus(lines []string) WorldStatus {
 			// ブロック開始前の未知 Key = ambient → 黙って読み飛ばす（警告しない）
 		}
 	}
-	return s
+	return s, nil
 }
 
 // assignStatusField は既知 Status Key なら s に値を書いて true、未知 Key なら false を返す。
+// 整数変換に失敗した場合は error を返し、0人に置き換えない。
 // 既知 Key 一覧の唯一の定義箇所（ParseStatus の起点判定もこの真偽値に従う）。
-func assignStatusField(s *WorldStatus, key, val string) bool {
+func assignStatusField(s *WorldStatus, key, val string) (bool, error) {
 	switch key {
 	case "Name":
 		s.Name = val
 	case "SessionID":
 		s.SessionID = val
-	case "Current Users":
-		s.CurrentUsers, _ = strconv.Atoi(val)
-	case "Present Users":
-		s.PresentUsers, _ = strconv.Atoi(val)
-	case "Max Users":
-		s.MaxUsers, _ = strconv.Atoi(val)
+	case "Current Users", "Present Users", "Max Users":
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return true, fmt.Errorf("status の %s を整数として解析できません: %w", key, err)
+		}
+		switch key {
+		case "Current Users":
+			s.CurrentUsers = n
+		case "Present Users":
+			s.PresentUsers = n
+		case "Max Users":
+			s.MaxUsers = n
+		}
 	case "Uptime":
 		s.Uptime = val
 	case "Access Level":
@@ -147,9 +165,9 @@ func assignStatusField(s *WorldStatus, key, val string) bool {
 	case "ResoniteLink":
 		s.ResoniteLink = val
 	default:
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 // isIndentedLine は行頭が空白/TAB かを返す。ambient ダンプの子項目（"\tUserSessionId: ..."）は
@@ -167,7 +185,10 @@ func ParseUsers(lines []string) []UserInfo {
 			continue
 		}
 		ping, _ := strconv.Atoi(m[5])
-		fps, _ := strconv.ParseFloat(m[6], 64)
+		var fps *float64
+		if n, err := strconv.ParseFloat(strings.TrimSpace(m[6]), 64); err == nil && !math.IsNaN(n) && !math.IsInf(n, 0) && n >= 0 {
+			fps = &n
+		}
 		out = append(out, UserInfo{
 			Name:     m[1],
 			ID:       m[2],
@@ -194,7 +215,7 @@ func ParseListBans(lines []string) []BanEntry {
 		machineIDs := strings.Fields(strings.TrimSpace(m[4]))
 		out = append(out, BanEntry{
 			Index:      idx,
-			Username:   m[2],
+			Username:   strings.TrimSpace(m[2]),
 			UserID:     m[3],
 			MachineIDs: machineIDs,
 		})
@@ -204,26 +225,25 @@ func ParseListBans(lines []string) []BanEntry {
 
 // ParseFriendRequests は friendrequests コマンドの応答行からユーザー名一覧を構築する。
 //
-// 実装方針 (v1 Node実装 parseFriendRequestsOutput と同じ単純戦略):
-//   - 各 line を trim
-//   - 空行 / プロンプトで終わる行 ('>') を除外
-//   - 残りを「pending friend request の username」として返す
-//
-// 行頭のプロンプト接頭辞は Driver 側 (stripExactPrompt) が剥がし済みなので、
-// ここでは trim + 空行/プロンプト('>'終端)除外だけを行う。
-//
-// === 既知の限界 ===
-// v1 と同じ限界を継承:
-//   - boot 直後など ambient ログが大量に流れる状況では、ambient 行が「friend request
-//     のユーザー名」として混入する可能性がある (v1 でも同じ問題)。
-//   - production の steady state (mrhc 24/7 稼働後) では ambient が希少なので
-//     実用上問題にならない。boot 直後の呼び出しは結果を信頼しすぎないこと。
-//   - 完全に信頼できる検証は、第三者からの pending friend request の実書式を
-//     採取してから (現状: 未採取)。実書式が判明したらより厳密な regex に差し替え可能。
+// 実機書式は1行1ユーザー名。Driver のプロンプト除去後、既知ログだけを除外する。
+// ponytail: 未知ログや既知ログ書式そのものと同じ名前は識別できない。
+// 完全に分離するには送信側に構造化応答が必要（docs/design/structured-driver.md §8）。
 func ParseFriendRequests(lines []string) []string {
 	out := make([]string, 0, len(lines))
+	signalRDump := false
 	for _, line := range lines {
+		if signalRDump && strings.HasPrefix(line, "\t") {
+			continue
+		}
+		signalRDump = false
 		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "SIGNALR: BroadcastStatus ") || strings.HasPrefix(t, "SIGNALR: BroadcastSession ") {
+			signalRDump = true
+			continue
+		}
+		if strings.HasPrefix(t, "Running refresh on: ") || strings.HasPrefix(t, "BOOTSTRAP: Running userspace bootstrap") || friendUpdatedLogRe.MatchString(t) {
+			continue
+		}
 		if t == "" {
 			continue
 		}

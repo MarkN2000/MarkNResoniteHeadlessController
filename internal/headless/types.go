@@ -36,13 +36,13 @@ type WorldStatus struct {
 // UserInfo は users コマンドが返す1ユーザーの情報。
 // ID は無アカウントユーザー（ヘッドレス自身など）では空文字。
 type UserInfo struct {
-	Name     string  `json:"name"`
-	ID       string  `json:"id"`
-	Role     string  `json:"role"`
-	Present  bool    `json:"present"`
-	PingMs   int     `json:"pingMs"`
-	FPS      float64 `json:"fps"`
-	Silenced bool    `json:"silenced"`
+	Name     string   `json:"name"`
+	ID       string   `json:"id"`
+	Role     string   `json:"role"`
+	Present  bool     `json:"present"`
+	PingMs   int      `json:"pingMs"`
+	FPS      *float64 `json:"fps"` // 不正値・非有限値・負値は nil（JSON null）
+	Silenced bool     `json:"silenced"`
 }
 
 // BanEntry は listbans コマンドが返す1件のBAN情報。

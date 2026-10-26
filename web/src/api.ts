@@ -66,7 +66,7 @@ export interface UserInfo {
   role: string;
   present: boolean;
   pingMs: number;
-  fps: number;
+  fps: number | null;
   silenced: boolean;
 }
 

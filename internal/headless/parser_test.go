@@ -1,6 +1,7 @@
 package headless
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -86,7 +87,10 @@ func TestParseStatusHandlesAmbient(t *testing.T) {
 		"SessionID: S-test-1234",
 		"Current Users: 1",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Name != "MRHC Test World A" {
 		t.Fatalf("Name 行が parse されるべき: %+v", got)
 	}
@@ -103,7 +107,10 @@ func TestParseStatusRichTextValues(t *testing.T) {
 		"Description: 1行目<br>2行目 <color=#3399ff>青</color>",
 		"Access Level: Private",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Name != "日本語 <color=red>赤</color> <s>取消</s>" {
 		t.Fatalf("rich text を含む Name が壊れた: %q", got.Name)
 	}
@@ -145,7 +152,10 @@ func TestParseStatus(t *testing.T) {
 		"Users: MARKNPC_MAIN",
 		"ResoniteLink: off",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	want := WorldStatus{
 		Name:              "MRHC Test World A",
 		SessionID:         "S-019e6cb1-6670-7f47-aaea-4f4fe830df12",
@@ -173,7 +183,10 @@ func TestParseStatusUnknownKeyTolerated(t *testing.T) {
 		"FutureKey: some-value",
 		"Current Users: 3",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Name != "hello" || got.CurrentUsers != 3 {
 		t.Fatalf("既知Keyのパースは継続すべき: %+v", got)
 	}
@@ -184,7 +197,10 @@ func TestParseStatusMultiUsersAndTags(t *testing.T) {
 		"Tags: alpha, beta, gamma",
 		"Users: alice, bob , carol",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	wantTags := []string{"alpha", "beta", "gamma"}
 	wantUsers := []string{"alice", "bob", "carol"}
 	if !reflect.DeepEqual(got.Tags, wantTags) {
@@ -228,7 +244,10 @@ func TestParseStatusIgnoresSignalRBroadcastDump(t *testing.T) {
 		"Users: HeadlessBot",
 		"ResoniteLink: off",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	want := WorldStatus{
 		Name:         "Test World",
 		SessionID:    "S-test-9999",
@@ -256,7 +275,10 @@ func TestParseStatusIgnoresRunningRefreshLine(t *testing.T) {
 		"Current Users: 5",
 		"ResoniteLink: off",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Name != "Test World" || got.SessionID != "S-test-1" || got.CurrentUsers != 5 {
 		t.Fatalf("混入行を除外して本物を取れるべき: %+v", got)
 	}
@@ -271,7 +293,10 @@ func TestParseStatusIgnoresSignalRBroadcastSessionLine(t *testing.T) {
 		"SessionID: S-real",
 		"ResoniteLink: off",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Name != "Real World" {
 		t.Fatalf("混入行の値中の Name: にアンカーしてはいけない: %q", got.Name)
 	}
@@ -289,7 +314,10 @@ func TestParseStatusAnchorsOnFirstKnownKey(t *testing.T) {
 		"Name: Later Name",
 		"Current Users: 2",
 	}
-	got := ParseStatus(input)
+	got, err := ParseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.SessionID != "S-first" || got.Name != "Later Name" || got.CurrentUsers != 2 {
 		t.Fatalf("既知 Key 起点で順序非依存に取れるべき: %+v", got)
 	}
@@ -302,7 +330,7 @@ func TestParseUsers(t *testing.T) {
 	}
 	got := ParseUsers(input)
 	want := []UserInfo{
-		{Name: "MARKNPC_MAIN", ID: "", Role: "Admin", Present: false, PingMs: 0, FPS: 59.65997, Silenced: false},
+		{Name: "MARKNPC_MAIN", ID: "", Role: "Admin", Present: false, PingMs: 0, FPS: new(59.65997), Silenced: false},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("users parse mismatch\n got=%+v\nwant=%+v", got, want)
@@ -319,7 +347,7 @@ func TestParseUsersWithID(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("expected 2 users, got %d", len(got))
 	}
-	if got[0].Name != "alice" || got[0].ID != "U-alice-1234" || got[0].PingMs != 42 || got[0].FPS != 90.0 || got[0].Present != true {
+	if got[0].Name != "alice" || got[0].ID != "U-alice-1234" || got[0].PingMs != 42 || (got[0].FPS == nil || *got[0].FPS != 90.0) || got[0].Present != true {
 		t.Fatalf("alice mismatch: %+v", got[0])
 	}
 	// 名前に空白を含むケース（TAB区切りで対応可能）
@@ -394,27 +422,78 @@ func TestParseFriendRequests_RealFormatEmpirical(t *testing.T) {
 	}
 }
 
-func TestParseFriendRequests_AmbientNotOverStripped(t *testing.T) {
-	// ParseFriendRequests はプロンプト剥がしをせず（Driver の stripExactPrompt 済が前提）、
-	// "Updated: A -> B" のような ambient 行も '>' を含むが誤剥がしされずそのまま残る。
-	// → 明らかにユーザー名でない形で残るので UI 側で見分け可能 (v1 と同じ挙動)。
+func TestParseFriendRequests_FiltersKnownAmbient(t *testing.T) {
 	got := ParseFriendRequests([]string{
 		"Updated: 0001/01/01 0:00:00 -> 2026/05/28 8:19:20",
 		"alice",
 		"BOOTSTRAP: Running userspace bootstrap",
+		"SIGNALR: BroadcastStatus - Online",
+		"\tUserSessionId: S-test",
+		"\tCurrentSession: test",
+		"日本語 名前",
+		"Running refresh on: U-test",
+		"SIGNALR: BroadcastSession SessionInfo. Id: S-test, Name: World",
+		"bob with space",
+		"Name: value",
+		"A > B",
+		"SIGNALR",
 	})
-	// ambient は剥がされず明らかな非ユーザー名形で残る (v1 と同じ受容)
-	if len(got) != 3 {
-		t.Fatalf("v1 互換: ambient も含めて 3 件、got=%v", got)
+	want := []string{"alice", "日本語 名前", "bob with space", "Name: value", "A > B", "SIGNALR"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ログ除外または名前の保持に失敗: got=%v want=%v", got, want)
 	}
-	if got[1] != "alice" {
-		t.Fatalf("alice が壊れている: %v", got)
-	}
-	// 重要: ambient の '>' を含む行が "B" に化けていないこと
-	for _, s := range got {
-		if s == "B" {
-			t.Fatalf("ambient の '>' を含む行が誤剥がしされて 'B' に化けた: %v", got)
+}
+
+func TestParseListBansSpacedNames(t *testing.T) {
+	for _, name := range []string{"Test User", "日本語 名前", "Name UserID: U-decoy MachineIds: fake"} {
+		for _, sep := range []string{"\t", "   "} {
+			line := "[0]" + sep + "Username: " + name + sep + "UserID: U-real" + sep + "MachineIds: "
+			got := ParseListBans([]string{line})
+			if len(got) != 1 || got[0].Username != name || got[0].UserID != "U-real" || len(got[0].MachineIDs) != 0 {
+				t.Fatalf("名前/区切り/空MachineIds: %q → %+v", line, got)
+			}
 		}
+	}
+}
+
+func TestParseUsersFPS(t *testing.T) {
+	for _, tc := range []struct {
+		fps  string
+		want *float64
+	}{
+		{"59.9", new(59.9)}, {"0", new(0.0)}, {"1E-05", new(0.00001)},
+		{"NaN", nil}, {"Infinity", nil}, {"-Infinity", nil}, {"1e999", nil},
+		{"-1", nil}, {"unknown", nil}, {"", nil}, {"1.2.3", nil},
+	} {
+		t.Run(tc.fps, func(t *testing.T) {
+			got := ParseUsers([]string{"Test User\tID: \tRole: Guest\tPresent: True\tPing: 10 ms\tFPS: " + tc.fps + "\tSilenced: False"})
+			if len(got) != 1 || got[0].Name != "Test User" || !reflect.DeepEqual(got[0].FPS, tc.want) {
+				t.Fatalf("参加者またはFPSを誤解析: %+v", got)
+			}
+			data, err := json.Marshal(got)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var decoded []UserInfo
+			if err := json.Unmarshal(data, &decoded); err != nil || !reflect.DeepEqual(got, decoded) {
+				t.Fatalf("JSON往復: %s (%v)", data, err)
+			}
+		})
+	}
+}
+
+func TestParseStatusInvalidCounts(t *testing.T) {
+	for _, key := range []string{"Current Users", "Present Users", "Max Users"} {
+		for _, val := range []string{"unknown", "", "1.5", "999999999999999999999999"} {
+			got, err := ParseStatus([]string{"Name: Test", key + ": " + val})
+			if err == nil || !reflect.DeepEqual(got, WorldStatus{}) {
+				t.Fatalf("不正人数を成功扱い: %s=%q got=%+v err=%v", key, val, got, err)
+			}
+		}
+	}
+	got, err := ParseStatus([]string{"Current Users: 0", "Current Users: invalid", "Present Users: 0", "Max Users: 16"})
+	if err != nil || got.CurrentUsers != 0 || got.MaxUsers != 16 {
+		t.Fatalf("正常な0人/先頭優先を維持: %+v (%v)", got, err)
 	}
 }
 

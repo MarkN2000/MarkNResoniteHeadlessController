@@ -355,6 +355,27 @@ func TestServer_SessionStatus_Concurrent(t *testing.T) {
 
 // --- writeExecErr のエラーマッピング ---
 
+func TestServer_ExecError_InvalidStatusCount(t *testing.T) {
+	_, err := headless.ParseStatus([]string{"Current Users: unknown"})
+	if err == nil {
+		t.Fatal("不正な人数が解析に成功した")
+	}
+	w := httptest.NewRecorder()
+	writeExecErr(w, err)
+	var body struct {
+		OK    bool `json:"ok"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != http.StatusInternalServerError || body.OK || body.Error.Code != "exec_failed" {
+		t.Fatalf("不正人数は0人の成功応答にしない: HTTP %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestServer_ExecError_NotReady_After_Stop(t *testing.T) {
 	// driver を停止 → /sessions が 409 (ErrNotReady→409 Conflict)
 	ts, pw := newTestServer(t)

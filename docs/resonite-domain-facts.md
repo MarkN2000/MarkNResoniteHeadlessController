@@ -315,10 +315,10 @@ fixture: `scripts/empirical-capture/fixtures/2026-05-28-lan-login/`
 - v1 (Node) の単純実装 `split + trim + filter('>')` が正解だったことを実機で確証
 
 **実装 (我々の Go)**:
-- `ParseFriendRequests` は v1 戦略（split+trim、プロンプトのみ行は保険でスキップ）。prompt-glue は Driver の `stripExactPrompt` が事前除去
+- `ParseFriendRequests` は split+trim に加え、2026-10-26から既知の非同期ログとSignalRダンプの子項目を除外する。prompt-glue は Driver の `stripExactPrompt` が事前除去。判別規則は `design/structured-driver.md` §8 を参照
 - 我々のテスト環境 (MarkN_headless) では pending が 0 件で empty レスポンスのみ取れたが、
   user の別アカウント (MARKNPC_SUB2) で実 format を採取
-- 限界: boot ambient が多発する状況では ambient 行も含まれる可能性あり (v1 と同じ受容)
+- 限界: 未知のログとユーザー名、既知ログ書式そのものと同じ名前は完全には識別できない（送信側の出力に識別情報がない）
 
 **`/command` の API 上の仕様注意**:
 - POST body は **JSON のみ** (`{"cmd":"X"}`)

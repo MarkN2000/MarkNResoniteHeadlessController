@@ -621,8 +621,8 @@ func (s *Server) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			return e
 		}
-		got = headless.ParseStatus(lines)
-		return nil
+		got, e = headless.ParseStatus(lines)
+		return e
 	})
 	if err != nil {
 		writeExecErr(w, err)
@@ -681,7 +681,10 @@ func (s *Server) handleSessionDetail(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			return e
 		}
-		resp.Status = headless.ParseStatus(statusLines)
+		resp.Status, e = headless.ParseStatus(statusLines)
+		if e != nil {
+			return e
+		}
 		userLines, e := tx.Exec("users")
 		if e != nil {
 			return e
@@ -707,7 +710,7 @@ func (s *Server) handleListBans(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleFriendRequests: GET /api/v1/friendrequests → []string（focus 不要・グローバル）
-// 注意: v1 互換の単純実装。boot 直後 ambient が多い時はノイズ混入可。
+// 注意: 既知の非同期ログを除外するが、未知ログとユーザー名は完全には識別できない。
 // 詳細: internal/headless/parser.go の ParseFriendRequests godoc 参照。
 func (s *Server) handleFriendRequests(w http.ResponseWriter, r *http.Request) {
 	lines, err := s.driver.Exec(r.Context(), "friendrequests")

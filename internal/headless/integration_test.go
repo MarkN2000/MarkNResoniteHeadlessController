@@ -152,8 +152,8 @@ func TestIntegration_Exec_Status(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		got = ParseStatus(lines)
-		return nil
+		got, err = ParseStatus(lines)
+		return err
 	})
 	if err != nil {
 		t.Fatalf("ExecGroup: %v", err)
@@ -305,7 +305,10 @@ func TestIntegration_WorldsService_ForEach(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("status: %w", err)
 		}
-		st := ParseStatus(lines)
+		st, err := ParseStatus(lines)
+		if err != nil {
+			return err
+		}
 		if st.Name != w.Name {
 			return fmt.Errorf("focus 不整合: world=%s status.Name=%s", w.Name, st.Name)
 		}
