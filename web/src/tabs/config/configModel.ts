@@ -4,9 +4,32 @@
 // $schema は保存時に backend が付与するため雛形には含めない。
 
 import type { ConfigDefaults } from "../../api";
+import { WORLD_DEDICATED_KEYS, WORLD_NICHE_CATALOG } from "./fieldCatalog";
 
 export type ConfigMap = Record<string, unknown>;
 export type WorldMap = Record<string, unknown>;
+
+export function importConfig(text: string, current: ConfigMap): ConfigMap {
+  const isMap = (value: unknown): value is ConfigMap =>
+    value !== null && typeof value === "object" && !Array.isArray(value);
+  // 既知の項目名だけを揃える。ユーザー名をキーにした権限辞書や未知項目は変更しない。
+  const normalizeKeys = (obj: ConfigMap, keys: Iterable<string>): ConfigMap => {
+    const names = new Map(Array.from(keys, (key) => [key.toLowerCase(), key]));
+    return Object.fromEntries(Object.entries(obj).map(([key, value]) => [names.get(key.toLowerCase()) ?? key, value]));
+  };
+  const parsed: unknown = JSON.parse(text.replace(/^\uFEFF/, ""));
+  if (!isMap(parsed)) throw new Error("Invalid headless config");
+  const { startWorlds } = normalizeKeys(parsed, ["startWorlds"]);
+  if (!Array.isArray(startWorlds) || !startWorlds.every(isMap)) {
+    throw new Error("Invalid headless config");
+  }
+  const worlds = startWorlds.map((world) => {
+    const next = normalizeKeys(world, [...WORLD_DEDICATED_KEYS, ...WORLD_NICHE_CATALOG.map((field) => field.key)]);
+    if (isMap(next.forcePorts)) next.forcePorts = normalizeKeys(next.forcePorts, ["lnl", "quic", "tcp"]);
+    return next;
+  });
+  return { ...current, startWorlds: worlds };
+}
 
 // 1ワールドの雛形。専用フォーム（①一般＋②上級）が扱うキーだけを明示的に持つ。
 // 公式スキーマのうちニッチな項目（③）は雛形に入れず、「詳細フィールド」から必要時に追加する。

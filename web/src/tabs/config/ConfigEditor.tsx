@@ -1,4 +1,5 @@
-import { Button, Divider, Stack, Text } from "@mantine/core";
+import { useRef } from "react";
+import { Button, Divider, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import type { ConfigDefaults } from "../../api";
 import { FieldRow, InspectorCard, InspectorTextInput } from "../../components/inspector";
@@ -20,6 +21,7 @@ export function ConfigEditor({
   canSave,
   saving,
   onSave,
+  onImport,
   centralUserId,
   folderDefaults,
 }: {
@@ -32,10 +34,12 @@ export function ConfigEditor({
   canSave: boolean; // 変更あり かつ 名前・QUIC固定ポートが有効（filled 表示＋活性の単一条件）
   saving: boolean;
   onSave: () => void;
+  onImport: (file: File) => void;
   centralUserId?: string; // customSessionId prefix の自動入力元（R12）
   folderDefaults?: ConfigDefaults | null; // dataFolder/cacheFolder のリセット先既定値（UI改善⑤）
 }) {
   const { t } = useTranslation();
+  const fileInput = useRef<HTMLInputElement>(null);
   // 上下2箇所の保存ボタンを同一 props で生成（挙動・活性条件の単一情報源）。
   const saveButton = (fullWidth: boolean) => (
     <Button
@@ -52,8 +56,21 @@ export function ConfigEditor({
     </Button>
   );
   return (
-    <InspectorCard title={t("config.editorTitle")} actions={saveButton(false)}>
+    <InspectorCard title={t("config.editorTitle")} actions={
+      <Group gap={6}>
+        <Button size="xs" variant="default" disabled={saving} onClick={() => fileInput.current?.click()}>
+          {t("config.importJSON")}
+        </Button>
+        {saveButton(false)}
+      </Group>
+    }>
       <Stack gap="sm">
+        <input ref={fileInput} type="file" accept=".json,application/json" hidden disabled={saving} aria-label={t("config.importJSON")} onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file) onImport(file);
+        }} />
+        <Text size="xs" c="dimmed">{t("config.importHint")}</Text>
         <FieldRow label={t("config.nameLabel")}>
           <InspectorTextInput
             value={draftName}

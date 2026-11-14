@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Box, Center, Loader, ScrollArea, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
@@ -10,7 +10,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { SplitColumns } from "../../components/SplitColumns";
 import { ConfigEditor } from "./ConfigEditor";
 import { ConfigList } from "./ConfigList";
-import { getDuplicateUDPPorts } from "./configModel";
+import { getDuplicateUDPPorts, importConfig } from "./configModel";
 import type { ConfigMap } from "./configModel";
 
 // config 名のバリデーション（backend の SanitizeName と同じ・パストラバーサル防止）。
@@ -41,6 +41,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const [folderDefaults, setFolderDefaults] = useState<api.ConfigDefaults | null>(null);
   const [draftName, setDraftName] = useState(""); // 編集可能なコンフィグ名（selected と変えて保存＝リネーム）
   const [formNonce, setFormNonce] = useState(0); // 編集セッションごとに++＝ConfigEditor の key（毎回再マウントしバッファ入力を再シード）
+  const importRequest = useRef(0);
   const confirm = useConfirm();
   const apply = useAsyncAction();
 
@@ -70,6 +71,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   // 編集セッションを初期化（読込/空 で共通）。formNonce を進めて ConfigEditor を再マウントし、
   // バッファ付き入力（タグ/autoSpawn 等）を確実に再シードする。空（config 0件）は cfg=null。
   const seedEditor = (sel: string | null, name: string, cfgVal: ConfigMap | null, orig: ConfigMap | null) => {
+    importRequest.current++;
     setSelected(sel);
     setDraftName(name);
     setCfg(cfgVal);
@@ -78,6 +80,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   };
 
   const load = async (name: string) => {
+    importRequest.current++;
     setLoading(true);
     const m = await api.getConfig(name);
     setLoading(false);
@@ -99,6 +102,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
       if (c) setCentralUserId(c.userId);
     });
     void api.getConfigDefaults().then(setFolderDefaults);
+    return () => { importRequest.current++; };
   }, []);
 
   // 未保存編集があれば破棄確認を挟んでから action を実行（一覧切替/新規/複製で共通）。
@@ -117,6 +121,24 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
 
   const select = (name: string) => {
     if (name !== selected) guardDiscard(() => void load(name));
+  };
+
+  const importFile = async (file: File) => {
+    if (!cfg || apply.busy || confirm.busy) return;
+    const request = ++importRequest.current;
+    let imported: ConfigMap;
+    try {
+      imported = importConfig(await file.text(), cfg);
+    } catch {
+      if (request === importRequest.current) notifyError(t("config.importFailed"));
+      return;
+    }
+    // 読み取り中に切替・編集された場合は、その後の編集内容を上書きしない。
+    if (request !== importRequest.current) return;
+    guardDiscard(() => {
+      setCfg(imported);
+      setFormNonce((n) => n + 1);
+    });
   };
 
   // 保存（上書き／リネーム）。
@@ -220,10 +242,11 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
                 nameError={nameError}
                 portsError={portsValid ? undefined : t("config.udpPortDuplicateSummary")}
                 cfg={cfg}
-                onChange={setCfg}
+                onChange={(next) => { importRequest.current++; setCfg(next); }}
                 canSave={canSave}
                 saving={apply.busy}
                 onSave={save}
+                onImport={importFile}
                 centralUserId={centralUserId}
                 folderDefaults={folderDefaults}
               />

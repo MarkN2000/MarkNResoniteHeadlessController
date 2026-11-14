@@ -78,7 +78,7 @@ function SteamLog({ logs }: { logs: LogEntry[] }) {
   if (logs.length === 0) return null;
   return (
     <ScrollArea h={120} type="auto">
-      <Box style={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+      <Box style={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
         {logs.map((l, i) => (
           <div key={i}>{logLineText(t, l)}</div>
         ))}
