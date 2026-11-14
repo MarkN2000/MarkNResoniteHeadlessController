@@ -516,10 +516,18 @@ func (d *Driver) waitExit(cmd *exec.Cmd, wg *sync.WaitGroup) {
 //
 //	単段の force-kill とし、その分猶予を長くした。設計: phase-7-spec レビュー 2026-05-29）
 func (d *Driver) Stop() error {
+	return d.stop(180 * time.Second)
+}
+
+func (d *Driver) stop(grace time.Duration) error {
 	d.mu.Lock()
 	if d.state == StateStopped || d.cmd == nil {
 		d.mu.Unlock()
 		return ErrNotRunning
+	}
+	if d.stopping {
+		d.mu.Unlock()
+		return nil
 	}
 	d.stopping = true
 	stdin := d.stdin
@@ -528,12 +536,8 @@ func (d *Driver) Stop() error {
 	d.mu.Unlock()
 
 	d.publishLog("sys", "停止要求: shutdown を送信")
-	if stdin != nil {
-		_, _ = io.WriteString(stdin, "shutdown\n")
-	}
-
 	go func() {
-		timer := time.NewTimer(180 * time.Second)
+		timer := time.NewTimer(grace)
 		defer timer.Stop()
 		<-timer.C
 		d.mu.Lock()
@@ -544,6 +548,10 @@ func (d *Driver) Stop() error {
 			_ = cmd.Process.Kill()
 		}
 	}()
+	// stdin が詰まっても停止受付と強制終了の期限を妨げない。
+	if stdin != nil {
+		go func() { _, _ = io.WriteString(stdin, "shutdown\n") }()
+	}
 	return nil
 }
 
@@ -658,6 +666,9 @@ func (d *Driver) checkReady() error {
 // execLocked は execMu を保持している前提で 1 コマンドを実行する。
 // Exec / ExecGroup 経由でのみ呼ばれる（execMu 取得は呼び出し側責務）。
 func (d *Driver) execLocked(ctx context.Context, cmd string, opts ...ExecOption) ([]string, error) {
+	if ctx.Err() != nil {
+		return nil, ErrCanceled
+	}
 	cfg := defaultExecConfig()
 	for _, o := range opts {
 		o(&cfg)

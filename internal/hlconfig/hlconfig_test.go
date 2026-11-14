@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"golang.org/x/text/unicode/norm"
@@ -91,6 +92,65 @@ func TestWriteRenamed_NFCvsNFD_NoDataLoss(t *testing.T) {
 	}
 	if l, _ := List(dir); len(l) != 1 {
 		t.Errorf("ファイル数が想定外（消失/重複）: %d", len(l))
+	}
+}
+
+func TestWriteRenamed_CaseOnly(t *testing.T) {
+	dir := t.TempDir()
+	if err := Write(dir, "world", map[string]any{"loginPassword": "keep", "comment": "before"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRenamed(dir, "world", "World", map[string]any{"loginPassword": "", "comment": "after"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readRaw(dir, "World")
+	if err != nil || got["comment"] != "after" || got["loginPassword"] != "keep" {
+		t.Fatalf("renamed config: %v, %v", got, err)
+	}
+	list, err := List(dir)
+	if err != nil || len(list) != 1 || list[0].Name != "World" {
+		t.Fatalf("renamed file list: %v, %v", list, err)
+	}
+}
+
+func TestWriteRenamed_CaseDistinctFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := Write(dir, "world", map[string]any{"loginPassword": "source"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(pathFor(dir, "World")); err == nil {
+		t.Skip("case-insensitive filesystem")
+	}
+	if err := Write(dir, "World", map[string]any{"loginPassword": "target"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRenamed(dir, "world", "World", map[string]any{"loginPassword": "", "comment": "after"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readRaw(dir, "World")
+	if err != nil || got["loginPassword"] != "source" || got["comment"] != "after" {
+		t.Fatalf("renamed config: %v, %v", got, err)
+	}
+	if _, err := os.Stat(pathFor(dir, "world")); !os.IsNotExist(err) {
+		t.Fatalf("source still exists: %v", err)
+	}
+}
+
+func TestCreate_ConcurrentNames(t *testing.T) {
+	dir := t.TempDir()
+	const count = 12
+	var wg sync.WaitGroup
+	for range count {
+		wg.Go(func() {
+			if _, err := Create(dir, dir); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	list, err := List(dir)
+	if err != nil || len(list) != count {
+		t.Fatalf("created %d configs, want %d: %v", len(list), count, err)
 	}
 }
 

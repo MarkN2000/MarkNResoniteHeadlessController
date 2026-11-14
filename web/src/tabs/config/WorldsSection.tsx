@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Button, Divider, Group, Stack, Switch, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import * as api from "../../api";
@@ -64,6 +64,7 @@ export function WorldsSection({
   const { t } = useTranslation();
   const worlds = getWorlds(cfg);
   const [active, setActive] = useState(0);
+  const [worldRevision, setWorldRevision] = useState(0);
   const confirm = useConfirm();
   const idx = Math.min(active, worlds.length - 1); // 削除でズレたとき安全に丸める
   const world: WorldMap = worlds[idx] ?? {};
@@ -119,6 +120,7 @@ export function WorldsSection({
       danger: true,
       onConfirm: () => {
         onChange(removeWorld(cfg, i));
+        if (i === idx) setWorldRevision((n) => n + 1);
         // 削除位置が active より前なら active を 1 つ詰め、末尾削除に備えて新範囲へクランプ。
         setActive((a) => Math.max(0, Math.min(i < a ? a - 1 : a, worlds.length - 2)));
       },
@@ -152,7 +154,7 @@ export function WorldsSection({
       </Group>
 
       {worlds.length > 0 && (
-        <>
+        <Fragment key={`${worldRevision}:${idx}`}>
           <FieldRow label={t("config.isEnabled")} {...resetProps("isEnabled", t("config.isEnabled"))}>
             <Switch checked={asBool(world.isEnabled, true)} onChange={(e) => setW("isEnabled", e.currentTarget.checked)} />
           </FieldRow>
@@ -413,7 +415,7 @@ export function WorldsSection({
               />
             </Stack>
           </CollapsibleSection>
-        </>
+        </Fragment>
       )}
 
       <ConfirmHost confirm={confirm} />

@@ -15,13 +15,18 @@ export function Login({ onAuthed }: { onAuthed: () => void }) {
     if (busy) return;
     setErr("");
     setBusy(true);
-    const r = await api.login(pw);
-    setBusy(false);
-    if (r.ok) {
-      setPw("");
-      onAuthed();
-    } else {
-      setErr(r.status === 429 ? t("login.rateLimited") : t("login.error"));
+    try {
+      const r = await api.login(pw);
+      if (r.ok) {
+        setPw("");
+        onAuthed();
+      } else {
+        setErr(r.status === 429 ? t("login.rateLimited") : t("login.error"));
+      }
+    } catch {
+      setErr(t("toast.errNetwork"));
+    } finally {
+      setBusy(false);
     }
   }
 

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,7 +15,34 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestDownloadTimeoutCleansTemporaryFiles(t *testing.T) {
+	for _, sendHeaders := range []bool{false, true} {
+		t.Run(fmt.Sprint(sendHeaders), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if sendHeaders {
+					w.WriteHeader(http.StatusOK)
+					w.(http.Flusher).Flush()
+				}
+				<-r.Context().Done()
+			}))
+			defer srv.Close()
+			a := NewAcquirer()
+			a.Client.Timeout = 100 * time.Millisecond
+			dir := t.TempDir()
+			err := a.downloadVerifyExtract(context.Background(), srv.URL, "unused", "DepotDownloader", filepath.Join(dir, "DepotDownloader"), nil)
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("停滞した取得がタイムアウトしない: %v", err)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("取得失敗の残骸: %v %v", entries, err)
+			}
+		})
+	}
+}
 
 // makeZip は entry 1件だけを含む zip のバイト列を返す（DD アセットを模した検証用）。
 func makeZip(t *testing.T, entry, content string) []byte {

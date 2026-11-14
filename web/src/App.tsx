@@ -75,6 +75,7 @@ function Shell({
   // 1つだけ覚えれば足りる（Set 全件保持は無制限に増えるため不可）。再接続時の履歴再送（重複 seq）も
   // これで弾け、取りこぼした新しい行は履歴から復旧できる。
   const lastSeq = useRef(0); // seq は 1 始まり。0 は安全な番兵
+  const logBoot = useRef<string | null>(null);
   // 中央 Resonite アカウントの設定状態（初回モーダル + 未設定バナーを駆動）。
   // null=未取得/取得失敗（バナー出さず）。取得成功して username+password が揃えば false。
   const [credUnset, setCredUnset] = useState<boolean | null>(null);
@@ -113,6 +114,14 @@ function Shell({
     const connect = () => {
       if (es) return; // 既に接続中（猶予中に戻ってきた等）
       es = new EventSource("/api/v1/events");
+      es.addEventListener("boot", (e) => {
+        const boot = JSON.parse((e as MessageEvent).data) as string;
+        if (logBoot.current !== null && logBoot.current !== boot) {
+          lastSeq.current = 0;
+          setLogs([]);
+        }
+        logBoot.current = boot;
+      });
       es.addEventListener("status", (e) => setStatus(JSON.parse((e as MessageEvent).data) as Status));
       es.addEventListener("log", (e) => {
         const line = JSON.parse((e as MessageEvent).data) as LogLine;

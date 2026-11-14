@@ -203,16 +203,15 @@ func runServer(cfg *config.Config, cfgPath, dir string, fromWizard bool) {
 		}
 	}
 
-	// 先にバックグラウンドワーカーを止める（予定発火を打ち切り、進行中の再起動 ①②③ を cancel して
-	// 下の driver.Stop() と競合しないようにする）。
+	go func() {
+		<-sigCh
+		fmt.Println(i18n.T(lang, "main.shutdown.force"))
+		os.Exit(1)
+	}()
+	// 予定発火・起動準備を中断し、以後の起動を閉じてから現在のプロセスを止める。
 	stopBackground()
 
 	if driver.Status().State != headless.StateStopped {
-		go func() {
-			<-sigCh
-			fmt.Println(i18n.T(lang, "main.shutdown.force"))
-			os.Exit(1)
-		}()
 		_ = driver.Stop()
 		// driver.Stop() の force-kill 猶予(180s)より少し長く待つ（先に MRHC が
 		// 終了して子プロセスが残るのを防ぐ）。

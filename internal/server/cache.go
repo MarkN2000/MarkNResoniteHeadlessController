@@ -99,6 +99,8 @@ func (s *Server) handleCacheInfo(w http.ResponseWriter, r *http.Request) {
 
 // handleCacheClear: POST /api/v1/cache/clear
 func (s *Server) handleCacheClear(w http.ResponseWriter, r *http.Request) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
 	if s.driver.Status().State != headless.StateStopped {
 		writeErr(w, http.StatusConflict, "headless_running",
 			"ヘッドレスが停止中のときのみキャッシュを削除できます。先に停止してください")
@@ -109,9 +111,7 @@ func (s *Server) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "cache_error", err.Error())
 		return
 	}
-	s.cacheMu.Lock()
 	removed, freed, err := emptyDir(dir)
-	s.cacheMu.Unlock()
 	if err != nil {
 		// 一部が削除できなかった（ロック中ファイル等）。原因を明示する。
 		writeErr(w, http.StatusInternalServerError, "cache_error", err.Error())
@@ -140,8 +140,11 @@ func (s *Server) maybeAutoEvictCache() {
 	}
 	cutoff := time.Now().Add(-time.Duration(cc.MaxAgeDays) * 24 * time.Hour)
 	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	if s.driver.Status().State != headless.StateStopped {
+		return // 停止通知の後に新しいプロセスが起動した場合は削除しない。
+	}
 	removed, freed, evErr := evictOlderThan(dir, cutoff)
-	s.cacheMu.Unlock()
 	if evErr != nil {
 		log.Printf("[cache] 自動削除中にエラー（一部のみ削除）: %v", evErr)
 	}

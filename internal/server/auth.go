@@ -56,20 +56,26 @@ func (a *authManager) loginLocked() (bool, time.Duration) {
 	return false, 0
 }
 
-// recordLoginResult はログイン結果を記録し、連続失敗が一定数を超えたら短時間ロックする。
-func (a *authManager) recordLoginResult(ok bool) {
+// authenticatePassword は画面とBearerの試行制限を共有する。
+// 判定と失敗回数の更新を直列化し、同時リクエストで制限をすり抜けないようにする。
+func (a *authManager) authenticatePassword(pw string) (bool, time.Duration) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if time.Now().Before(a.lockUntil) {
+		return false, time.Until(a.lockUntil)
+	}
+	ok := a.checkPassword(pw)
 	if ok {
 		a.failures = 0
 		a.lockUntil = time.Time{}
-		return
+		return true, 0
 	}
 	a.failures++
 	if a.failures >= 10 {
 		a.lockUntil = time.Now().Add(time.Minute)
 		a.failures = 0
 	}
+	return false, 0
 }
 
 func (a *authManager) checkPassword(pw string) bool {
@@ -133,7 +139,8 @@ func (s *Server) authorized(r *http.Request) bool {
 		return true
 	}
 	if pw := bearerToken(r); pw != "" {
-		return s.auth.checkPassword(pw)
+		ok, _ := s.auth.authenticatePassword(pw)
+		return ok
 	}
 	return false
 }
@@ -141,6 +148,10 @@ func (s *Server) authorized(r *http.Request) bool {
 func (s *Server) requireAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.authorized(r) {
+			if locked, _ := s.auth.loginLocked(); locked {
+				writeErr(w, http.StatusTooManyRequests, "rate_limited", "ログイン試行が多すぎます。しばらく待ってから再試行してください")
+				return
+			}
 			writeErr(w, http.StatusUnauthorized, "unauthorized", "認証が必要です")
 			return
 		}

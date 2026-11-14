@@ -1,9 +1,41 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
+
+func TestWriteFileAtomic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := WriteFileAtomic(path, []byte(`{"value":"old"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFileAtomic(path, []byte(`{"value":"new"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != `{"value":"new"}` {
+		t.Fatalf("replacement: %s, %v", got, err)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("private permissions: %v, %v", info, err)
+		}
+	}
+	// 置換できない宛先でも、既存の内容と一時ファイルの後始末を保つ。
+	if err := WriteFileAtomic(dir, []byte("cannot replace directory")); err == nil {
+		t.Fatal("replacing a directory succeeded")
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != `{"value":"new"}` {
+		t.Fatalf("failed replacement changed contents: %s, %v", got, err)
+	}
+	if leftovers, err := filepath.Glob(filepath.Join(filepath.Dir(dir), ".mrhc-config-*.tmp")); err != nil || len(leftovers) != 0 {
+		t.Fatalf("temporary files remain: %v, %v", leftovers, err)
+	}
+}
 
 // TestInstallDirOrDefault は install 先導出の優先順（明示 Steam.InstallDir → 既定）を検証する（R-A / 一本化）。
 func TestInstallDirOrDefault(t *testing.T) {

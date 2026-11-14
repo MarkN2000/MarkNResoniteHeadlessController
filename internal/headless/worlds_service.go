@@ -3,6 +3,7 @@ package headless
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -64,6 +65,46 @@ func NewWorldsService(d *Driver) WorldsService {
 	return &worldsService{d: d}
 }
 
+// FocusWorld は同じExecGroup内で対象の存在と切替後の状態を確認する。
+// ponytail: worldsにはSessionIDがないため番号と名前で照合する。同名セッションの入替も
+// 識別する必要が生じたら、一覧取得と操作要求でSessionIDを共有する。
+func FocusWorld(tx Tx, index int) (WorldStatus, error) {
+	lines, err := tx.Exec("worlds")
+	if err != nil {
+		return WorldStatus{}, err
+	}
+	for _, world := range ParseWorlds(lines) {
+		if world.Index == index {
+			return focusListedWorld(tx, world)
+		}
+	}
+	return WorldStatus{}, fmt.Errorf("セッション%dが見つかりません。最新の一覧を確認してください", index)
+}
+
+func focusListedWorld(tx Tx, world World) (WorldStatus, error) {
+	lines, err := tx.Exec(fmt.Sprintf("focus %d", world.Index), WithTimeout(2*time.Second))
+	if err != nil {
+		return WorldStatus{}, err
+	}
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "Unknown command" {
+			return WorldStatus{}, fmt.Errorf("セッション%dへの切り替えに失敗しました", world.Index)
+		}
+	}
+	lines, err = tx.Exec("status")
+	if err != nil {
+		return WorldStatus{}, err
+	}
+	status, err := ParseStatus(lines)
+	if err != nil {
+		return WorldStatus{}, err
+	}
+	if status.SessionID == "" || status.Name != world.Name {
+		return WorldStatus{}, fmt.Errorf("セッション%dへの切り替えを確認できませんでした", world.Index)
+	}
+	return status, nil
+}
+
 func (s *worldsService) List(ctx context.Context) ([]World, error) {
 	lines, err := s.d.Exec(ctx, "worlds")
 	if err != nil {
@@ -82,7 +123,7 @@ func (s *worldsService) ForEach(ctx context.Context, fn func(w World, s Scope) e
 		}
 		worlds := ParseWorlds(lines)
 		for _, w := range worlds {
-			if _, err := tx.Exec(fmt.Sprintf("focus %d", w.Index), WithTimeout(2*time.Second)); err != nil {
+			if _, err := focusListedWorld(tx, w); err != nil {
 				return fmt.Errorf("focus %d: %w", w.Index, err)
 			}
 			if err := fn(w, &scopeImpl{tx: tx, w: w}); err != nil {

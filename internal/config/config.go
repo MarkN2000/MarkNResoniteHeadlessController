@@ -167,7 +167,39 @@ func (c *Config) SaveTo(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	return WriteFileAtomic(path, b)
+}
+
+// WriteFileAtomic は同じディレクトリで書き込みを完了してから設定ファイルを置換する。
+// 既存ファイルの権限を維持し、新規ファイルは秘密情報を含むため 0600 にする。
+func WriteFileAtomic(path string, data []byte) error {
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".mrhc-config-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+	}()
+	if err := tmp.Chmod(mode); err != nil {
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }
 
 // RandomSecret は URL-safe な乱数文字列を生成する（APIキー・セッション秘密用）。

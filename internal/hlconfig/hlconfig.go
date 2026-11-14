@@ -19,9 +19,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"golang.org/x/text/unicode/norm"
 )
+
+// ponytail: 単一ヘッドレスの設定操作をまとめて排他する。複数管理対象に拡張する場合はストア単位へ移す。
+var filesMu sync.RWMutex
 
 const (
 	schemaURL               = "https://raw.githubusercontent.com/Yellow-Dog-Man/JSONSchemas/main/schemas/HeadlessConfig.schema.json"
@@ -100,13 +105,15 @@ func readRaw(dir, name string) (map[string]any, error) {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidJSON, err)
 	}
 	if m == nil {
-		m = map[string]any{}
+		return nil, ErrInvalidJSON
 	}
 	return m, nil
 }
 
 // List は dir 内の *.json を要約して返す（name 昇順）。dir 不在は空リスト。
 func List(dir string) ([]Summary, error) {
+	filesMu.RLock()
+	defer filesMu.RUnlock()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -137,6 +144,8 @@ func List(dir string) ([]Summary, error) {
 
 // ReadMasked は GET 用に loginPassword をマスク("")した config を返す。
 func ReadMasked(dir, name string) (map[string]any, error) {
+	filesMu.RLock()
+	defer filesMu.RUnlock()
 	if err := SanitizeName(name); err != nil {
 		return nil, err
 	}
@@ -154,6 +163,8 @@ func ReadMasked(dir, name string) (map[string]any, error) {
 //   - loginPassword が空なら既存ファイルの値を保持（GET でマスクされるため空送信＝変更なし）
 //   - $schema を付与し 0600 で保存
 func Write(dir, name string, body map[string]any) error {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	return writeMasked(dir, name, name, body)
 }
 
@@ -162,25 +173,43 @@ func Write(dir, name string, body map[string]any) error {
 // 保存先名のため、リネームでは元 config の password が失われる）。oldName 不在は ErrNotFound。
 // 書き込み成功 → 削除の順なので、途中で失敗してもデータは失われない（両方残る＝リトライ可能）。
 func WriteRenamed(dir, oldName, newName string, body map[string]any) error {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	if err := SanitizeName(oldName); err != nil {
+		return err
+	}
+	if err := SanitizeName(newName); err != nil {
 		return err
 	}
 	// 同名判定は NFC 正準形で行う。生バイトのままだと NFC/NFD 違いで「別名＝改名」と誤判定し、
 	// 「新名で書き込み → pathFor の正規化で同一ファイルに上書き → 旧名（=同一ファイル）を削除」で
 	// 保存内容を失う。pathFor が NFC 化するので、等価判定もそれに合わせる。
 	if norm.NFC.String(oldName) == norm.NFC.String(newName) {
-		return Write(dir, newName, body)
+		return writeMasked(dir, newName, oldName, body)
 	}
-	if _, err := os.Stat(pathFor(dir, oldName)); err != nil {
+	oldPath, newPath := pathFor(dir, oldName), pathFor(dir, newName)
+	oldInfo, err := os.Stat(oldPath)
+	if err != nil {
 		if os.IsNotExist(err) {
 			return ErrNotFound
 		}
 		return err
 	}
+	newInfo, err := os.Stat(newPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err == nil && os.SameFile(oldInfo, newInfo) {
+		// 大小文字を区別しないファイルシステムでも、保存した同一ファイルを削除しない。
+		if err := writeMasked(dir, oldName, oldName, body); err != nil {
+			return err
+		}
+		return os.Rename(oldPath, newPath)
+	}
 	if err := writeMasked(dir, newName, oldName, body); err != nil {
 		return err
 	}
-	return os.Remove(pathFor(dir, oldName))
+	return os.Remove(oldPath)
 }
 
 // writeMasked は Write の本体。マスクされた loginPassword（空）の解決先ファイルを
@@ -188,6 +217,9 @@ func WriteRenamed(dir, oldName, newName string, body map[string]any) error {
 func writeMasked(dir, name, maskSource string, body map[string]any) error {
 	if err := SanitizeName(name); err != nil {
 		return err
+	}
+	if body == nil {
+		return ErrInvalidJSON
 	}
 	if sw, ok := body["startWorlds"]; ok && sw != nil {
 		if _, isArr := sw.([]any); !isArr {
@@ -214,7 +246,7 @@ func writeMasked(dir, name, maskSource string, body map[string]any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(pathFor(dir, name), b, 0o600)
+	return config.WriteFileAtomic(pathFor(dir, name), b)
 }
 
 // normalizeAllowedURLHosts は旧TTSホストと完全一致する配列要素だけを現行ホストへ置換する。
@@ -348,6 +380,8 @@ func fixedPortNumber(value any) (uint16, bool) {
 
 // Delete は config を削除する。
 func Delete(dir, name string) error {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	if err := SanitizeName(name); err != nil {
 		return err
 	}
@@ -364,6 +398,8 @@ func Delete(dir, name string) error {
 // config 自身の loginCredential/loginPassword が空なら central を注入（per-config 指定を優先）。
 // 保存済みファイルには password を焼き込まず、平文は中央設定と起動用一時ファイルのみに存在する。
 func ResolveForLaunch(dir, name string, central Credentials, runDir string) (string, error) {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	if err := SanitizeName(name); err != nil {
 		return "", err
 	}
@@ -393,7 +429,7 @@ func ResolveForLaunch(dir, name string, central Credentials, runDir string) (str
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(out, b, 0o600); err != nil {
+	if err := config.WriteFileAtomic(out, b); err != nil {
 		return "", err
 	}
 	return out, nil
@@ -435,6 +471,8 @@ func bakedDefaultJSON(dataDir string) string {
 // dataFolder/cacheFolder には DefaultFolders(dataDir) の絶対パスを焼き込む（表示=保存値一致）。
 // comment はテンプレでは空で、default.json にだけ説明文を注入する（jsonString＝エスケープ安全）。
 func EnsureDefault(dir, dataDir string) error {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -449,7 +487,7 @@ func EnsureDefault(dir, dataDir string) error {
 	}
 	body := strings.Replace(bakedDefaultJSON(dataDir),
 		`"comment": ""`, `"comment": `+jsonString(defaultConfigComment), 1)
-	return os.WriteFile(filepath.Join(dir, "default.json"), []byte(body), 0o600)
+	return config.WriteFileAtomic(filepath.Join(dir, "default.json"), []byte(body))
 }
 
 // pickUniqueName は base, base2, base3, … の最初の未使用名を返す（即時作成の自動命名）。
@@ -478,6 +516,8 @@ func pickUniqueName(dir, base string) (string, error) {
 // 即時作成し、作成した名前（new-config, new-config2, …）を返す。default.json 用の説明文は
 // EnsureDefault 側で注入するため、こちらはテンプレそのまま＝フロント defaultConfig() と一致。
 func Create(dir, dataDir string) (string, error) {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
@@ -485,7 +525,7 @@ func Create(dir, dataDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(pathFor(dir, name), []byte(bakedDefaultJSON(dataDir)), 0o600); err != nil {
+	if err := config.WriteFileAtomic(pathFor(dir, name), []byte(bakedDefaultJSON(dataDir))); err != nil {
 		return "", err
 	}
 	return name, nil
@@ -495,6 +535,8 @@ func Create(dir, dataDir string) (string, error) {
 // を返す。フロント経由（GET マスク → PUT）と違い loginPassword・未知フィールド・整形が
 // そのまま写る（マスク済み password の喪失が構造的に起きない）。
 func Duplicate(dir, name string) (string, error) {
+	filesMu.Lock()
+	defer filesMu.Unlock()
 	if err := SanitizeName(name); err != nil {
 		return "", err
 	}
@@ -509,7 +551,7 @@ func Duplicate(dir, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(pathFor(dir, newName), b, 0o600); err != nil {
+	if err := config.WriteFileAtomic(pathFor(dir, newName), b); err != nil {
 		return "", err
 	}
 	return newName, nil
@@ -520,6 +562,8 @@ func Duplicate(dir, name string) (string, error) {
 // 絶対パスのみ対象（相対値はカレントディレクトリ汚染を避けて作らない＝headless の挙動は従来どおり）。
 // 作成失敗はエラーで返して起動を止める（headless 側の分かりにくいクラッシュより明示的な 409 で見せる）。
 func EnsureFolders(dir, name string) error {
+	filesMu.RLock()
+	defer filesMu.RUnlock()
 	m, err := readRaw(dir, name)
 	if err != nil {
 		return err

@@ -53,11 +53,11 @@ func (s *Server) loadFavoritesLocked() favoritesState {
 	return st
 }
 
-func (s *Server) saveFavoritesLocked(st favoritesState) {
+func (s *Server) saveFavoritesLocked(st favoritesState) error {
 	if s.dataDir == "" {
-		return
+		return nil
 	}
-	writeJSONFile(s.favoritesPath(), st)
+	return writeJSONFile(s.favoritesPath(), st)
 }
 
 // --- 状態変更（HTTP から独立・単体テスト可能。検証は HTTP 層が担う） ---
@@ -82,12 +82,11 @@ func (s *Server) addFavorite(f favoriteWorld) ([]favoriteWorld, error) {
 		return st.Worlds, errFavoritesFull
 	}
 	st.Worlds = append(st.Worlds, f)
-	s.saveFavoritesLocked(st)
-	return st.Worlds, nil
+	return st.Worlds, s.saveFavoritesLocked(st)
 }
 
 // removeFavorite は recordId 一致を取り除き更新後一覧を返す（無ければ無変更）。
-func (s *Server) removeFavorite(recordID string) []favoriteWorld {
+func (s *Server) removeFavorite(recordID string) ([]favoriteWorld, error) {
 	s.favMu.Lock()
 	defer s.favMu.Unlock()
 	st := s.loadFavoritesLocked()
@@ -99,9 +98,11 @@ func (s *Server) removeFavorite(recordID string) []favoriteWorld {
 	}
 	if len(out) != len(st.Worlds) {
 		st.Worlds = out
-		s.saveFavoritesLocked(st)
+		if err := s.saveFavoritesLocked(st); err != nil {
+			return nil, err
+		}
 	}
-	return out
+	return out, nil
 }
 
 // --- HTTP CRUD（いずれも更新後一覧を data で返す） ---
@@ -138,7 +139,11 @@ func (s *Server) handleFavoriteAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	worlds, err := s.addFavorite(body)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "limit_exceeded", err.Error())
+		if errors.Is(err, errFavoritesFull) {
+			writeErr(w, http.StatusBadRequest, "limit_exceeded", err.Error())
+		} else {
+			writeErr(w, http.StatusInternalServerError, "save_failed", err.Error())
+		}
 		return
 	}
 	writeOK(w, worlds)
@@ -146,5 +151,10 @@ func (s *Server) handleFavoriteAdd(w http.ResponseWriter, r *http.Request) {
 
 // handleFavoriteRemove: DELETE /api/v1/favorites/{recordId} → 削除 → 更新後一覧
 func (s *Server) handleFavoriteRemove(w http.ResponseWriter, r *http.Request) {
-	writeOK(w, s.removeFavorite(r.PathValue("recordId")))
+	worlds, err := s.removeFavorite(r.PathValue("recordId"))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "save_failed", err.Error())
+		return
+	}
+	writeOK(w, worlds)
 }

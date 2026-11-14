@@ -119,8 +119,7 @@ type Server struct {
 	// （add/remove の並行リクエストでの取りこぼし・上書きを防ぐ）。
 	favMu sync.Mutex
 
-	// cacheMu はキャッシュ削除（手動全削除 / 停止時の自動古削除）を直列化する
-	// （停止直後の自動削除と手動全削除が同時に同じフォルダを消す競合を防ぐ）。
+	// cacheMu はキャッシュ削除（手動 / 自動）とヘッドレス起動を排他する。
 	cacheMu sync.Mutex
 
 	// システム使用率（マシン全体・metrics.go）。sysSampler は runMetricsSampler（単一 goroutine）
@@ -187,7 +186,8 @@ func New(cfg *config.Config, cfgPath string, driver *headless.Driver, reso *reso
 
 // Start はバックグラウンドワーカー（scheduler・P8-4a／後続で crash-monitor）を起動し、
 // 停止関数を返す。停止関数は bg ctx を cancel（ワーカー停止）し、進行中の再起動を
-// best-effort で中止する（①②③のみ。④以降は仕様上 cancel 不可）。main から起動時に1回呼ぶ。
+// 中止する。起動の最終段との排他を待ち、戻った後は新しいプロセスを起動しない。
+// main から起動時に1回呼ぶ。
 func (s *Server) Start() (stop func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.bgMu.Lock()
@@ -203,6 +203,10 @@ func (s *Server) Start() (stop func()) {
 	return func() {
 		cancel()
 		_ = s.restart.Cancel()
+		// 既に起動判定を通過した処理だけを待つ。HTTP入力待ちも含む operationMu は待たない。
+		// 準備中・以後の起動は startHeadlessLocked がキャンセル済み ctx で拒否する。
+		s.cacheMu.Lock()
+		s.cacheMu.Unlock()
 	}
 }
 
@@ -375,8 +379,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "不正なリクエスト")
 		return
 	}
-	ok := s.auth.checkPassword(body.Password)
-	s.auth.recordLoginResult(ok)
+	ok, remain := s.auth.authenticatePassword(body.Password)
+	if remain > 0 {
+		writeErr(w, http.StatusTooManyRequests, "rate_limited",
+			fmt.Sprintf("ログイン試行が多すぎます。約%d秒後に再試行してください", int(remain.Seconds())+1))
+		return
+	}
 	if !ok {
 		writeErr(w, http.StatusUnauthorized, "invalid_password", "パスワードが違います")
 		return
@@ -614,14 +622,8 @@ func (s *Server) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	var got headless.WorldStatus
 	err = s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
-		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
-			return e
-		}
-		lines, e := tx.Exec("status")
-		if e != nil {
-			return e
-		}
-		got, e = headless.ParseStatus(lines)
+		var e error
+		got, e = headless.FocusWorld(tx, idx)
 		return e
 	})
 	if err != nil {
@@ -640,7 +642,7 @@ func (s *Server) handleSessionUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	var got []headless.UserInfo
 	err = s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
-		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+		if _, e := headless.FocusWorld(tx, idx); e != nil {
 			return e
 		}
 		lines, e := tx.Exec("users")
@@ -674,14 +676,8 @@ func (s *Server) handleSessionDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	var resp sessionDetailResp
 	err = s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
-		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
-			return e
-		}
-		statusLines, e := tx.Exec("status")
-		if e != nil {
-			return e
-		}
-		resp.Status, e = headless.ParseStatus(statusLines)
+		var e error
+		resp.Status, e = headless.FocusWorld(tx, idx)
 		if e != nil {
 			return e
 		}
@@ -818,6 +814,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	statusCh, cur := s.driver.SubscribeStatus(16)
 	defer s.driver.UnsubscribeStatus(statusCh)
 
+	writeSSE(w, "boot", s.bootID)
 	writeSSE(w, "status", cur)
 	for _, l := range history {
 		writeSSE(w, "log", l)

@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // ddVersion は固定する DepotDownloader のバージョン。GitHub の tag は "DepotDownloader_"+ddVersion。
@@ -62,9 +63,9 @@ type Acquirer struct {
 	Client  *http.Client // HTTP クライアント
 }
 
-// NewAcquirer は既定（GitHub Releases・既定HTTPクライアント）の取得器を返す。
+// NewAcquirer はGitHub Releasesの取得器を返す。DD起動前の取得にも待機上限を設ける。
 func NewAcquirer() *Acquirer {
-	return &Acquirer{BaseURL: ddReleaseBase, Client: http.DefaultClient}
+	return &Acquirer{BaseURL: ddReleaseBase, Client: &http.Client{Timeout: 5 * time.Minute}}
 }
 
 // Ensure は DepotDownloader 実行ファイルを用意してそのパスを返す（冪等）。

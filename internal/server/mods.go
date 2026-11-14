@@ -392,6 +392,11 @@ func (s *Server) startHeadless(headlessPath, launchPath, name string) error {
 
 // 全起動経路がここを通り、ジャーナル復旧とRML起動指定を共用する。
 func (s *Server) startHeadlessLocked(headlessPath, launchPath, name string) error {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	if err := s.backgroundCtx().Err(); err != nil {
+		return err
+	}
 	if s.steamRunning() {
 		return errModBusy
 	}

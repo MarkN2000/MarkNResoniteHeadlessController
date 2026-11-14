@@ -6,7 +6,7 @@ package server
 // 設計方針:
 //   - idx は path、識別子/引数は body（JSON）。全 POST・認証必須。
 //   - セッション操作 = ExecGroup(focus idx → cmd)、グローバル操作 = Exec（focus 不要）。
-//   - idx は信頼（focus 前の worlds 検証なし。range 外 idx の誤爆は妥協＝read 系と同挙動）。
+//   - 対象の存在とfocus後のstatusを確認してから操作する。
 //   - 方針A: write 出力はパースせず、プロンプト復帰 = 成功で {"executed":true} を返す。
 //     UI はトースト + 該当データ再取得で実状態を見せる。
 //   - 引数サニタイズは internal/headless の QuoteArg / SanitizeToken に集約。
@@ -45,7 +45,7 @@ const saveTimeout = 600 * time.Second
 // focus と cmd は execMu を握ったまま連続実行されるため、他リクエストに割り込まれない。
 func (s *Server) execSession(w http.ResponseWriter, r *http.Request, idx int, cmd string, opts ...headless.ExecOption) {
 	err := s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
-		if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+		if _, e := headless.FocusWorld(tx, idx); e != nil {
 			return e
 		}
 		_, e := tx.Exec(cmd, opts...)
@@ -340,7 +340,7 @@ func (s *Server) handleSessionSpawnImpulse(w http.ResponseWriter, r *http.Reques
 	}
 	if url != "" {
 		err := s.driver.ExecGroup(r.Context(), func(tx headless.Tx) error {
-			if _, e := tx.Exec(fmt.Sprintf("focus %d", idx)); e != nil {
+			if _, e := headless.FocusWorld(tx, idx); e != nil {
 				return e
 			}
 			return execTemporarySpawn(tx, url)

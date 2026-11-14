@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -128,5 +129,22 @@ func TestFavorites_AddValidation(t *testing.T) {
 	}
 	if got := s.listFavorites(); len(got) != 1 {
 		t.Fatalf("after valid add: want 1, got %d", len(got))
+	}
+}
+
+func TestFavorites_SaveFailure(t *testing.T) {
+	s := newFavServer(t, t.TempDir())
+	if err := os.Mkdir(s.favoritesPath(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/favorites",
+		strings.NewReader(`{"name":"World","resoniteUrl":"resrec:///U-x/R-y","ownerId":"U-x","recordId":"R-y"}`))
+	s.handleFavoriteAdd(rec, req)
+	if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), "save_failed") {
+		t.Fatalf("failed save reported success: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := s.listFavorites(); len(got) != 0 {
+		t.Fatalf("unsaved favorites returned: %+v", got)
 	}
 }

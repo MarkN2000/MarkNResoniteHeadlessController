@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Center, Loader, ScrollArea, Stack } from "@mantine/core";
 import * as api from "../../api";
@@ -37,6 +37,8 @@ export function ScheduleTab({
   const [original, setOriginal] = useState<RestartConfig | null>(null);
   const confirm = useConfirm();
   const apply = useAsyncAction();
+  const savePending = useRef(false);
+  const [saving, setSaving] = useState(false);
   const announceTemplates = templates.filter((template) => template.actions.includes("announce"));
   const announce = rc?.preActions.announce;
   const announceTemplate = announceTemplates.find((template) => template.id === announce?.templateId);
@@ -114,32 +116,33 @@ export function ScheduleTab({
     });
   };
 
-  // 設定群の一括保存。完全オブジェクトを PUT（backend pointer 設計に一致）。
-  // 保存後に next-schedule が変わるため status を refetch（backend 側でも scheduler.Reload 発火）。
-  const save = () =>
-    apply.run(async () => {
-      if (!rc) return { ok: true };
-      const r = await api.putRestartConfig(rc);
+  // 一括保存と予定の即時保存は同じ設定全体を送るため、同時に実行しない。
+  const persistConfig = async (next: RestartConfig, schedulesOnly = false): Promise<WriteResult | undefined> => {
+    if (savePending.current) return;
+    savePending.current = true;
+    setSaving(true);
+    try {
+      const r = await api.putRestartConfig(next);
       if (r.ok) {
-        setOriginal(rc);
+        setOriginal(next);
+        if (schedulesOnly) setRc((cur) => (cur ? { ...cur, scheduled: next.scheduled } : cur));
         void refetch();
       }
       return r;
-    }, t("schedule.toastSaved"));
+    } finally {
+      savePending.current = false;
+      setSaving(false);
+    }
+  };
+
+  const save = () => apply.run(async () => rc ? persistConfig(rc) : undefined, t("schedule.toastSaved"));
 
   // 予定リストはその場で即保存（一括「保存」から分離）。設定値は最後に保存した値(original)を使うので、
   // 未保存の待機/事前アクション/クラッシュ復帰の編集は巻き込まない（それらは従来どおり一括保存）。
   // トーストは呼び出し側（ScheduleListCard の useAsyncAction / useConfirm）が1回だけ出す（ここでは出さない）。
-  const persist = async (scheduled: ScheduledRestart[]): Promise<WriteResult> => {
-    if (!rc || !original) return { ok: true };
-    const persisted = { ...original, scheduled };
-    const r = await api.putRestartConfig(persisted);
-    if (r.ok) {
-      setOriginal(persisted);
-      setRc((cur) => (cur ? { ...cur, scheduled } : cur));
-      void refetch();
-    }
-    return r;
+  const persist = async (scheduled: ScheduledRestart[]): Promise<WriteResult | undefined> => {
+    if (!original) return;
+    return persistConfig({ ...original, scheduled }, true);
   };
 
   // rc 更新ヘルパ（スライス単位の onChange を合成）。
@@ -160,7 +163,7 @@ export function ScheduleTab({
             right={
               rc ? (
                 <Stack gap="lg">
-                  <ScheduleListCard schedules={rc.scheduled} configs={configs} onPersist={persist} />
+                  <ScheduleListCard schedules={rc.scheduled} configs={configs} onPersist={persist} saving={saving} />
                   <WaitControlCard value={rc.waitControl} onChange={(waitControl) => patch({ waitControl })} />
                   <PreActionsCard
                     value={rc.preActions}
@@ -175,7 +178,7 @@ export function ScheduleTab({
                     onScheduledChange={(updateOnScheduledRestart) => patch({ updateOnScheduledRestart })}
                     onManualChange={(updateBeforeManualStart) => patch({ updateBeforeManualStart })}
                   />
-                  <SaveBar dirty={dirty} valid={ttsAnnouncementValid} saving={apply.busy} onSave={save} />
+                  <SaveBar dirty={dirty} valid={ttsAnnouncementValid} saving={saving} onSave={save} />
                 </Stack>
               ) : (
                 <Center h={200}>

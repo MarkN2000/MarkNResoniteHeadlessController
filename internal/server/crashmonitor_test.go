@@ -18,8 +18,72 @@ func newTestCrashMon(cfg func() (bool, int, int), inProgress func() bool, start 
 		start:      start,
 		now:        now,
 		windowUnit: time.Minute,
+		retryDelay: time.Millisecond,
 		signals:    make(chan struct{}, 8),
 		logf:       func(string, ...any) {},
+	}
+}
+
+func TestCrashMonitor_RetriesBusyWithoutCountingAnotherCrash(t *testing.T) {
+	attempts := 0
+	cm := newTestCrashMon(func() (bool, int, int) { return true, 2, 10 }, func() bool { return false }, func(string) error {
+		attempts++
+		if attempts < 3 {
+			return errModBusy
+		}
+		return nil
+	}, time.Now)
+	cm.handleCrash(context.Background())
+	if attempts != 3 || len(cm.crashes) != 1 {
+		t.Fatalf("attempts=%d crashes=%d", attempts, len(cm.crashes))
+	}
+	cm.handleCrash(context.Background())
+	if attempts != 3 {
+		t.Fatal("本当の2回目のクラッシュでループ保護が働いていない")
+	}
+}
+
+func TestCrashMonitor_RechecksOrchestratorAndStopsRetryOnShutdown(t *testing.T) {
+	checks, starts := 0, 0
+	cm := newTestCrashMon(func() (bool, int, int) { return true, 3, 10 }, func() bool {
+		checks++
+		return checks == 1
+	}, func(string) error { starts++; return nil }, time.Now)
+	cm.handleCrash(context.Background())
+	if starts != 1 || checks != 2 {
+		t.Fatalf("再起動直後のクラッシュを取りこぼした: checks=%d starts=%d", checks, starts)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cm.start = func(string) error { starts++; cancel(); return errModBusy }
+	cm.handleCrash(ctx)
+	if starts != 2 {
+		t.Fatal("shutdown 後も再試行した")
+	}
+}
+
+func TestCrashMonitor_BusyRetryIsBounded(t *testing.T) {
+	attempts := 0
+	cm := newTestCrashMon(func() (bool, int, int) { return true, 3, 10 }, func() bool { return false }, func(string) error {
+		attempts++
+		return errModBusy
+	}, time.Now)
+	cm.handleCrash(context.Background())
+	if attempts != 3 {
+		t.Fatalf("競合時の試行回数=%d want 3", attempts)
+	}
+}
+
+func TestCrashMonitor_DisablingRecoveryStopsPendingRetry(t *testing.T) {
+	enabled, attempts := true, 0
+	cm := newTestCrashMon(func() (bool, int, int) { return enabled, 3, 10 }, func() bool { return false }, func(string) error {
+		attempts++
+		enabled = false
+		return errModBusy
+	}, time.Now)
+	cm.handleCrash(context.Background())
+	if attempts != 1 {
+		t.Fatalf("自動復帰を無効にしても再試行した: %d", attempts)
 	}
 }
 

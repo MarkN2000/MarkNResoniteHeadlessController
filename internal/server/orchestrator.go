@@ -179,6 +179,10 @@ func (o *restartOrchestrator) startFlow(rc config.Restart, name, triggerType str
 	if parent == nil {
 		parent = context.Background()
 	}
+	if err := parent.Err(); err != nil {
+		o.mu.Unlock()
+		return err
+	}
 	ctx, cancel := context.WithCancel(parent)
 	o.cancel = cancel
 	o.p = restartProgress{
@@ -483,10 +487,15 @@ func (o *restartOrchestrator) announce(ctx context.Context, a config.AnnounceAct
 // doRestart は ④ 停止→（StateStopped 待ち）→（予定再起動なら更新）→選択 config で起動。cancel 不可。
 func (o *restartOrchestrator) doRestart(name, triggerType string) {
 	_ = o.driver.Stop() // 既に停止していれば ErrNotRunning（無視）
-	o.waitStopped()
+	if !o.waitStopped() {
+		return
+	}
 	// 予定再起動なら停止完了後・起動前に Resonite を更新する（scheduled 限定・失敗でも起動継続・P9-B）。
 	if o.beforeStart != nil {
 		o.beforeStart(o.parent(), triggerType)
+	}
+	if o.parent().Err() != nil {
+		return
 	}
 	headlessPath, launchPath, err := o.resolve(name)
 	if err != nil {
@@ -496,6 +505,9 @@ func (o *restartOrchestrator) doRestart(name, triggerType string) {
 	start := o.start
 	if start == nil {
 		start = o.driver.Start
+	}
+	if o.parent().Err() != nil {
+		return
 	}
 	if err := start(headlessPath, launchPath, name); err != nil {
 		log.Printf("[restart] 起動に失敗（再起動を中断）: %v", err)
@@ -507,12 +519,22 @@ func (o *restartOrchestrator) doRestart(name, triggerType string) {
 	}
 }
 
-func (o *restartOrchestrator) waitStopped() {
+func (o *restartOrchestrator) waitStopped() bool {
+	ctx := o.parent()
 	deadline := time.Now().Add(o.stopWaitTimeout)
 	for time.Now().Before(deadline) {
-		if o.driver.Status().State == headless.StateStopped {
-			return
+		if ctx.Err() != nil {
+			return false
 		}
-		time.Sleep(o.stopPollInterval)
+		if o.driver.Status().State == headless.StateStopped {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(o.stopPollInterval):
+		}
 	}
+	log.Printf("[restart] 停止を確認できないため処理を中断します")
+	return false
 }

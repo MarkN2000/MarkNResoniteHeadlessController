@@ -16,6 +16,7 @@ export function useVisiblePolling(fn: () => void | Promise<void>, intervalMs: nu
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
+    let running = false;
 
     const clear = () => {
       if (timer !== undefined) {
@@ -25,10 +26,12 @@ export function useVisiblePolling(fn: () => void | Promise<void>, intervalMs: nu
     };
     const tick = async () => {
       clear();
-      if (cancelled || document.hidden) return;
+      if (cancelled || document.hidden || running) return;
+      running = true;
       try {
         await fnRef.current();
       } finally {
+        running = false;
         // fn が throw しても poll ループを止めない（次回で復帰）。停止/非表示/unmount 時のみ再予約しない。
         if (!cancelled && !document.hidden) timer = setTimeout(() => void tick(), intervalMs);
       }

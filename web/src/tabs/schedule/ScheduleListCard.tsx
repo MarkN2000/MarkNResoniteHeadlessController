@@ -18,10 +18,12 @@ export function ScheduleListCard({
   schedules,
   configs,
   onPersist,
+  saving,
 }: {
   schedules: ScheduledRestart[];
   configs: ConfigSummary[];
-  onPersist: (scheduled: ScheduledRestart[]) => Promise<WriteResult>;
+  onPersist: (scheduled: ScheduledRestart[]) => Promise<WriteResult | undefined>;
+  saving: boolean;
 }) {
   const { t } = useTranslation();
   // 編集対象（コピー）。null=モーダル閉。新規/既存は id が一覧にあるかで判定。
@@ -54,7 +56,7 @@ export function ScheduleListCard({
     <InspectorCard
       title={t("schedule.scheduleListTitle")}
       actions={
-        <InspectorButton severity="neutral" disabled={act.busy} onClick={() => setEditing(defaultScheduled())}>
+        <InspectorButton severity="neutral" disabled={saving} onClick={() => setEditing(defaultScheduled())}>
           ＋ {t("schedule.addSchedule")}
         </InspectorButton>
       }
@@ -64,7 +66,7 @@ export function ScheduleListCard({
           const time = formatScheduleTime(s, t(WEEKDAY_KEYS[s.weekday] ?? WEEKDAY_KEYS[0]));
           return (
             <Group key={s.id} gap={4} wrap="nowrap" align="center">
-              <Switch size="xs" checked={s.enabled} onChange={(e) => toggle(s.id, e.currentTarget.checked)} />
+              <Switch size="xs" checked={s.enabled} disabled={saving} onChange={(e) => toggle(s.id, e.currentTarget.checked)} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <Text size="sm" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t(typeKey(s.type))}・{time}
@@ -73,10 +75,10 @@ export function ScheduleListCard({
                   {s.configName || t("schedule.usePrevious")}
                 </Text>
               </div>
-              <RowIconButton color="gray" label={t("schedule.editSchedule")} onClick={() => setEditing({ ...s })}>
+              <RowIconButton color="gray" label={t("schedule.editSchedule")} disabled={saving} onClick={() => setEditing({ ...s })}>
                 ✎
               </RowIconButton>
-              <RowIconButton color="red" label={t("schedule.deleteSchedule")} onClick={() => askRemove(s.id)}>
+              <RowIconButton color="red" label={t("schedule.deleteSchedule")} disabled={saving} onClick={() => askRemove(s.id)}>
                 ×
               </RowIconButton>
             </Group>

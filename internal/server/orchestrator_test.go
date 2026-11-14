@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +15,24 @@ import (
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/headless"
 )
+
+func TestDoRestart_ShutdownDuringUpdateDoesNotStart(t *testing.T) {
+	d := &fakeDriver{state: headless.StateRunning}
+	o := newTestOrch(d, &fakeWorlds{}, config.DefaultRestart(), "night")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	o.setParent(ctx)
+	o.beforeStart = func(context.Context, string) { cancel() }
+	o.doRestart("night", "scheduled")
+	state, _, starts, _ := d.snap()
+	if starts != 0 || state != headless.StateStopped {
+		t.Fatalf("終了中に起動した: starts=%d state=%s", starts, state)
+	}
+	d.setState(headless.StateRunning)
+	if err := o.Trigger("manual", "night"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("終了後の起動要求を受理した: %v", err)
+	}
+}
 
 // --- フェイク ---
 

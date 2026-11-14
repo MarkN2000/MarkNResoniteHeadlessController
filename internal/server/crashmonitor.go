@@ -24,6 +24,7 @@ type crashMonitor struct {
 	recordStart func(trigger, at string) // 最終起動の記録（§3.16(9)・trigger="crash"）
 	now         func() time.Time
 	windowUnit  time.Duration // windowMin の単位（本番 time.Minute・テストで縮める seam）
+	retryDelay  time.Duration // 一時的な起動競合の再確認間隔（本番1秒）
 	signals     chan struct{}
 	logf        func(format string, args ...any)
 
@@ -55,6 +56,7 @@ func newCrashMonitor(s *Server) *crashMonitor {
 		recordStart: s.recordLastStart,
 		now:         time.Now,
 		windowUnit:  time.Minute,
+		retryDelay:  time.Second,
 		signals:     make(chan struct{}, 4),
 		logf:        log.Printf,
 	}
@@ -75,12 +77,12 @@ func (cm *crashMonitor) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-cm.signals:
-			cm.handleCrash()
+			cm.handleCrash(ctx)
 		}
 	}
 }
 
-func (cm *crashMonitor) handleCrash() {
+func (cm *crashMonitor) handleCrash(ctx context.Context) {
 	enabled, maxCrashes, windowMin := cm.cfg()
 	if !enabled {
 		return // クラッシュ復帰 OFF
@@ -91,10 +93,6 @@ func (cm *crashMonitor) handleCrash() {
 	}
 	if windowMin < 1 {
 		windowMin = 1
-	}
-	if cm.inProgress() {
-		cm.logf("[crash] 再起動進行中のため自動復帰をスキップ（orchestrator が処理）")
-		return
 	}
 	// ループ保護: 窓内のクラッシュ回数を数え、maxCrashes 以上なら復帰停止。
 	now := cm.now()
@@ -110,22 +108,43 @@ func (cm *crashMonitor) handleCrash() {
 		cm.logf("[crash] ループ保護作動: %d分内に%d回クラッシュ。自動復帰を停止します", windowMin, len(cm.crashes))
 		return
 	}
-	name := cm.lastUsed()
-	if name == "" {
-		cm.logf("[crash] 直近 config が不明のため復帰できません")
-		return
-	}
-	if err := cm.start(name); err != nil {
-		if errors.Is(err, headless.ErrAlreadyRunning) {
-			// orchestrator 等が先に起動した＝復帰不要（inProgress チェックと start の非アトミック性の保険）。
-			cm.logf("[crash] 既に起動済みのため自動復帰をスキップ")
+	// 同じクラッシュを回数に重複加算せず、一時的な競合だけ最大3回確認する。
+	for attempt := 0; attempt < 3; attempt++ {
+		if ctx.Err() != nil {
 			return
 		}
-		cm.logf("[crash] 自動復帰の起動に失敗（%s）: %v", name, err)
-		return
+		if enabled, _, _ := cm.cfg(); !enabled {
+			return
+		}
+		if !cm.inProgress() {
+			name := cm.lastUsed()
+			if name == "" {
+				cm.logf("[crash] 直近 config が不明のため復帰できません")
+				return
+			}
+			err := cm.start(name)
+			switch {
+			case err == nil:
+				if cm.recordStart != nil {
+					cm.recordStart("crash", cm.now().Format(time.RFC3339))
+				}
+				cm.logf("[crash] 自動復帰しました（config=%s）", name)
+				return
+			case errors.Is(err, headless.ErrAlreadyRunning):
+				cm.logf("[crash] 既に起動済みのため自動復帰をスキップ")
+				return
+			case !errors.Is(err, errModBusy):
+				cm.logf("[crash] 自動復帰の起動に失敗（%s）: %v", name, err)
+				return
+			}
+		}
+		if attempt < 2 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(cm.retryDelay):
+			}
+		}
 	}
-	if cm.recordStart != nil {
-		cm.recordStart("crash", cm.now().Format(time.RFC3339))
-	}
-	cm.logf("[crash] 自動復帰しました（config=%s）", name)
+	cm.logf("[crash] 起動処理の競合が続くため自動復帰を見送ります")
 }

@@ -29,6 +29,67 @@ import (
 
 var testReq = platform.RuntimeRequirement{Major: 10, Minor: 0, Patch: 0, Raw: "10.0.0"}
 
+func TestShutdownRejectsPendingAndLaterStarts(t *testing.T) {
+	_, _, s, _ := newGuardServer(t)
+	stop := s.Start()
+	entered, release, prepared := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	s.readRuntimeReq = func(string) (platform.RuntimeRequirement, bool) { return testReq, true }
+	s.systemSatisfies = func(string, string, platform.RuntimeRequirement) bool {
+		close(entered)
+		<-release
+		return true
+	}
+	s.operationMu.Lock()
+	go func() {
+		defer close(prepared)
+		defer s.operationMu.Unlock()
+		s.startWithRuntimeGuard("night", fakehlPath, "")
+	}()
+	<-entered
+	done := make(chan struct{})
+	go func() { stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		close(release)
+		t.Fatal("shutdown が準備中の operationMu を待っている")
+	}
+	close(release)
+	select {
+	case <-prepared:
+	case <-time.After(2 * time.Second):
+		t.Fatal("起動準備が完了しない")
+	}
+	t.Cleanup(func() { stopFakehl(s.driver) })
+	if st := s.driver.Status(); st.State != headless.StateStopped {
+		t.Fatalf("shutdown 中に起動した: %+v", st)
+	}
+	if err := s.startHeadless(fakehlPath, "", "night"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("shutdown 後の起動を拒否していない: %v", err)
+	}
+}
+
+func TestShutdownWaitsForFinalStart(t *testing.T) {
+	_, _, s, _ := newGuardServer(t)
+	stop := s.Start()
+	s.cacheMu.Lock()
+	done := make(chan struct{})
+	go func() { stop(); close(done) }()
+	<-s.backgroundCtx().Done()
+	select {
+	case <-done:
+		s.cacheMu.Unlock()
+		t.Fatal("起動の最終段との排他を待たず shutdown が完了した")
+	case <-time.After(30 * time.Millisecond):
+	}
+	s.cacheMu.Unlock()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("起動の最終段が完了しても shutdown が完了しない")
+	}
+}
+
 // newGuardServer は newConfigServer と同型だが、seam を差し替えるため *Server も返す。
 func newGuardServer(t *testing.T) (ts *httptest.Server, pw string, srv *Server, dataDir string) {
 	t.Helper()

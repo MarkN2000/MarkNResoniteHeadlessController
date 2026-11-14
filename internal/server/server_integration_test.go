@@ -4,6 +4,7 @@ package server
 // Server (httptest) 経由で 構造化API + 認証(Bearer) + メソッド/エラーマッピング を検証する。
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,6 +26,21 @@ import (
 )
 
 var fakehlPath string
+
+func TestEventsBootPrecedesHistory(t *testing.T) {
+	driver := headless.NewDriver(nil)
+	driver.PublishSys("history")
+	s := &Server{driver: driver, bootID: "boot-one"}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r := httptest.NewRequest(http.MethodGet, "/events", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	s.handleEvents(w, r)
+	body := w.Body.String()
+	if !strings.HasPrefix(body, "event: boot\ndata: \"boot-one\"\n\nevent: status\n") || !strings.Contains(body, "event: log\n") {
+		t.Fatalf("起動識別子が履歴より前に送られない: %s", body)
+	}
+}
 
 func TestMain(m *testing.M) {
 	tmp, err := os.MkdirTemp("", "mrhc-server-fakehl-")

@@ -74,6 +74,7 @@ func (u *Updater) ApplyWithProgress(ctx context.Context, progress ProgressFunc) 
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath) // 成否にかかわらずアーカイブは残さない
+	defer tmp.Close()
 
 	base := strings.TrimSuffix(u.BaseURL, "/") + "/releases/download/" + latest
 	// SHA256SUMS（数百B）は本体（十数MB）より先に取得する: 公開直後等で SUMS が欠けている

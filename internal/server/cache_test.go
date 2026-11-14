@@ -194,3 +194,33 @@ func TestMaybeAutoEvictCache(t *testing.T) {
 		t.Fatal("enabled: new.bin should remain")
 	}
 }
+
+func TestCacheCleanupAndStartAreExclusive(t *testing.T) {
+	_, _, cacheDir, srv := newCacheServer(t)
+	srv.cfg.CacheCleanup = &config.CacheCleanup{Enabled: true, MaxAgeDays: 30}
+	mkCacheFile(t, cacheDir, "old.bin", "old", time.Now().Add(-40*24*time.Hour))
+	t.Cleanup(func() { stopFakehl(srv.driver) })
+	srv.cacheMu.Lock()
+	started := make(chan error, 1)
+	go func() { started <- srv.startHeadless(fakehlPath, "", "night") }()
+	select {
+	case err := <-started:
+		srv.cacheMu.Unlock()
+		t.Fatalf("キャッシュ操作中に起動した: %v", err)
+	case <-time.After(30 * time.Millisecond):
+	}
+	srv.cacheMu.Unlock()
+	select {
+	case err := <-started:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("キャッシュ操作後に起動できない")
+	}
+	// 停止コールバックより先に次のプロセスが起動した場合は、そのキャッシュを削除しない。
+	srv.maybeAutoEvictCache()
+	if _, err := os.Stat(filepath.Join(cacheDir, "old.bin")); err != nil {
+		t.Fatal("起動後に自動キャッシュ削除が走った", err)
+	}
+}

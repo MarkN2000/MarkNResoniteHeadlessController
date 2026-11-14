@@ -6,6 +6,8 @@ package server
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/MarkN2000/MarkNResoniteHeadlessController/internal/config"
 )
 
 // readJSONFile は path の JSON を T に読み込む。存在しない/壊れている場合は T のゼロ値を返す
@@ -19,9 +21,11 @@ func readJSONFile[T any](path string) T {
 }
 
 // writeJSONFile は v を整形 JSON として path に 0600 で書く（秘密を含み得る状態ファイル用）。
-// runtimeState と同様、書き込み失敗は best-effort で握りつぶす（次回保存で回復する状態のため）。
-func writeJSONFile[T any](path string, v T) {
-	if b, err := json.MarshalIndent(v, "", "  "); err == nil {
-		_ = os.WriteFile(path, b, 0o600)
+// 保存失敗を呼び出し元に返し、既存ファイルは途中で切り詰めない。
+func writeJSONFile[T any](path string, v T) error {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
 	}
+	return config.WriteFileAtomic(path, b)
 }

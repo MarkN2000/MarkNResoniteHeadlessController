@@ -41,6 +41,8 @@ jobs:
           npm ci --ignore-scripts
           npm audit signatures
           npm audit --audit-level=high
+          npx tsc --noEmit
+          node ../scripts/check-config-import.mjs
           npm run build
 
       # --- バックエンド（CGO 不要の純 Go。GOOS/GOARCH を変えるだけでクロスビルド可）---
@@ -48,6 +50,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Test backend
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: go test -race ./internal/... ./cmd/... -timeout 120s
       - name: Build binary
         env:
           CGO_ENABLED: '0'

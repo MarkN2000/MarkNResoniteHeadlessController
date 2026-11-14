@@ -76,6 +76,16 @@ func TestApplyLinux(t *testing.T) {
 	}
 }
 
+func TestApplyInvalidChecksumsCleansTemporaryFile(t *testing.T) {
+	u, exe := setupLinuxApply(t, "v2.1.0", linuxArchive(t, fakeELF(elf.EM_X86_64, "new")),
+		map[string][]byte{"SHA256SUMS": []byte("invalid")})
+	old := readFile(t, exe)
+	if _, err := u.Apply(context.Background()); err == nil {
+		t.Fatal("invalid checksums accepted")
+	}
+	assertUntouched(t, exe, old)
+}
+
 func TestApplyPrereleaseAndMinimumVersion(t *testing.T) {
 	for _, minimum := range []string{"", "v2.2.0-beta.1", "v2.2.0"} {
 		t.Run(minimum, func(t *testing.T) {

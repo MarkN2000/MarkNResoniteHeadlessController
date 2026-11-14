@@ -95,7 +95,7 @@ func TestAuth_LoginLockout(t *testing.T) {
 	a := newTestAuth("pw")
 	// 失敗を 10 回繰り返すとロック
 	for i := 0; i < 10; i++ {
-		a.recordLoginResult(false)
+		a.authenticatePassword("wrong")
 	}
 	locked, remain := a.loginLocked()
 	if !locked {
@@ -104,10 +104,54 @@ func TestAuth_LoginLockout(t *testing.T) {
 	if remain <= 0 || remain > time.Minute+time.Second {
 		t.Fatalf("remain が想定外: %v", remain)
 	}
-	// 成功 → failures リセット
-	a.recordLoginResult(true)
+	if ok, remain := a.authenticatePassword("pw"); ok || remain <= 0 {
+		t.Fatal("ロック中に正しいパスワードで制限を回避できた")
+	}
+	a.lockUntil = time.Now().Add(-time.Second)
+	if ok, _ := a.authenticatePassword("pw"); !ok {
+		t.Fatal("ロック解除後も認証できない")
+	}
 	if a.failures != 0 {
 		t.Fatalf("成功後 failures が 0 にリセットされていない: %d", a.failures)
+	}
+}
+
+func TestAuth_BearerAndLoginShareLockout(t *testing.T) {
+	a := newTestAuth("pw")
+	s := &Server{auth: a, cfg: a.cfg}
+	h := s.requireAuth(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r := httptest.NewRequest(http.MethodGet, "/status", nil)
+			r.Header.Set("Authorization", "Bearer wrong")
+			h(httptest.NewRecorder(), r)
+		}()
+	}
+	wg.Wait()
+	if locked, _ := a.loginLocked(); !locked {
+		t.Fatal("並行Bearer試行がロックされなかった")
+	}
+	r := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"password":"pw"}`))
+	w := httptest.NewRecorder()
+	s.handleLogin(w, r)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("login status=%d", w.Code)
+	}
+	r = httptest.NewRequest(http.MethodGet, "/status", nil)
+	r.Header.Set("Authorization", "Bearer pw")
+	w = httptest.NewRecorder()
+	h(w, r)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("bearer status=%d", w.Code)
+	}
+	r.AddCookie(&http.Cookie{Name: sessionCookie, Value: a.issueToken()})
+	w = httptest.NewRecorder()
+	h(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("既存Cookieまでロックされた: %d", w.Code)
 	}
 }
 

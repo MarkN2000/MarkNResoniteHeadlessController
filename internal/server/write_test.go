@@ -24,6 +24,27 @@ func postJSON(t *testing.T, url, pw, body string) (int, okEnv[map[string]any]) {
 	return resp.StatusCode, env
 }
 
+func TestServer_Write_MissingSessionDoesNotChangeFocusedWorld(t *testing.T) {
+	ts, pw := newTestServer(t)
+	code, env := postJSON(t, ts.URL+"/api/v1/sessions/999/name", pw, `{"name":"Wrong target"}`)
+	if code == http.StatusOK || env.OK {
+		t.Fatal("存在しないセッションへの変更が成功した")
+	}
+	var list okEnv[[]headless.World]
+	authGet(t, ts.URL+"/api/v1/sessions", pw, &list)
+	if len(list.Data) != 2 || list.Data[0].Name != "Fake World 0" || list.Data[1].Name != "Fake World 1" {
+		t.Fatalf("別セッションが変更された: %+v", list.Data)
+	}
+	code, env = postJSON(t, ts.URL+"/api/v1/sessions/1/name", pw, `{"name":"Right target"}`)
+	if code != http.StatusOK || !env.OK {
+		t.Fatalf("有効セッションの変更が失敗: %d %+v", code, env)
+	}
+	authGet(t, ts.URL+"/api/v1/sessions", pw, &list)
+	if list.Data[0].Name != "Fake World 0" || list.Data[1].Name != "Right target" {
+		t.Fatalf("対象が不整合: %+v", list.Data)
+	}
+}
+
 // 正常系: kick が executed=true を返し、再取得した users から対象が消える（状態反映）。
 func TestServer_Write_Kick_RemovesUser(t *testing.T) {
 	ts, pw := newTestServer(t)

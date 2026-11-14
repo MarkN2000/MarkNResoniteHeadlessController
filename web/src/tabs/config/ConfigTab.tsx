@@ -80,9 +80,10 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   };
 
   const load = async (name: string) => {
-    importRequest.current++;
+    const request = ++importRequest.current;
     setLoading(true);
     const m = await api.getConfig(name);
+    if (request !== importRequest.current) return;
     setLoading(false);
     if (!m) {
       notifyError(t("config.loadFailed"));
@@ -152,11 +153,13 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
     if (!isValidName(name)) return;
     const from = selected !== null && selected !== name ? selected : undefined;
     const persist = async () => {
+      const request = importRequest.current;
       const r = await api.saveConfig(name, body, from);
       if (r.ok) {
+        if (from !== undefined) setSelected((current) => current === from ? name : current);
         await refreshList();
         // backend が旧 forcePort を新形式へ正規化するため、保存結果を再読込して表示と dirty 判定を揃える。
-        await load(name);
+        if (request === importRequest.current) await load(name);
       }
       return r;
     };
@@ -177,11 +180,12 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
   const createAndLoad = (create: () => Promise<api.WriteResult>, successMsg: string) =>
     guardDiscard(() => {
       void apply.run(async () => {
+        const request = importRequest.current;
         const r = await create();
         const name = (r.data as { name?: string } | undefined)?.name;
         if (r.ok && name) {
           await refreshList();
-          await load(name);
+          if (request === importRequest.current) await load(name);
         }
         return r;
       }, successMsg);
@@ -205,10 +209,11 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
       danger: true,
       success: t("config.toastDeleted"),
       onConfirm: async () => {
+        const request = importRequest.current;
         const r = await api.deleteConfig(name);
         if (r.ok) {
           const l = await refreshList();
-          if (name === selected) selectFirst(l);
+          if (name === selected && request === importRequest.current) selectFirst(l);
         }
         return r;
       },
@@ -238,7 +243,7 @@ export function ConfigTab({ onConfigsChanged }: { onConfigsChanged: () => void }
               <ConfigEditor
                 key={formNonce}
                 draftName={draftName}
-                onDraftNameChange={setDraftName}
+                onDraftNameChange={(name) => { importRequest.current++; setDraftName(name); }}
                 nameError={nameError}
                 portsError={portsValid ? undefined : t("config.udpPortDuplicateSummary")}
                 cfg={cfg}

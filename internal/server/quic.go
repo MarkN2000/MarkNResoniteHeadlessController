@@ -113,51 +113,6 @@ func normalizePublicIPv4(value string) (string, bool) {
 	return value, true
 }
 
-// atomicWriteJSON は同一ディレクトリの一時ファイルを完全に書いてから置き換える。
-// 既存ファイルがあればパーミッションを維持し、新規は秘密を含み得るため 0600 とする。
-func atomicWriteJSON(path string, m map[string]any) error {
-	b, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	mode := os.FileMode(0o600)
-	if info, statErr := os.Stat(path); statErr == nil {
-		mode = info.Mode().Perm()
-	} else if !os.IsNotExist(statErr) {
-		return statErr
-	}
-
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".quic-config-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	keep := false
-	defer func() {
-		_ = tmp.Close()
-		if !keep {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if err := tmp.Chmod(mode); err != nil {
-		return err
-	}
-	if _, err := tmp.Write(b); err != nil {
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return err
-	}
-	keep = true
-	return nil
-}
-
 func writeQUICConfigError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, os.ErrNotExist):
@@ -251,7 +206,7 @@ func (s *Server) handleQUICConfigPut(w http.ResponseWriter, r *http.Request) {
 		q["publicIP"] = publicIP
 	}
 
-	if err := atomicWriteJSON(path, m); err != nil {
+	if err := writeJSONFile(path, m); err != nil {
 		writeQUICConfigError(w, err)
 		return
 	}

@@ -396,3 +396,65 @@ func TestIntegration_Exec_NotReadyAfterStop(t *testing.T) {
 		t.Fatalf("expected ErrNotReady, got %v", err)
 	}
 }
+
+type blockedStopWriter struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (w *blockedStopWriter) Write(p []byte) (int, error) {
+	close(w.started)
+	<-w.release
+	return len(p), nil
+}
+func (w *blockedStopWriter) Close() error { return nil }
+
+func TestIntegration_StopKillsWhileShutdownWriteBlocked(t *testing.T) {
+	d := newFakeDriver(t)
+	w := &blockedStopWriter{started: make(chan struct{}), release: make(chan struct{})}
+	t.Cleanup(func() { close(w.release) })
+	d.mu.Lock()
+	d.stdin = w
+	d.mu.Unlock()
+	returned := make(chan error, 1)
+	go func() { returned <- d.stop(50 * time.Millisecond) }()
+	select {
+	case err := <-returned:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("停止受付が stdin の書き込みを待っている")
+	}
+	select {
+	case <-w.started:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown が送信されていない")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if d.Status().State == StateStopped {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("stdin が詰まると強制終了できない")
+}
+
+func TestIntegration_ExecCanceledBeforeSend(t *testing.T) {
+	d := newFakeDriver(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := d.Exec(ctx, `name "CanceledMutation"`); !errors.Is(err, ErrCanceled) {
+		t.Fatalf("expected ErrCanceled, got %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	lines, err := d.Exec(context.Background(), "worlds")
+	if err != nil {
+		t.Fatal(err)
+	}
+	worlds := ParseWorlds(lines)
+	if len(worlds) == 0 || worlds[0].Name != "Fake World 0" {
+		t.Fatalf("キャンセル済みコマンドが実行された: %+v", worlds)
+	}
+}

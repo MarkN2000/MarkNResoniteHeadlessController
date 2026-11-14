@@ -110,6 +110,40 @@ func TestConfigs_PutGetMask(t *testing.T) {
 	}
 }
 
+func TestConfigs_NullRejected(t *testing.T) {
+	ts, pw, dir := newConfigServer(t)
+	const original = `{"comment":"keep","loginPassword":"secret"}`
+	resp := authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/world", pw, "application/json", original)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("initial save: %d", resp.StatusCode)
+	}
+	path := filepath.Join(dir, "world.json")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, endpoint := range []string{"world", "renamed?from=world"} {
+		resp = authReq(t, http.MethodPut, ts.URL+"/api/v1/headless-configs/"+endpoint, pw, "application/json", "null")
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("null save %s: %d", endpoint, resp.StatusCode)
+		}
+	}
+	if after, err := os.ReadFile(path); err != nil || string(after) != string(before) {
+		t.Fatalf("invalid save changed existing config: %s, %v", after, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "renamed.json")); !os.IsNotExist(err) {
+		t.Fatalf("invalid rename created destination: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("null"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code := authGet(t, ts.URL+"/api/v1/headless-configs/world", pw, nil); code != http.StatusBadRequest {
+		t.Fatalf("null config on disk: %d", code)
+	}
+}
+
 func TestConfigs_List_SaveAs_Delete(t *testing.T) {
 	ts, pw, _ := newConfigServer(t)
 	put := func(name, body string) {
