@@ -176,6 +176,62 @@ func TestRMLPairAndGlobalSwitch(t *testing.T) {
 	}
 }
 
+func TestChangedRMLDeployment(t *testing.T) {
+	s, _ := mustStore(t)
+	rml := put(t, s, "ResoniteModLoader.dll", 1)
+	harmony := put(t, s, "0Harmony.dll", 2)
+	st := State{Entries: []Entry{{ID: "rml", Enabled: true, Current: Version{Files: []File{rml, harmony}}}}}
+	changed := testDLL(9)
+	writeChanged := func() {
+		t.Helper()
+		if err := s.write(loaderPath, changed); err != nil {
+			t.Fatal(err)
+		}
+	}
+	checkFile := func(path string, want []byte) {
+		t.Helper()
+		b, err := s.read(path)
+		if err != nil || !bytes.Equal(b, want) {
+			t.Fatalf("%s: unexpected contents (%v)", path, err)
+		}
+	}
+	writeChanged()
+	if err := s.Commit(State{}, st); !errors.Is(err, ErrConflict) {
+		t.Fatal("unmanaged loader should block installation", err)
+	}
+	checkFile(loaderPath, changed)
+	if err := s.root.Remove(loaderPath); err != nil {
+		t.Fatal(err)
+	}
+	commit(t, s, State{}, st)
+	writeChanged()
+	if args, err := s.LaunchArgs(); err != nil || len(args) != 2 {
+		t.Fatal(args, err)
+	}
+	checkFile(loaderPath, changed)
+	next := load(t, s)
+	next.Find("rml").Enabled = false
+	commit(t, s, st, next)
+	if args, err := s.LaunchArgs(); err != nil || len(args) != 0 {
+		t.Fatal(args, err)
+	}
+	checkFile(loaderPath, changed)
+	updated := load(t, s)
+	updated.Find("rml").Previous = &next.Find("rml").Current
+	updated.Find("rml").Current.Files[0] = put(t, s, "ResoniteModLoader.dll", 3)
+	commit(t, s, next, updated)
+	checkFile(loaderPath, testDLL(3))
+	writeChanged()
+	commit(t, s, updated, st)
+	checkFile(loaderPath, testDLL(1))
+	if err := s.write("rml_libs/0Harmony.dll", changed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LaunchArgs(); !errors.Is(err, ErrConflict) {
+		t.Fatal("modified Harmony should block launch", err)
+	}
+}
+
 func TestUnmanagedAndDamagedFilesArePreserved(t *testing.T) {
 	s, _ := mustStore(t)
 	if err := s.write("rml_mods/Other.dll", []byte("manual")); err != nil {

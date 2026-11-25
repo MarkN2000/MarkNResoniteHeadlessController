@@ -21,6 +21,7 @@ import (
 
 const MaxDLL = 32 << 20
 const storeDir = ".mrhc-mods"
+const loaderPath = "Libraries/ResoniteModLoader.dll"
 const OfficialRepo = "resonite-modding-group/ResoniteModLoader"
 
 var (
@@ -275,7 +276,7 @@ func deployed(st State) map[string]string {
 	m := map[string]string{}
 	for _, e := range st.Entries {
 		if e.ID == "rml" {
-			m["Libraries/ResoniteModLoader.dll"] = e.Current.Files[0].Hash
+			m[loaderPath] = e.Current.Files[0].Hash
 			m["rml_libs/0Harmony.dll"] = e.Current.Files[1].Hash
 		} else if e.Enabled {
 			m["rml_mods/"+e.Current.Files[0].Name] = e.Current.Files[0].Hash
@@ -365,6 +366,10 @@ func (s *Store) inspect(old, next map[string]string, recovery bool) error {
 		if err != nil {
 			return err
 		}
+		// 登録済みRMLはResoniteが起動時に加工するため、配置後の内容は原本と比較しない。
+		if p == loaderPath && old[p] != "" {
+			continue
+		}
 		h := digest(b)
 		if h == old[p] || (recovery && h == next[p]) {
 			continue
@@ -378,7 +383,7 @@ func (s *Store) applyFiles(from, to map[string]string) error {
 	for p, hash := range to {
 		// ON/OFFや別Modの追加で、変化のないDLLを再配置しない。
 		// アップロード元として開かれた既存DLLの置換はWindowsでは失敗する。
-		if current, err := s.read(p); err == nil && digest(current) == hash {
+		if current, err := s.read(p); err == nil && ((p == loaderPath && from[p] == hash) || digest(current) == hash) {
 			continue
 		}
 		b, err := s.read(storeDir + "/blobs/" + hash + ".dll")
@@ -531,7 +536,7 @@ func (s *Store) LaunchArgs() ([]string, error) {
 		return nil, err
 	}
 	if e := st.Find("rml"); e != nil && e.Enabled {
-		return []string{"-LoadAssembly", "Libraries/ResoniteModLoader.dll"}, nil
+		return []string{"-LoadAssembly", loaderPath}, nil
 	}
 	return nil, nil
 }
